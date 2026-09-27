@@ -39,7 +39,7 @@
   <FolderPicker v-if="store.modal?.type === 'folder'" v-bind="store.modal.props" />
   <Menu v-if="store.modal?.type === 'menu'" v-bind="store.modal.props" />
 
-  <div class="toasts">
+  <div class="toasts" :class="{ shifted: store.quickMenu }">
     <div v-for="t in store.toasts" :key="t.id" class="toast" :class="t.kind"><span class="ti"><Icon :name="t.icon" :size="18" /></span>{{ t.msg }}</div>
   </div>
 </template>

@@ -1,8 +1,11 @@
 name: Release
 
+# Bumping "version" in package.json on main builds the AppImage and publishes
+# it as release v<version>. Installed copies of Cartridge pick it up on their own.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths: ['package.json']
   workflow_dispatch:
 
 permissions:

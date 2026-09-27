@@ -150,6 +150,7 @@ img { -webkit-user-drag: none; }
 .toast .ti { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: rgba(139, 116, 232, 0.25); color: #cfc4ff; flex: none; }
 .toast.ok .ti { background: rgba(63, 185, 80, 0.2); color: var(--green-l); }
 .toast.error .ti { background: rgba(255, 107, 97, 0.18); color: #ffa39c; }
+.toasts.shifted { right: 430px; }
 @keyframes toastIn { from { transform: translateX(30px); opacity: 0; } }
 
 .scrim { position: fixed; inset: 0; background: rgba(3, 4, 7, 0.66); backdrop-filter: blur(10px); display: grid; place-items: center; z-index: 50; animation: fade 0.2s; }
