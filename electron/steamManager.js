@@ -83,7 +83,7 @@ function readShortcuts(acc) {
       const extra = toks.slice(1).map((t) => t.raw).join(' ');
       lo = /%command%/.test(lo) ? lo.replace('%command%', `%command% ${extra}`) : `%command% ${extra}${lo ? ' ' + lo : ''}`;
     }
-    return { appid: (e.appid ?? 0) >>> 0, name: e.AppName || e.appname || '', exe, exeRaw, start: unq(e.StartDir || ''), lo, last: e.LastPlayTime || 0 };
+    return { appid: (e.appid ?? 0) >>> 0, name: e.AppName || e.appname || '', exe, exeRaw, start: unq(e.StartDir || ''), lo, loRaw: e.LaunchOptions || '', last: e.LastPlayTime || 0 };
   });
 }
 // Collections the user made (dynamic, filter-based ones can't hold chosen games)
@@ -537,7 +537,9 @@ module.exports = function createSteamManager(ctx) {
       // a game that can't be added yet (Vita: not installed in Vita3K) says why
       const t = sc || !g.file ? null : (tFor[g.key] !== undefined ? tFor[g.key] : (tFor[g.key] = templateFor(g.key)));
       const blocked = t?.kind === 'vitaid' ? gameRef(g.rom, g.file, t).missing || null : null;
-      return { romId: g.rom.id, name: g.rom.name, console: g.key, platform: g.platform.display_name, inSteam: !!sc, ours: !!ours, appid: sc?.appid || null, queued, file: g.file, blocked };
+      // ours with arguments in Target but "%command%" in Launch options (Steam's own default): won't start
+      const badLo = !!(ours && !ours.loFixed && sc.exeRaw && tokenize(sc.exeRaw).length > 1 && /^\s*%command%\s*$/.test(sc.loRaw || ''));
+      return { romId: g.rom.id, name: g.rom.name, console: g.key, platform: g.platform.display_name, inSteam: !!sc, ours: !!ours, appid: sc?.appid || null, queued, file: g.file, blocked, badLo };
     });
     const keys = [...new Set(games.map((g) => g.console))];
     const consoles = keys.map((k) => {
@@ -549,7 +551,7 @@ module.exports = function createSteamManager(ctx) {
         // installed emulators to pick from, and which one new shortcuts use
         emus: [...(learned[k] ? [{ id: 'learned', label: 'From your Steam shortcuts', sub: learned[k].from }] : []), ...candidates(k).map((c) => ({ id: c.id, label: c.label, sub: c.t.from }))],
         emu: t?.how === 'yours' ? 'yours' : t?.emu || null,
-        outdated: t ? ps.filter((g) => g.inSteam && g.ours && reg[g.appid]?.sig !== sigOf(t, (cfg().modes || {})[k])).length : 0 };
+        outdated: t ? ps.filter((g) => g.inSteam && g.ours && (g.badLo || reg[g.appid]?.sig !== sigOf(t, (cfg().modes || {})[k]))).length : 0 };
     }).sort((a, b) => a.platform.localeCompare(b.platform));
     return {
       steam: env.installed ? (env.account ? { account: env.account.name, accounts: env.accounts.map((a) => a.name), running: env.running, flatpak: env.account.flatpak } : { error: 'Steam is installed but no account has signed in yet. Open Steam once, then come back.' }) : { error: 'Steam was not found on this device.' },
@@ -908,8 +910,20 @@ module.exports = function createSteamManager(ctx) {
     // pick the emulator new shortcuts use for a console (clears a hand-edited setup for it)
     setEmu: (key, id) => { const c = cfg(); c.emus ||= {}; if (id) c.emus[key] = id; else delete c.emus[key]; if (c.templates?.[key]) delete c.templates[key]; ctx.saveConfig(); return true; },
     // re-add this console's games Cartridge put in Steam, so they use the current emulator setup
-    refresh: (key) => {
-      const games = overview().games.filter((g) => g.console === key && g.inSteam && g.ours && g.file && g.appid);
+    refresh: async (key) => {
+      const t = templateFor(key), sig = sigOf(t, (cfg().modes || {})[key]);
+      let games = overview().games.filter((g) => g.console === key && g.inSteam && g.ours && g.file && g.appid && (g.badLo || reg[g.appid]?.sig !== sig));
+      // only "%command%" left in Launch options and the setup is current: clear it in place (keeps play time)
+      const env = environment();
+      const fixable = games.filter((g) => g.badLo && reg[g.appid]?.sig === sig);
+      if (fixable.length && env.account && await live.available(env.account.root)) {
+        const scs = readShortcuts(env.account);
+        let fixed = 0;
+        for (const g of fixable) { const sc = scs.find((x) => x.appid === g.appid); if (sc && (await live.settle(g.appid, sc.exeRaw, '')) === 'ok') { reg[g.appid].loFixed = Date.now(); fixed++; } }
+        saveReg();
+        games = games.filter((g) => !reg[g.appid]?.loFixed); // anything not fixed in place is re-added
+        if (!games.length) return { count: fixed, fixed };
+      }
       if (!games.length) return { count: 0 };
       queueAdd(games.map((g) => ({ romId: g.romId, collections: reg[g.appid]?.collections || [] })));
       queueRemove(games.map((g) => g.appid)); // after queueAdd, which drops pending removals of the same game

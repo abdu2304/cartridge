@@ -126,6 +126,7 @@ async function pickEmu() {
 async function refresh() {
   const r = await call('steam:refresh', { key: props.ckey }).catch((e) => { toast(e.message, 'error'); return null; });
   if (!r?.count) return;
+  if (r.fixed === r.count) { toast(`Fixed ${r.fixed} shortcut${r.fixed === 1 ? '' : 's'} in Steam`, 'ok', 2500, 'mdiCheck'); return load(); }
   steam.queue = await call('steam:overview').then((o) => o.queue).catch(() => steam.queue);
   await apply();
 }

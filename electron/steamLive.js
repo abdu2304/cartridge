@@ -57,6 +57,7 @@ module.exports = function steamLive({ log = () => {} } = {}) {
       return id;
     })()`);
     if (!appid) throw new Error('Steam did not create the shortcut');
+    await settle(appid, exe, lo);
     if (proton) await run(`SteamClient.Apps.SpecifyCompatTool(${appid}, ${J(proton)})`).catch((e) => log('steam live proton', e.message));
     for (const [suffix, type] of ASSETS) {
       const f = art && path.join(art.dir, `${art.id}${suffix}.png`);
@@ -98,8 +99,30 @@ module.exports = function steamLive({ log = () => {} } = {}) {
       return true;
     })()`);
   }
+  // Steam can fill in "%command%" on a new shortcut after we set empty Launch options, and with the
+  // arguments in Target that stops the game starting. Read back what Steam kept and set it again
+  // until it sticks. Also used to repair shortcuts that already have it.
+  async function settle(appid, exe, lo) {
+    return run(`(async () => {
+      const id = ${appid >>> 0}, want = ${J(lo)}, exe = ${J(exe)};
+      const read = () => new Promise((res) => {
+        let reg = null; const t = setTimeout(() => { try { reg?.unregister(); } catch {} res(window.appDetailsStore?.GetAppDetails?.(id) || null); }, 1500);
+        try { reg = SteamClient.Apps.RegisterForAppDetails(id, (d) => { clearTimeout(t); try { reg?.unregister(); } catch {} res(d); }); } catch { clearTimeout(t); res(window.appDetailsStore?.GetAppDetails?.(id) || null); }
+      });
+      for (let i = 0; i < 6; i++) {
+        await new Promise((r) => setTimeout(r, 400));
+        const d = await read();
+        const got = d ? (d.strShortcutLaunchOptions ?? d.strLaunchOptions) : undefined;
+        if (got === undefined) { SteamClient.Apps.SetShortcutLaunchOptions(id, want); return 'unknown'; }
+        if (got === want && (d.strShortcutExe === undefined || d.strShortcutExe === exe)) return 'ok';
+        if (d.strShortcutExe !== undefined && d.strShortcutExe !== exe) SteamClient.Apps.SetShortcutExe(id, exe);
+        SteamClient.Apps.SetShortcutLaunchOptions(id, want);
+      }
+      return 'retried';
+    })()`, 20000).then((r) => { if (r !== 'ok') log('steam live launch options', appid >>> 0, r); return r; }).catch((e) => log('steam live settle', e.message));
+  }
   const removeShortcut = (appid) => run(`SteamClient.Apps.RemoveShortcut(${appid >>> 0}), true`);
   // What SteamGridDB's Decky plugin does after changing artwork
   const restart = () => run('SteamClient.User.StartRestart(false), true', 5000);
-  return { available, addShortcut, removeShortcut, restart, flagOn, FLAG };
+  return { available, addShortcut, removeShortcut, settle, restart, flagOn, FLAG };
 };

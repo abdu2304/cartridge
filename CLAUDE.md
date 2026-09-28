@@ -106,5 +106,9 @@ LT/RT switch top tabs. LB/RB only switch sections inside a page. A select, B bac
 - Vita: `vita3k` kind `vitaid`: `-F -r <title ID>` only when `ux0/app/<id>` exists (Vita3K pref path); otherwise `missing`, shown as `blocked` in the overview and skipped in `plan()`.
 - `src/views/SteamMissing.vue` (route `steam-missing`) replaces "Add N missing". Gallery toolbar: Show/Sort menus, More (Surprise me, Select, Get all); series header uses a game cover (`headArt`).
 
+## 0.7.12
+- Real Steam put "%command%" into a live-added shortcut's empty Launch options, which broke launching (args are in Target). `steamLive.settle()` reads the shortcut back (`RegisterForAppDetails`, `strShortcutLaunchOptions`) and sets it again until it sticks. Overview `badLo` (ours, args in Exe, Launch options exactly `%command%`) counts as outdated; `steam:refresh` clears it in place (`reg[id].loFixed`), else re-adds.
+- Smoothness (measured without the GPU): scroll containers `will-change: scroll-position` (`.view`, `.shelf`, `.shelves`, `.menu-list`, `[data-scroll]`, `[data-hscroll]`), so scrolling doesn't repaint the one full-screen `.shell` layer. The vignette is painted as `.shell`'s background (`body:has(.xmb-vignette)`), one full-screen layer fewer. Light effects draw the canvas at full size below 4K (stretching it cost the software compositor more). Light effects animate only the card lift, not the shadow.
+
 ## Releases (full steps: HANDOFF D8)
 Only when the owner asks. Bump `version` and `build.releaseInfo.releaseName` ("Cartridge X.Y.Z") in `package.json`, put only this version's notes in `RELEASE_NOTES.md` (heading `## Cartridge X.Y.Z · Title`), add them to the top of `CHANGELOG.md`, grouped as New / Changed / Fixed with bold lead-ins. CI builds, launch-checks and publishes.

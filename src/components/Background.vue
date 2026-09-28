@@ -4,6 +4,7 @@
       <div class="xmb-grad" />
       <div v-if="DARK_BASE.has(mode)" class="bg-darken" />
       <canvas v-if="RENDERERS[mode]" ref="cv" class="xmb-waves" />
+      <!-- the interface paints this itself once it's up (see .shell below): one full-screen layer fewer -->
       <div class="xmb-vignette" />
     </template>
     <template v-else-if="mode === 'wallpaper'">
@@ -36,13 +37,15 @@ watch(light, (v) => document.body.classList.toggle('light-fx', v), { immediate: 
 
 // ---------- animated canvas backgrounds
 // Drawn at full sharpness with the GPU. Without it (software rendering) they draw at a lower
-// resolution and frame rate so the rest of the interface stays smooth.
+// frame rate so the rest of the interface stays smooth. Not at a lower resolution below 4K:
+// stretching a smaller canvas to the screen on every frame costs the software compositor more
+// than drawing it full size (measured: about 30% of each frame while moving around).
 const cv = ref(null);
 let raf = 0, last = 0, ctx = null, frame = null, key = '';
 const t0 = performance.now();
 function scale() {
   const dpr = window.devicePixelRatio || 1;
-  if (light.value) return innerWidth * dpr > 2600 ? 0.5 : 0.75;
+  if (light.value) return innerWidth * dpr > 2600 ? 0.5 : 1;
   return Math.min(dpr, 2);
 }
 function setup() {
@@ -112,6 +115,11 @@ watch(() => [store.bg?.src, mode.value], () => {
 .xmb-waves { position: absolute; inset: 0; width: 100%; height: 100%; }
 .xmb-vignette { position: absolute; inset: 0; background: radial-gradient(120% 100% at 50% 40%, transparent 55%, rgba(var(--tint-rgb), 0.5) 100%), linear-gradient(0deg, rgba(var(--tint-rgb), 0.5), transparent 35%); }
 .surface-oled .xmb-vignette { background: radial-gradient(120% 100% at 50% 40%, transparent 45%, rgba(0, 0, 0, 0.85) 100%), linear-gradient(0deg, #000 2%, transparent 45%); }
+/* same vignette, painted as the interface's background: without the GPU every full-screen layer is
+   blended again on each frame, so this saves one while moving around */
+body:has(.xmb-vignette) .shell { background: radial-gradient(120% 100% at 50% 40%, transparent 55%, rgba(var(--tint-rgb), 0.5) 100%), linear-gradient(0deg, rgba(var(--tint-rgb), 0.5), transparent 35%); }
+body.surface-oled:has(.xmb-vignette) .shell { background: radial-gradient(120% 100% at 50% 40%, transparent 45%, rgba(0, 0, 0, 0.85) 100%), linear-gradient(0deg, #000 2%, transparent 45%); }
+body:has(.shell) .xmb-vignette { display: none; }
 .bg-stage .layer.wall { inset: 0; transform: none; filter: none; }
 .wall-dim { position: absolute; inset: 0; background: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.6) 50%, rgba(0, 0, 0, 0.35) 100%); }
 </style>
