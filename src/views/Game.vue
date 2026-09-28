@@ -19,13 +19,20 @@
             <span v-if="fav" class="chip primary"><Icon name="mdiHeart" :size="14" />Favourite</span>
             <span v-if="statusText" class="chip"><Icon name="mdiProgressCheck" :size="14" />{{ statusText }}</span>
             <span v-if="cached?.user?.hidden" class="chip"><Icon name="mdiEyeOffOutline" :size="14" />Hidden</span>
+            <span v-if="play" class="chip" :title="play.src ? 'From ' + play.src : ''"><Icon name="mdiClockOutline" :size="14" />{{ play.min ? playtimeText(play.min) + ' played' : 'Played' }}<template v-if="play.last"> · {{ ago(play.last) }}</template></span>
           </div>
 
-          <div v-if="beat" class="beat">
-            <Icon name="mdiTimerOutline" :size="17" /><span class="beat-l">How long to beat</span>
-            <span v-if="beat.main"><b>{{ beat.main }} h</b>Main story</span>
-            <span v-if="beat.extra"><b>{{ beat.extra }} h</b>Main + extras</span>
-            <span v-if="beat.full"><b>{{ beat.full }} h</b>Completionist</span>
+          <!-- HowLongToBeat: its logo comes from your RomM server (RomM ships it), so none is kept here -->
+          <div v-if="beat" class="beat glass">
+            <div class="beat-brand">
+              <img v-if="!hltbLogoFail" :src="img('/assets/scrappers/hltb.png')" alt="HowLongToBeat" @error="hltbLogoFail = true" />
+              <span v-else class="beat-word">HowLong<b>ToBeat</b></span>
+            </div>
+            <div v-for="t in beatRows" :key="t.k" class="beat-t">
+              <b>{{ t.h }}<small>h</small></b>
+              <span>{{ t.l }}</span>
+              <i><em :style="{ width: t.w + '%' }" /></i>
+            </div>
           </div>
 
           <div class="g-actions">
@@ -140,7 +147,7 @@
 <script setup>
 import { addGame, removeGame, applyChanges } from '../steam.js';
 import { computed, onMounted, ref, nextTick, watch } from 'vue';
-import { store, call, img, go, cover, bytes, year, rating, toast, confirm, download, downloadFor, romById, platformById, isNew, setBg, logoOf, resetLogos, artFor, choose, openModal, allRoms, visible, isFavourite, addToCollection } from '../store.js';
+import { store, call, img, go, cover, bytes, year, rating, toast, confirm, download, downloadFor, romById, platformById, isNew, setBg, logoOf, resetLogos, artFor, choose, openModal, allRoms, visible, isFavourite, addToCollection, playOf, playtimeText, ago, loadPlay, askText, saveConfig } from '../store.js';
 import { useView } from '../useView.js';
 import { ensureFocus, focusFirst } from '../nav.js';
 import Icon from '../components/Icon.vue';
@@ -280,6 +287,105 @@ const beat = computed(() => {
   const fromRomm = h && (h.main_story || h.main_plus_extra || h.completionist) ? { main: halfHours(h.main_story), extra: halfHours(h.main_plus_extra), full: halfHours(h.completionist) } : null;
   return fromRomm || hltbLive.value;
 });
+const hltbLogoFail = ref(false);
+const play = computed(() => playOf(Number(props.romId)));
+
+// ---------------- 0.8: timeline, edit details, theme from this game
+async function openTimeline() {
+  const id = Number(props.romId);
+  const t = await call('rom:timeline', { romId: id }).catch(() => ({}));
+  const ev = [];
+  const add = (time, icon, label, sub) => { if (time && time > 0) ev.push({ t: time, icon, label, sub }); };
+  add(t.created, 'mdiServerOutline', 'Added to RomM');
+  if (t.firstSeen && Math.abs(t.firstSeen - (t.created || 0)) > 36e5) add(t.firstSeen, 'mdiSync', 'First synced to Cartridge');
+  add(t.downloaded, 'mdiDownloadOutline', 'Downloaded', bytes(base.value.fs_size_bytes));
+  add(t.steam, 'mdiSteam', 'Added to Steam');
+  const unlocks = [
+    ...(tro.value?.trophies || []).filter((x) => x.unlocked && x.time).map((x) => ({ t: x.time, n: x.name })),
+    ...(ra.value?.achievements || []).filter((x) => x.earned || x.earnedHc).map((x) => ({ t: Date.parse(String(x.earnedHc || x.earned).replace(' ', 'T') + 'Z') || 0, n: x.title })),
+  ].filter((x) => x.t).sort((a, b) => a.t - b.t);
+  if (unlocks.length) add(unlocks[0].t, 'mdiTrophyOutline', 'First trophy', unlocks[0].n);
+  if (unlocks.length > 1) add(unlocks[unlocks.length - 1].t, 'mdiTrophyOutline', 'Latest trophy', unlocks[unlocks.length - 1].n);
+  const p = t.play || play.value;
+  if (p?.last) add(p.last, 'mdiPlayOutline', 'Last played', p.min ? `${playtimeText(p.min)} in total${p.src ? ' · from ' + p.src : ''}` : '');
+  ev.sort((a, b) => a.t - b.t);
+  const got = (tro.value?.trophies || []).filter((x) => x.unlocked).length + (ra.value?.earned || 0);
+  const all = (tro.value?.trophies || []).length + (ra.value?.total || 0);
+  const stats = [
+    { l: 'Played', v: p?.min ? playtimeText(p.min) : 'None yet' },
+    ...(all ? [{ l: 'Trophies', v: `${got} / ${all}` }] : []),
+    ...(statusText.value ? [{ l: 'Status', v: statusText.value }] : []),
+  ];
+  await openModal('timeline', { name: base.value.name, cover: coverSrc.value, stats, events: ev });
+}
+// Edit what RomM knows about the game, one field at a time (controller friendly), then save
+async function editDetails() {
+  const draft = { name: base.value.name, summary: detail.value?.summary ?? base.value.summary ?? '', cover: '' };
+  const mine = artFor(props.romId)?.grid || '';
+  for (;;) {
+    const v = await choose({ title: 'Edit details', message: 'Saved to RomM, for every device', options: [
+      { label: 'Name', sub: draft.name, value: 'name', icon: 'mdiFormatTitle' },
+      { label: 'Description', sub: (draft.summary || 'None').slice(0, 90) + (draft.summary.length > 90 ? '…' : ''), value: 'summary', icon: 'mdiTextBoxOutline' },
+      ...(mine ? [{ label: draft.cover ? 'Cover: your SteamGridDB cover' : 'Cover: keep RomM\'s', sub: draft.cover ? 'Press to keep RomM\'s instead' : 'Press to use the cover you picked here', value: 'cover', icon: 'mdiImageOutline' }] : []),
+      { label: 'Save to RomM', value: 'save', icon: 'mdiContentSave', primary: true },
+      { label: 'Cancel', value: 'cancel', icon: 'mdiClose' },
+    ] });
+    if (!v || v === 'cancel') return;
+    if (v === 'name') { const n = await askText({ title: 'Name', value: draft.name, mode: 'game' }); if (n && n.trim()) draft.name = n.trim(); }
+    if (v === 'summary') { const n = await askText({ title: 'Description', value: draft.summary }); if (n != null) draft.summary = n.trim(); }
+    if (v === 'cover') draft.cover = draft.cover ? '' : mine;
+    if (v === 'save') {
+      try {
+        await call('rom:edit', { romId: Number(props.romId), name: draft.name, summary: draft.summary, coverUrl: draft.cover || undefined });
+        detail.value = await call('api:get', { path: `/api/roms/${props.romId}` }).catch(() => detail.value);
+        toast('Saved to RomM', 'ok', 2400, 'mdiContentSave');
+      } catch (e) { toast(e.message, 'error', 7000); }
+      return;
+    }
+  }
+}
+// The cover's strongest colour (skipping greys, near black and near white) as a custom theme
+async function coverColour(src) {
+  const im = new Image(); im.crossOrigin = 'anonymous';
+  await new Promise((ok, bad) => { im.onload = ok; im.onerror = bad; im.src = src; });
+  const w = 48, h = Math.max(1, Math.round((im.naturalHeight / im.naturalWidth) * 48) || 72);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  const x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, w, h);
+  const d = x.getImageData(0, 0, w, h).data;
+  const bins = Array.from({ length: 24 }, () => ({ wt: 0, r: 0, g: 0, b: 0 }));
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i] / 255, g = d[i + 1] / 255, b = d[i + 2] / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, dd = mx - mn;
+    if (dd < 0.12 || l < 0.12 || l > 0.9) continue;
+    const sat = dd / (1 - Math.abs(2 * l - 1));
+    let hue = mx === r ? ((g - b) / dd) % 6 : mx === g ? (b - r) / dd + 2 : (r - g) / dd + 4;
+    hue = (hue * 60 + 360) % 360;
+    const bin = bins[Math.floor(hue / 15)], wt = sat * sat * (1 - Math.abs(l - 0.5));
+    bin.wt += wt; bin.r += d[i] * wt; bin.g += d[i + 1] * wt; bin.b += d[i + 2] * wt;
+  }
+  const best = bins.reduce((a, b) => (b.wt > a.wt ? b : a));
+  if (best.wt < 1) return null;
+  let [r, g, b] = [best.r / best.wt, best.g / best.wt, best.b / best.wt];
+  // keep it bright enough to read as an accent
+  const mx = Math.max(r, g, b); if (mx < 170) { const k = 170 / mx; r *= k; g *= k; b *= k; }
+  return '#' + [r, g, b].map((v) => Math.round(Math.min(255, v)).toString(16).padStart(2, '0')).join('');
+}
+async function themeFromGame() {
+  let hex = null;
+  try { hex = await coverColour(coverSrc.value); } catch {}
+  if (!hex) { toast("This cover has no strong colour to use", 'info', 3500); return; }
+  const ui = store.config.ui;
+  const keep = ui.gameTheme ? { theme: ui.gameTheme.theme, customColor: ui.gameTheme.customColor } : { theme: ui.theme, customColor: ui.customColor || '' };
+  await saveConfig({ ui: { theme: 'custom', customColor: hex, gameTheme: { ...keep, name: base.value.name } } });
+  toast(`Theme from ${base.value.name}. More → Back to your own theme undoes it.`, 'ok', 4500, 'mdiPaletteOutline');
+}
+// the three times with a bar each, against the longest
+const beatRows = computed(() => {
+  const b = beat.value; if (!b) return [];
+  const rows = [['main', 'Main story', b.main], ['extra', 'Main + extras', b.extra], ['full', 'Completionist', b.full]].filter((r) => r[2]);
+  const max = Math.max(...rows.map((r) => r[2]));
+  return rows.map(([k, l, h]) => ({ k, l, h: String(h).replace(/\.5$/, '½'), w: Math.max(6, Math.round((h / max) * 100)) }));
+});
 async function loadHltb() {
   if (beat.value || !base.value) return;
   const y = base.value.year ? new Date(base.value.year).getUTCFullYear() : null;
@@ -340,6 +446,10 @@ async function more() {
     { label: 'Add to a collection', sub: 'Yours in RomM, or a new one', value: 'col', icon: 'mdiBookmarkPlusOutline' },
     { label: u?.hidden ? 'Unhide game' : 'Hide game', sub: u?.hidden ? 'Show it in lists again' : 'Keep it out of Home, Library and Search', value: 'hide', icon: u?.hidden ? 'mdiEyeOutline' : 'mdiEyeOffOutline' },
     { label: 'Change metadata', sub: 'Cover, logo and background from SteamGridDB', value: 'art', icon: 'mdiImageEditOutline' },
+    { label: 'Edit details', sub: 'Name, description and cover, saved to RomM', value: 'edit', icon: 'mdiPencilOutline' },
+    { label: 'Timeline', sub: 'Added, downloaded, played, trophies', value: 'timeline', icon: 'mdiTimelineClockOutline' },
+    ...(coverSrc.value ? [{ label: 'Theme from this game', sub: 'Cartridge takes its colours from the cover', value: 'theme', icon: 'mdiPaletteOutline' }] : []),
+    ...(store.config.ui.gameTheme ? [{ label: 'Back to your own theme', sub: store.config.ui.gameTheme.name ? `Now using ${store.config.ui.gameTheme.name}` : '', value: 'untheme', icon: 'mdiUndoVariant' }] : []),
   ];
   if (folderSystem.value) {
     if (marked.value) opts.push({ label: 'Unmark as installed', sub: 'Only removes the mark, no files are touched', value: 'unmark', icon: 'mdiCheckboxBlankOffOutline' });
@@ -375,6 +485,10 @@ async function more() {
     return;
   }
   if (v === 'status') { await pickStatus(); return; }
+  if (v === 'timeline') { await openTimeline(); return; }
+  if (v === 'edit') { await editDetails(); return; }
+  if (v === 'theme') { await themeFromGame(); return; }
+  if (v === 'untheme') { const g = store.config.ui.gameTheme; await saveConfig({ ui: { theme: g.theme || 'purple', customColor: g.customColor || '', gameTheme: null } }); toast('Your own theme is back', 'ok', 2200, 'mdiUndoVariant'); return; }
   if (v === 'col') { await addToCollection([Number(props.romId)]); return; }
   if (v === 'hide') { await setUser({ hidden: !u?.hidden }, u?.hidden ? 'Shown in lists again' : 'Hidden from lists. Find it again with Library → Filters → Show hidden games.'); return; }
   if (v === 'steamadd') { await addGame({ ...base.value, id: Number(props.romId) }); return; }
@@ -445,10 +559,19 @@ onMounted(async () => {
 .shot { flex: none; width: 340px; aspect-ratio: 16/9; border-radius: 8px; overflow: hidden; background: #161a25; transition: transform 0.2s var(--ease), box-shadow 0.2s; }
 .shot img { width: 100%; height: 100%; object-fit: cover; }
 .shot:focus { transform: scale(1.04); }
-.beat { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; font-size: 13.5px; color: var(--muted); }
-.beat-l { margin-left: -10px; font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; }
-.beat span:not(.beat-l) { display: inline-flex; align-items: baseline; gap: 6px; }
-.beat b { color: var(--text); font-family: var(--display); font-size: 16px; font-weight: 600; }
+/* HowLongToBeat card: logo, then each time as a big number with a bar against the longest */
+.beat { display: flex; align-items: stretch; gap: 0; align-self: flex-start; padding: 12px 6px 12px 16px; border-radius: 14px; max-width: 100%; }
+.beat-brand { display: flex; align-items: center; padding-right: 16px; margin-right: 4px; border-right: 1px solid var(--line); }
+.beat-brand img { height: 30px; width: auto; max-width: 120px; object-fit: contain; }
+.beat-word { font-family: var(--display); font-size: 14px; font-weight: 600; letter-spacing: -0.01em; color: var(--text); }
+.beat-word b { color: #5aa5ff; font-weight: 700; }
+.beat-t { display: flex; flex-direction: column; justify-content: center; gap: 3px; min-width: 104px; padding: 0 14px; }
+.beat-t + .beat-t { border-left: 1px solid var(--line); }
+.beat-t b { font-family: var(--display); font-size: 22px; font-weight: 700; line-height: 1; color: var(--text); }
+.beat-t b small { font-size: 13px; font-weight: 600; margin-left: 2px; color: var(--muted); }
+.beat-t span { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.beat-t i { display: block; height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.08); overflow: hidden; margin-top: 3px; }
+.beat-t em { display: block; height: 100%; border-radius: 3px; background: linear-gradient(90deg, #3d8bff, #7fc0ff); }
 .rel { padding: 18px 20px 18px 56px; margin: -8px 0 0 -56px; scroll-padding: 0 56px; }
 .facts { width: 250px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; align-self: start; box-sizing: border-box; }
 .icon-btn span { font-size: 14px; }

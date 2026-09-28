@@ -59,6 +59,12 @@ module.exports = function steamLive({ log = () => {} } = {}) {
     if (!appid) throw new Error('Steam did not create the shortcut');
     await settle(appid, exe, lo);
     if (proton) await run(`SteamClient.Apps.SpecifyCompatTool(${appid}, ${J(proton)})`).catch((e) => log('steam live proton', e.message));
+    await setArtwork(appid, art);
+    if (collections?.length) await addToCollections(appid, collections).catch((e) => log('steam live collections', e.message));
+    return appid >>> 0;
+  }
+  // cover, background, logo, wide banner and icon for a shortcut: art = { dir, id } where files are <id>p.png etc.
+  async function setArtwork(appid, art) {
     for (const [suffix, type] of ASSETS) {
       const f = art && path.join(art.dir, `${art.id}${suffix}.png`);
       if (!f || !fs.existsSync(f)) continue;
@@ -79,8 +85,6 @@ module.exports = function steamLive({ log = () => {} } = {}) {
       const mine = path.join(art.dir, `${appid >>> 0}_icon.png`);
       try { if (mine !== icon) fs.copyFileSync(icon, mine); await run(`SteamClient.Apps.SetShortcutIcon(${appid}, ${J(mine)}), true`); } catch (e) { log('steam live icon', e.message); }
     }
-    if (collections?.length) await addToCollections(appid, collections).catch((e) => log('steam live collections', e.message));
-    return appid >>> 0;
   }
   // Steam's collection store lives in the same page (used by Decky plugins such as TabMaster)
   async function addToCollections(appid, names) {
@@ -124,5 +128,5 @@ module.exports = function steamLive({ log = () => {} } = {}) {
   const removeShortcut = (appid) => run(`SteamClient.Apps.RemoveShortcut(${appid >>> 0}), true`);
   // What SteamGridDB's Decky plugin does after changing artwork
   const restart = () => run('SteamClient.User.StartRestart(false), true', 5000);
-  return { available, addShortcut, removeShortcut, settle, restart, flagOn, FLAG };
+  return { available, addShortcut, removeShortcut, settle, setArtwork, restart, flagOn, FLAG };
 };

@@ -32,7 +32,18 @@ export const store = reactive({
   trophySync: { state: 'idle' },
   trophyScan: null,
   pops: [], // "Trophy unlocked" pop-ups
+  play: {}, // romId -> { min, last, src }: play time from Steam and RetroArch (0.8)
 });
+
+// ---------------- play time (Steam's own numbers for games in Steam, plus RetroArch's logs)
+export async function loadPlay() { try { store.play = (await call('play:stats')) || {}; } catch {} }
+export const playOf = (id) => store.play[id] || null;
+export function playtimeText(min) {
+  if (!min) return '';
+  if (min < 60) return `${min} min`;
+  const h = min / 60;
+  return `${h < 10 ? Math.round(h * 10) / 10 : Math.round(h)} h`;
+}
 
 // ---------------- routing
 export function go(name, params = {}) {
@@ -245,7 +256,8 @@ export function when(ms) {
   return new Date(ms).toLocaleDateString();
 }
 rd.on('library', (lib) => setLib(lib));
-rd.on('installed', (m) => { store.installed = m; });
+let playT = 0;
+rd.on('installed', (m) => { store.installed = m; clearTimeout(playT); playT = setTimeout(loadPlay, 800); }); // RetroArch times match installed files
 rd.on('sync', (s) => { store.sync = s; });
 rd.on('update', (u) => {
   if (u.state === 'ready' && store.update.state !== 'ready') toast(`Cartridge ${u.version} is ready. Restart from the Quick Menu to update.`, 'ok', 6000, 'mdiUpdate');

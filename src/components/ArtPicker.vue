@@ -56,7 +56,7 @@ async function load(gid) {
 async function searchOther() {
   // the text prompt replaces this modal, so reopen with the result
   const saved = store.modal;
-  const v = await askText({ title: 'Search SteamGridDB', value: query, placeholder: 'Game name' });
+  const v = await askText({ title: 'Search SteamGridDB', value: query, placeholder: 'Game name', mode: 'game' });
   store.modal = { ...saved, props: { ...saved.props, query: v && v.trim() ? v.trim() : query } };
 }
 

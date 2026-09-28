@@ -42,6 +42,10 @@
             <p class="muted small">“Scan server” asks RomM to look through its own folders for files you copied in, then resyncs. It needs username &amp; password sign-in.</p>
           </template>
 
+          <template v-else-if="sec === 'romm'">
+            <h1>RomM</h1>
+            <RommUpload />
+          </template>
           <template v-else-if="sec === 'storage'">
             <h1>Storage</h1>
             <div class="pathrow glass">
@@ -100,7 +104,7 @@
 
             <div class="subh"><Icon name="mdiPaletteOutline" :size="20" />Colour</div>
             <div class="swatches">
-              <button v-for="(t, k) in THEMES" :key="k" class="swatch" data-focus :class="{ on: (ui.theme || 'purple') === k }" :style="{ background: `linear-gradient(135deg, ${t.grad[0]}, ${t.grad[2]} 60%, ${t.grad[4]})` }" :title="t.label" @click="saveConfig({ ui: { theme: k } })"><i :style="{ background: t.accent[0] }" /><span>{{ t.label }}</span></button>
+              <button v-for="(t, k) in THEMES" :key="k" class="swatch" data-focus :class="{ on: (ui.theme || 'purple') === k }" :style="{ background: `linear-gradient(135deg, ${t.grad[0]}, ${t.grad[2]} 60%, ${t.grad[4]})` }" :title="t.label" @click="saveConfig({ ui: { theme: k, gameTheme: null } })"><i :style="{ background: t.accent[0] }" /><span>{{ t.label }}</span></button>
               <button class="swatch custom" data-focus :class="{ on: ui.theme === 'custom' }" :style="ui.customColor ? { background: `linear-gradient(135deg, ${customT.grad[0]}, ${customT.grad[2]} 60%, ${customT.grad[4]})` } : {}" @click="pickColor"><Icon name="mdiEyedropperVariant" :size="18" /><span>Custom</span></button>
             </div>
             <div class="finetune">
@@ -114,12 +118,12 @@
             <div class="row"><span class="lbl">Text</span><div class="seg"><button v-for="(v, k) in TEXTS" :key="k" data-focus :class="{ on: (ui.text || 'normal') === k }" @click="saveConfig({ ui: { text: k } })">{{ v.label }}</button></div></div>
 
             <div class="subh"><Icon name="mdiWallpaper" :size="20" />Background</div>
-            <div class="bgs">
-              <button v-for="b in BACKGROUNDS" :key="b.v" class="bgtile" data-focus :class="['bgp-' + b.v, { on: (ui.bgStyle || 'waves') === b.v }]" @click="setBg(b.v)">
-                <span class="bgp"><i /><i /><i /></span>
-                <b>{{ b.l }}</b><small>{{ b.sub }}</small>
-              </button>
-            </div>
+            <!-- one row: what's on now, and a menu with every background (theme ones, consoles, other) -->
+            <button class="bgnow glass" data-focus @click="pickBg">
+              <span class="bgnow-ic"><Icon name="mdiWallpaper" :size="22" /></span>
+              <span class="bgnow-t"><b>{{ bgNow.l }}</b><small>{{ bgNow.sub }}</small></span>
+              <span class="bgnow-c">Change<Icon name="mdiChevronRight" :size="18" /></span>
+            </button>
             <div v-if="ui.bgStyle === 'wallpaper'" class="row wrap" style="gap: 12px">
               <button class="btn" data-focus @click="chooseWallpaper"><Icon name="mdiImageSearchOutline" :size="18" />{{ ui.wallpaper ? 'Change image' : 'Choose image' }}</button>
               <div class="seg"><button v-for="d in dims" :key="d.v" data-focus :class="{ on: (ui.wallDim || 'medium') === d.v }" @click="saveConfig({ ui: { wallDim: d.v } })">{{ d.l }}</button></div>
@@ -168,6 +172,8 @@
             <button class="btn small" data-focus style="align-self: flex-start" @click="saveConfig({ ui: { tabs: null } })"><Icon name="mdiRestore" :size="18" />Default tabs</button>
 
             <div class="subh"><Icon name="mdiAnimationPlayOutline" :size="20" />Motion &amp; Sound</div>
+            <div class="row"><span class="lbl">Idle screen</span><div class="seg"><button v-for="m in idles" :key="m.v" data-focus :class="{ on: (ui.idle ?? '5') === m.v }" @click="saveConfig({ ui: { idle: m.v } })">{{ m.l }}</button></div></div>
+            <p class="muted small" style="margin-top: -6px">After this long without input, your games' artwork drifts by with the clock. Any button wakes it.</p>
             <div class="row"><span class="lbl">Animations</span><div class="seg"><button v-for="m in motions" :key="m.v" data-focus :class="{ on: (ui.motion || 'normal') === m.v }" @click="saveConfig({ ui: { motion: m.v } })">{{ m.l }}</button></div></div>
             <div class="row"><span class="lbl">Effects</span><div class="seg"><button v-for="m in effectsOpts" :key="m.v" data-focus :class="{ on: (ui.effects || 'auto') === m.v }" @click="saveConfig({ ui: { effects: m.v } })">{{ m.l }}</button></div></div>
             <p class="muted small" style="margin-top: -6px">Reduced turns off movement, including the animated background, which then shows a still frame. Light effects draw backgrounds at a lower resolution and frame rate and skip blur. Auto uses light effects when the GPU is off (software rendering), so it stays smooth everywhere. {{ store.info.gpu === false ? 'The GPU is off right now, so Auto is using light effects.' : '' }}</p>
@@ -290,6 +296,7 @@
               <Logo :size="64" />
               <div><div style="font-family: var(--display); font-size: 26px; font-weight: 700">Cartridge</div><div class="muted">Version {{ store.info.version }} · a RomM client for the couch</div></div>
             </div>
+            <ServerStatus />
             <div class="card-s glass">
               <div class="kv"><span>Game Mode</span><span>{{ store.info.gamescope ? 'Yes (gamescope)' : 'No (desktop)' }}</span></div>
               <div class="kv"><span>Controller</span><span>{{ padInfo?.name || input.padName || 'Press any button' }}</span></div>
@@ -320,6 +327,8 @@ import Grade from '../components/Grade.vue';
 import Btn from '../components/Btn.vue';
 import SteamSettings from '../components/SteamSettings.vue';
 import StorageManager from '../components/StorageManager.vue';
+import RommUpload from '../components/RommUpload.vue';
+import ServerStatus from '../components/ServerStatus.vue';
 import { padInfo } from '../pad.js';
 
 const el = ref(null);
@@ -328,6 +337,7 @@ const sec = ref(store.settingsSection || 'conn');
 const sections = [
   { id: 'conn', label: 'Connection', icon: 'mdiServerNetwork' },
   { id: 'sync', label: 'Library & Sync', icon: 'mdiSync' },
+  { id: 'romm', label: 'RomM', icon: 'mdiCloudUploadOutline' },
   { id: 'storage', label: 'Storage', icon: 'mdiHarddisk' },
   { id: 'folders', label: 'Console Folders', icon: 'mdiFolderMultipleOutline' },
   { id: 'dl', label: 'Downloads', icon: 'mdiTrayArrowDown' },
@@ -391,6 +401,7 @@ const total = computed(() => allRoms().length);
 const modes = [{ v: 'auto', l: 'Auto' }, { v: 'local', l: 'Local' }, { v: 'remote', l: 'Remote' }];
 const sizes = [{ v: 'sm', l: 'Small' }, { v: 'md', l: 'Medium' }, { v: 'lg', l: 'Large' }];
 const dims = [{ v: 'low', l: 'Bright' }, { v: 'medium', l: 'Dimmed' }, { v: 'high', l: 'Dark' }];
+const idles = [{ v: 'off', l: 'Off' }, { v: '3', l: '3 min' }, { v: '5', l: '5 min' }, { v: '10', l: '10 min' }, { v: '15', l: '15 min' }];
 const motions = [{ v: 'normal', l: 'Normal' }, { v: 'fast', l: 'Fast' }, { v: 'reduce', l: 'Reduced' }];
 const effectsOpts = [{ v: 'auto', l: 'Auto' }, { v: 'full', l: 'Full' }, { v: 'light', l: 'Light' }];
 const volumes = [{ v: 'low', l: 'Low' }, { v: 'medium', l: 'Medium' }, { v: 'high', l: 'High' }];
@@ -409,7 +420,7 @@ async function pickPart(f) {
 const customT = computed(() => themeFrom(ui.value.customColor || '#8b74e8'));
 async function pickColor() {
   const c = await openModal('color', { value: ui.value.customColor || THEMES[ui.value.theme]?.accent?.[0] || '#8b74e8' });
-  if (c) await saveConfig({ ui: { theme: 'custom', customColor: c } });
+  if (c) await saveConfig({ ui: { theme: 'custom', customColor: c, gameTheme: null } });
 }
 async function setBg(v) {
   if (v === 'wallpaper' && !ui.value.wallpaper) { await chooseWallpaper(); return; }
@@ -419,6 +430,14 @@ async function chooseWallpaper() {
   const file = await pickFolder({ title: 'Choose a wallpaper', subtitle: 'PNG, JPG or WebP', start: store.info.home, files: ['png', 'jpg', 'jpeg', 'webp'] });
   if (!file) return;
   try { store.config = await call('wallpaper:set', { file }); toast('Wallpaper set', 'ok', 2000, 'mdiWallpaper'); } catch (e) { toast(e.message, 'error', 4000); }
+}
+const bgNow = computed(() => BACKGROUNDS.find((b) => b.v === (ui.value.bgStyle || 'waves')) || BACKGROUNDS[0]);
+const BG_ICON = { Theme: 'mdiWaves', Consoles: 'mdiGamepadVariantOutline', Other: 'mdiImageOutline' };
+async function pickBg() {
+  let last = '';
+  const options = BACKGROUNDS.map((b) => { const o = { label: b.l, sub: b.sub, value: b.v, icon: BG_ICON[b.group], selected: bgNow.value.v === b.v, heading: b.group !== last ? { Theme: 'Your theme colours', Consoles: 'Consoles', Other: 'Other' }[b.group] : '' }; last = b.group; return o; });
+  const v = await choose({ title: 'Background', options });
+  if (v) await setBg(v);
 }
 async function clearWallpaper() { store.config = await call('wallpaper:clear'); await saveConfig({ ui: { bgStyle: 'waves' } }); }
 async function setPack(v) { await saveConfig({ ui: { soundPack: v } }); setSoundStyle(v, ui.value.volume); previewSound(); }
@@ -438,7 +457,7 @@ function moveTab(n, d) {
   [l[i], l[j]] = [l[j], l[i]];
   saveConfig({ ui: { tabs: l } });
 }
-const LOOK_KEYS = ['theme', 'customColor', 'colors', 'surface', 'text', 'font', 'bgStyle', 'wallDim', 'cardShape', 'density', 'gridSize', 'cardTitles', 'mediaBar', 'logos', 'motion', 'effects', 'sounds', 'soundPack', 'volume'];
+const LOOK_KEYS = ['theme', 'customColor', 'colors', 'idle', 'surface', 'text', 'font', 'bgStyle', 'wallDim', 'cardShape', 'density', 'gridSize', 'cardTitles', 'mediaBar', 'logos', 'motion', 'effects', 'sounds', 'soundPack', 'volume'];
 const presets = computed(() => store.config.lookPresets || []);
 const presetStyle = (p) => { const g = themeOf(p.ui).grad; return { background: `linear-gradient(135deg, ${g[0]}, ${g[2]} 60%, ${g[4]})` }; };
 function lookNow() { const o = {}; for (const k of LOOK_KEYS) if (ui.value[k] !== undefined) o[k] = JSON.parse(JSON.stringify(ui.value[k])); return o; }
@@ -647,6 +666,13 @@ onMounted(async () => { space.value = await call('fs:space', store.config.romsRo
 .ft-t b { font-size: 13px; font-weight: 600; }
 .ft-t small { font-size: 11px; color: var(--muted); }
 .bgs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.bgnow { display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 12px; text-align: left; width: 100%; max-width: 560px; }
+.bgnow:focus { box-shadow: var(--ring); }
+.bgnow-ic { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: rgba(var(--primary-rgb), 0.22); color: var(--primary-t); flex: none; }
+.bgnow-t { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bgnow-t b { font-size: 15px; }
+.bgnow-t small { font-size: 12px; color: var(--muted); }
+.bgnow-c { display: inline-flex; align-items: center; gap: 2px; font-size: 13px; font-weight: 600; color: var(--primary-t); }
 .bgtile { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.045); border: 1px solid var(--line); text-align: left; }
 .bgtile.on { border-color: var(--primary-l); background: rgba(var(--primary-rgb), 0.18); }
 .bgtile b { font-size: 13.5px; font-weight: 600; margin-top: 6px; }

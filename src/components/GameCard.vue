@@ -11,14 +11,14 @@
       <div v-if="dl && dl.status === 'downloading'" class="prog"><i :style="{ width: pct + '%' }" /></div>
     </div>
     <div v-if="!hideTitle" class="title">{{ rom.name }}</div>
-    <div v-if="showPlatform" class="sub">{{ rom.platform_display_name }}</div>
+    <div v-if="showPlatform || extra" class="sub">{{ [showPlatform && rom.platform_display_name, extra].filter(Boolean).join(' · ') }}</div>
   </button>
 </template>
 <script setup>
 import { computed, ref } from 'vue';
 import { store, cover, downloadFor, isNew } from '../store.js';
 import Icon from './Icon.vue';
-const props = defineProps({ rom: Object, showPlatform: Boolean, hideTitle: Boolean, selected: { type: Boolean, default: null } });
+const props = defineProps({ rom: Object, showPlatform: Boolean, extra: String, hideTitle: Boolean, selected: { type: Boolean, default: null } });
 const emit = defineEmits(['open', 'focused']);
 const failed = ref(false);
 const src = computed(() => cover(props.rom));

@@ -6,6 +6,11 @@
         <span v-if="text">{{ shown }}</span><span v-else class="ph">{{ placeholder }}</span><i class="caret" />
         <button v-if="password" class="reveal" data-focus @click="reveal = !reveal"><Icon :name="reveal ? 'mdiEyeOff' : 'mdiEye'" /></button>
       </div>
+      <!-- game names: whole titles that match, then the word being typed, completed -->
+      <div v-if="mode === 'game'" class="kb-row sugg">
+        <button v-for="(g, i) in suggestions" :key="g.kind + g.v" class="key small sg" :class="g.kind" data-focus :data-key="'sg-' + i" @click="pick(g)"><Icon v-if="g.kind === 'title'" name="mdiGamepadVariantOutline" :size="15" />{{ g.v }}</button>
+        <span v-if="!suggestions.length" class="sg-empty">Game names show up here as you type</span>
+      </div>
       <div v-if="quick.length" class="kb-row quick">
         <button v-for="q in quick" :key="q" class="key small" data-focus @click="type(q)">{{ q }}</button>
       </div>
@@ -34,7 +39,7 @@
 // Built-in on-screen keyboard for controllers (Settings → Look & Feel → On-screen keyboard)
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { pushLayer, focusFirst } from '../nav.js';
-import { closeModal, call } from '../store.js';
+import { closeModal, call, allRoms } from '../store.js';
 import Icon from './Icon.vue';
 import Btn from './Btn.vue';
 
@@ -43,7 +48,7 @@ const props = defineProps({
   value: { type: String, default: '' },
   placeholder: { type: String, default: '' },
   password: Boolean,
-  mode: { type: String, default: 'text' }, // text | url
+  mode: { type: String, default: 'text' }, // text | url | game (suggests your game names)
 });
 const el = ref(null);
 const text = ref(props.value || '');
@@ -68,6 +73,32 @@ const rows = computed(() => (sym.value ? symbols : base.map((r) => r.map((k) => 
 const quick = computed(() => (props.mode === 'url' ? ['http://', 'https://', '192.168.', ':8080', '.xyz', '.com', ':', 'localhost'] : []));
 const shown = computed(() => (props.password && !reveal.value ? '•'.repeat(text.value.length) : text.value));
 
+// Suggestions from your library's game names (mode 'game'). Words are ranked by how many titles use them.
+const norm = (t) => t.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+let index = null;
+function buildIndex() {
+  const titles = [...new Set(allRoms().map((r) => r.name).filter(Boolean))].map((n) => ({ n, k: norm(n) }));
+  const words = new Map();
+  for (const t of titles) for (const w of new Set(t.k.split(' '))) if (w.length > 2) words.set(w, (words.get(w) || 0) + 1);
+  const wordList = [...words.entries()].sort((a, b) => b[1] - a[1]).map(([w]) => w);
+  return { titles, wordList };
+}
+const suggestions = computed(() => {
+  if (props.mode !== 'game') return [];
+  const q = norm(text.value);
+  if (!q) return [];
+  index ||= buildIndex();
+  const parts = q.split(' '), last = parts[parts.length - 1];
+  const done = parts.slice(0, -1);
+  const hit = (k) => { const ws = k.split(' '); return done.every((p) => ws.includes(p)) && ws.some((w) => w.startsWith(last)); };
+  const titles = index.titles.filter((t) => hit(t.k)).sort((a, b) => (b.k.startsWith(q) - a.k.startsWith(q)) || a.n.length - b.n.length).slice(0, 4);
+  const words = last.length >= 1 ? index.wordList.filter((w) => w.startsWith(last) && w !== last).slice(0, 4) : [];
+  return [...titles.map((t) => ({ kind: 'title', v: t.n })), ...words.map((w) => ({ kind: 'word', v: w }))];
+});
+function pick(g) {
+  if (g.kind === 'title') { text.value = g.v; return; }
+  text.value = text.value.replace(/\S*$/, '') + g.v + ' ';
+}
 function type(k) {
   text.value += k;
   if (shift.value && k.length === 1) shift.value = false;
@@ -123,6 +154,10 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); laye
 .key.done { background: var(--btn, var(--grad)); border: 0; color: var(--on-btn, var(--on-primary)); font-weight: 700; }
 .key:focus { box-shadow: var(--ring); transform: scale(1.06); z-index: 1; }
 .key:hover { background: rgba(255,255,255,.12); }
+.sugg { justify-content: flex-start; flex-wrap: nowrap; overflow: hidden; min-height: 38px; }
+.key.sg { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; gap: 6px; }
+.sg-empty { color: var(--dim); font-size: 13px; align-self: center; padding-left: 4px; }
+.key.sg.title { background: rgba(var(--primary-rgb), 0.18); border-color: rgba(var(--primary-rgb), 0.45); }
 .kb-hints { display: flex; gap: 18px; justify-content: center; color: var(--muted); font-size: 12px; }
 .hint { display: flex; align-items: center; gap: 6px; }
 </style>

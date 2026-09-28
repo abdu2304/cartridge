@@ -82,110 +82,221 @@ function ribbons(g, w, h, S, pal, light) {
   };
 }
 
-// Bokeh: soft floating lights (inspired by the PS5 home screen)
-function bokeh(g, w, h, S, pal, light) {
-  const r = rng(7);
-  const sprites = [sprite(pal.light), sprite(pal.warm), sprite('#ffffff'), sprite(pal.accent)];
-  const n = light ? 22 : 34;
-  const dots = Array.from({ length: n }, () => ({ x: r(), y: r(), z: 0.3 + r() * 0.7, s: sprites[Math.floor(r() * sprites.length)], p: r() * Math.PI * 2, v: 0.004 + r() * 0.01 }));
-  return (time) => {
+// ---------------------------------------------------------------- console backgrounds
+// Each follows its console's own look: colours, shapes and how things move. Nothing is copied from
+// the consoles themselves. The bright Nintendo ones are toned down so Cartridge's white text reads.
+// Their base colour is a CSS gradient (BG_BASE); the canvas draws the motion on top.
+const TAU = Math.PI * 2;
+// a pattern drawn once, then reused every frame
+function once(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); return c; }
+function rrect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
+
+// PS2: the boot screen's towers of light rising out of a dark blue haze, small blocks drifting up
+function ps2(g, w, h, S, pal, light) {
+  const r = rng(22), cols = light ? 13 : 21;
+  const towers = Array.from({ length: cols }, (_, i) => ({ x: (i + 0.5) / cols + (r() - 0.5) * 0.02, z: 0.35 + r() * 0.65, hh: 0.2 + r() * 0.5, p: r() * TAU, s: 0.12 + r() * 0.2 })).sort((a, b) => a.z - b.z);
+  const blocks = Array.from({ length: light ? 16 : 28 }, () => ({ x: r(), y: r(), z: 0.3 + r() * 0.7, v: 0.008 + r() * 0.016, p: r() * TAU }));
+  const floor = once(w, h, (c) => { const gr = c.createLinearGradient(0, h * 0.55, 0, h); gr.addColorStop(0, 'rgba(90,130,255,0)'); gr.addColorStop(1, 'rgba(90,130,255,0.14)'); c.fillStyle = gr; c.fillRect(0, h * 0.55, w, h * 0.45); });
+  return (t) => {
     g.clearRect(0, 0, w, h);
-    g.globalCompositeOperation = 'lighter';
-    for (const d of dots) {
-      const size = (60 + d.z * 260) * (h / 1080);
-      const y = ((d.y - time * d.v * d.z) % 1.2 + 1.2) % 1.2 - 0.1;
-      const x = d.x + Math.sin(time * 0.2 + d.p) * 0.02;
-      g.globalAlpha = (0.1 + 0.26 * d.z) * (0.7 + 0.3 * Math.sin(time * 0.7 + d.p));
-      g.drawImage(d.s, x * w - size / 2, y * h - size / 2, size, size);
+    g.drawImage(floor, 0, 0);
+    for (const tw of towers) {
+      const th = h * tw.hh * (0.8 + 0.2 * Math.sin(t * tw.s + tw.p)), bw = (w / cols) * 0.5 * tw.z;
+      const x = tw.x * w - bw / 2, base = h * (0.8 + (1 - tw.z) * 0.1);
+      const gr = g.createLinearGradient(0, base - th, 0, base);
+      gr.addColorStop(0, 'rgba(150,180,255,0)'); gr.addColorStop(0.75, `rgba(120,160,255,${0.1 * tw.z})`); gr.addColorStop(1, `rgba(210,225,255,${0.2 * tw.z})`);
+      g.fillStyle = gr; g.fillRect(x, base - th, bw, th);
+      g.fillStyle = `rgba(225,235,255,${0.22 * tw.z})`; g.fillRect(x, base - th, bw, 1.5 * S);
     }
-    g.globalAlpha = 1;
+    for (const b of blocks) {
+      const y = (((b.y - t * b.v) % 1) + 1) % 1, sz = (3 + 8 * b.z) * S * (h / 1080) * 1.4;
+      g.fillStyle = `rgba(195,215,255,${(0.06 + 0.16 * b.z) * (0.6 + 0.4 * Math.sin(t + b.p))})`;
+      g.fillRect(b.x * w + Math.sin(t * 0.3 + b.p) * 10 * S, y * h, sz, sz);
+    }
   };
 }
 
-// Blades: big translucent panels sweeping slowly (inspired by the Xbox dashboard)
-function blades(g, w, h, S, pal) {
-  const cols = [pal.accent, pal.light, pal.warm, '#ffffff', pal.accent];
-  return (time) => {
+// Wii: the soft grey menu with its fine pinstripes, the channel grid, and the Wii blue light
+function wii(g, w, h, S, pal, light) {
+  const stripes = once(w, h, (c) => { c.fillStyle = 'rgba(255,255,255,0.045)'; const st = Math.max(2, Math.round(3 * S)); for (let y = 0; y < h; y += st * 2) c.fillRect(0, y, w, st); });
+  const cols = 4, rows = 3, gw = w * 0.74, gh = h * 0.56, gx = (w - gw) / 2, gy = h * 0.14;
+  const cw = gw / cols, ch = gh / rows, pad = Math.min(cw, ch) * 0.08, rad = Math.min(cw, ch) * 0.16;
+  const BLUE = [52, 190, 237];
+  return (t) => {
+    g.clearRect(0, 0, w, h);
+    g.drawImage(stripes, 0, 0);
+    // channels: ghosted rounded tiles, one at a time lighting up in Wii blue
+    const lit = Math.floor(t / 2.6) % (cols * rows), k = (t % 2.6) / 2.6, glow = Math.sin(k * Math.PI);
+    for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) {
+      const n = j * cols + i, x = gx + i * cw + pad, y = gy + j * ch + pad;
+      rrect(g, x, y, cw - pad * 2, ch - pad * 2, rad);
+      g.fillStyle = 'rgba(255,255,255,0.02)'; g.fill();
+      g.lineWidth = (n === lit ? 2 : 1) * S;
+      g.strokeStyle = n === lit ? `rgba(${BLUE},${0.12 + 0.3 * glow})` : 'rgba(255,255,255,0.055)'; g.stroke();
+    }
+    // the curved bar along the bottom, its edge in Wii blue
+    const by = h * 0.86, sag = h * 0.05 * (1 + 0.1 * Math.sin(t * 0.4));
+    g.beginPath(); g.moveTo(0, by - sag); g.quadraticCurveTo(w / 2, by + sag, w, by - sag); g.lineTo(w, h); g.lineTo(0, h); g.closePath();
+    g.fillStyle = 'rgba(255,255,255,0.06)'; g.fill();
+    g.beginPath(); g.moveTo(0, by - sag); g.quadraticCurveTo(w / 2, by + sag, w, by - sag);
+    g.strokeStyle = `rgba(${BLUE},0.55)`; g.lineWidth = 2 * S; g.stroke();
+  };
+}
+
+// Wii U: a calm blue-white gradient with big soft bubbles floating up, like the plaza's light
+function wiiu(g, w, h, S, pal, light) {
+  const r = rng(31), sp = [sprite('#ffffff', 256), sprite('#8fdcff', 256), sprite('#cfe9ff', 256)];
+  const bubbles = Array.from({ length: light ? 12 : 20 }, () => ({ x: r(), y: r(), z: 0.3 + r() * 0.7, s: Math.floor(r() * 3), v: 0.006 + r() * 0.01, p: r() * TAU }));
+  const band = once(w, h, (c) => { const gr = c.createLinearGradient(0, 0, w, h); gr.addColorStop(0.3, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.07)'); gr.addColorStop(0.7, 'rgba(255,255,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); });
+  return (t) => {
+    g.clearRect(0, 0, w, h);
+    g.globalAlpha = 0.7 + 0.3 * Math.sin(t * 0.15); g.drawImage(band, 0, 0); g.globalAlpha = 1;
+    g.globalCompositeOperation = 'lighter';
+    for (const b of bubbles) {
+      const size = (80 + b.z * 280) * (h / 1080), y = (((b.y - t * b.v) % 1.3) + 1.3) % 1.3 - 0.15;
+      g.globalAlpha = 0.08 + 0.16 * b.z;
+      g.drawImage(sp[b.s], (b.x + Math.sin(t * 0.18 + b.p) * 0.02) * w - size / 2, y * h - size / 2, size, size);
+    }
+    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+  };
+}
+
+// Switch: its dark theme, flat and quiet, with the two Joy-Con colours glowing at the edges
+function nswitch(g, w, h, S, pal, light) {
+  const blue = sprite('#00c3e3', 256), red = sprite('#ff4554', 256);
+  return (t) => {
     g.clearRect(0, 0, w, h);
     g.globalCompositeOperation = 'lighter';
-    cols.forEach((c, i) => {
-      const off = ((time * (0.012 + i * 0.004) + i * 0.23) % 1.6) - 0.3;
-      const x0 = (off - 0.2) * w, bw = w * (0.18 + 0.06 * i), skew = h * 0.5;
-      const gr = g.createLinearGradient(x0, 0, x0 + bw + skew, h);
-      gr.addColorStop(0, rgba(c, 0)); gr.addColorStop(0.5, rgba(c, 0.13 - i * 0.012)); gr.addColorStop(1, rgba(c, 0));
-      g.fillStyle = gr;
-      g.beginPath();
-      g.moveTo(x0 + skew, 0); g.lineTo(x0 + skew + bw, 0); g.lineTo(x0 + bw, h); g.lineTo(x0, h);
-      g.closePath(); g.fill();
-    });
-    // a thin bright edge that drifts across
-    const ex = (((time * 0.02) % 1.4) - 0.2) * w;
-    g.strokeStyle = 'rgba(255,255,255,0.14)'; g.lineWidth = 2 * S;
-    g.beginPath(); g.moveTo(ex + h * 0.5, 0); g.lineTo(ex, h); g.stroke();
+    const a = 0.34 + 0.1 * Math.sin(t * 0.5), b = 0.34 + 0.1 * Math.sin(t * 0.5 + Math.PI), size = h * 1.3;
+    g.globalAlpha = a; g.drawImage(blue, -size * 0.55, h - size * 0.55, size, size);
+    g.globalAlpha = b; g.drawImage(red, w - size * 0.45, h - size * 0.55, size, size);
+    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
+    // the thin line the home menu sits on, blue into red
+    const gr = g.createLinearGradient(0, 0, w, 0);
+    gr.addColorStop(0, 'rgba(0,195,227,0.5)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.12)'); gr.addColorStop(1, 'rgba(255,69,84,0.5)');
+    g.fillStyle = gr; g.fillRect(0, h * 0.9, w, 1.5 * S);
   };
 }
 
-// Dots: a calm grid of rounded dots with a slow wave running through it (inspired by Nintendo menus)
-function dots(g, w, h, S, pal, light) {
-  const gap = (light ? 64 : 46) * S;
-  const cols = Math.ceil(w / gap) + 1, rows = Math.ceil(h / gap) + 1;
-  const buckets = 5;
-  return (time) => {
+// Xbox: the green glowing core of the original console, rings pulsing out through a dark haze
+function xbox(g, w, h, S, pal, light) {
+  const core = sprite('#6dff3a', 256), fog = sprite('#1f8a14', 256);
+  const r = rng(5), motes = Array.from({ length: light ? 20 : 36 }, () => ({ a: r() * TAU, d: 0.15 + r() * 0.7, v: 0.02 + r() * 0.05, z: r() }));
+  const cx = w * 0.5, cy = h * 0.46;
+  return (t) => {
     g.clearRect(0, 0, w, h);
+    g.globalCompositeOperation = 'lighter';
+    const pulse = 0.5 + 0.5 * Math.sin(t * 0.9);
+    g.globalAlpha = 0.25; g.drawImage(fog, cx - h, cy - h, h * 2, h * 2);
+    g.globalAlpha = 0.28 + 0.12 * pulse; const cs = h * (0.55 + 0.05 * pulse); g.drawImage(core, cx - cs / 2, cy - cs / 2, cs, cs);
+    g.globalAlpha = 1;
+    // rings travelling outward
+    g.lineWidth = 1.5 * S;
+    for (let i = 0; i < 5; i++) {
+      const k = ((t * 0.06 + i / 5) % 1), rr = h * (0.12 + k * 0.9);
+      g.strokeStyle = `rgba(120,255,80,${0.16 * (1 - k)})`;
+      g.beginPath(); g.ellipse(cx, cy, rr * 1.35, rr, 0, 0, TAU); g.stroke();
+    }
+    for (const m of motes) {
+      const a = m.a + t * m.v, d = (m.d + t * 0.01 * (0.5 + m.z)) % 1, x = cx + Math.cos(a) * d * w * 0.6, y = cy + Math.sin(a) * d * h * 0.55;
+      g.fillStyle = `rgba(150,255,110,${0.1 + 0.25 * m.z * (1 - d)})`; g.fillRect(x, y, 2 * S, 2 * S);
+    }
     g.globalCompositeOperation = 'source-over';
-    const paths = Array.from({ length: buckets }, () => new Path2D());
-    for (let j = 0; j < rows; j++) {
-      for (let i = 0; i < cols; i++) {
-        const x = i * gap + (j % 2) * gap * 0.5, y = j * gap;
-        const v = 0.5 + 0.5 * Math.sin(i * 0.35 + j * 0.25 - time * 0.9) * Math.sin(j * 0.18 + time * 0.3);
-        const b = Math.min(buckets - 1, Math.floor(v * buckets));
-        const rr = (1.6 + b * 1.1) * S;
-        paths[b].moveTo(x + rr, y);
-        paths[b].arc(x, y, rr, 0, Math.PI * 2);
-      }
-    }
-    paths.forEach((p, b) => { g.fillStyle = `rgba(255,255,255,${0.05 + b * 0.05})`; g.fill(p); });
   };
 }
 
-// Glow: deep colour with slow drifting light (inspired by Steam Big Picture)
-function glow(g, w, h, S, pal) {
-  const sprites = [sprite(pal.accent, 256), sprite(pal.light, 256), sprite(pal.warm, 256)];
-  const blobs = [
-    { s: 0, x: 0.2, y: 0.25, r: 0.9, px: 0.07, py: 0.05, t: 0.05 },
-    { s: 1, x: 0.8, y: 0.7, r: 0.8, px: 0.06, py: 0.07, t: 0.04 },
-    { s: 2, x: 0.55, y: 0.95, r: 0.7, px: 0.09, py: 0.03, t: 0.06 },
-  ];
-  return (time) => {
+// Xbox 360: bright green swooshes sweeping through the scene, with soft white orbs
+function xbox360(g, w, h, S, pal, light) {
+  const orb = sprite('#ffffff', 128), r = rng(9);
+  const orbs = Array.from({ length: light ? 10 : 18 }, () => ({ x: r(), y: r(), z: 0.3 + r() * 0.7, v: 0.004 + r() * 0.01, p: r() * TAU }));
+  const SW = [{ y: 0.55, a: 0.18, k: 1.2, s: 0.05, c: '155,227,90', al: 0.22 }, { y: 0.66, a: 0.14, k: 1.7, s: -0.04, c: '230,255,210', al: 0.14 }, { y: 0.48, a: 0.22, k: 0.9, s: 0.03, c: '120,200,60', al: 0.16 }];
+  const STEP = light ? 40 : 24;
+  return (t) => {
     g.clearRect(0, 0, w, h);
     g.globalCompositeOperation = 'lighter';
-    for (const b of blobs) {
-      const size = b.r * Math.max(w, h);
-      const x = (b.x + Math.sin(time * b.t * 2.1) * b.px) * w, y = (b.y + Math.cos(time * b.t * 1.7) * b.py) * h;
-      g.globalAlpha = 0.3;
-      g.drawImage(sprites[b.s], x - size / 2, y - size / 2, size, size);
+    for (const sw of SW) {
+      const yOf = (u) => h * (sw.y + sw.a * Math.sin(u * Math.PI * sw.k + t * sw.s * 6) * 0.5);
+      const thick = (u) => h * 0.06 * (0.4 + 0.6 * Math.sin(u * Math.PI));
+      g.beginPath();
+      for (let x = 0; x <= w + STEP; x += STEP) { const u = x / w; x ? g.lineTo(x, yOf(u) - thick(u)) : g.moveTo(x, yOf(u) - thick(u)); }
+      for (let x = Math.ceil((w + STEP) / STEP) * STEP; x >= 0; x -= STEP) { const u = x / w; g.lineTo(x, yOf(u) + thick(u)); }
+      g.closePath();
+      const gr = g.createLinearGradient(0, 0, w, 0);
+      gr.addColorStop(0, `rgba(${sw.c},0)`); gr.addColorStop(0.5, `rgba(${sw.c},${sw.al})`); gr.addColorStop(1, `rgba(${sw.c},0)`);
+      g.fillStyle = gr; g.fill();
     }
-    g.globalAlpha = 1;
-    // faint diagonal light streak
-    const sx = (((time * 0.015) % 1.5) - 0.25) * w;
-    const gr = g.createLinearGradient(sx, 0, sx + w * 0.25, h);
-    gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(0.5, 'rgba(255,255,255,0.05)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
-    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (const o of orbs) {
+      const size = (20 + o.z * 70) * (h / 1080), y = (((o.y - t * o.v) % 1.2) + 1.2) % 1.2 - 0.1;
+      g.globalAlpha = 0.12 + 0.22 * o.z * (0.7 + 0.3 * Math.sin(t + o.p));
+      g.drawImage(orb, o.x * w - size / 2, y * h - size / 2, size, size);
+    }
+    g.globalAlpha = 1; g.globalCompositeOperation = 'source-over';
   };
 }
 
-export const RENDERERS = { waves, ribbons, bokeh, blades, dots, glow };
-// Picker entries (label + what it is loosely inspired by)
+// DS: the menu's wide pale stripes gliding slowly, a soft blue top screen glow
+function ds(g, w, h, S, pal, light) {
+  const bandH = h / 9;
+  const top = once(w, h, (c) => { const gr = c.createLinearGradient(0, 0, 0, h * 0.45); gr.addColorStop(0, 'rgba(120,190,255,0.18)'); gr.addColorStop(1, 'rgba(120,190,255,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h * 0.45); });
+  return (t) => {
+    g.clearRect(0, 0, w, h);
+    g.drawImage(top, 0, 0);
+    const off = (t * 6 * S) % (bandH * 2);
+    g.fillStyle = 'rgba(255,255,255,0.028)';
+    for (let y = -bandH * 2 + off; y < h; y += bandH * 2) g.fillRect(0, y, w, bandH);
+    // the hinge line between the two screens
+    g.fillStyle = 'rgba(255,255,255,0.1)'; g.fillRect(0, h * 0.5, w, 1.5 * S);
+  };
+}
+
+// 3DS: a white grid running away into depth, with see-through squares floating at different depths
+function n3ds(g, w, h, S, pal, light) {
+  const r = rng(13), squares = Array.from({ length: light ? 8 : 13 }, () => ({ x: r(), y: 0.12 + r() * 0.42, z: 0.25 + r() * 0.75, p: r() * TAU, v: 0.01 + r() * 0.02 }));
+  const hz = h * 0.52, lines = light ? 12 : 18;
+  return (t) => {
+    g.clearRect(0, 0, w, h);
+    g.lineWidth = 1 * S;
+    // floor grid: lines to a vanishing point, rows moving towards you
+    for (let i = -lines; i <= lines; i++) { g.strokeStyle = 'rgba(255,255,255,0.07)'; g.beginPath(); g.moveTo(w / 2 + i * w * 0.02, hz); g.lineTo(w / 2 + i * w * 0.12, h); g.stroke(); }
+    for (let k = 0; k < 10; k++) {
+      const d = ((k + (t * 0.25) % 1) / 10), y = hz + (h - hz) * d * d;
+      g.strokeStyle = `rgba(255,255,255,${0.02 + 0.08 * d})`; g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke();
+    }
+    for (const q of squares) {
+      const sz = (30 + 90 * q.z) * (h / 1080), x = ((q.x + t * q.v * q.z * 0.2) % 1.1) * w - sz, y = q.y * h + Math.sin(t * 0.5 + q.p) * 12 * S;
+      g.fillStyle = `rgba(255,255,255,${0.015 + 0.035 * q.z})`; g.strokeStyle = `rgba(255,255,255,${0.05 + 0.08 * q.z})`;
+      rrect(g, x, y, sz, sz, sz * 0.14); g.fill(); g.stroke();
+    }
+  };
+}
+
+export const RENDERERS = { waves, ribbons, ps2, wii, wiiu, switch: nswitch, xbox, xbox360, ds, n3ds };
+// Picker entries. The first two follow your theme colours, the console ones use their own.
 export const BACKGROUNDS = [
-  { v: 'waves', l: 'XMB Waves', sub: 'Inspired by the PSP' },
-  { v: 'ribbons', l: 'Ribbons', sub: 'Inspired by the PS3' },
-  { v: 'bokeh', l: 'Bokeh', sub: 'Inspired by the PS5' },
-  { v: 'blades', l: 'Blades', sub: 'Inspired by the Xbox' },
-  { v: 'dots', l: 'Dots', sub: 'Inspired by Nintendo' },
-  { v: 'glow', l: 'Glow', sub: 'Inspired by Steam' },
-  { v: 'solid', l: 'Still', sub: 'A still gradient, no motion' },
-  { v: 'art', l: 'Game artwork', sub: 'The highlighted game' },
-  { v: 'wallpaper', l: 'Wallpaper', sub: 'An image of your own' },
+  { v: 'waves', l: 'XMB Waves', sub: 'PSP style, in your theme colours', group: 'Theme' },
+  { v: 'ribbons', l: 'Ribbons', sub: 'PS3 style, in your theme colours', group: 'Theme' },
+  { v: 'ps2', l: 'PlayStation 2', sub: 'Towers of light in blue haze', group: 'Consoles' },
+  { v: 'wii', l: 'Wii', sub: 'Pinstripes, channels and Wii blue', group: 'Consoles' },
+  { v: 'wiiu', l: 'Wii U', sub: 'Soft light bubbles', group: 'Consoles' },
+  { v: 'switch', l: 'Switch', sub: 'Dark theme with Joy-Con glow', group: 'Consoles' },
+  { v: 'ds', l: 'Nintendo DS', sub: 'Gliding menu stripes', group: 'Consoles' },
+  { v: 'n3ds', l: 'Nintendo 3DS', sub: 'A grid running into depth', group: 'Consoles' },
+  { v: 'xbox', l: 'Xbox', sub: 'The glowing green core', group: 'Consoles' },
+  { v: 'xbox360', l: 'Xbox 360', sub: 'Green swooshes and orbs', group: 'Consoles' },
+  { v: 'solid', l: 'Still', sub: 'A still gradient, no motion', group: 'Other' },
+  { v: 'art', l: 'Game artwork', sub: 'The highlighted game', group: 'Other' },
+  { v: 'wallpaper', l: 'Wallpaper', sub: 'An image of your own', group: 'Other' },
 ];
-// darker base for renderers that need contrast
-export const DARK_BASE = new Set(['bokeh', 'glow', 'blades', 'dots']);
+// The console backgrounds' own base colours (under the canvas)
+export const BG_BASE = {
+  ps2: 'radial-gradient(120% 90% at 50% 100%, #122466 0%, #070c24 55%, #020308 100%)',
+  wii: 'linear-gradient(180deg, #6f7988 0%, #535c69 50%, #353b45 100%)',
+  wiiu: 'linear-gradient(160deg, #5b7897 0%, #34495f 50%, #1a2432 100%)',
+  switch: 'linear-gradient(180deg, #343434 0%, #282828 60%, #1c1c1c 100%)',
+  ds: 'linear-gradient(180deg, #5c6470 0%, #40464f 55%, #272b31 100%)',
+  n3ds: 'linear-gradient(180deg, #5d6169 0%, #3d4046 55%, #232529 100%)',
+  xbox: 'radial-gradient(90% 90% at 50% 45%, #0f3a10 0%, #051405 50%, #010401 100%)',
+  xbox360: 'linear-gradient(170deg, #3e6c20 0%, #1d3b0e 50%, #0a1606 100%)',
+};
+// darker base for renderers that need contrast (theme gradient under the canvas)
+export const DARK_BASE = new Set([]);

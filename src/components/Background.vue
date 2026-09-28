@@ -1,7 +1,7 @@
 <template>
   <div class="bg-stage" :class="['bg-' + mode, { xmb: painted }]">
     <template v-if="painted">
-      <div class="xmb-grad" />
+      <div class="xmb-grad" :style="BG_BASE[mode] ? { background: BG_BASE[mode], opacity: 1 } : null" />
       <div v-if="DARK_BASE.has(mode)" class="bg-darken" />
       <canvas v-if="RENDERERS[mode]" ref="cv" class="xmb-waves" />
       <!-- the interface paints this itself once it's up (see .shell below): one full-screen layer fewer -->
@@ -22,7 +22,7 @@
 <script setup>
 import { computed, reactive, ref, watch, onBeforeUnmount, nextTick } from 'vue';
 import { store } from '../store.js';
-import { RENDERERS, DARK_BASE } from '../bgRenderers.js';
+import { RENDERERS, DARK_BASE, BG_BASE } from '../bgRenderers.js';
 import { paletteOf, lightEffects } from '../themes.js';
 import { lastInput } from '../nav.js';
 
@@ -34,6 +34,8 @@ const painted = computed(() => !!RENDERERS[mode.value] || mode.value === 'solid'
 const light = computed(() => lightEffects(store.config?.ui, store.info));
 const reduce = computed(() => store.config?.ui?.motion === 'reduce');
 watch(light, (v) => document.body.classList.toggle('light-fx', v), { immediate: true });
+// console backgrounds bring their own colours: a neutral vignette instead of the theme's tint
+watch(mode, (m) => document.body.classList.toggle('bg-console', !!BG_BASE[m]), { immediate: true });
 
 // ---------- animated canvas backgrounds
 // Drawn at full sharpness with the GPU. Without it (software rendering) they draw at a lower
@@ -120,6 +122,7 @@ watch(() => [store.bg?.src, mode.value], () => {
 body:has(.xmb-vignette) .shell { background: radial-gradient(120% 100% at 50% 40%, transparent 55%, rgba(var(--tint-rgb), 0.5) 100%), linear-gradient(0deg, rgba(var(--tint-rgb), 0.5), transparent 35%); }
 body.surface-oled:has(.xmb-vignette) .shell { background: radial-gradient(120% 100% at 50% 40%, transparent 45%, rgba(0, 0, 0, 0.85) 100%), linear-gradient(0deg, #000 2%, transparent 45%); }
 body:has(.shell) .xmb-vignette { display: none; }
+body.bg-console .xmb-vignette, body.bg-console:has(.xmb-vignette) .shell { background: radial-gradient(120% 100% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.45) 100%), linear-gradient(0deg, rgba(0, 0, 0, 0.45), transparent 35%); }
 .bg-stage .layer.wall { inset: 0; transform: none; filter: none; }
 .wall-dim { position: absolute; inset: 0; background: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.6) 50%, rgba(0, 0, 0, 0.35) 100%); }
 </style>

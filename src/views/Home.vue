@@ -56,12 +56,17 @@
               <SysTile v-for="p in s.items" :key="p.id" :p="p" @open="openSys" @focused="focusSys" />
             </template>
             <template v-else-if="s.type === 'ra'">
-              <button v-for="a in s.items" :key="a.key" class="ra-home glass" data-focus @click="a.open()" @focus="focusRa(a)">
+              <template v-for="(a, i) in s.items" :key="a.key">
+              <!-- a timeline: the day where it changes, then each unlock with its time -->
+              <div v-if="a.t && (i === 0 || dayOf(s.items[i - 1].t) !== dayOf(a.t))" class="ach-day"><span>{{ dayLabel(a.t) }}</span></div>
+              <button class="ra-home glass" data-focus @click="a.open()" @focus="focusRa(a)">
+                <span v-if="a.t" class="ach-when">{{ whenLabel(a.t) }}</span>
                 <span class="ach-img"><img v-if="a.badge" :src="a.badge" loading="lazy" /><Grade v-else :g="a.grade" :size="40" /><span class="ach-src"><img v-if="a.kind === 'ra'" :src="raLogo" class="ach-ra" /><Grade v-else :g="a.grade || null" :size="16" /></span></span>
                 <div class="ra-home-t">{{ a.title }}</div>
                 <div class="ra-home-g">{{ a.game }}</div>
                 <div class="ra-home-p" :class="'k-' + a.kind"><template v-if="a.kind === 'ra'">{{ a.pts }}</template><template v-else-if="a.grade">{{ GRADE[a.grade] }}</template><template v-else>{{ a.pts }}</template></div>
               </button>
+              </template>
             </template>
             <template v-else-if="s.type === 'genre'">
               <GenreTile v-for="c in s.items" :key="c.id" :g="c" @open="openCol" @focused="focusCol" />
@@ -70,7 +75,7 @@
               <CollTile v-for="c in s.items" :key="c.id" :c="c" wide @open="openCol" @focused="focusCol" />
             </template>
             <template v-else>
-              <GameCard v-for="r in s.items" :key="r.id" :rom="r" :show-platform="true" @open="openGame" @focused="focusRom" />
+              <GameCard v-for="r in s.items" :key="r.id" :rom="r" :show-platform="true" :extra="s.sub ? s.sub(r) : ''" @open="openGame" @focused="focusRom" />
             </template>
           </div>
         </div>
@@ -81,7 +86,7 @@
 
 <script setup>
 import { computed, ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue';
-import { img, cover, collections, autoLists, seriesLists, genres, visible, store, go, allRoms, visiblePlatforms, romsOf, isNew, setBg, backdropOf, bytes, year, ago, rating, resync, downloadFor, download, romById, toast, logoOf, call, GRADE } from '../store.js';
+import { img, cover, collections, autoLists, seriesLists, genres, visible, store, go, allRoms, visiblePlatforms, romsOf, isNew, setBg, backdropOf, bytes, year, ago, rating, resync, downloadFor, download, romById, toast, logoOf, call, GRADE, loadPlay, playtimeText } from '../store.js';
 import { useView } from '../useView.js';
 import { ensureFocus, scrollMode } from '../nav.js';
 import Icon from '../components/Icon.vue';
@@ -160,22 +165,47 @@ async function loadAch() {
 }
 loadAch();
 watch(() => store.trophyVer, loadAch);
+// When each was unlocked: "Today", "Yesterday", a weekday this week, else the date; on the tile
+// "12 min ago" today and the time on other days
+const dayOf = (t) => new Date(t).toDateString();
+function dayLabel(t) {
+  const d = new Date(t), now = new Date(), day = 864e5;
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (t >= start) return 'Today';
+  if (t >= start - day) return 'Yesterday';
+  if (t >= start - 6 * day) return d.toLocaleDateString(undefined, { weekday: 'long' });
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(d.getFullYear() !== now.getFullYear() ? { year: 'numeric' } : {}) });
+}
+function whenLabel(t) {
+  const m = Math.round((Date.now() - t) / 6e4);
+  if (dayLabel(t) === 'Today') return m < 1 ? 'Just now' : m < 60 ? `${m} min ago` : `${Math.round(m / 60)} h ago`;
+  return new Date(t).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
 function focusRa(a) {
   heroRom.value = a.romId ? romById(a.romId) : null; heroSys.value = null; heroCol.value = null;
   if (heroRom.value) setBg(backdropOf(heroRom.value));
 }
 // Last played times from Steam's shortcuts (games added to Steam by Cartridge or matched to it)
 const played = ref({});
-const lastPlay = (r) => Math.max(played.value[r.id] || 0, r.user?.played || 0); // Steam or RomM, whichever is newer
+const lastPlay = (r) => Math.max(played.value[r.id] || 0, store.play[r.id]?.last || 0, r.user?.played || 0); // Steam, RetroArch or RomM, whichever is newer
 call('steam:played').then((m) => { played.value = m || {}; }).catch(() => {});
+loadPlay();
+const minsOf = (r) => store.play[r.id]?.min || 0;
+const DONE = new Set(['finished', 'completed_100', 'retired', 'never_playing']);
 const shelves = computed(() => {
   const roms = allRoms().filter(visible);
   const out = [];
   // Mirrors RomM's home: recently added, random picks, then your stuff
   const playing = roms.filter((r) => r.user?.playing || r.user?.status === 'incomplete').sort((a, b) => lastPlay(b) - lastPlay(a));
   if (playing.length) out.push({ id: 'playing', title: 'Continue playing', icon: 'mdiPlayCircleOutline', count: playing.length, items: playing.slice(0, 30) });
+  // started (played a while, or marked in RomM) but not finished, and not already above
+  const inPlaying = new Set(playing.map((r) => r.id));
+  const started = roms.filter((r) => !inPlaying.has(r.id) && !DONE.has(r.user?.status) && (minsOf(r) >= 30 || r.user?.status === 'incomplete')).sort((a, b) => lastPlay(b) - lastPlay(a));
+  if (started.length) out.push({ id: 'started', title: 'Finish what you started', icon: 'mdiFlagCheckered', count: started.length, items: started.slice(0, 30) });
   const lastPlayed = roms.filter(lastPlay).sort((a, b) => lastPlay(b) - lastPlay(a));
   if (lastPlayed.length) out.push({ id: 'played', title: 'Recently played', icon: 'mdiHistory', count: '', items: lastPlayed.slice(0, 30) });
+  const most = roms.filter(minsOf).sort((a, b) => minsOf(b) - minsOf(a));
+  if (most.length) out.push({ id: 'most', title: 'Most played', icon: 'mdiChartBar', count: '', items: most.slice(0, 30), sub: (r) => playtimeText(minsOf(r)) });
   const recent = [...roms].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 30);
   out.push({ id: 'recent', title: 'Recently added', icon: 'mdiClockOutline', count: '', items: recent });
   if (!discoverSeed || discoverSeed.v !== store.libVersion) {
@@ -184,6 +214,13 @@ const shelves = computed(() => {
     discoverSeed = { v: store.libVersion, items: pool.slice(0, 24) };
   }
   if (discoverSeed.items.length) out.push({ id: 'picks', title: 'Picks for you', icon: 'mdiDiceMultipleOutline', count: '', items: discoverSeed.items });
+  // smart shelves, each only when it has enough games to be worth a row
+  const short = roms.filter((r) => r.hours > 0 && r.hours <= 5 && !DONE.has(r.user?.status)).sort((a, b) => (b.rating || 0) - (a.rating || 0) || a.hours - b.hours);
+  if (short.length >= 4) out.push({ id: 'short', title: 'Short games', icon: 'mdiTimerSandComplete', count: short.length, items: short.slice(0, 30), sub: (r) => `${String(Math.round(r.hours * 2) / 2).replace(/\.5$/, '½')} h to beat` });
+  const unplayed = roms.filter((r) => (r.rating || 0) >= 80 && !lastPlay(r) && !minsOf(r) && !r.user?.status).sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.votes || 0) - (a.votes || 0));
+  if (unplayed.length >= 4) out.push({ id: 'toprated', title: "Top rated you haven't played", icon: 'mdiStarCircleOutline', count: '', items: unplayed.slice(0, 30) });
+  const multi = roms.filter((r) => (r.modes || []).some((m) => /split.?screen|co-?op|multiplayer/i.test(m))).sort((a, b) => (b.rating || 0) - (a.rating || 0));
+  if (multi.length >= 4) out.push({ id: 'multi', title: 'Local multiplayer', icon: 'mdiAccountGroupOutline', count: multi.length, items: multi.slice(0, 30) });
   const onDevice = roms.filter((r) => store.installed[r.id]).sort((a, b) => a.name.localeCompare(b.name));
   if (onDevice.length) out.push({ id: 'device', title: 'On this device', icon: 'mdiCheckCircleOutline', count: onDevice.length, items: onDevice.slice(0, 40) });
   const fresh = roms.filter(isNew).sort((a, b) => (store.lib.firstSeen[b.id] || 0) - (store.lib.firstSeen[a.id] || 0));
@@ -271,4 +308,8 @@ onMounted(async () => { await nextTick(); ensureFocus(el.value); });
 .ra-home-t { font-family: var(--display); font-weight: 600; font-size: 13.5px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .ra-home-g { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .ra-home-p { font-size: 11px; color: var(--gold); font-weight: 600; }
+.ra-home { position: relative; padding-top: 28px; }
+.ach-when { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); padding: 2px 8px; border-radius: 999px; background: rgba(0, 0, 0, 0.35); font-size: 10.5px; font-weight: 600; color: rgba(255, 255, 255, 0.78); white-space: nowrap; }
+.ach-day { flex: none; align-self: stretch; display: flex; align-items: center; padding: 0 2px 0 6px; }
+.ach-day span { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; font-weight: 700; color: var(--primary-t); padding: 8px 0; border-right: 2px solid color-mix(in srgb, var(--primary-t) 50%, transparent); padding-right: 8px; }
 </style>

@@ -1451,11 +1451,18 @@ async function storageOverview() {
     if (!drives.has(dv.mount)) {
       let free = 0, total = 0;
       try { const st = await fsp.statfs(dv.mount); free = st.bavail * st.bsize; total = st.blocks * st.bsize; } catch {}
-      drives.set(dv.mount, { ...dv, free, total, games: 0, count: 0 });
+      drives.set(dv.mount, { ...dv, free, total, games: 0, count: 0, consoles: [] });
     }
     return drives.get(dv.mount);
   };
   await addDrive(config.romsRoot);
+  // every drive a console downloads to (custom console folders can sit on other drives)
+  for (const p of library?.platforms || []) {
+    if (!(library.roms[p.id] || []).length) continue;
+    const t = platformPath(p).path;
+    const dv = t && (await addDrive(t));
+    if (dv && !dv.consoles.includes(p.display_name)) dv.consoles.push(p.display_name);
+  }
   const roms = new Map(library ? Object.values(library.roms).flat().map((r) => [r.id, r]) : []);
   const games = [];
   for (const [id, p] of Object.entries(installedMap)) {
@@ -1614,13 +1621,15 @@ function asPng(buf) {
   const im = nativeImage.createFromBuffer(buf);
   return im.isEmpty() ? null : im.toPNG();
 }
-async function sgdbImage(name, kind) {
+async function sgdbImage(name, kind, style) {
   if (!config.sgdbKey || !name) return null;
   const g = (await sgdbGames(name))[0];
   if (!g) return null;
-  const ep = kind === 'grid' ? `/grids/game/${g.id}?dimensions=600x900&types=static&nsfw=false&humor=false`
-    : kind === 'wide' ? `/grids/game/${g.id}?dimensions=920x430,460x215&types=static&nsfw=false&humor=false`
-    : `/heroes/game/${g.id}?types=static&nsfw=false&humor=false`;
+  // style: SteamGridDB's own styles (alternate, blurred, white_logo, no_logo, material); heroes know alternate, blurred and material
+  const st = style && (kind !== 'hero' || ['alternate', 'blurred', 'material'].includes(style)) ? `&styles=${style}` : '';
+  const ep = kind === 'grid' ? `/grids/game/${g.id}?dimensions=600x900&types=static&nsfw=false&humor=false${st}`
+    : kind === 'wide' ? `/grids/game/${g.id}?dimensions=920x430,460x215&types=static&nsfw=false&humor=false${st}`
+    : `/heroes/game/${g.id}?types=static&nsfw=false&humor=false${st}`;
   const list = ((await sgdb(ep)) || []).sort((a, b) => (b.score || 0) - (a.score || 0));
   // only take images of the right shape (a portrait cover is no use as a wide banner)
   const fits = (w, h) => (kind === 'grid' ? h > w : kind === 'wide' ? w > h * 1.6 : w > h * 1.4);
@@ -1649,9 +1658,178 @@ const steamMgr = require('./steamManager')({
   emulationRoots: () => { const emu = readEmuDeckSettings(); return require('./trophies').emulationRoots([emu.emulationPath, config.romsRoot && path.dirname(config.romsRoot)].filter(Boolean)); },
   isGamescope,
 });
+// ---------------------------------------------------------------- 0.8: play time, server status, edits, uploads
+// RetroArch's runtime logs (playlists/logs/<core>/<game>.lrtl, when "Save runtime log" is on):
+// { runtime: "H:MM:SS", last_played: "YYYY-MM-DD HH:MM:SS" } keyed by the game's file name
+function retroarchRuntime() {
+  const home = os.homedir();
+  const cfgDirs = [path.join(home, '.config/retroarch'), path.join(home, '.var/app/org.libretro.RetroArch/config/retroarch')];
+  for (const r of steamMgr.steamRoots?.() || []) cfgDirs.push(path.join(r, 'steamapps/common/RetroArch'));
+  const out = new Map();
+  for (const d of cfgDirs) {
+    let plDir = path.join(d, 'playlists');
+    try { const m = fs.readFileSync(path.join(d, 'retroarch.cfg'), 'utf8').match(/^playlist_directory\s*=\s*"([^"]+)"/m); if (m && m[1] && m[1] !== 'default') plDir = expandHome(m[1].replace(/^:\//, d + '/')); } catch {}
+    const walk = (dir, depth) => {
+      let list = []; try { list = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+      for (const e of list) {
+        const f = path.join(dir, e.name);
+        if (e.isDirectory()) { if (depth < 2) walk(f, depth + 1); continue; }
+        if (!/\.lrtl$/i.test(e.name)) continue;
+        try {
+          const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+          const [h, mi, se] = String(j.runtime || '0:0:0').split(':').map(Number);
+          const min = Math.round((h || 0) * 60 + (mi || 0) + (se || 0) / 60);
+          const last = j.last_played ? new Date(String(j.last_played).replace(' ', 'T')).getTime() || 0 : 0;
+          const k = e.name.replace(/\.lrtl$/i, '').toLowerCase();
+          const prev = out.get(k);
+          out.set(k, { min: (prev?.min || 0) + min, last: Math.max(prev?.last || 0, last) });
+        } catch {}
+      }
+    };
+    walk(path.join(plDir, 'logs'), 0);
+  }
+  return out;
+}
+// romId -> { min, last, src }: Steam's play time for games in Steam, plus RetroArch's own logs
+function playStats() {
+  let steam = {};
+  try { steam = steamMgr.playtime(); } catch (e) { log('play time from Steam failed', e.message); }
+  const ra = retroarchRuntime();
+  const out = { ...steam };
+  if (ra.size) {
+    for (const [id, p] of Object.entries(installedMap)) {
+      if (!p || p === MARKED) continue;
+      const names = [path.basename(p).replace(/\.[^.]+$/, '')];
+      if (isDir(p)) { try { for (const n of fs.readdirSync(p)) names.push(n.replace(/\.[^.]+$/, '')); } catch {} }
+      const hit = names.map((n) => ra.get(n.toLowerCase())).find(Boolean);
+      if (!hit) continue;
+      const cur = out[id] || { min: 0, last: 0 };
+      // a game started both ways: Steam counts the whole session, RetroArch too, so take the larger
+      out[id] = { min: Math.max(cur.min, hit.min), last: Math.max(cur.last, hit.last), src: cur.src ? `${cur.src} and RetroArch` : 'RetroArch' };
+    }
+  }
+  return out;
+}
+// The server at a glance (Settings → About): reachable, how fast, its version and what it holds
+async function serverHealth() {
+  const base = await resolveBase().catch(() => null);
+  const out = { base, route: base && base === trimUrl(config.server.localUrl) ? 'local' : base ? 'remote' : null, ok: false };
+  if (!base) return out;
+  const t0 = Date.now();
+  try {
+    const r = await fetch(`${base}/api/heartbeat`, { headers: authHeaders(), signal: AbortSignal.timeout(8000) });
+    out.ms = Date.now() - t0;
+    out.ok = r.ok;
+    const hb = r.ok ? await r.json().catch(() => ({})) : {};
+    out.version = hb.SYSTEM?.VERSION || hb.VERSION || null;
+    out.sources = Object.entries(hb.METADATA_SOURCES || {}).filter(([k, v]) => v === true && /_API_ENABLED$/.test(k)).map(([k]) => k.replace(/_API_ENABLED$/, ''));
+    out.rescan = hb.TASKS?.ENABLE_SCHEDULED_RESCAN ? hb.TASKS.SCHEDULED_RESCAN_CRON || true : false;
+  } catch (e) { out.error = e.cause?.code || e.message; return out; }
+  try { const st = await api('/api/stats'); out.stats = { platforms: st.PLATFORMS, roms: st.ROMS, saves: st.SAVES, states: st.STATES, screenshots: st.SCREENSHOTS, bytes: st.TOTAL_FILESIZE_BYTES }; } catch {}
+  return out;
+}
+const DENIED_WRITE = "Your RomM sign-in can't change games. Sign in with your password, or pair again with the QR code so Cartridge can ask for that.";
+// Edit a game's details in RomM (name, description, cover), then refresh it in the library
+async function editRom({ romId, name, summary, coverUrl, coverFile }) {
+  const b = await resolveBase();
+  const fd = new FormData();
+  if (name != null) fd.append('name', name);
+  if (summary != null) fd.append('summary', summary);
+  if (coverUrl) fd.append('url_cover', coverUrl);
+  if (coverFile) { const buf = await fsp.readFile(coverFile); fd.append('artwork', new Blob([buf]), path.basename(coverFile)); }
+  const r = await fetch(`${b}/api/roms/${romId}`, { method: 'PUT', headers: authHeaders(), body: fd, signal: AbortSignal.timeout(60000) });
+  if (r.status === 401 || r.status === 403) throw new Error(DENIED_WRITE);
+  if (!r.ok) throw new Error(`RomM could not save it (error ${r.status})`);
+  const full = await api(`/api/roms/${romId}`);
+  const slim = slimRom(full);
+  for (const [pid, list] of Object.entries(library?.roms || {})) {
+    const i = list.findIndex((x) => x.id === romId);
+    if (i >= 0) { library.roms[pid][i] = { ...list[i], ...slim }; break; }
+  }
+  saveLib();
+  return slim;
+}
+// Files in your console folders that RomM doesn't have (to upload): not a known game, not ours
+const UPLOAD_SKIP = /\.(partial|part|tmp|m3u|txt|nfo|jpe?g|png|webp|gif|pdf|srm|sav|state\d*|auto|cfg|ini|xml|dat|db|json|log|lpl|md5|sha1|sfv|DS_Store)$/i;
+function uploadCandidates() {
+  if (!library) return [];
+  const known = new Set(Object.values(installedMap).filter((p) => p && p !== MARKED).map((p) => path.resolve(p)));
+  const out = [];
+  for (const p of library.platforms) {
+    const dir = platformPath(p).path;
+    if (!dir || !isDir(dir)) continue;
+    const names = new Set((library.roms[p.id] || []).flatMap((r) => [r.fs_name, ...(r.files || []).map((f) => f.file_name)]).filter(Boolean));
+    let list = []; try { list = fs.readdirSync(dir, { withFileTypes: true }); } catch { continue; }
+    for (const e of list) {
+      if (!e.isFile() || e.name.startsWith('.') || UPLOAD_SKIP.test(e.name) || names.has(e.name)) continue;
+      const f = path.join(dir, e.name);
+      if (known.has(path.resolve(f))) continue;
+      let size = 0; try { size = fs.statSync(f).size; } catch {}
+      if (size < 1024) continue;
+      out.push({ platformId: p.id, platform: p.display_name, slug: p.slug, fs_slug: p.fs_slug, name: e.name, path: f, size });
+    }
+  }
+  return out.sort((a, b) => a.platform.localeCompare(b.platform) || a.name.localeCompare(b.name));
+}
+// Upload one file to RomM: chunked (RomM 4) or, on older servers, one multipart request
+const uploads = new Map(); // path -> { pct, state, error, abort }
+async function uploadFile({ path: f, platformId }) {
+  if (uploads.get(f)?.state === 'uploading') return uploads.get(f);
+  const st = { path: f, pct: 0, state: 'uploading', error: null, abort: new AbortController() };
+  uploads.set(f, st);
+  const put = (o) => { Object.assign(st, o); broadcast('upload', { path: f, pct: st.pct, state: st.state, error: st.error }); };
+  put({});
+  (async () => {
+    const b = await resolveBase();
+    const size = (await fsp.stat(f)).size, name = path.basename(f);
+    const CH = 16 * 1024 * 1024, total = Math.max(1, Math.ceil(size / CH));
+    const h = { ...authHeaders(), 'x-upload-platform': String(platformId), 'x-upload-filename': name, 'x-upload-total-size': String(size), 'x-upload-total-chunks': String(size ? total : 0) };
+    const start = await fetch(`${b}/api/roms/upload/start`, { method: 'POST', headers: h, signal: st.abort.signal });
+    if (start.status === 401 || start.status === 403) throw new Error(DENIED_WRITE);
+    if (start.status === 404 || start.status === 405) {
+      // older RomM: POST /api/roms with the file as a form part named after it
+      const buf = await fsp.readFile(f);
+      const fd = new FormData(); fd.append(name, new Blob([buf]), name);
+      const r = await fetch(`${b}/api/roms`, { method: 'POST', headers: { ...authHeaders(), 'x-upload-platform': String(platformId), 'x-upload-filename': name }, body: fd, signal: st.abort.signal });
+      if (r.status === 401 || r.status === 403) throw new Error(DENIED_WRITE);
+      if (!r.ok) throw new Error(`RomM refused the upload (error ${r.status})`);
+      return;
+    }
+    if (!start.ok) { const d = await start.json().catch(() => ({})); throw new Error(d.detail || `RomM refused the upload (error ${start.status})`); }
+    const { upload_id: id } = await start.json();
+    const fh = await fsp.open(f, 'r');
+    try {
+      for (let i = 0; i < total && size; i++) {
+        const len = Math.min(CH, size - i * CH), buf = Buffer.alloc(len);
+        await fh.read(buf, 0, len, i * CH);
+        const r = await fetch(`${b}/api/roms/upload/${id}`, { method: 'PUT', headers: { ...authHeaders(), 'x-chunk-index': String(i), 'Content-Type': 'application/octet-stream' }, body: buf, signal: st.abort.signal });
+        if (!r.ok) throw new Error(`Upload stopped at part ${i + 1} of ${total} (error ${r.status})`);
+        put({ pct: Math.round(((i + 1) / total) * 100) });
+      }
+    } finally { await fh.close(); }
+    const done = await fetch(`${b}/api/roms/upload/${id}/complete`, { method: 'POST', headers: authHeaders(), signal: st.abort.signal });
+    if (!done.ok) { const d = await done.json().catch(() => ({})); throw new Error(d.detail || `RomM could not finish the upload (error ${done.status})`); }
+  })().then(() => put({ pct: 100, state: 'done' }), (e) => put({ state: st.abort.signal.aborted ? 'cancelled' : 'error', error: st.abort.signal.aborted ? null : e.message }));
+  return { path: f, state: 'uploading' };
+}
+const handlers08 = {
+  'play:stats': () => playStats(),
+  // dates for a game's timeline (the game page adds trophies and achievements it already has)
+  'rom:timeline': ({ romId }) => {
+    const r = romIndexMain().get(romId);
+    const st = steamMgr.addedAt(romId);
+    return { created: r?.created_at ? Date.parse(r.created_at) || null : null, firstSeen: library?.firstSeen?.[romId] > 1 ? library.firstSeen[romId] : null, downloaded: manifest[romId]?.at || null, steam: Number.isFinite(st) ? st : null, play: playStats()[romId] || null };
+  },
+  'server:health': () => serverHealth(),
+  'rom:edit': (o) => editRom(o),
+  'upload:list': () => ({ files: uploadCandidates(), active: [...uploads.values()].map(({ path: p, pct, state, error }) => ({ path: p, pct, state, error })) }),
+  'upload:start': (o) => uploadFile(o),
+  'upload:cancel': ({ path: f }) => { uploads.get(f)?.abort.abort(); return true; },
+};
 const handlers = {
   ...trophySvc.handlers,
   ...colHandlers,
+  ...handlers08,
   'config:get': () => config,
   'wallpaper:set': async ({ file }) => {
     const ext = path.extname(file || '').toLowerCase();
@@ -1746,7 +1924,7 @@ const handlers = {
     const r = await fetch(`${b}/api/auth/device/init`, {
       method: 'POST', headers: { ...authHeaders({ ...config.server, auth: 'none', username: '' }), 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(15000),
       body: JSON.stringify({ client_device_identifier: config.deviceId, name: `Cartridge on ${os.hostname()}`.slice(0, 255), client: 'Cartridge', platform: 'linux', client_version: app.getVersion(),
-        requested_scopes: ['me.read', 'roms.read', 'roms.user.read', 'roms.user.write', 'platforms.read', 'assets.read', 'firmware.read', 'collections.read', 'collections.write'] }),
+        requested_scopes: ['me.read', 'roms.read', 'roms.user.read', 'roms.user.write', 'platforms.read', 'assets.read', 'firmware.read', 'collections.read', 'collections.write', 'roms.write'] }),
     });
     if (r.status === 404 || r.status === 405) throw new Error('This RomM version has no QR pairing. Use a pairing code instead.');
     if (r.status === 429) throw new Error('RomM is limiting pairing requests. Try again in a minute.');
@@ -1883,6 +2061,7 @@ const handlers = {
   'steam:liveInfo': () => steamMgr.liveInfo(),
   'steam:setEmu': ({ key, id }) => steamMgr.setEmu(key, id),
   'steam:refresh': ({ key }) => steamMgr.refresh(key),
+  'steam:refreshArt': ({ style }) => steamMgr.refreshArt(style),
   'steam:liveEnable': () => steamMgr.liveEnable(),
   'steam:queueAdd': (items) => steamMgr.queueAdd(items),
   'steam:queueRemove': (ids) => steamMgr.queueRemove(ids),
@@ -1932,7 +2111,8 @@ for (const [ch, fn] of Object.entries(handlers)) {
 }
 
 app.whenReady().then(() => {
-  protocol.handle('romimg', handleImage);
+  // readable by the page's canvas too (Theme from this game reads a cover's colours)
+  protocol.handle('romimg', async (req) => { const r = await handleImage(req); try { r.headers.set('Access-Control-Allow-Origin', '*'); } catch {} return r; });
   createWindow();
   if (library) computeInstalled();
   win.webContents.once('did-finish-load', () => {

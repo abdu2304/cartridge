@@ -86,6 +86,39 @@ function readShortcuts(acc) {
     return { appid: (e.appid ?? 0) >>> 0, name: e.AppName || e.appname || '', exe, exeRaw, start: unq(e.StartDir || ''), lo, loRaw: e.LaunchOptions || '', last: e.LastPlayTime || 0 };
   });
 }
+// Steam's text VDF (localconfig.vdf): { key: value | { ... } }
+function parseTextVdf(t) {
+  const re = /"((?:[^"\\]|\\.)*)"|([{}])/g;
+  const root = {}, stack = [root];
+  let key = null, m;
+  while ((m = re.exec(t))) {
+    if (m[2] === '{') { const o = {}; stack[stack.length - 1][key ?? ''] = o; stack.push(o); key = null; }
+    else if (m[2] === '}') { if (stack.length > 1) stack.pop(); key = null; }
+    else if (key === null) key = m[1];
+    else { stack[stack.length - 1][key] = m[1].replace(/\\(.)/g, '$1'); key = null; }
+  }
+  return root;
+}
+// Play time Steam keeps per app, shortcuts included: appid -> { min, last (ms) }. Shortcuts show
+// up under their 32-bit id, or as the long game id ((appid << 32) | 0x02000000) in some versions.
+function readPlaytime(acc) {
+  let t; try { t = fs.readFileSync(path.join(acc.root, 'userdata', acc.id, 'config', 'localconfig.vdf'), 'utf8'); } catch { return {}; }
+  const v = parseTextVdf(t);
+  const lower = (o) => Object.fromEntries(Object.entries(o || {}).map(([k, x]) => [k.toLowerCase(), x]));
+  const apps = lower(lower(lower(lower(lower(v).userlocalconfigstore).software).valve).steam).apps || {};
+  const out = {};
+  for (const [id, a] of Object.entries(apps)) {
+    if (!a || typeof a !== 'object') continue;
+    const min = Number(a.Playtime ?? a.playtime ?? 0), last = Number(a.LastPlayed ?? a.lastplayed ?? 0);
+    if (!min && !last) continue;
+    let key = id;
+    if (id.length > 12) { try { key = String(Number(BigInt(id) >> 32n) >>> 0); } catch {} } // long game id
+    else if (Number(id) < 0) key = String(Number(id) >>> 0);
+    const prev = out[key];
+    out[key] = { min: Math.max(prev?.min || 0, min), last: Math.max(prev?.last || 0, last * 1000) };
+  }
+  return out;
+}
 // Collections the user made (dynamic, filter-based ones can't hold chosen games)
 function readCollections(acc) {
   try {
@@ -572,6 +605,23 @@ module.exports = function createSteamManager(ctx) {
     return out;
   }
 
+  // Play time and last played for downloaded games that are in Steam: romId -> { min, last }
+  function playtime() {
+    const env = environment();
+    if (!env.account) return {};
+    const scs = readShortcuts(env.account);
+    const find = inSteamIndex(scs);
+    const pt = readPlaytime(env.account);
+    const out = {};
+    for (const g of installedGames()) {
+      const sc = find(g) || liveHit(g);
+      if (!sc) continue;
+      const p = pt[String(sc.appid >>> 0)] || {};
+      const last = Math.max(p.last || 0, (sc.last || 0) * 1000);
+      if (p.min || last) out[g.rom.id] = { min: p.min || 0, last, src: 'Steam' };
+    }
+    return out;
+  }
   // One game: is it in Steam, and would Cartridge know how to add it?
   function forRom(romId) {
     const env = environment();
@@ -667,7 +717,9 @@ module.exports = function createSteamManager(ctx) {
   }
 
   // ---------------------------------------------------------------- artwork
-  async function writeArt(e, grid) {
+  // style: undefined = Cartridge's artwork (yours, RomM's), 'top' = SteamGridDB's most popular,
+  // or one of SteamGridDB's styles (alternate, blurred, no_logo, material)
+  async function writeArt(e, grid, style) {
     fs.mkdirSync(grid, { recursive: true });
     const rom = ctx.romById(e.romId);
     const out = {};
@@ -676,12 +728,14 @@ module.exports = function createSteamManager(ctx) {
       try { const buf = await getter(); if (buf) { fs.writeFileSync(f, buf); out[name] = true; } } catch (err) { log('steam art', name, err.message); }
     };
     const art = ctx.artFor(e.romId) || {};
+    const sg = style ? (style === 'top' ? undefined : style) : undefined;
     const cover = art.grid || rom?.path_cover_large || rom?.path_cover_small || rom?.url_cover;
     const hero = art.hero || rom?.shot || null;
-    await put(`${e.appid}p.png`, async () => (cover ? ctx.fetchImage(cover) : ctx.sgdbImage(rom?.name, 'grid')));
-    await put(`${e.appid}_hero.png`, async () => (hero ? ctx.fetchImage(hero) : ctx.sgdbImage(rom?.name, 'hero')));
+    const fromSgdb = async (kind, fallback) => (await ctx.sgdbImage(rom?.name, kind, sg).catch(() => null)) || (fallback ? ctx.fetchImage(fallback) : null);
+    await put(`${e.appid}p.png`, async () => (style ? fromSgdb('grid', cover) : cover ? ctx.fetchImage(cover) : ctx.sgdbImage(rom?.name, 'grid')));
+    await put(`${e.appid}_hero.png`, async () => (style ? fromSgdb('hero', hero) : hero ? ctx.fetchImage(hero) : ctx.sgdbImage(rom?.name, 'hero')));
     await put(`${e.appid}.png`, async () => { // wide banner: SteamGridDB's, else cut from the background
-      const w = await ctx.sgdbImage(rom?.name, 'wide').catch(() => null);
+      const w = await ctx.sgdbImage(rom?.name, 'wide', sg).catch(() => null);
       if (w) return w;
       const src = hero ? await ctx.fetchImage(hero) : null;
       return src ? ctx.cropTo(src, 920, 430) : null;
@@ -697,6 +751,28 @@ module.exports = function createSteamManager(ctx) {
     return out;
   }
 
+  // Refresh the artwork of every shortcut Cartridge added: new files in Steam's grid folder, and
+  // straight into the running Steam when it can be reached (else Steam shows them after a restart)
+  async function refreshArt(style) {
+    const env = environment();
+    if (!env.account) throw new Error('Steam was not found on this device.');
+    if (style && !ctx.getConfig().sgdbKey) throw new Error('Add a SteamGridDB API key in Settings → Look & feel first.');
+    const have = new Set(readShortcuts(env.account).map((x) => x.appid >>> 0));
+    const ours = Object.entries(reg).filter(([id, r]) => r.romId && (have.has(Number(id) >>> 0) || r.live));
+    if (!ours.length) return { count: 0 };
+    const grid = files(env.account).grid;
+    const liveOn = await live.available(env.account.root).catch(() => false);
+    let n = 0;
+    for (const [id, r] of ours) {
+      const appid = Number(id) >>> 0;
+      ctx.broadcast('steam-progress', { step: 'art', done: n, total: ours.length, name: r.name });
+      await writeArt({ appid, romId: r.romId }, grid, style);
+      if (liveOn) await live.setArtwork(appid, { dir: grid, id: appid }).catch((e) => log('steam live art refresh', e.message));
+      n++;
+    }
+    ctx.broadcast('steam-progress', null);
+    return { count: n, live: liveOn };
+  }
   // ---------------------------------------------------------------- apply
   function lastStatus() {
     const f = path.join(JOB_DIR, 'last.status.json');
@@ -931,7 +1007,8 @@ module.exports = function createSteamManager(ctx) {
     },
     liveInfo: async () => { const env = environment(); if (!env.account) return { on: false, flag: false }; return { on: await live.available(env.account.root), flag: live.flagOn(env.account.root) }; },
     liveEnable: () => { const env = environment(); if (!env.account) throw new Error('Steam was not found.'); fs.writeFileSync(path.join(env.account.root, live.FLAG), ''); return true; },
-    onDownloaded, onDeleted, lastStatus, writeScript, startupReport, forRom, fixCollections, played,
+    onDownloaded, onDeleted, lastStatus, writeScript, startupReport, forRom, fixCollections, played, playtime, steamRoots, refreshArt,
+    addedAt: (romId) => Math.min(...Object.values(reg).filter((r) => r.romId === romId && r.at).map((r) => r.at), Infinity),
     // exposed for tests
     _learnOne: learnOne, _tokenize: tokenize, _buildLaunch: buildLaunch, _learnAll: learnAll, _candidates: candidates,
   };

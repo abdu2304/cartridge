@@ -324,7 +324,7 @@ async function deleteCol() {
   try { await call('col:delete', { rid: c.rid }); toast(`${c.name} deleted`, 'ok', 2200); back(); } catch (e) { toast(e.message, 'error', 5000); }
 }
 async function search() {
-  const v = await askText({ title: `Filter ${title.value}`, value: q.value, placeholder: 'Game name' });
+  const v = await askText({ title: `Filter ${title.value}`, value: q.value, placeholder: 'Game name', mode: 'game' });
   if (v !== null && v !== undefined) q.value = v.trim();
 }
 async function pickConsole() {

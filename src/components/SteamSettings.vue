@@ -20,6 +20,7 @@
 
         <div class="row wrap">
           <button class="btn primary" data-focus :disabled="!notIn" @click="go('steam-missing')"><Icon name="mdiFormatListChecks" />{{ notIn ? `${notIn} missing from Steam` : 'Every game is in Steam' }}</button>
+          <button class="btn" data-focus :disabled="steam.busy || !ov.ours" @click="refreshArt"><Icon name="mdiImageRefreshOutline" />Refresh artwork</button>
           <button class="btn" data-focus @click="restartSteam"><Icon name="mdiRestart" />Restart Steam</button>
         </div>
 
@@ -62,7 +63,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
-import { store, call, confirm, toast, go, romById } from '../store.js';
+import { store, call, confirm, toast, go, romById, choose } from '../store.js';
 import { steam, applyChanges, restartSteam } from '../steam.js';
 import Icon from './Icon.vue';
 import Toggle from './Toggle.vue';
@@ -90,6 +91,26 @@ async function enableLive() {
   if (!(await confirm('Turn on live Steam changes?', "Cartridge adds a small file to Steam's folder that opens Steam's interface to apps on this device only, the same thing Decky Loader does. Steam then takes new games without closing. Restart Steam once afterwards (Steam menu → Power → Restart Steam).", 'Turn on'))) return;
   try { await call('steam:liveEnable'); toast('Live changes turned on. Restart Steam once to use them.', 'ok', 5000, 'mdiSteam'); } catch (e) { toast(e.message, 'error'); }
   loadLive();
+}
+// New artwork for every game Cartridge put in Steam, in the style you pick
+async function refreshArt() {
+  const v = await choose({ title: 'Refresh artwork', message: `For the ${ov.value.ours} game${ov.value.ours === 1 ? '' : 's'} Cartridge added to Steam`, options: [
+    { label: 'Your Cartridge artwork', sub: 'Covers and backgrounds you picked, else RomM\'s', value: 'mine', icon: 'mdiImageOutline' },
+    { label: 'SteamGridDB · most popular', sub: 'The top rated art for each game', value: 'top', icon: 'mdiStarOutline' },
+    { label: 'SteamGridDB · clean', sub: 'Covers without logos', value: 'no_logo', icon: 'mdiImageFilterCenterFocus' },
+    { label: 'SteamGridDB · alternate', sub: 'Fan-made takes on the box art', value: 'alternate', icon: 'mdiPaletteOutline' },
+    { label: 'SteamGridDB · blurred', sub: 'Soft, blurred art', value: 'blurred', icon: 'mdiBlur' },
+    { label: 'SteamGridDB · material', sub: 'Flat, minimal art', value: 'material', icon: 'mdiShapeOutline' },
+  ] });
+  if (!v) return;
+  steam.busy = true;
+  try {
+    const r = await call('steam:refreshArt', { style: v === 'mine' ? undefined : v });
+    if (!r.count) toast('No games from Cartridge in Steam yet', 'info', 3000);
+    else if (r.live) toast(`New artwork for ${r.count} game${r.count === 1 ? '' : 's'} is in Steam`, 'ok', 3500, 'mdiImageRefreshOutline');
+    else if (await confirm('Artwork ready', `New artwork for ${r.count} game${r.count === 1 ? '' : 's'} is saved. Steam shows it after a restart.`, 'Restart Steam')) restartSteam();
+  } catch (e) { toast(e.message, 'error', 6000); }
+  steam.busy = false; steam.progress = null;
 }
 async function setC(patch) { store.config.steam = await call('steam:setConfig', patch); }
 async function apply() { if (await applyChanges()) load(); }

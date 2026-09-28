@@ -114,5 +114,14 @@ LT/RT switch top tabs. LB/RB only switch sections inside a page. A select, B bac
 - Console cards (owner picked "Showcase" from mockups): `SysTile` only sets `--sys-a`/`--sys-b` (consoleColors, else a hue from the slug); the look is `.systile` in `styles.css`. The picture (`.glyph`) stays inside the card (top/right inset, height from the card, fade mask to the left); the old bottom strip is gone. PIcon's inline size is overridden inside `.glyph`.
 - Consoles header: title plus `.stats` (big numbers, small labels). Top bar connection: `.net` pill (light green LAN, light purple Tunnel, light red Offline on a dark see-through pill), no dot.
 
+## 0.8.0 (Your Library, Alive)
+- Play time: `steamManager.playtime()` (localconfig.vdf `apps/<appid>` Playtime/LastPlayed via `parseTextVdf`/`readPlaytime`, long game ids folded to 32-bit) plus RetroArch `.lrtl` runtime logs by file name (`retroarchRuntime` in main.js). `play:stats` -> `store.play`, `playOf`, `playtimeText`; reloaded on the `installed` event.
+- Home shelves (Home.vue): Finish what you started, Most played (`GameCard extra`), Short games, Top rated you haven't played, Local multiplayer. Trophy row: `.ach-day` markers and `.ach-when` times.
+- Game page More: Edit details (`rom:edit`, PUT /api/roms/{id} form name/summary/url_cover), Timeline (`rom:timeline` + `GameTimeline.vue`), Theme from this game (cover colour via canvas; `romimg` responses carry ACAO *; `ui.gameTheme` keeps the old theme, cleared when a theme is picked in Settings). HLTB card loads `/assets/scrappers/hltb.png` from the RomM server.
+- Settings → RomM (`RommUpload.vue`): `upload:list` (files in console folders not in RomM), `upload:start` (RomM 4 chunked /api/roms/upload/start, PUT chunks, /complete; older servers POST /api/roms). QR pairing requests `roms.write`. Settings → About: `ServerStatus.vue` (`server:health`).
+- Idle screen `IdleScreen.vue` (`ui.idle` minutes, default 5; its layer eats the waking press). Keyboard `mode: 'game'` suggests titles and words.
+- Backgrounds: `bgRenderers.js` keeps waves/ribbons, adds ps2, wii, wiiu, switch, ds, n3ds, xbox, xbox360 with `BG_BASE` CSS bases and a neutral vignette (`body.bg-console`). Picker is one row plus a grouped menu (Menu `heading`).
+- Steam: `steam:refreshArt` (style: undefined = Cartridge art, 'top', or SteamGridDB styles), `steamLive.setArtwork`. Storage drives include console folders and list `consoles`; Free up space pre-selects games unplayed for 2 months.
+
 ## Releases (full steps: HANDOFF D8)
 Only when the owner asks. Bump `version` and `build.releaseInfo.releaseName` ("Cartridge X.Y.Z") in `package.json`, put only this version's notes in `RELEASE_NOTES.md` (heading `## Cartridge X.Y.Z · Title`), add them to the top of `CHANGELOG.md`, grouped as New / Changed / Fixed with bold lead-ins. CI builds, launch-checks and publishes.

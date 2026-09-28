@@ -52,6 +52,8 @@
   <SteamPreview v-if="store.modal?.type === 'steam-preview'" v-bind="store.modal.props" />
   <SteamEmu v-if="store.modal?.type === 'steam-emu'" :key="JSON.stringify(store.modal.props)" v-bind="store.modal.props" />
   <ArtPicker v-if="store.modal?.type === 'art'" :key="store.modal.props.query || ''" v-bind="store.modal.props" />
+  <GameTimeline v-if="store.modal?.type === 'timeline'" v-bind="store.modal.props" />
+  <IdleScreen v-if="store.config?.configured" />
 
   <div class="pops">
     <TransitionGroup name="pop">
@@ -89,6 +91,8 @@ import Grade from './components/Grade.vue';
 import FolderPicker from './components/FolderPicker.vue';
 import Menu from './components/Menu.vue';
 import ArtPicker from './components/ArtPicker.vue';
+import GameTimeline from './components/GameTimeline.vue';
+import IdleScreen from './components/IdleScreen.vue';
 import SteamCollections from './components/SteamCollections.vue';
 import SteamPreview from './components/SteamPreview.vue';
 import SteamEmu from './components/SteamEmu.vue';
@@ -122,7 +126,7 @@ function onSearch(e) {
 }
 async function searchOsk() {
   if (!builtinKb()) return;
-  const v = await askText({ title: 'Search games', value: store.lastSearch, placeholder: 'Game name' });
+  const v = await askText({ title: 'Search games', value: store.lastSearch, placeholder: 'Game name', mode: 'game' });
   if (v == null) return;
   store.lastSearch = v;
   if (v.trim() && store.route.name !== 'search') go('search');
