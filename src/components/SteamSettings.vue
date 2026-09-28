@@ -19,7 +19,7 @@
         </div>
 
         <div class="row wrap">
-          <button class="btn primary" data-focus :disabled="!missing.length" @click="addMissing"><Icon name="mdiPlaylistPlus" />{{ missing.length ? `Add ${missing.length} missing game${missing.length === 1 ? '' : 's'}` : 'Every game is in Steam' }}</button>
+          <button class="btn primary" data-focus :disabled="!notIn" @click="go('steam-missing')"><Icon name="mdiFormatListChecks" />{{ notIn ? `${notIn} missing from Steam` : 'Every game is in Steam' }}</button>
           <button class="btn" data-focus @click="restartSteam"><Icon name="mdiRestart" />Restart Steam</button>
         </div>
 
@@ -63,7 +63,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
 import { store, call, confirm, toast, go, romById } from '../store.js';
-import { steam, applyChanges, restartSteam, pickCollections } from '../steam.js';
+import { steam, applyChanges, restartSteam } from '../steam.js';
 import Icon from './Icon.vue';
 import Toggle from './Toggle.vue';
 import PIcon from './PIcon.vue';
@@ -74,8 +74,7 @@ const sc = computed(() => store.config.steam || {});
 const HOW = { learned: 'From your shortcuts', yours: 'Set by you', emudeck: 'EmuDeck', appimage: 'AppImage', flatpak: 'Flatpak', native: 'Installed program' };
 const nameOpts = [{ v: 'clash', l: 'Only on clashes' }, { v: 'always', l: 'Always' }];
 const inSteam = computed(() => ov.value?.games.filter((g) => g.inSteam).length || 0);
-// only games Cartridge knows how to start (consoles without an emulator are shown below)
-const missing = computed(() => (ov.value?.games || []).filter((g) => !g.inSteam && g.queued !== 'add' && ov.value.consoles.find((c) => c.key === g.console)?.template));
+const notIn = computed(() => (ov.value?.games.length || 0) - inSteam.value);
 async function load() {
   try { ov.value = await call('steam:overview'); steam.queue = ov.value.queue; } catch (e) { ov.value = { steam: { error: e.message }, games: [], consoles: [] }; }
   call('steam:verify').then((m) => (missingCols.value = m || [])).catch(() => {});
@@ -95,14 +94,6 @@ async function enableLive() {
 async function setC(patch) { store.config.steam = await call('steam:setConfig', patch); }
 async function apply() { if (await applyChanges()) load(); }
 async function clearQueue() { steam.queue = await call('steam:queueClear'); load(); }
-async function addMissing() {
-  const list = missing.value;
-  const keys = [...new Set(list.map((g) => g.console))];
-  const cols = await pickCollections(keys.length === 1 ? keys[0] : null, keys.length === 1 ? null : [], keys.length > 1);
-  if (cols == null) return;
-  steam.queue = await call('steam:queueAdd', list.map((g) => ({ romId: g.romId, collections: cols })));
-  await apply();
-}
 // console logo: RomM's icon for the platform of any of its games
 const platOf = (c) => { const r = (ov.value?.games || []).filter((g) => g.console === c.key).map((g) => romById(g.romId)).find(Boolean); return r ? { slug: r.platform_slug, fs_slug: r.platform_fs_slug } : { slug: c.key }; };
 async function undo() {

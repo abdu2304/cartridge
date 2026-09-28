@@ -99,5 +99,12 @@ LT/RT switch top tabs. LB/RB only switch sections inside a page. A select, B bac
 - An EmuDeck launcher that runs a Flatpak or an AppImage in ~/Applications hides that copy (the script text is read). RetroArch's Flatpak is hidden when EmuDeck's retroarch.sh wraps it.
 - Launch placeholders: `{ROM}`, `{SERIAL}`, `{DIR}` (game folder), `{NAME}` (file name without extension, for MAME).
 
+## 0.7.11
+- Shortcuts are SRM style: `plan()` puts `"exe" args` in Target (`entry.target`, used for the appid, the helper `Exe` and live `SetShortcutExe`) and leaves Launch options empty. `%command%` form only with `pre` (env vars, wrappers) or `%RPCS3_GAMEID%`. `sigOf` starts with `v2`, so older shortcuts show Update.
+- Folder games: `gameRef` hands the emulator the file inside (`playableFile`: `DISC_FIRST` m3u/cue/gdi..., then `GAME_EXT[key]`, else the biggest file) unless the console takes folders (`DIR_GAMES`).
+- In Steam matching: `nameKey` (letters and digits, & = and, no ™), `gameSerial` reads PS3/PSP/Vita serials from the game when the name lacks one.
+- Vita: `vita3k` kind `vitaid`: `-F -r <title ID>` only when `ux0/app/<id>` exists (Vita3K pref path); otherwise `missing`, shown as `blocked` in the overview and skipped in `plan()`.
+- `src/views/SteamMissing.vue` (route `steam-missing`) replaces "Add N missing". Gallery toolbar: Show/Sort menus, More (Surprise me, Select, Get all); series header uses a game cover (`headArt`).
+
 ## Releases (full steps: HANDOFF D8)
 Only when the owner asks. Bump `version` and `build.releaseInfo.releaseName` ("Cartridge X.Y.Z") in `package.json`, put only this version's notes in `RELEASE_NOTES.md` (heading `## Cartridge X.Y.Z · Title`), add them to the top of `CHANGELOG.md`, grouped as New / Changed / Fixed with bold lead-ins. CI builds, launch-checks and publishes.

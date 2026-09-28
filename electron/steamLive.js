@@ -47,7 +47,8 @@ module.exports = function steamLive({ log = () => {} } = {}) {
   // Add one shortcut; returns Steam's appid for it. art: { dir, id } where files are <id>p.png etc.
   async function addShortcut({ name, exe, start, lo, art, proton, collections }) {
     const appid = await run(`(async () => {
-      const id = await SteamClient.Apps.AddShortcut(${J(name)}, ${J(exe)}, ${J(start)}, ${J(lo)});
+      // created with the program alone, then the full Target (program plus arguments) is set
+      const id = await SteamClient.Apps.AddShortcut(${J(name)}, ${J((String(exe).match(/^"[^"]*"|^\S+/) || [exe])[0])}, ${J(start)}, ${J(lo)});
       // AddShortcut can name the shortcut after the exe; set everything explicitly
       SteamClient.Apps.SetShortcutName(id, ${J(name)});
       SteamClient.Apps.SetShortcutExe(id, ${J(exe)});

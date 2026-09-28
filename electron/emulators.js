@@ -25,7 +25,8 @@ const EMU = {
   xemu: { label: 'xemu', scripts: ['xemu-emu.sh', 'xemu.sh'], app: /xemu/i, fp: ['app.xemu.xemu'], bin: ['xemu'], args: '-full-screen -dvd_path "{ROM}"', for: ['xbox'] },
   // Xenia runs under Proton inside EmuDeck's launcher, so the game needs a Windows path (Z: is /)
   xenia: { label: 'Xenia', scripts: ['xenia.sh'], args: '"Z:{ROM}"', for: ['xbox360'] },
-  vita3k: { label: 'Vita3K', scripts: ['vita3k.sh'], app: /vita3k/i, fp: [], bin: ['Vita3K', 'vita3k'], args: '"{ROM}"', for: ['psvita'] },
+  // Vita games run once installed in Vita3K (from their .pkg/.vpk), started by title ID like EmuDeck does
+  vita3k: { label: 'Vita3K', scripts: ['vita3k.sh'], app: /vita3k/i, fp: [], bin: ['Vita3K', 'vita3k'], args: '-F -r {SERIAL}', kind: 'vitaid', for: ['psvita'] },
   mgba: { label: 'mGBA', scripts: ['mgba.sh'], app: /mgba/i, fp: ['io.mgba.mGBA'], bin: ['mgba-qt', 'mgba'], args: '-f "{ROM}"', for: ['gb', 'gbc', 'gba'] },
   rmg: { label: "Rosalie's Mupen GUI", scripts: ['rosaliesmupengui.sh'], app: /(^rmg|rosalie)/i, fp: ['com.github.Rosalie241.RMG'], bin: ['RMG'], args: '--fullscreen --nogui --quit-after-emulation "{ROM}"', for: ['n64'] },
   simple64: { label: 'simple64', app: /simple64/i, fp: ['io.github.simple64.simple64'], bin: ['simple64-gui'], args: '"{ROM}"', for: ['n64'] },
@@ -82,6 +83,23 @@ const RA_FIRST = new Set(['nes', 'fds', 'famicom', 'snes', 'sfc', 'gb', 'gbc', '
   'pcengine', 'pcenginecd', 'pcfx', 'pc88', 'pc98', 'arcade', 'neogeo', 'cps1', 'cps2', 'cps3', 'neogeocd', 'atari2600', 'atari5200', 'atari7800', 'atari800', 'atarijaguar', 'atarilynx', 'atarist', 'ngp', 'ngpc',
   'wonderswan', 'wonderswancolor', 'colecovision', 'intellivision', 'vectrex', '3do', 'amiga', 'amigacd32', 'amstradcpc', 'c64', 'msx', 'msx2', 'x68000', 'zxspectrum', 'pico8', 'tic80']);
 
+// When RomM keeps a game as several files, Cartridge downloads it into a folder. Emulators need the
+// game file inside it, like Steam ROM Manager's file patterns pick (EmuDeck's parsers): a playlist or
+// disc descriptor first, then these extensions in order. Consoles in DIR_GAMES take the folder itself.
+const DISC_FIRST = ['m3u', 'cue', 'gdi', 'cdi', 'ccd', 'mds', 'chd'];
+const GAME_EXT = {
+  psx: ['pbp', 'iso', 'img', 'ecm', 'bin'], ps2: ['iso', 'cso', 'zso', 'bin', 'gz'], psp: ['iso', 'cso', 'pbp', 'elf'],
+  xbox: ['iso', 'xiso'], xbox360: ['iso', 'xex', 'zar'], gc: ['rvz', 'iso', 'gcm', 'gcz', 'ciso', 'wbfs'], wii: ['rvz', 'wbfs', 'iso', 'wia', 'gcz'],
+  switch: ['xci', 'nsp', 'nsz', 'xcz'], n3ds: ['3ds', 'cci', 'cia', 'cxi', 'app', 'zcci'], nds: ['nds', 'dsi', 'zip', '7z'],
+  nes: ['nes', 'fds', 'unf', 'unif', 'zip', '7z'], fds: ['fds', 'zip'], famicom: ['nes', 'fds', 'zip'], snes: ['sfc', 'smc', 'fig', 'swc', 'bs', 'zip', '7z'], sfc: ['sfc', 'smc', 'zip'],
+  gb: ['gb', 'zip', '7z'], gbc: ['gbc', 'gb', 'zip', '7z'], gba: ['gba', 'zip', '7z'], n64: ['z64', 'n64', 'v64', 'ndd', 'zip', '7z'], virtualboy: ['vb', 'zip'],
+  genesis: ['md', 'gen', 'smd', 'bin', 'zip', '7z'], megadrive: ['md', 'gen', 'smd', 'bin', 'zip', '7z'], mastersystem: ['sms', 'zip'], gamegear: ['gg', 'zip'], sega32x: ['32x', 'zip'], 'sg-1000': ['sg', 'zip'],
+  segacd: ['iso', 'bin', 'zip'], saturn: ['iso', 'bin', 'zip'], dreamcast: ['iso', 'bin', 'zip'], naomi: ['zip', 'dat', 'lst'], atomiswave: ['zip', 'bin'],
+  pcengine: ['pce', 'zip'], pcenginecd: ['iso', 'bin'], ngp: ['ngp', 'zip'], ngpc: ['ngc', 'ngp', 'zip'], wonderswan: ['ws', 'zip'], wonderswancolor: ['wsc', 'ws', 'zip'],
+  atari2600: ['a26', 'bin', 'zip'], atari7800: ['a78', 'zip'], atarilynx: ['lnx', 'zip'], atarijaguar: ['j64', 'jag', 'zip'], arcade: ['zip', '7z'], neogeo: ['zip', '7z'],
+};
+const DIR_GAMES = new Set(['ps3', 'ps4', 'ps5', 'wiiu', 'psvita', 'scummvm', 'dos', 'windows']);
+
 // console -> standalone emulator ids, in the order above (first is preferred)
 function emulatorsFor(key) { return Object.keys(EMU).filter((id) => EMU[id].for.includes(key)); }
 // the launch args for one emulator, console and install kind
@@ -92,4 +110,4 @@ function argsFor(id, key, src) {
 }
 const coreName = (c) => CORE_NAMES[c] || c.replace(/_/g, ' ');
 
-module.exports = { EMU, CORES, RA_FIRST, emulatorsFor, argsFor, coreName };
+module.exports = { EMU, CORES, RA_FIRST, emulatorsFor, argsFor, coreName, DISC_FIRST, GAME_EXT, DIR_GAMES };

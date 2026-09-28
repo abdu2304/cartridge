@@ -26,9 +26,9 @@
           <button class="btn small" data-focus :data-key="'emu-pick'" :disabled="!con.emus.length" @click="pickEmu"><Icon name="mdiSwapHorizontal" :size="18" />{{ emuLabel }}</button>
         </div>
         <template v-if="con.template">
-          <div class="lo"><span>Target</span><b class="mono">{{ con.template.exe }}</b></div>
+          <div class="lo"><span>Target</span><b class="mono">{{ con.template.target || con.template.exe }}</b></div>
           <div v-if="con.template.start" class="lo"><span>Start in</span><b class="mono">{{ con.template.start }}</b></div>
-          <div class="lo"><span>Launch options</span><b class="mono">{{ con.template.lo }}</b></div>
+          <div class="lo"><span>Launch options</span><b class="mono">{{ con.template.target ? con.template.launch || '(empty)' : con.template.lo }}</b></div>
           <div v-if="con.template.from && con.template.how !== 'yours'" class="muted small">{{ con.template.how === 'learned' ? 'Copied from your Steam shortcut for ' + con.template.from : 'Found: ' + con.template.from }}</div>
         </template>
         <div v-else class="muted">No emulator found for this console. Press More → Edit to set one.</div>

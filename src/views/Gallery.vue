@@ -6,6 +6,7 @@
         <div class="sys-switch">
           <Btn v-if="mode !== 'all'" b="LB" />
           <PIcon v-if="mode === 'platform'" :p="platform" :size="52" />
+          <div v-else-if="headArt" class="hicon art"><img :src="headArt" /></div>
           <div v-else class="hicon"><Icon :name="headIcon" :size="30" /></div>
           <div style="min-width: 0">
             <div v-if="mode !== 'platform'" class="eyebrow">{{ eyebrow }}</div>
@@ -34,8 +35,9 @@
       </header>
 
       <div class="toolbar">
-        <div class="seg"><button v-for="f in filters" :key="f.v" data-focus :class="{ on: filter === f.v }" @click="filter = f.v">{{ f.l }}</button></div>
-        <div class="seg"><button v-for="s in sorts" :key="s.v" data-focus :class="{ on: sort === s.v }" @click="sort = s.v">{{ s.l }}</button></div>
+        <!-- compact: what to show and the order are each one button with a menu -->
+        <button class="btn small" :class="{ primary: filter !== 'all' }" data-focus @click="pickShow"><Icon name="mdiEyeOutline" :size="18" />{{ filters.find((f) => f.v === filter)?.l }}</button>
+        <button class="btn small" data-focus @click="pickSort"><Icon name="mdiSortVariant" :size="18" />{{ sorts.find((x) => x.v === sort)?.l }}</button>
         <button class="btn small" data-focus @click="search"><Icon name="mdiMagnify" :size="18" />{{ q ? `“${q}”` : 'Filter' }}</button>
         <button v-if="q" class="btn small" data-focus @click="q = ''"><Icon name="mdiClose" :size="18" /></button>
         <button class="btn small" :class="{ primary: nFilters }" data-focus @click="moreFilters"><Icon name="mdiFilterVariant" :size="18" />{{ nFilters ? `Filters · ${nFilters}` : 'Filters' }}</button>
@@ -49,9 +51,7 @@
           <button class="btn small" data-focus @click="stopSelect"><Icon name="mdiCheck" :size="18" />Done</button>
         </template>
         <template v-else>
-          <button v-if="list.length" class="btn small" data-focus @click="surprise"><Icon name="mdiDiceMultipleOutline" :size="18" />Surprise me</button>
-          <button v-if="list.length" class="btn small" data-focus @click="selecting = true"><Icon name="mdiCheckboxMultipleMarkedOutline" :size="18" />Select</button>
-          <button v-if="missingCount && filter !== 'installed' && mode !== 'all'" class="btn small" data-focus @click="downloadAll"><Icon name="mdiDownloadMultiple" :size="18" />Get all {{ missingCount }}</button>
+          <button v-if="list.length" class="btn small" data-focus @click="moreActions"><Icon name="mdiDotsHorizontal" :size="18" />More</button>
         </template>
       </div>
 
@@ -120,8 +120,28 @@ const cur = ref(null);
 const consoleFilter = ref(null);
 const PAGE = 120;
 const limit = ref(PAGE);
-const filters = [{ v: 'all', l: 'All' }, { v: 'installed', l: 'On device' }, { v: 'missing', l: 'Not downloaded' }, { v: 'new', l: 'New' }];
-const sorts = [{ v: 'name', l: 'A–Z' }, { v: 'new', l: 'Recently added' }, { v: 'year', l: 'Release' }, { v: 'rating', l: 'Rating' }, { v: 'size', l: 'Size' }];
+// Show and Sort menus, and More (Surprise me, Select, Get all)
+async function pickShow() {
+  const v = await choose({ title: 'Show', options: filters.map((f) => ({ label: f.l, value: f.v, icon: f.icon, selected: filter.value === f.v })) });
+  if (v) filter.value = v;
+}
+async function pickSort() {
+  const v = await choose({ title: 'Sort by', options: sorts.map((x) => ({ label: x.l, value: x.v, icon: x.icon, selected: sort.value === x.v })) });
+  if (v) sort.value = v;
+}
+async function moreActions() {
+  const canGetAll = missingCount.value && filter.value !== 'installed' && mode.value !== 'all';
+  const v = await choose({ title: title.value, options: [
+    { label: 'Surprise me', sub: 'Open a random game from this list', value: 'surprise', icon: 'mdiDiceMultipleOutline' },
+    { label: 'Select games', sub: 'Download, collect or add many to Steam', value: 'select', icon: 'mdiCheckboxMultipleMarkedOutline' },
+    ...(canGetAll ? [{ label: `Get all ${missingCount.value}`, sub: 'Download every game here not on this device', value: 'all', icon: 'mdiDownloadMultiple' }] : []),
+  ] });
+  if (v === 'surprise') surprise();
+  else if (v === 'select') selecting.value = true;
+  else if (v === 'all') downloadAll();
+}
+const filters = [{ v: 'all', l: 'All', icon: 'mdiViewGridOutline' }, { v: 'installed', l: 'On device', icon: 'mdiCheckCircleOutline' }, { v: 'missing', l: 'Not downloaded', icon: 'mdiCloudOutline' }, { v: 'new', l: 'New', icon: 'mdiNewBox' }];
+const sorts = [{ v: 'name', l: 'A–Z', icon: 'mdiSortAlphabeticalAscending' }, { v: 'new', l: 'Recently added', icon: 'mdiClockOutline' }, { v: 'year', l: 'Release', icon: 'mdiCalendarOutline' }, { v: 'rating', l: 'Rating', icon: 'mdiStarOutline' }, { v: 'size', l: 'Size', icon: 'mdiHarddisk' }];
 
 const platform = computed(() => platformById(props.platformId));
 const collection = computed(() => collectionById(props.collectionId));
@@ -132,6 +152,8 @@ const eyebrow = computed(() => {
   const c = collection.value;
   return c?.series ? 'Series' : c?.auto ? 'Made by Cartridge' : c?.smart ? 'Smart collection' : 'Collection';
 });
+// a series shows its first game's cover in the header instead of a plain icon
+const headArt = computed(() => { if (!collection.value?.series) return ''; const r = source.value.find((x) => x.path_cover_small || x.url_cover); return r ? cover(r) : ''; });
 const headIcon = computed(() => (mode.value === 'all' ? 'mdiViewGridOutline' : mode.value === 'genre' ? 'mdiTagOutline' : collection.value?.favorite ? 'mdiStar' : collection.value?.icon || 'mdiBookmarkMultipleOutline'));
 const source = computed(() => {
   if (mode.value === 'platform') return romsOf(props.platformId);
@@ -377,7 +399,11 @@ onMounted(async () => {
 .fadeup-leave-to { opacity: 0; }
 @media (max-width: 1100px) { .body { grid-template-columns: 1fr; } .detail { display: none; } }
 .con-sec { margin-bottom: 26px; }
-.con-head { display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; font-family: var(--display); font-size: 18px; }
+.con-head { display: flex; align-items: center; gap: 12px; margin: 4px 0 4px; font-family: var(--display); font-size: 18px; }
 .con-head b { font-weight: 700; }
 .con-head .count { color: var(--muted); font-size: 13px; font-family: var(--font); }
+.hicon.art { overflow: hidden; padding: 0; }
+.hicon.art img { width: 100%; height: 100%; object-fit: cover; }
+/* room above each console's games so a highlighted (raised, zoomed) card never covers its header */
+.con-sec .game-grid { padding-top: 14px; }
 </style>

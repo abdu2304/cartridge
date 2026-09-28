@@ -100,6 +100,7 @@ import Gallery from './views/Gallery.vue';
 import Consoles from './views/Consoles.vue';
 import Game from './views/Game.vue';
 import Downloads from './views/Downloads.vue';
+import SteamMissing from './views/SteamMissing.vue';
 import SteamConsole from './views/SteamConsole.vue';
 import Settings from './views/Settings.vue';
 import Search from './views/Search.vue';
@@ -109,7 +110,7 @@ import TrophyGame from './views/TrophyGame.vue';
 import Genres from './views/Genres.vue';
 import Collections from './views/Collections.vue';
 
-const views = { achievements: Achievements, 'ra-game': RaGame, 'trophy-game': TrophyGame, home: Home, library: Gallery, consoles: Consoles, platform: Gallery, collection: Gallery, genre: Gallery, genres: Genres, collections: Collections, game: Game, downloads: Downloads, settings: Settings, search: Search, 'steam-console': SteamConsole };
+const views = { achievements: Achievements, 'ra-game': RaGame, 'trophy-game': TrophyGame, home: Home, library: Gallery, consoles: Consoles, platform: Gallery, collection: Gallery, genre: Gallery, genres: Genres, collections: Collections, game: Game, downloads: Downloads, settings: Settings, search: Search, 'steam-console': SteamConsole, 'steam-missing': SteamMissing };
 // the tabs you picked in Look & Feel → Top bar, in your order
 const tabs = computed(() => activeTabs().map((name) => ({ name, ...TAB_DEFS[name] })));
 const mainEl = ref(null);
