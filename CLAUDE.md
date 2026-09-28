@@ -123,5 +123,8 @@ LT/RT switch top tabs. LB/RB only switch sections inside a page. A select, B bac
 - Backgrounds: `bgRenderers.js` keeps waves/ribbons, adds ps2, wii, wiiu, switch, ds, n3ds, xbox, xbox360 with `BG_BASE` CSS bases and a neutral vignette (`body.bg-console`). Picker is one row plus a grouped menu (Menu `heading`).
 - Steam: `steam:refreshArt` (style: undefined = Cartridge art, 'top', or SteamGridDB styles), `steamLive.setArtwork`. Storage drives include console folders and list `consoles`; Free up space pre-selects games unplayed for 2 months.
 
+## 0.8.1
+- `.net` pill colour coded: nearly solid dark green (LAN), purple (Tunnel), red (Offline) backgrounds with a matching edge.
+
 ## Releases (full steps: HANDOFF D8)
 Only when the owner asks. Bump `version` and `build.releaseInfo.releaseName` ("Cartridge X.Y.Z") in `package.json`, put only this version's notes in `RELEASE_NOTES.md` (heading `## Cartridge X.Y.Z · Title`), add them to the top of `CHANGELOG.md`, grouped as New / Changed / Fixed with bold lead-ins. CI builds, launch-checks and publishes.

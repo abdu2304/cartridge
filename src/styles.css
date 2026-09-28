@@ -89,7 +89,10 @@ img { -webkit-user-drag: none; }
 /* LAN / Tunnel / Offline in the top bar: a light coloured word on a dark see-through pill, readable on
    any background colour */
 .net { padding: 5px 12px; border-radius: 999px; background: rgba(8, 9, 16, 0.38); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08); font-weight: 600; font-size: 12.5px; letter-spacing: 0.08em; }
-.net.ok { color: #b9f6ca; } .net.remote { color: #dccbff; } .net.bad { color: #ffc0c0; }
+/* the pill itself carries the colour: a dark, nearly solid tint (the same on any background) with an edge */
+.net.ok { color: #c9f9d6; background: rgba(20, 84, 48, 0.92); box-shadow: inset 0 0 0 1px rgba(127, 227, 166, 0.55); }
+.net.remote { color: #e6dbff; background: rgba(70, 44, 132, 0.92); box-shadow: inset 0 0 0 1px rgba(190, 165, 255, 0.55); }
+.net.bad { color: #ffd0d0; background: rgba(112, 30, 36, 0.92); box-shadow: inset 0 0 0 1px rgba(255, 140, 140, 0.55); }
 .spin { animation: spin 1.1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
