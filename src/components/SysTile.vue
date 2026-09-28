@@ -1,7 +1,7 @@
 <template>
   <button class="systile" data-focus :data-key="'sys-' + p.id" @click="$emit('open', p)" @focus="$emit('focused', p)" :style="tileStyle">
-    <!-- the faded logo and the colour strip sit in their own clipped layer: while the tile is zoomed on
-         focus they otherwise slip past the rounded corners (software rendering) -->
+    <!-- the controller picture sits in its own clipped layer: while the tile is zoomed on focus it
+         otherwise slips past the rounded corners (software rendering) -->
     <div class="sys-clip"><div class="glyph"><PIcon :p="p" :size="150" /></div></div>
     <div class="sys-top">
       <img v-if="logo && !logoFail" class="sys-logo" :src="logo" :alt="p.display_name" @error="logoFail = true" />
@@ -12,7 +12,7 @@
     <div>
       <div v-if="!logo || logoFail" class="nm">{{ p.display_name }}</div>
       <div v-if="meta" class="fam">{{ meta }}</div>
-      <div class="ct">{{ p.rom_count }} games<template v-if="onDevice"> · <span class="ondev">{{ onDevice }} on device</span></template></div>
+      <div class="ct">{{ p.rom_count }} {{ p.rom_count === 1 ? 'game' : 'games' }}<template v-if="onDevice"> · <span class="ondev">{{ onDevice }} on device</span></template></div>
     </div>
   </button>
 </template>
@@ -37,27 +37,21 @@ function load() {
   call('syslogo:get', { slug: props.p.slug, fs_slug: props.p.fs_slug }).then((u) => { cache.set(k, u || ''); logo.value = u || ''; }).catch(() => cache.set(k, ''));
 }
 
-// The console's own colours, as a tinted glass gradient that stays dark at the bottom right
+// The console's own colours as --sys-a / --sys-b (styles.css builds the tile from them). Consoles
+// without a known pair get a colour from their name, so each keeps the same one.
 const tileStyle = computed(() => {
   const c = consoleColors(props.p);
-  if (!c) {
-    let h = 0; for (const ch of props.p.slug) h = (h * 31 + ch.charCodeAt(0)) % 360;
-    const hue = 230 + (h % 90);
-    return { background: `linear-gradient(145deg, hsla(${hue}, 45%, 30%, .92), rgba(14,16,24,.94) 70%)` };
-  }
-  const [a, b] = c;
-  return {
-    '--sys-a': a, '--sys-b': b,
-    background: `radial-gradient(120% 90% at 0% 0%, ${a}e6 0%, ${a}8c 38%, transparent 70%), linear-gradient(150deg, ${a}66 0%, ${b}59 60%, rgba(12,13,20,.92) 100%), rgba(14,16,24,.9)`,
-  };
+  if (c) return { '--sys-a': c[0], '--sys-b': c[1] };
+  let h = 0; for (const ch of props.p.slug) h = (h * 31 + ch.charCodeAt(0)) % 360;
+  const hue = 200 + (h % 140);
+  return { '--sys-a': `hsl(${hue} 45% 42%)`, '--sys-b': `hsl(${(hue + 30) % 360} 40% 22%)` };
 });
 </script>
 <style>
-.systile .sys-top { height: 44px; display: flex; align-items: center; }
+.systile .sys-top { height: 44px; display: flex; align-items: center; position: relative; z-index: 1; }
+.systile .sys-top + div { position: relative; z-index: 1; }
 .systile .sys-logo { max-height: 34px; max-width: 170px; object-fit: contain; object-position: left center; filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.45)); transition: transform 0.3s var(--ease); transform-origin: left center; }
 .systile:focus .sys-logo { transform: scale(1.06); }
-.systile .ondev { color: var(--green-l); }
-.systile { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 0 0 0 1px rgba(255, 255, 255, 0.05); }
-.systile .sys-clip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; clip-path: inset(0 round 10px); pointer-events: none; }
-.systile .sys-clip::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: linear-gradient(90deg, var(--sys-a, transparent), var(--sys-b, transparent)); opacity: 0.85; }
+.systile .ondev { color: #b9f6ca; }
+.systile .sys-clip { position: absolute; inset: 0; border-radius: inherit; overflow: hidden; clip-path: inset(0 round 16px); pointer-events: none; }
 </style>

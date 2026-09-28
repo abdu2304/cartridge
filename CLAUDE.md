@@ -110,5 +110,9 @@ LT/RT switch top tabs. LB/RB only switch sections inside a page. A select, B bac
 - Real Steam put "%command%" into a live-added shortcut's empty Launch options, which broke launching (args are in Target). `steamLive.settle()` reads the shortcut back (`RegisterForAppDetails`, `strShortcutLaunchOptions`) and sets it again until it sticks. Overview `badLo` (ours, args in Exe, Launch options exactly `%command%`) counts as outdated; `steam:refresh` clears it in place (`reg[id].loFixed`), else re-adds.
 - Smoothness (measured without the GPU): scroll containers `will-change: scroll-position` (`.view`, `.shelf`, `.shelves`, `.menu-list`, `[data-scroll]`, `[data-hscroll]`), so scrolling doesn't repaint the one full-screen `.shell` layer. The vignette is painted as `.shell`'s background (`body:has(.xmb-vignette)`), one full-screen layer fewer. Light effects draw the canvas at full size below 4K (stretching it cost the software compositor more). Light effects animate only the card lift, not the shadow.
 
+## 0.7.13
+- Console cards (owner picked "Showcase" from mockups): `SysTile` only sets `--sys-a`/`--sys-b` (consoleColors, else a hue from the slug); the look is `.systile` in `styles.css`. The picture (`.glyph`) stays inside the card (top/right inset, height from the card, fade mask to the left); the old bottom strip is gone. PIcon's inline size is overridden inside `.glyph`.
+- Consoles header: title plus `.stats` (big numbers, small labels). Top bar connection: `.net` pill (light green LAN, light purple Tunnel, light red Offline on a dark see-through pill), no dot.
+
 ## Releases (full steps: HANDOFF D8)
 Only when the owner asks. Bump `version` and `build.releaseInfo.releaseName` ("Cartridge X.Y.Z") in `package.json`, put only this version's notes in `RELEASE_NOTES.md` (heading `## Cartridge X.Y.Z · Title`), add them to the top of `CHANGELOG.md`, grouped as New / Changed / Fixed with bold lead-ins. CI builds, launch-checks and publishes.

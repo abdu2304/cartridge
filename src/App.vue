@@ -28,7 +28,7 @@
           <svg width="22" height="22" viewBox="0 0 36 36" class="ring"><circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,.12)" stroke-width="4" /><circle cx="18" cy="18" r="15" fill="none" stroke="url(#rg)" stroke-width="4" stroke-linecap="round" :stroke-dasharray="`${dlPct * 0.943} 100`" transform="rotate(-90 18 18)" /><defs><linearGradient id="rg"><stop offset="0" style="stop-color: var(--primary-l)" /><stop offset="1" style="stop-color: var(--peach)" /></linearGradient></defs></svg>
           {{ dlPct }}%
         </div>
-        <div class="item" :title="store.connection.base"><span class="dot" :class="store.connection.route === 'local' ? 'ok' : store.connection.base ? 'remote' : 'bad'" />{{ store.connection.route === 'local' ? 'LAN' : store.connection.base ? 'Tunnel' : 'Offline' }}</div>
+        <div class="item net" :class="store.connection.route === 'local' ? 'ok' : store.connection.base ? 'remote' : 'bad'" :title="store.connection.base">{{ store.connection.route === 'local' ? 'LAN' : store.connection.base ? 'Tunnel' : 'Offline' }}</div>
         <div v-if="battery" class="item"><Icon :name="batteryIcon" :size="18" />{{ battery.level }}%</div>
         <div class="clock">{{ clock }}</div>
       </div>
