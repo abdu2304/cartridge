@@ -263,10 +263,7 @@
             </div>
             <Toggle :model-value="tcfg.sync !== false" label="Sync across devices" desc="Keeps trophies from every device together, stored as private notes on your RomM games. Uses your RomM login, no extra account. Only adds unlocks, never removes them." @update:model-value="(v) => setT({ sync: v })" />
             <p v-if="tcfg.sync !== false" class="muted small" style="margin-top: -6px">{{ syncLine }}</p>
-            <div v-if="tcfg.sync !== false" class="row" style="align-items: flex-end; gap: 12px">
-              <TextField v-model="deviceName" label="This device's name" :placeholder="store.info.hostname || 'Steam Deck'" icon="mdiDevices" style="flex: 1" />
-              <button class="btn" data-focus @click="setT({ device: deviceName.trim() })"><Icon name="mdiCheck" :size="18" />Save name</button>
-            </div>
+            <p v-if="tcfg.sync !== false" class="muted small" style="margin-top: -6px">This device's name is in Settings → About.</p>
             <Toggle v-if="tcfg.sync !== false" :model-value="tcfg.syncIcons !== false" label="Sync trophy pictures" desc="Stores small copies of trophy pictures in RomM too (about 150 to 300 KB per game), so every device shows them, not just the one that played" @update:model-value="(v) => setT({ syncIcons: v })" />
             <Toggle :model-value="tcfg.popups !== false" label="Trophy pop-ups" desc="Shows a pop-up when a trophy unlocks while Cartridge is open" @update:model-value="(v) => setT({ popups: v })" />
             <Toggle :model-value="ui.trophyOnGames !== false" label="Trophies on game pages" desc="PS3, PS4, Xbox 360 and PS Vita games show their trophies" @update:model-value="(v) => saveConfig({ ui: { trophyOnGames: v } })" />
@@ -296,7 +293,16 @@
               <Logo :size="64" />
               <div><div style="font-family: var(--display); font-size: 26px; font-weight: 700">Cartridge</div><div class="muted">Version {{ store.info.version }} · a RomM client for the couch</div></div>
             </div>
+            <!-- the name other devices see: on trophies and on games played here (Recently played) -->
+            <div class="card-s glass">
+              <div class="row" style="align-items: flex-end; gap: 12px">
+                <TextField v-model="deviceName" label="This device's name" :placeholder="store.info.hostname || 'Steam Deck'" icon="mdiDevices" style="flex: 1" />
+                <button class="btn" data-focus @click="saveDevice"><Icon name="mdiCheck" :size="18" />Save name</button>
+              </div>
+              <p class="muted small" style="margin: 0">Shown on your other devices next to games you played here and trophies you unlocked here, for example "Steam Deck" or "Living Room PC".</p>
+            </div>
             <ServerStatus />
+            <ControllerTest />
             <div class="card-s glass">
               <div class="kv"><span>Game Mode</span><span>{{ store.info.gamescope ? 'Yes (gamescope)' : 'No (desktop)' }}</span></div>
               <div class="kv"><span>Controller</span><span>{{ padInfo?.name || input.padName || 'Press any button' }}</span></div>
@@ -329,6 +335,7 @@ import SteamSettings from '../components/SteamSettings.vue';
 import StorageManager from '../components/StorageManager.vue';
 import RommUpload from '../components/RommUpload.vue';
 import ServerStatus from '../components/ServerStatus.vue';
+import ControllerTest from '../components/ControllerTest.vue';
 import { padInfo } from '../pad.js';
 
 const el = ref(null);
@@ -505,6 +512,13 @@ const deviceName = ref(store.config.trophies?.device || '');
 const loadSrc = () => call('trophies:sources').then((r) => (trophySrc.value = r)).catch(() => {});
 watch(() => store.trophyVer, loadSrc);
 loadSrc();
+async function saveDevice() {
+  const name = deviceName.value.trim();
+  await saveConfig({ trophies: { device: name } });
+  call('trophies:sync').catch(() => {});
+  call('play:device', { name }).catch(() => {}); // renames this device in RomM when it's registered there
+  toast('Device name saved', 'ok', 2000);
+}
 async function setT(patch) { await saveConfig({ trophies: patch }); if ('sync' in patch || 'device' in patch) { call('trophies:sync').catch(() => {}); if ('device' in patch) toast('Device name saved', 'ok', 2000); } }
 async function toggleSrc(s, v) { trophySrc.value = await call('trophies:toggle', { src: s.id, enabled: v }); store.config = await call('config:get'); }
 async function chooseSrc(s) {

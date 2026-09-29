@@ -11,6 +11,26 @@ document.body.classList.add('pad-mode'); // the starting mode needs its class to
 let lastRepeat = 0;
 export let lastInput = 0; // for the background: it pauses while you navigate in light-effects mode
 export const scrollMode = () => (performance.now() - lastRepeat < 250 ? 'auto' : 'smooth');
+// A short, snappy scroll (about 120 ms, easing out) instead of the browser's slow smooth scroll.
+// Presses in quick succession add up; while a direction is held it jumps instantly.
+const anims = new WeakMap();
+export function glideBy(sc, dx = 0, dy = 0) {
+  if (!sc || (!dx && !dy)) return;
+  const a = anims.get(sc);
+  const tx = (a ? a.tx : sc.scrollLeft) + dx, ty = (a ? a.ty : sc.scrollTop) + dy;
+  if (a) cancelAnimationFrame(a.raf);
+  if (scrollMode() === 'auto' || document.body.classList.contains('motion-reduce')) { anims.delete(sc); sc.scrollLeft = tx; sc.scrollTop = ty; return; }
+  const sx = sc.scrollLeft, sy = sc.scrollTop, t0 = performance.now(), D = 120;
+  const st = { tx, ty, raf: 0 };
+  const step = (t) => {
+    const k = Math.min(1, (t - t0) / D), e = 1 - Math.pow(1 - k, 3);
+    sc.scrollLeft = sx + (tx - sx) * e; sc.scrollTop = sy + (ty - sy) * e;
+    if (k < 1) st.raf = requestAnimationFrame(step); else anims.delete(sc);
+  };
+  anims.set(sc, st);
+  st.raf = requestAnimationFrame(step);
+}
+export const glideTo = (sc, top) => sc && glideBy(sc, 0, top - (anims.get(sc)?.ty ?? sc.scrollTop));
 const layers = [];
 
 export function pushLayer(el, handlers = {}) {
@@ -53,14 +73,19 @@ export function focusFirst(scope, selector) {
 
 function inScope(el, scope) { return el && scope.contains(el) && el.hasAttribute?.('data-focus'); }
 
+// Moving up and down keeps to the column you started in (a short item in between doesn't pull you
+// sideways); moving left or right sets a new column.
+let colX = null, colFrom = null;
 function move(dir) {
   const layer = topLayer();
   const scope = layer?.el || document.body;
   const cur = document.activeElement;
   if (!inScope(cur, scope)) { focusFirst(scope); return; }
-  // Group hint: elements inside [data-nav-row] prefer staying in the same row for left/right
   const c = cur.getBoundingClientRect();
   const cx = c.left + c.width / 2, cy = c.top + c.height / 2;
+  const vertical = dir === 'up' || dir === 'down';
+  if (!vertical || colFrom !== cur) colX = cx;
+  const wantX = colX;
   let best = null, bestScore = Infinity;
   for (const [el, r] of focusables(scope, true)) {
     if (el === cur) continue;
@@ -72,17 +97,19 @@ function move(dir) {
     else if (dir === 'down') { if (r.top < c.bottom - 4 && y <= cy + 1) continue; primary = y - cy; secondary = overlapGap(c.left, c.right, r.left, r.right); }
     else { if (r.bottom > c.top + 4 && y >= cy - 1) continue; primary = cy - y; secondary = overlapGap(c.left, c.right, r.left, r.right); }
     if (primary <= 0) continue;
-    const score = primary + secondary * 3 + (secondary > 0 ? 5000 : 0); // prefer aligned targets
+    let score = primary + secondary * 3 + (secondary > 0 ? 5000 : 0); // prefer aligned targets
+    if (vertical) score += Math.abs(x - wantX) * 0.35; // then the one nearest your column
     if (score < bestScore) { bestScore = score; best = el; }
   }
   if (best) {
     sfx.move();
     best.focus({ preventScroll: true });
+    colFrom = vertical ? best : null;
     scrollIntoViewSmart(best);
-  } else if (dir === 'up' || dir === 'down') {
+  } else if (vertical) {
     // Nothing further: scroll the container so hidden content becomes reachable
     const sc = cur.closest('[data-scroll]');
-    if (sc) sc.scrollBy({ top: dir === 'down' ? 200 : -200, behavior: scrollMode() });
+    if (sc) glideBy(sc, 0, dir === 'down' ? 200 : -200);
   }
 }
 
@@ -99,18 +126,18 @@ function scrollIntoViewSmart(el) {
   if (row) {
     const rr = row.getBoundingClientRect();
     const pad = Math.min(160, rr.width * 0.18);
-    if (r.left < rr.left + pad) row.scrollBy({ left: r.left - rr.left - pad, behavior: scrollMode() });
-    else if (r.right > rr.right - pad) row.scrollBy({ left: r.right - rr.right + pad, behavior: scrollMode() });
+    if (r.left < rr.left + pad) glideBy(row, r.left - rr.left - pad, 0);
+    else if (r.right > rr.right - pad) glideBy(row, r.right - rr.right + pad, 0);
   }
   const sc = el.closest('[data-scroll]');
   if (!sc) return;
   const s = sc.getBoundingClientRect();
   // nothing focusable above this one: show the top of the page too (a game's banner, a page header)
   const first = [...sc.querySelectorAll('[data-focus]')].find((x) => !x.disabled && x.offsetParent !== null);
-  if (first === el) { sc.scrollTo({ top: 0, behavior: scrollMode() }); return; }
+  if (first === el) { glideTo(sc, 0); return; }
   const vpad = Math.min(120, s.height * 0.2);
-  if (r.top < s.top + vpad) sc.scrollBy({ top: r.top - s.top - vpad, behavior: scrollMode() });
-  else if (r.bottom > s.bottom - vpad) sc.scrollBy({ top: r.bottom - s.bottom + vpad, behavior: scrollMode() });
+  if (r.top < s.top + vpad) glideBy(sc, 0, r.top - s.top - vpad);
+  else if (r.bottom > s.bottom - vpad) glideBy(sc, 0, r.bottom - s.bottom + vpad);
 }
 
 export function dispatch(action) {
@@ -172,35 +199,60 @@ window.addEventListener('mousemove', (e) => {
 }, { passive: true });
 
 // ---------------- gamepad
+// Read on its own 8 ms timer, not once per drawn frame: without the GPU a slow frame would
+// otherwise delay the press. Hold-to-repeat starts after 220 ms and speeds up the longer you hold.
 const BTN = { 0: 'accept', 1: 'back', 2: 'x', 3: 'y', 4: 'lb', 5: 'rb', 6: 'lt', 7: 'rt', 8: 'select', 9: 'start', 12: 'up', 13: 'down', 14: 'left', 15: 'right' };
 const REPEATABLE = new Set(['up', 'down', 'left', 'right', 'lt', 'rt']);
-const state = {}; // key -> { down, next }
-const DELAY = 300, RATE = 70;
+const ACTIONS = [...new Set(Object.values(BTN))];
+const state = {}; // key -> { down, next, n }
+const DELAY = 220, RATE = 70, FAST = 40;
 
 function press(key, isDown, now) {
-  const s = state[key] || (state[key] = { down: false, next: 0 });
-  if (isDown && !s.down) { s.down = true; s.next = now + DELAY; dispatch(key); }
-  else if (isDown && s.down && REPEATABLE.has(key) && now >= s.next) { s.next = now + RATE; lastRepeat = now; dispatch(key); }
+  const s = state[key] || (state[key] = { down: false, next: 0, n: 0 });
+  if (isDown && !s.down) { s.down = true; s.n = 0; s.next = now + DELAY; dispatch(key); }
+  else if (isDown && s.down && REPEATABLE.has(key) && now >= s.next) { s.n++; s.next = now + (s.n > 6 ? FAST : RATE); lastRepeat = now; dispatch(key); }
   else if (!isDown) s.down = false;
 }
-
+// Triggers go by how far they are pulled, never the "pressed" flag: on Linux a trigger can read as
+// half pulled (0.5, "pressed") until it first moves, which made the first LT/RT press do nothing.
+// A trigger only counts once it has been seen at rest.
+const armed = {}; // pad index + trigger -> seen at rest
+function trigger(gp, which, v) {
+  const k = gp.index + which;
+  if (v < 0.6) armed[k] = true;
+  return !!armed[k] && v > 0.6;
+}
+export const padLive = { pads: [] }; // for Settings → About → Controller test
 function poll() {
   const now = performance.now();
   const pads = navigator.getGamepads ? [...navigator.getGamepads()].filter(Boolean) : [];
   const merged = {};
   for (const gp of pads) {
     input.padName = gp.id;
-    gp.buttons.forEach((b, i) => { const a = BTN[i]; if (a && (b.pressed || b.value > 0.5)) merged[a] = true; });
+    gp.buttons.forEach((b, i) => {
+      const a = BTN[i];
+      if (!a || a === 'lt' || a === 'rt') return;
+      if (b.pressed || b.value > 0.5) merged[a] = true;
+    });
+    if (gp.mapping === 'standard' || gp.buttons.length > 7) {
+      if (trigger(gp, 'lt', gp.buttons[6]?.value ?? 0)) merged.lt = true;
+      if (trigger(gp, 'rt', gp.buttons[7]?.value ?? 0)) merged.rt = true;
+    }
+    // pads the browser doesn't map: triggers are axes 2 and 5 resting at -1
+    if (gp.mapping !== 'standard' && gp.axes.length >= 6) {
+      if (trigger(gp, 'lta', (gp.axes[2] + 1) / 2)) merged.lt = true;
+      if (trigger(gp, 'rta', (gp.axes[5] + 1) / 2)) merged.rt = true;
+    }
     const [ax, ay] = gp.axes;
     if (ax < -0.55) merged.left = true;
     if (ax > 0.55) merged.right = true;
     if (ay < -0.55) merged.up = true;
     if (ay > 0.55) merged.down = true;
   }
-  if (document.hasFocus()) for (const key of new Set([...Object.values(BTN)])) press(key, !!merged[key], now);
-  requestAnimationFrame(poll);
+  padLive.pads = pads;
+  if (document.hasFocus()) for (const key of ACTIONS) press(key, !!merged[key], now);
 }
-requestAnimationFrame(poll);
+setInterval(poll, 8);
 
 export function ensureFocus(root) {
   if (!root) return;
@@ -211,13 +263,15 @@ export function ensureFocus(root) {
 }
 export function jump(dir, n = 4) { for (let i = 0; i < n; i++) move(dir); }
 
-// ---------------- drag to scroll (touch, pen, and touch that arrives as a mouse)
-// Native touch scrolling fought with focus-driven scrolling and never worked when Game Mode
-// delivers touches as mouse clicks. So every swipe is handled here: pick the axis after a few
-// pixels, scroll the nearest scroller on that axis, keep momentum on release, and swallow the
-// click that ends a drag. Real mouse users keep normal clicks; dragging with a mouse also scrolls.
-const DRAG_START = 8;
-let drag = null, glide = 0;
+// ---------------- touch and drag scrolling
+// Real touches scroll natively (touch-action pan-x/pan-y in styles.css): the browser's own
+// scrolling is composited, so it tracks your finger and glides like a phone even without the GPU.
+// Game Mode can deliver touches as mouse events instead; those, and mouse drags, go through the
+// drag below: it follows the finger once per frame and keeps momentum on release. A drag swallows
+// the click that ends it, so a swipe never opens a game.
+export const lastPointer = { type: '' }; // for the controller test
+const DRAG_START = 10;
+let drag = null, glide = 0, pend = 0, pendRaf = 0;
 function scrollerFor(el, axis) {
   for (let n = el; n && n !== document.documentElement; n = n.parentElement) {
     const cs = getComputedStyle(n);
@@ -227,8 +281,17 @@ function scrollerFor(el, axis) {
   return null;
 }
 function stopGlide() { cancelAnimationFrame(glide); glide = 0; }
+function flush() {
+  pendRaf = 0;
+  if (!drag?.sc || !pend) return;
+  if (drag.axis === 'x') drag.sc.scrollLeft += pend; else drag.sc.scrollTop += pend;
+  pend = 0;
+}
 window.addEventListener('pointerdown', (e) => {
+  lastPointer.type = e.pointerType;
   stopGlide();
+  // real touches and pens: the browser scrolls natively
+  if (e.pointerType === 'touch' || e.pointerType === 'pen') { drag = null; return; }
   if (e.button !== 0 || e.target.closest('input, textarea, [data-nodrag]')) { drag = null; return; }
   drag = { id: e.pointerId, x: e.clientX, y: e.clientY, lx: e.clientX, ly: e.clientY, axis: null, sc: null, target: e.target, hist: [] };
 }, { capture: true, passive: true });
@@ -242,42 +305,44 @@ window.addEventListener('pointermove', (e) => {
     drag.sc = scrollerFor(drag.target, want) || scrollerFor(drag.target, want === 'x' ? 'y' : 'x');
     if (drag.sc && !scrollerFor(drag.target, want)) drag.axis = want === 'x' ? 'y' : 'x';
     if (!drag.sc) { drag = null; return; }
-    drag.sc.style.scrollBehavior = 'auto';
+    const a = anims.get(drag.sc); if (a) { cancelAnimationFrame(a.raf); anims.delete(drag.sc); }
     document.body.classList.add('dragging');
   }
-  const mx = drag.lx - e.clientX, my = drag.ly - e.clientY;
+  const m = drag.axis === 'x' ? drag.lx - e.clientX : drag.ly - e.clientY;
   drag.lx = e.clientX; drag.ly = e.clientY;
-  if (drag.axis === 'x') drag.sc.scrollLeft += mx; else drag.sc.scrollTop += my;
+  pend += m;
+  if (!pendRaf) pendRaf = requestAnimationFrame(flush);
   const now = performance.now();
-  drag.hist.push([now, drag.axis === 'x' ? mx : my]);
-  while (drag.hist.length && now - drag.hist[0][0] > 90) drag.hist.shift();
+  drag.hist.push([now, m]);
+  while (drag.hist.length && now - drag.hist[0][0] > 100) drag.hist.shift();
 }, { capture: true, passive: true });
 function endDrag(e) {
   if (!drag || e.pointerId !== drag.id) return;
+  flush();
   const d = drag; drag = null;
   if (!d.axis) return;
   document.body.classList.remove('dragging');
-  // swallow the click that the browser sends at the end of a drag
   const eat = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
   window.addEventListener('click', eat, { capture: true, once: true });
-  setTimeout(() => window.removeEventListener('click', eat, { capture: true }), 60);
-  // momentum
+  setTimeout(() => window.removeEventListener('click', eat, { capture: true }), 80);
+  // momentum like a phone: starts at your finger's speed and eases out over about a second
   const span = d.hist.length > 1 ? d.hist[d.hist.length - 1][0] - d.hist[0][0] : 0;
   let v = span > 0 ? d.hist.reduce((s, h) => s + h[1], 0) / span : 0; // px per ms
-  if (Math.abs(v) < 0.1) return;
-  v = Math.max(-4, Math.min(4, v));
+  if (Math.abs(v) < 0.05) return;
+  v = Math.max(-6, Math.min(6, v));
   let last = performance.now();
   const step = (t) => {
     const dt = Math.min(32, t - last); last = t;
     if (d.axis === 'x') d.sc.scrollLeft += v * dt; else d.sc.scrollTop += v * dt;
-    v *= Math.pow(0.95, dt / 16);
-    glide = Math.abs(v) > 0.02 ? requestAnimationFrame(step) : 0;
+    v *= Math.pow(0.9965, dt);
+    glide = Math.abs(v) > 0.015 ? requestAnimationFrame(step) : 0;
   };
   glide = requestAnimationFrame(step);
 }
 window.addEventListener('pointerup', endDrag, { capture: true, passive: true });
-window.addEventListener('pointercancel', endDrag, { capture: true, passive: true });
+window.addEventListener('pointercancel', (e) => { if (drag && e.pointerId === drag.id) { drag = null; document.body.classList.remove('dragging'); } }, { capture: true, passive: true });
 window.addEventListener('wheel', stopGlide, { passive: true });
+window.addEventListener('touchstart', stopGlide, { passive: true });
 // With touch, a tap should open things without also yanking the view around to "focus" them.
 window.addEventListener('mousedown', (e) => {
   if (input.mode === 'touch' && !e.target.closest('input, textarea')) e.preventDefault();

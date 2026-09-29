@@ -231,9 +231,13 @@ module.exports = function createTrophyService(ctx) {
     };
   }
   function allKeys() { return [...new Set([...games.keys(), ...remote.keys()])]; }
+  // games you hid (Trophies → a game → More): left out of the totals, gamerscore and latest unlocks
+  const hiddenSet = () => new Set(cfg()?.hidden || []);
   function overview() {
-    const list = allKeys().map(merged).filter(Boolean);
-    const summary = { P: 0, G: 0, S: 0, B: 0, trophies: 0, gamerscore: 0, gamerscoreMax: 0, games: list.length };
+    const hidden = hiddenSet();
+    const all = allKeys().map(merged).filter(Boolean);
+    const list = all.filter((g) => !hidden.has(g.key));
+    const summary = { P: 0, G: 0, S: 0, B: 0, trophies: 0, gamerscore: 0, gamerscoreMax: 0, games: list.length, hidden: all.length - list.length };
     const recent = [];
     for (const g of list) {
       for (const t of g.trophies) {
@@ -245,7 +249,7 @@ module.exports = function createTrophyService(ctx) {
       if (T.SOURCES[g.src].kind === 'gamerscore') summary.gamerscoreMax += g.trophies.reduce((s, t) => s + (t.points || 0), 0);
     }
     recent.sort((a, b) => (b.time || 0) - (a.time || 0));
-    const games2 = list.map(light).sort((a, b) => (b.last - a.last) || a.title.localeCompare(b.title));
+    const games2 = all.map((g) => ({ ...light(g), hidden: hidden.has(g.key) })).sort((a, b) => (b.last - a.last) || a.title.localeCompare(b.title));
     return { summary, recent: recent.slice(0, 40), games: games2, sources: status(), sync: syncState, device: device(), anySource: status().some((s) => s.state === 'found') || remote.size > 0 };
   }
   function forRom(romId) {
@@ -412,6 +416,14 @@ module.exports = function createTrophyService(ctx) {
     'trophies:linkable': ({ slug, fs_slug }) => {
       const srcs = ORDER.filter((id) => T.SOURCES[id].slugs.includes(slug) || T.SOURCES[id].slugs.includes(fs_slug));
       return allKeys().map(merged).filter((g) => g && srcs.includes(g.src)).map(light).sort((a, b) => a.title.localeCompare(b.title));
+    },
+    'trophies:hide': ({ key, hidden }) => {
+      const set = hiddenSet();
+      if (hidden) set.add(key); else set.delete(key);
+      ctx.getConfig().trophies = { ...(cfg() || {}), hidden: [...set] };
+      ctx.saveConfig();
+      broadcast('trophies', {});
+      return [...set];
     },
     'trophies:link': ({ key, romId }) => {
       // one game per ROM: a new link replaces any other game on that ROM

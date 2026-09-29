@@ -95,7 +95,15 @@ async function more() {
   const key = iconKey(g.value?.romId, g.value?.title);
   const opts = [{ label: 'Change icon', sub: 'SteamGridDB', value: 'icon', icon: 'mdiImageEditOutline' }, { label: 'Reset icon', sub: 'Back to the automatic pick', value: 'reset', icon: 'mdiRestore' }];
   if (g.value?.romId) opts.push({ label: 'Open in library', value: 'lib', icon: 'mdiGamepadVariantOutline' });
+  const hid = (store.config.trophies?.hidden || []).includes(g.value.key);
+  opts.push(hid ? { label: 'Show in totals again', sub: 'Counts in your trophies, gamerscore and latest unlocks', value: 'unhide', icon: 'mdiEyeOutline' } : { label: 'Hide from totals', sub: 'Leaves your trophies, gamerscore and latest unlocks', value: 'hide', icon: 'mdiEyeOffOutline' });
   const v = await choose({ title: g.value.title, options: opts });
+  if (v === 'hide' || v === 'unhide') {
+    const list = await call('trophies:hide', { key: g.value.key, hidden: v === 'hide' });
+    store.config.trophies = { ...(store.config.trophies || {}), hidden: list };
+    toast(v === 'hide' ? 'Hidden from your totals. Trophies → Hidden shows it again.' : 'Counts in your totals again', 'ok', 3000, v === 'hide' ? 'mdiEyeOffOutline' : 'mdiEyeOutline');
+    return;
+  }
   if (v === 'lib') { go('game', { romId: g.value.romId }); return; }
   if (v === 'reset') { await call('icon:reset', { key }); iconChanged(key); toast('Icon reset', 'ok', 2000, 'mdiRestore'); return; }
   if (v !== 'icon') return;

@@ -484,7 +484,13 @@ module.exports = function createSteamManager(ctx) {
   }
   // what a shortcut was made with, to spot ones made before the console's setup changed
   // v2: arguments written into Target like Steam ROM Manager (0.7.11)
-  const sigOf = (t, mode) => (t ? ['v2', mode || 'direct', t.exe, (t.pre || []).join(' '), t.args].join('|') : '');
+  // v3: the emulator in Target, its arguments in Launch options again (0.8.2)
+  const sigOf = (t, mode) => (t ? ['v3', mode || 'direct', t.exe, (t.pre || []).join(' '), t.args].join('|') : '');
+  // Target is the emulator alone; Launch options hold its arguments and the game. Steam adds Launch
+  // options after Target for shortcuts, so no "%command%" in front (a lone or leading %command% kept
+  // games from starting). Only when something must run first (vblank_mode=0, an env var) is it
+  // "<that> %command% <arguments>".
+  const launchFor = (t, lo, args) => ({ target: q(t.exe), launch: (t.pre || []).length ? lo : args });
   function buildLaunch(rom, file, t) {
     const ref = gameRef(rom, file, t);
     let args = t.args;
@@ -571,7 +577,7 @@ module.exports = function createSteamManager(ctx) {
       const t = sc || !g.file ? null : (tFor[g.key] !== undefined ? tFor[g.key] : (tFor[g.key] = templateFor(g.key)));
       const blocked = t?.kind === 'vitaid' ? gameRef(g.rom, g.file, t).missing || null : null;
       // ours with arguments in Target but "%command%" in Launch options (Steam's own default): won't start
-      const badLo = !!(ours && !ours.loFixed && sc.exeRaw && tokenize(sc.exeRaw).length > 1 && /^\s*%command%\s*$/.test(sc.loRaw || ''));
+      const badLo = !!(ours && !ours.inPlace && sc.exeRaw && tokenize(sc.exeRaw).length > 1 && ours.mode !== 'script'); // arguments in Target (0.7.11 to 0.8.1): Update moves them back
       return { romId: g.rom.id, name: g.rom.name, console: g.key, platform: g.platform.display_name, inSteam: !!sc, ours: !!ours, appid: sc?.appid || null, queued, file: g.file, blocked, badLo };
     });
     const keys = [...new Set(games.map((g) => g.console))];
@@ -580,7 +586,7 @@ module.exports = function createSteamManager(ctx) {
       const ps = games.filter((g) => g.console === k);
       return { key: k, label: SHORT[k] || ps[0]?.platform || k, platform: ps[0]?.platform || k, games: ps.length, inSteam: ps.filter((g) => g.inSteam).length, template: t ? { exe: t.exe, start: t.start, lo: [...(t.pre || []), ...(t.command ? ['%command%'] : []), t.args].join(' '), how: t.how, from: t.from, kind: t.kind,
         // exactly what goes in Steam (see plan): arguments in Target unless something wraps the command
-        ...(!(t.pre || []).length && !/%RPCS3_GAMEID%/.test(t.args) ? { target: `${q(t.exe)} ${t.args}`, launch: '' } : { target: q(t.exe), launch: [...(t.pre || []), ...(t.command ? ['%command%'] : []), t.args].join(' ') }) } : null, mode: (cfg().modes || {})[k] || 'direct',
+        ...launchFor(t, [...(t.pre || []), ...(t.command ? ['%command%'] : []), t.args].join(' '), t.args) } : null, mode: (cfg().modes || {})[k] || 'direct',
         // installed emulators to pick from, and which one new shortcuts use
         emus: [...(learned[k] ? [{ id: 'learned', label: 'From your Steam shortcuts', sub: learned[k].from }] : []), ...candidates(k).map((c) => ({ id: c.id, label: c.label, sub: c.t.from }))],
         emu: t?.how === 'yours' ? 'yours' : t?.emu || null,
@@ -674,11 +680,7 @@ module.exports = function createSteamManager(ctx) {
       if (always || nameCount[name.toLowerCase()] > 1 || (names.has(name.toLowerCase()) && !find(scs, g))) name = `${name} (${SHORT[g.key] || g.platform.display_name})`;
       const { lo, args, fallback, missing } = buildLaunch(g.rom, g.file, t);
       if (missing) { skipped.push({ romId: a.romId, name: g.rom.name, why: missing }); continue; }
-      let exe = t.exe, start = t.start, launch = lo, target = q(t.exe);
-      // Like Steam ROM Manager (EmuDeck's setup): the arguments go in Target and Launch options stay
-      // empty. Kept as "%command% ..." only when something must wrap the command (env vars, wrappers)
-      // or for RPCS3's %RPCS3_GAMEID% form, which is read from the launch options.
-      if (!(t.pre || []).length && !/%RPCS3_GAMEID%/.test(args)) { target = `${q(t.exe)} ${args}`.trim(); launch = ''; }
+      let exe = t.exe, start = t.start, { target, launch } = launchFor(t, lo, args);
       if (mode === 'script') { exe = scriptPath(); start = path.dirname(scriptPath()); launch = String(g.rom.id); target = q(exe); }
       const appid = shortcutId(target, name);
       entries.push({
@@ -989,15 +991,27 @@ module.exports = function createSteamManager(ctx) {
     refresh: async (key) => {
       const t = templateFor(key), sig = sigOf(t, (cfg().modes || {})[key]);
       let games = overview().games.filter((g) => g.console === key && g.inSteam && g.ours && g.file && g.appid && (g.badLo || reg[g.appid]?.sig !== sig));
-      // only "%command%" left in Launch options and the setup is current: clear it in place (keeps play time)
+      // With Steam reachable, each shortcut is changed in place: same appid, so its play time,
+      // collections and artwork stay. Otherwise (or if that fails) it's removed and added again.
       const env = environment();
-      const fixable = games.filter((g) => g.badLo && reg[g.appid]?.sig === sig);
-      if (fixable.length && env.account && await live.available(env.account.root)) {
-        const scs = readShortcuts(env.account);
+      const mode = (cfg().modes || {})[key] || 'direct';
+      if (games.length && t && mode !== 'script' && env.account && await live.available(env.account.root)) {
+        const byRom = new Map(installedGames().map((x) => [x.rom.id, x]));
         let fixed = 0;
-        for (const g of fixable) { const sc = scs.find((x) => x.appid === g.appid); if (sc && (await live.settle(g.appid, sc.exeRaw, '')) === 'ok') { reg[g.appid].loFixed = Date.now(); fixed++; } }
+        for (const g of games) {
+          const ig = byRom.get(g.romId);
+          if (!ig?.file) continue;
+          const b = buildLaunch(ig.rom, ig.file, t);
+          if (b.missing) continue;
+          const { target, launch } = launchFor(t, b.lo, b.args);
+          try {
+            if ((await live.updateShortcut(g.appid, { exe: target, start: q(t.start), lo: launch })) === 'ok') {
+              Object.assign(reg[g.appid], { sig, exe: t.exe, mode, inPlace: Date.now() }); delete reg[g.appid].loFixed; fixed++; // Steam saves its file later
+            }
+          } catch (e) { log('steam live update', e.message); }
+        }
         saveReg();
-        games = games.filter((g) => !reg[g.appid]?.loFixed); // anything not fixed in place is re-added
+        games = games.filter((g) => reg[g.appid]?.sig !== sig); // anything not changed in place is re-added
         if (!games.length) return { count: fixed, fixed };
       }
       if (!games.length) return { count: 0 };

@@ -36,9 +36,9 @@
       </header>
 
       <div class="shelf-title"><Icon name="mdiStarShootingOutline" :size="20" />Latest unlocks</div>
-      <div v-if="!data.recent.length" class="muted" style="margin: 0 0 24px">Nothing unlocked yet.</div>
+      <div v-if="!recent.length" class="muted" style="margin: 0 0 24px">Nothing unlocked yet.</div>
       <div v-else class="shelf" data-hscroll>
-        <button v-for="t in data.recent" :key="t.key + t.id" class="tp-unlock glass" data-focus @click="open(t.key)">
+        <button v-for="t in recent" :key="t.key + t.id" class="tp-unlock glass" data-focus @click="open(t.key)">
           <div class="tp-ticon"><img v-if="t.icon" :src="t.icon" loading="lazy" /><Grade v-else :g="t.grade" :size="36" /><span class="tp-ticon-game"><GameIcon :title="t.game" :rom-id="romOf(t.key)" :fallback="t.gameIcon" :size="26" /></span></div>
           <div class="tp-u-body">
             <div class="tp-u-title"><Grade :g="t.grade" :size="16" />{{ t.name }}</div>
@@ -49,10 +49,17 @@
         </button>
       </div>
 
-      <div class="shelf-title" style="margin-top: 18px"><Icon name="mdiGamepadVariantOutline" :size="20" />Games<span class="count">{{ data.games.length }}</span></div>
+      <div class="tp-gh">
+        <div class="shelf-title" style="margin: 0"><Icon name="mdiGamepadVariantOutline" :size="20" />Games<span class="count">{{ games.length }}</span></div>
+        <div class="spacer" />
+        <!-- which consoles, the order, and whether hidden games show -->
+        <button class="btn small" :class="{ primary: show !== 'all' }" data-focus @click="pickShow"><Icon name="mdiEyeOutline" :size="18" />{{ showLabel }}</button>
+        <button class="btn small" data-focus @click="pickSort"><Icon name="mdiSortVariant" :size="18" />{{ SORTS.find((x) => x.v === sort).l }}</button>
+        <button v-if="data.summary.hidden" class="btn small" :class="{ primary: withHidden }" data-focus @click="withHidden = !withHidden"><Icon :name="withHidden ? 'mdiEyeOutline' : 'mdiEyeOffOutline'" :size="18" />Hidden · {{ data.summary.hidden }}</button>
+      </div>
       <div class="tp-games">
-        <button v-for="g in data.games" :key="g.key" class="tp-game glass" data-focus :data-key="'tg-' + g.key" @click="open(g.key)" @focus="focusGame(g)">
-          <GameIcon :title="g.title" :rom-id="g.romId" :fallback="g.icon || (g.cover ? img(g.cover) : '')" :size="76" :grade="g.kind === 'trophy' ? 'G' : null" />
+        <button v-for="g in games" :key="g.key" class="tp-game glass" data-focus :data-key="'tg-' + g.key" @click="open(g.key)" @focus="focusGame(g)">
+          <GameIcon :title="g.title" :rom-id="g.romId" :fallback="g.icon || (g.cover ? img(g.cover) : '')" :size="76" :grade="g.kind === 'trophy' ? 'G' : null" :class="{ 'tp-hid': g.hidden }" />
           <div class="tp-g-body">
             <GameLogo class="tp-g-logo" :logo="store.config.ui.logos !== false ? logoFor(g) : null" :name="g.title" cls="tp-g-title" :area="4200" :max-w="200" :max-h="38" />
             <div class="tp-g-sub"><span class="plat"><ConsoleMark :slug="SLUG[g.src]" :label="g.short" /></span><template v-if="g.last">{{ when(g.last) }}</template><template v-if="g.romId"> · <span class="inlib">In your library</span></template><template v-if="g.remoteOnly"> · <span class="dev">from {{ g.devices[0] || 'another device' }}</span></template></div>
@@ -71,7 +78,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
-import { store, call, img, go, toast, setBg, when, GRADE, logoOf, romById } from '../store.js';
+import { store, call, img, go, toast, setBg, when, GRADE, logoOf, romById, choose } from '../store.js';
 import { useView } from '../useView.js';
 import { focusFirst } from '../nav.js';
 import Icon from '../components/Icon.vue';
@@ -104,6 +111,28 @@ const syncText = computed(() => {
   return 'On this device';
 });
 
+// Show: every console or one; Sort: latest unlock, most or least complete, name
+const show = ref('all'), sort = ref('latest'), withHidden = ref(false);
+const PLAT = { rpcs3: 'PS3', shadps4: 'PS4', xenia: 'Xbox 360', vita3k: 'PS Vita' };
+const SORTS = [{ v: 'latest', l: 'Latest', icon: 'mdiClockOutline' }, { v: 'most', l: 'Most complete', icon: 'mdiProgressCheck' }, { v: 'least', l: 'Least complete', icon: 'mdiProgressClock' }, { v: 'name', l: 'A–Z', icon: 'mdiSortAlphabeticalAscending' }];
+const showLabel = computed(() => (show.value === 'all' ? 'All consoles' : PLAT[show.value]));
+const games = computed(() => {
+  const l = (data.value?.games || []).filter((g) => (show.value === 'all' || g.src === show.value) && (withHidden.value || !g.hidden));
+  if (sort.value === 'most') return [...l].sort((a, b) => pct(b) - pct(a) || b.last - a.last);
+  if (sort.value === 'least') return [...l].sort((a, b) => pct(a) - pct(b) || b.last - a.last);
+  if (sort.value === 'name') return [...l].sort((a, b) => a.title.localeCompare(b.title));
+  return l;
+});
+const recent = computed(() => (data.value?.recent || []).filter((t) => show.value === 'all' || t.src === show.value));
+async function pickShow() {
+  const srcs = [...new Set((data.value?.games || []).map((g) => g.src))];
+  const v = await choose({ title: 'Show', options: [{ label: 'All consoles', value: 'all', icon: 'mdiViewGridOutline', selected: show.value === 'all' }, ...srcs.map((s) => ({ label: PLAT[s] || s, value: s, icon: 'mdiGamepadVariantOutline', selected: show.value === s }))] });
+  if (v) show.value = v;
+}
+async function pickSort() {
+  const v = await choose({ title: 'Sort by', options: SORTS.map((x) => ({ label: x.l, value: x.v, icon: x.icon, selected: sort.value === x.v })) });
+  if (v) sort.value = v;
+}
 async function load() {
   try { data.value = await call('trophies:overview'); if (data.value.sync) store.trophySync = data.value.sync; } catch (e) { toast(e.message, 'error'); }
 }
@@ -134,6 +163,9 @@ onMounted(async () => { await load(); focusFirst(el.value); });
 .chip.found { background: rgba(80, 200, 120, 0.18); color: #9be8b4; }
 .chip.missing { background: rgba(255, 255, 255, 0.08); color: var(--muted); }
 .chip.off { background: rgba(255, 90, 90, 0.14); color: #ffaaaa; }
+.tp-gh { display: flex; align-items: center; gap: 10px; margin: 18px 0 12px; flex-wrap: wrap; }
+.tp-gh .spacer { flex: 1; }
+.tp-hid { opacity: 0.45; }
 .tp-head { display: flex; align-items: center; gap: 20px; margin: 4px 0 24px; flex-wrap: wrap; }
 .tp-grades { display: flex; gap: 12px; flex-wrap: wrap; }
 .tp-grade { display: flex; align-items: center; gap: 10px; padding: 10px 16px 10px 12px; border-radius: 12px; background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); }

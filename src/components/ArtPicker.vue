@@ -16,6 +16,7 @@
       <div v-else class="ap-grid" :class="kind" data-scroll>
         <button v-for="(im, i) in images" :key="im.url" class="ap-item" data-focus :data-autofocus="i === 0 ? '' : undefined" @click="closeModal(im.url)">
           <img :src="img(im.thumb)" loading="lazy" decoding="async" />
+          <span v-if="im.w" class="ap-size" :class="{ low: kind === 'hero' && im.w < 1920 }">{{ im.w }}×{{ im.h }}</span>
           <span v-if="im.style" class="ap-style">{{ im.style }}</span>
         </button>
       </div>
@@ -69,6 +70,9 @@ onBeforeUnmount(() => layer.pop());
 </script>
 
 <style>
+.ap-item { position: relative; }
+.ap-size { position: absolute; left: 6px; bottom: 6px; padding: 2px 7px; border-radius: 6px; background: rgba(0, 0, 0, 0.65); font-size: 11px; font-weight: 600; color: #fff; }
+.ap-size.low { color: #ffc0c0; }
 .dialog.art-picker { width: min(980px, 94vw); max-width: none; height: min(720px, 90vh); }
 .ap-head { display: flex; align-items: baseline; gap: 14px; }
 .ap-games { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

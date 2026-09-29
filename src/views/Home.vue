@@ -88,7 +88,7 @@
 import { computed, ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue';
 import { img, cover, collections, autoLists, seriesLists, genres, visible, store, go, allRoms, visiblePlatforms, romsOf, isNew, setBg, backdropOf, bytes, year, ago, rating, resync, downloadFor, download, romById, toast, logoOf, call, GRADE, loadPlay, playtimeText } from '../store.js';
 import { useView } from '../useView.js';
-import { ensureFocus, scrollMode } from '../nav.js';
+import { ensureFocus, glideTo } from '../nav.js';
 import Icon from '../components/Icon.vue';
 import Logo from '../components/Logo.vue';
 import PIcon from '../components/PIcon.vue';
@@ -203,7 +203,8 @@ const shelves = computed(() => {
   const started = roms.filter((r) => !inPlaying.has(r.id) && !DONE.has(r.user?.status) && (minsOf(r) >= 30 || r.user?.status === 'incomplete')).sort((a, b) => lastPlay(b) - lastPlay(a));
   if (started.length) out.push({ id: 'started', title: 'Finish what you started', icon: 'mdiFlagCheckered', count: started.length, items: started.slice(0, 30) });
   const lastPlayed = roms.filter(lastPlay).sort((a, b) => lastPlay(b) - lastPlay(a));
-  if (lastPlayed.length) out.push({ id: 'played', title: 'Recently played', icon: 'mdiHistory', count: '', items: lastPlayed.slice(0, 30) });
+  // which device it was last played on (this one or another one in RomM)
+  if (lastPlayed.length) out.push({ id: 'played', title: 'Recently played', icon: 'mdiHistory', count: '', items: lastPlayed.slice(0, 30), sub: (r) => store.play[r.id]?.device || '' });
   const most = roms.filter(minsOf).sort((a, b) => minsOf(b) - minsOf(a));
   if (most.length) out.push({ id: 'most', title: 'Most played', icon: 'mdiChartBar', count: '', items: most.slice(0, 30), sub: (r) => playtimeText(minsOf(r)) });
   const recent = [...roms].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 30);
@@ -258,7 +259,7 @@ function onShelfFocus(e) {
   const wrap = e.target.closest('.shelf-wrap');
   if (!wrap || !shelvesEl.value) return;
   if (!document.body.classList.contains('pad-mode')) return; // only snap rows when using a controller
-  shelvesEl.value.scrollTo({ top: wrap.offsetTop - 4, behavior: scrollMode() });
+  glideTo(shelvesEl.value, wrap.offsetTop - 4);
 }
 
 useView(

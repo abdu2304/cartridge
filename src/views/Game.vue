@@ -19,7 +19,7 @@
             <span v-if="fav" class="chip primary"><Icon name="mdiHeart" :size="14" />Favourite</span>
             <span v-if="statusText" class="chip"><Icon name="mdiProgressCheck" :size="14" />{{ statusText }}</span>
             <span v-if="cached?.user?.hidden" class="chip"><Icon name="mdiEyeOffOutline" :size="14" />Hidden</span>
-            <span v-if="play" class="chip" :title="play.src ? 'From ' + play.src : ''"><Icon name="mdiClockOutline" :size="14" />{{ play.min ? playtimeText(play.min) + ' played' : 'Played' }}<template v-if="play.last"> · {{ ago(play.last) }}</template></span>
+            <span v-if="play" class="chip" :title="play.src ? 'From ' + play.src : ''"><Icon name="mdiClockOutline" :size="14" />{{ play.min ? playtimeText(play.min) + ' played' : 'Played' }}<template v-if="play.last"> · {{ ago(play.last) }}</template><template v-if="play.remote && play.device"> on {{ play.device }}</template></span>
           </div>
 
           <!-- HowLongToBeat: its logo comes from your RomM server (RomM ships it), so none is kept here -->

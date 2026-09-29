@@ -125,8 +125,14 @@ module.exports = function steamLive({ log = () => {} } = {}) {
       return 'retried';
     })()`, 20000).then((r) => { if (r !== 'ok') log('steam live launch options', appid >>> 0, r); return r; }).catch((e) => log('steam live settle', e.message));
   }
+  // change an existing shortcut in place (same appid: play time, collections and artwork stay)
+  async function updateShortcut(appid, { exe, start, lo }) {
+    await run(`(() => { const id = ${appid >>> 0}; SteamClient.Apps.SetShortcutExe(id, ${J(exe)}); SteamClient.Apps.SetShortcutStartDir(id, ${J(start)}); SteamClient.Apps.SetShortcutLaunchOptions(id, ${J(lo)}); return true; })()`);
+    const r = await settle(appid, exe, lo);
+    return r === 'ok' || r === 'unknown' ? 'ok' : r;
+  }
   const removeShortcut = (appid) => run(`SteamClient.Apps.RemoveShortcut(${appid >>> 0}), true`);
   // What SteamGridDB's Decky plugin does after changing artwork
   const restart = () => run('SteamClient.User.StartRestart(false), true', 5000);
-  return { available, addShortcut, removeShortcut, settle, setArtwork, restart, flagOn, FLAG };
+  return { available, addShortcut, removeShortcut, updateShortcut, settle, setArtwork, restart, flagOn, FLAG };
 };
