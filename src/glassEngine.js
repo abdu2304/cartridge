@@ -63,6 +63,9 @@ function paramsOf(el, w, h) {
   const big = el.classList.contains('dialog'), small = Math.min(w, h);
   return { frost: big ? 14 : el.classList.contains('tabs') ? 7 : 5, bezel: Math.max(8, Math.min(big ? 26 : 18, small * 0.32)), scale: big ? 34 : Math.min(44, small * 0.6) };
 }
+// 0.9.54 (owner: dark Glass looked milky): dark glass keeps the colours behind it rich but not loud (saturate 1.45,
+// contrast 1.05, as its CSS backdrop); Light keeps 1.6. A theme change gives every piece its new filter (key 'd'/'l').
+const tone = () => (document.body.classList.contains('theme-light') ? { k: 'l', sat: 1.6, con: 1 } : { k: 'd', sat: 1.45, con: 1.05 });
 function filterFor(el) {
   // 0.9.49: the layout size, not getBoundingClientRect: a pop-up measured while it arrives (scaled to 0.9) got a filter
   // smaller than itself, and the part outside showed the page sharp along its edges (the keyboard, owner's photos)
@@ -70,8 +73,8 @@ function filterFor(el) {
   if (bw < 24 || bh < 16) return null;
   const w = Math.ceil(bw / 8) * 8, h = Math.ceil(bh / 8) * 8;
   const r = Math.min(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0, w / 2, h / 2);
-  const p = paramsOf(el, w, h);
-  const key = `${w}x${h}r${Math.round(r)}f${p.frost}`;
+  const p = paramsOf(el, w, h), t = tone();
+  const key = `${w}x${h}r${Math.round(r)}f${p.frost}${t.k}`;
   let f = filters.get(key);
   if (!f) {
     if (filters.size >= 32) { const old = [...filters.entries()].sort((a, b2) => a[1].used - b2[1].used)[0]; document.getElementById(old[1].id)?.remove(); filters.delete(old[0]); }
@@ -92,8 +95,8 @@ function filterFor(el) {
       + `<feImage href="${lensMap(w, h, r, p.bezel)}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none" result="lensPic"/>`
       + `<feComposite in="lensPic" in2="still" operator="over" result="lens"/>`
       + `<feDisplacementMap in="frost" in2="lens" scale="${p.scale}" xChannelSelector="R" yChannelSelector="G" result="bent"/>`
-      + `<feColorMatrix in="bent" type="saturate" values="1.6" result="sat"/>`
-      + `<feComponentTransfer in="sat"><feFuncA type="table" tableValues="1 1"/></feComponentTransfer>`;
+      + `<feColorMatrix in="bent" type="saturate" values="${t.sat}" result="sat"/>`
+      + `<feComponentTransfer in="sat">${t.con === 1 ? '' : ['R', 'G', 'B'].map((c) => `<feFunc${c} type="linear" slope="${t.con}" intercept="${((1 - t.con) / 2).toFixed(3)}"/>`).join('')}<feFuncA type="table" tableValues="1 1"/></feComponentTransfer>`;
     ensureDefs().appendChild(node);
     f = { id, used: 0 };
     filters.set(key, f);
@@ -163,7 +166,7 @@ export function startGlass() {
   });
   mo.observe(document.body, { childList: true, subtree: true });
   // the body's classes say whether Glass, light effects or reduced motion are on
-  new MutationObserver(() => enable(allowed())).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(() => { enable(allowed()); if (on) scan(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   enable(allowed());
   let lastScroll = 0;
   addEventListener('scroll', () => { const t = performance.now(); if (on && t - lastScroll > 5000) { lastScroll = t; glassSample(); } }, { capture: true, passive: true });

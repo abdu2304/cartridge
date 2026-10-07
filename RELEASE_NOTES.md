@@ -1,8 +1,4 @@
-## Cartridge 0.9.53 · A New Look
+## Cartridge 0.9.54 · Obsidian Glass
 
-### New
-- **A new brand.** Cartridge's mark is now a panel with the C cut out of it, lit orange from behind. The app icon, the Steam artwork (cover, banner, logo, icon) and the welcome's opening all use it. Use Settings → Steam → Add to Steam again to give Cartridge's own Steam entry the new artwork.
-- **A new GitHub page.** The README shows Cartridge with a real library, in all four looks, with a moving header.
-
-### Fixed
-- **Console cards in Light:** console names on the darker cards (PlayStation 2, 3 and 4, Xbox) were dark on dark and hard to read. They stay white now.
+### Changed
+- **Dark Glass is smoked black glass now.** It was a milky grey film. The Dock, search, buttons, pop-ups and toasts are near-black with a hint of your colour, the art behind them stays rich instead of washing out, and the glass gets its shape from crisp edges: a fine line of light on one side, a dark one on the other, and a deeper shadow under the pieces that float. Light Glass, Plain and OLED Plain are unchanged.

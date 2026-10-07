@@ -17,8 +17,10 @@ Code: `src/glassEngine.js` (the engine), the end of `src/styles.css` (Liquid Gla
 art) gets an SVG filter as its `backdrop-filter`:
 
 ```
-feGaussianBlur (frost) -> feImage (lens map) -> feDisplacementMap -> feColorMatrix (saturate 1.6)
+feGaussianBlur (frost) -> feImage (lens map) -> feDisplacementMap -> feColorMatrix (saturate) -> contrast
 ```
+
+The tone depends on the theme (0.9.54): dark glass saturates 1.45 and adds 5% contrast, so game art stays rich under smoked glass without turning loud; Light keeps saturate 1.6. Each piece's filter key carries the tone, and a theme change rebuilds them. Dark glass itself is smoked obsidian (near-black with 9% of the chosen colour, 72% fill, 80% on sheets, no brightening of the backdrop), shaped by its edges: the moving rim light fading to a dark line on the far side, a light bevel top-left and a dark one bottom-right, a faint top-down sheen, a contact shadow on controls and a deep one on floating pieces.
 
 The lens map is drawn once per size on a canvas at half resolution: a rounded rectangle's signed distance field;
 inside the bezel the surface curves down to the rim like a quarter circle, and the slope of that curve sets how far
