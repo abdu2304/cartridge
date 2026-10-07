@@ -194,9 +194,15 @@ export function applyTheme(uiOrName) {
   if (surf.bg && !black && !lightT && surf.glassA < 1) S[0] = surf.bg;
   // OLED (0.9.41, owner: "no difference from Cartridge"): black panels too, set apart by a fine edge (body.theme-oled)
   if (t.oled) { S[1] = '#000000'; S[2] = '#101012'; S[3] = '#1c1c1f'; }
-  // chosen but not where you are: a lighter grey fill (0.9.2, replaces accent stripes)
-  r.setProperty('--sel', lightT ? '#d1d1d8' : t.oled ? '#232327' : hsl(sh[0], ss, el.black ? 0.22 : 0.26));
-  S.forEach((c, i) => r.setProperty('--s' + i, el.glassA < 1 && i ? `rgba(${rgb(c)}, ${el.glassA})` : c));
+  // chosen but not where you are (0.9.2: a fill, never stripes). 0.9.57 (owner: the grey highlights "look like absolute
+  // shit"): in the dark looks the chosen fill is your highlight colour, solid, with its own text colour (--on-sel), the
+  // same as focus; focus adds its ring. Light keeps its soft grey, which reads as chosen on a light page.
+  r.setProperty('--sel', lightT ? '#d1d1d8' : fo);
+  r.setProperty('--on-sel', lightT ? tx.text : foLight ? '#0c0d10' : '#ffffff');
+  r.setProperty('--on-sel-dim', lightT ? tx.muted : foLight ? 'rgba(12, 13, 16, 0.66)' : 'rgba(255, 255, 255, 0.78)');
+  // 0.9.57 (owner: dark Glass looked grey): dark Glass panels are mostly solid, so the page behind only tints them
+  const ga = el.glassA < 1 && !lightT ? Math.max(el.glassA, 0.86) : el.glassA;
+  S.forEach((c, i) => r.setProperty('--s' + i, ga < 1 && i ? `rgba(${rgb(c)}, ${ga})` : c));
   r.setProperty('--xmb', `radial-gradient(120% 90% at 85% 0%, ${g[0]} 0%, transparent 55%), radial-gradient(90% 80% at 0% 100%, ${g[5]} 0%, transparent 60%), linear-gradient(160deg, ${g[1]} 0%, ${g[2]} 38%, ${g[3]} 70%, ${g[4]} 100%)`);
   r.setProperty('--xmb-base', black ? '#000' : g[4]);
   // Cartridge's own theme: a flat page, so art and panels meet it without a seam
@@ -204,7 +210,7 @@ export function applyTheme(uiOrName) {
   for (let i = 0; i < 6; i++) r.setProperty('--g' + i, g[i]);
   r.setProperty('--tint-rgb', black ? '0, 0, 0' : lightT ? '227, 227, 233' : tint);
   // Light (0.9.47): white frosted panels; the dark tint made grey slabs with unreadable text in Light + Glass
-  r.setProperty('--glass-bg', el.glassA < 1 ? `rgba(${lightT ? '255, 255, 255' : black ? '0, 0, 0' : tint}, ${lightT ? 0.84 : el.glassA})` : S[1]);
+  r.setProperty('--glass-bg', el.glassA < 1 ? `rgba(${lightT ? '255, 255, 255' : black || t.oled ? '0, 0, 0' : tint}, ${lightT ? 0.84 : ga})` : S[1]);
   // Liquid Glass tokens (0.9.42): the material's tint (the theme's hue, white glass on Light, black on OLED) and the
   // prominent colour (the highlight) for focused controls and primary buttons
   r.setProperty('--lg-tint', lightT ? '255, 255, 255' : black || t.oled ? '0, 0, 0' : tint);

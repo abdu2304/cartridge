@@ -1300,13 +1300,13 @@ onMounted(() => {
 .rail-item { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-radius: var(--r-md); color: var(--muted); font-weight: 500; transition: background var(--tint), color var(--tint); }
 /* the page follows the list as you move, so the current section only needs brighter text, no box */
 .sync-lock { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--s-2); }
-.rail-item.on { color: var(--text); background: var(--sel); } /* the open section: chosen, the softer fill (docs/design-rules.md 6) */
+.rail-item.on { color: var(--on-sel); background: var(--sel); } /* the open section: chosen, the softer fill (docs/design-rules.md 6) */
 .rail-item:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; }
 .pane { overflow-y: auto; padding: 6px 12px 60px 24px; }
 .ga-cons { display: flex; gap: 8px; overflow-x: auto; padding: 8px 6px 10px; margin: 0 -6px; scrollbar-width: none; } /* room for a selected chip (0.9.28: it was cut off) */
 .ga-con { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--s1); box-shadow: var(--weight-edge); font-weight: 600; font-size: var(--t-sm); }
 .ga-con em { font-style: normal; color: var(--muted); font-weight: 500; }
-.ga-con.on { background: var(--sel); }
+.ga-con.on { background: var(--sel); color: var(--on-sel); }
 .ga-con:focus-visible, .pad-mode .ga-con:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; outline: none; } /* the standard highlight: white fill, dark text, no ring */
 .pad-mode .ga-con:focus em { color: var(--on-focus-dim); }
 .rail-st { color: inherit !important; }
@@ -1360,7 +1360,7 @@ onMounted(() => {
 .bgnow-t small { font-size: var(--t-xs); color: var(--muted); }
 .bgnow-c { display: inline-flex; align-items: center; gap: 2px; font-size: var(--t-sm); font-weight: 600; color: var(--primary-t); }
 .bgtile { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: var(--r-md); background: var(--s2); text-align: left; }
-.bgtile.on { background: var(--sel); }
+.bgtile.on { background: var(--sel); color: var(--on-sel); }
 .bgtile b { font-size: var(--t-sm); font-weight: 600; margin-top: 6px; }
 .bgtile small { font-size: var(--t-xs); color: var(--muted); }
 .bgp { position: relative; height: 54px; border-radius: var(--r-sm); overflow: hidden; background: var(--xmb); }
@@ -1382,7 +1382,7 @@ onMounted(() => {
 .fonttile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 8px; border-radius: var(--r-md); background: var(--s2); }
 .fonttile b { font-size: var(--t-xl); font-weight: 600; line-height: 1.1; }
 .fonttile span { font-size: var(--t-xs); color: var(--muted); }
-.fonttile.on { background: var(--sel); }
+.fonttile.on { background: var(--sel); color: var(--on-sel); }
 .steam-grid { width: 130px; border-radius: var(--r-sm); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5); flex: none; }
 .fadeup-enter-active { transition: opacity var(--fade-in), transform var(--spring-d) var(--spring); }
 .fadeup-enter-from { opacity: 0; transform: translateX(10px); }

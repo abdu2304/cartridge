@@ -383,7 +383,8 @@ body.light-fx .systile .glyph { filter: saturate(0.6) brightness(1.1); }
 .menu-list > * { flex: none; }
 .menu-item { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--r-md); background: var(--s2); font-size: var(--t-md); font-weight: 500; transition: background var(--d-fast), color var(--d-fast); }
 .menu-item.danger { color: var(--danger-t, #ff9b93); }
-.menu-item.selected { background: var(--sel); }
+.menu-item.selected { background: var(--sel); color: var(--on-sel); }
+.menu-item.selected :is(.sub, .muted, small) { color: var(--on-sel-dim); }
 /* the chosen option's mark (0.9.49, owner: the tick vanished on a highlighted row; use the green tick everywhere): the
    same green disc with a white check as "On this device", readable on any fill, focused or not */
 .tick-ok { display: inline-grid; place-items: center; flex: none; width: 22px; height: 22px; margin-left: 8px; border-radius: 50%; background: var(--green, #2fb36a); color: #fff; box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.18); }
@@ -400,7 +401,7 @@ body.light-fx .systile .glyph { filter: saturate(0.6) brightness(1.1); }
 .field .box span.val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg { display: inline-flex; background: var(--s2); border-radius: var(--r-md); padding: 4px; gap: 4px; }
 .seg button { padding: 8px 16px; border-radius: var(--r-sm); color: var(--muted); font-size: var(--t-sm); font-weight: 600; transition: background var(--d-fast), color var(--d-fast); }
-.seg button.on { background: var(--sel); color: var(--text); }
+.seg button.on { background: var(--sel); color: var(--on-sel); }
 .seg button:focus-visible, .pad-mode .seg button:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; }
 .toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 18px; border-radius: var(--r-md); background: var(--s2); width: 100%; font-weight: 500; }
 .toggle:focus-visible, .pad-mode .toggle:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; }
@@ -636,24 +637,25 @@ body.theme-oled .statusbar::before { background: linear-gradient(0deg, #000 0%, 
    refraction line on the other, a faint top-down sheen inside, and a two-layer shadow (contact plus a deep one on the
    pieces that float). Light keeps its own values below. */
 body.elements-glass {
-  --lg-ob: color-mix(in srgb, rgb(var(--lg-tint)) 9%, rgb(7, 9, 13)); /* owner: a touch darker, still glass */
-  --lg-fill: color-mix(in srgb, var(--lg-ob) 72%, transparent);
-  --lg-fill-hover: color-mix(in srgb, var(--lg-ob) 82%, transparent);
-  --lg-pane: color-mix(in srgb, var(--lg-ob) 80%, transparent); /* sheets and pop-ups: smoked glass so long text reads */
-  --lg-blur: blur(28px) saturate(1.45) contrast(1.05);
+  /* 0.9.57 (owner: dark Glass looked grey, not black): nearly black smoke, more of it, so what's behind only tints it */
+  --lg-ob: color-mix(in srgb, rgb(var(--lg-tint)) 5%, rgb(4, 5, 8));
+  --lg-fill: color-mix(in srgb, var(--lg-ob) 84%, transparent);
+  --lg-fill-hover: color-mix(in srgb, var(--lg-ob) 92%, transparent);
+  --lg-pane: color-mix(in srgb, var(--lg-ob) 90%, transparent); /* sheets and pop-ups: smoked glass so long text reads */
+  --lg-blur: blur(28px) saturate(1.3) contrast(1.05) brightness(0.85);
   --lg-rim-grad: linear-gradient(var(--lg-angle, 135deg), rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.14) 22%, rgba(255, 255, 255, 0.04) 50%, rgba(0, 0, 0, 0.3) 78%, rgba(0, 0, 0, 0.45) 100%);
   --lg-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.45), inset -1px 0 0 rgba(0, 0, 0, 0.3);
   --lg-drop: 0 4px 8px rgba(0, 0, 0, 0.5);
   --lg-drop-deep: 0 4px 8px rgba(0, 0, 0, 0.5), 0 20px 40px rgba(0, 0, 0, 0.65);
   --lg-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 40%, rgba(0, 0, 0, 0.25) 100%), linear-gradient(166deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 36%, rgba(255, 255, 255, 0) 36.4%);
   --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.12'/%3E%3C/svg%3E");
-  --lg-lit: rgba(var(--lg-hi), 0.88); /* prominent glass: the highlight colour nearly solid, so focus reads white with dark text (owner: not grey) */
+  --lg-lit: rgb(var(--lg-hi)); /* prominent glass: the highlight colour, solid (0.9.57: 0.88 still read grey over black) */
   --lg-lit-rim: linear-gradient(var(--lg-angle, 135deg), #fff 0%, rgba(255, 255, 255, 0.55) 30%, rgba(255, 255, 255, 0.3) 55%, rgba(255, 255, 255, 0.9) 100%);
   /* 0.9.56 (owner: white shadows moving round whatever is focused in dark Glass): no white halo round focus any more,
      only a fine edge and the same contact shadow as everything else */
   --lg-lit-glow: 0 0 0 1px rgba(255, 255, 255, 0.35), 0 4px 10px rgba(0, 0, 0, 0.5);
   --lg-on-lit: var(--lg-on-hi);
-  --lg-sel: rgba(255, 255, 255, 0.16); /* chosen but not focused (0.9.47): brighter glass with white text, never the lit focus look */
+  --lg-sel: var(--sel); /* chosen (0.9.57, owner's pick B): the highlight colour, solid, as in Plain; focus adds its ring */
 }
 body.elements-glass.theme-light {
   --lg-fill: rgba(255, 255, 255, 0.42);
@@ -687,8 +689,9 @@ body.elements-glass.bar-pill.dock-glass .tabs::before, body.elements-glass :is(.
 body.elements-glass.bar-pill.dock-glass .tabs::after, body.elements-glass :is(.top-search, .dialog, .toast, .btn, .seg)::after {
   content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--lg-gloss); pointer-events: none; z-index: -1;
 }
-body.elements-glass :is(.dialog, .toast)::after { background: var(--lg-gloss), var(--lg-grain); background-size: auto, 160px 160px; opacity: 0.9; }
-body.elements-glass .dialog::after { background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 30%), var(--lg-grain); background-size: auto, 160px 160px; }
+/* 0.9.57: no white grain in dark Glass (on black it read as grey speckle); Light keeps its frost */
+body.elements-glass :is(.dialog, .toast)::after { background: var(--lg-gloss); opacity: 0.9; }
+body.elements-glass .dialog::after { background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 30%); }
 body.elements-glass.theme-light .dialog::after { background: linear-gradient(170deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.2) 22%, rgba(255, 255, 255, 0) 22.3%); }
 body.elements-glass .btn:not(.primary):hover { background: var(--lg-fill-hover); }
 /* rows in a glass sheet sit on the glass (no grey blocks), only a hairline marks them; the focused one is lit glass */
@@ -703,8 +706,8 @@ body.elements-glass.bar-pill.dock-glass .tab-ink { background: var(--lg-lit); bo
    focus's white), so the two read the same. Chosen is brighter glass now; only focus is lit, as in Plain (grey vs white). */
 body.elements-glass .seg-ink { background: var(--lg-sel); box-shadow: var(--lg-bevel); }
 body.elements-glass.bar-pill.dock-glass .tab.active, body.elements-glass.bar-pill.dock-glass .tab.active:hover { color: var(--lg-on-lit); }
-body.elements-glass .seg.inked > button.on { color: var(--text); }
-body.elements-glass .btn.primary { background: rgba(var(--primary-rgb), 0.62); color: var(--on-btn, var(--on-primary)); box-shadow: var(--lg-bevel), var(--lg-drop); }
+body.elements-glass .seg.inked > button.on { color: var(--on-sel); }
+body.elements-glass .btn.primary { background: var(--btn, var(--primary)); color: var(--on-btn, var(--on-primary)); box-shadow: var(--lg-bevel), var(--lg-drop); } /* 0.9.57: solid (see-through white over dark was the grey the owner hated) */
 /* 0.9.49 (owner: in Light the main buttons were black frosted glass): on a light page the prominent button is bright
    glass, nearly white, with dark text; it stands out from the others by its brightness, weight and shadow. Focus is
    still the dark lit glass, so where you are never reads the same as what's prominent. */
@@ -763,7 +766,7 @@ body.style-plain:not(.theme-light):not(.theme-oled) :is(.glass, .eg-con, .lrow, 
 body.style-plain:not(.theme-light):not(.theme-oled) .btn:not(.primary):not(:focus):not(:focus-visible) { box-shadow: var(--pl-top), var(--pl-raise); }
 body.style-plain:not(.theme-light):not(.theme-oled) .btn.primary:not(:focus):not(:focus-visible) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), var(--pl-raise); }
 body.style-plain:not(.theme-light):not(.theme-oled) .seg { box-shadow: var(--pl-sink); }
-body.style-plain:not(.theme-light):not(.theme-oled) .seg-ink { background: var(--s3); box-shadow: var(--pl-top), var(--pl-raise); }
+body.style-plain:not(.theme-light):not(.theme-oled) .seg-ink { background: var(--sel); box-shadow: var(--pl-top), var(--pl-raise); }
 body.style-plain:not(.theme-light):not(.theme-oled) :is(.dialog, .toast) { box-shadow: var(--pl-top), var(--pl-edge), var(--shadow-pop); }
 body.style-plain:not(.theme-light):not(.theme-oled) .dialog .menu-item:not(:focus) { box-shadow: var(--pl-edge); }
 body.style-plain:not(.theme-light):not(.theme-oled).bar-pill:is(.dock-black, .dock-accent) .tabs { box-shadow: var(--pl-top), var(--pl-edge), 0 10px 26px -10px rgba(0, 0, 0, 0.7); }
