@@ -1,4 +1,5 @@
-## Cartridge 0.9.54 · Obsidian Glass
+## Cartridge 0.9.55 · Steady
 
-### Changed
-- **Dark Glass is smoked black glass now.** It was a milky grey film. The Dock, search, buttons, pop-ups and toasts are near-black with a hint of your colour, the art behind them stays rich instead of washing out, and the glass gets its shape from crisp edges: a fine line of light on one side, a dark one on the other, and a deeper shadow under the pieces that float. Light Glass, Plain and OLED Plain are unchanged.
+### Fixed
+- **Cartridge no longer freezes a few seconds after it starts.** It waited on Flatpak for the list of installed apps, and the whole app stood still while Flatpak worked, so in Game Mode Steam dimmed it as not responding and the controller could stop working afterwards. Installed Flatpaks are now read straight from Flatpak's folders, the other lookup that could hold the app is done in the background, and the Flatpak access buttons no longer freeze it either.
+- **Home no longer dims a second after you come back from a game.** Going back, Home faded in a second time about a second later. It now stays as it is.
