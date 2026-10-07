@@ -2552,13 +2552,15 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
     for (const [i, u] of todo.entries()) {
       let r;
       try { r = await SS.syncUnit(u, rpc, ssLedger, { extra, backupsRoot: SAVE_BACKUPS, choice: key ? choice : null, dry }); } catch (e) { r = { key: u.key, result: e.code === 'auth' ? 'auth' : 'error', error: e.message }; }
-      results.push({ ...r, label: u.label || u.key, emu: u.emu, emuName: SS.LABEL[u.emu] || u.emu, romId: u.romId, card: u.card, states: !!u.states });
+      results.push({ ...r, label: u.label || u.key, emu: u.emu, emuName: SS.LABEL[u.emu] || u.emu, romId: u.romId, card: u.card, states: !!u.states, why: u.why || null });
       if (!['none', 'same', 'unmatched'].includes(r.result)) log('save sync:', u.key, r.result, r.error || '');
       broadcast('savesync', { state: 'run', done: i + 1, of: todo.length, why, romId });
       if (r.result === 'auth') break;
     }
     const counts = {}; for (const r of results) counts[r.result] = (counts[r.result] || 0) + 1;
-    if (romId == null && !dry) { ssData.last = { at: Date.now(), counts, conflicts: results.filter((r) => r.result === 'conflict').map((r) => ({ key: r.key, label: r.label, emuName: r.emuName, romId: r.romId })) }; saveJson(SAVESYNC_FILE, ssData, false); }
+    // 0.9.56 (owner: each count opens the saves behind it): what each save did in the last whole sync, at most 600
+    const items = results.filter((r) => ['up', 'down', 'same', 'unmatched'].includes(r.result)).slice(0, 600).map((r) => ({ key: r.key, label: r.label, emu: r.emu, emuName: r.emuName, romId: r.romId, card: r.card, states: r.states, result: r.result, why: r.why }));
+    if (romId == null && !dry) { ssData.last = { at: Date.now(), counts, items, conflicts: results.filter((r) => r.result === 'conflict').map((r) => ({ key: r.key, label: r.label, emuName: r.emuName, romId: r.romId })) }; saveJson(SAVESYNC_FILE, ssData, false); }
     broadcast('savesync', { state: 'done', counts, why, romId });
     return { results, counts };
   })().finally(() => { ssBusy = null; });
@@ -4040,7 +4042,9 @@ const handlers = {
   // Add-on downloads (0.9.17): what can be installed for a game, from where, and what Cartridge put in
   // 0.9.52: every source is a provider of the mods engine (modEngine.js); sources lists the game's (EmuCoreX, GameBanana,
   // Nexus Mods, ROM hacks) and source picks one; the PS2 catalog and GameBanana keep their own path below, unchanged
-  'addons:available': async ({ romId, sort = 'downloads', source = '' }) => {
+  // as: a shorter name the game is known by on that site, picked from a suggestion (0.9.56, owner: "Nexus Mods has no
+  // game called Bloodborne Game of the Year Edition, but it has Bloodborne"); mods still install by this game's rules
+  'addons:available': async ({ romId, sort = 'downloads', source = '', as = '' }) => {
     const rom = romIndexMain().get(Number(romId));
     if (!rom) return { emus: [], packs: [], installed: [] };
     const emus = handlers['addons:forGame']({ romId });
@@ -4048,8 +4052,8 @@ const handlers = {
     const out = { emus, installed, packs: [], source: null, error: '', featured: [], sources: modsEng().sourcesFor({ ...modGame(rom), mods: emus.some((e) => require('./modRules').takesMods(e.id)) }) };
     if (source === 'nexus' || source === 'rh') {
       if (source === 'nexus' && !emus.some((e) => require('./modRules').takesMods(e.id))) return { ...out, source, error: 'None of the emulators for this console on this device take mods Cartridge knows how to install.' };
-      const r = await modsEng().list(source, modGame(rom), { sort });
-      return { ...out, source, packs: r.items, error: r.error || '', modGame: r.game || null, hackMode: source === 'rh' ? hackModes(rom) : null };
+      const r = await modsEng().list(source, { ...modGame(rom), as: as || '' }, { sort });
+      return { ...out, source, packs: r.items, error: r.error || '', suggest: r.suggest || null, as: as || '', modGame: r.game || null, hackMode: source === 'rh' ? hackModes(rom) : null };
     }
     // 0.9.23: hand-picked texture packs from their creators' pages (Dolphin by game ID)
     // featured texture packs: GameCube by game ID, and HenrikoMagnifico's GameCube, Wii and 3DS packs by ID or name (0.9.24)
@@ -4074,9 +4078,12 @@ const handlers = {
         if (serial) { try { const g = await S.gbGame(rom.name); if (g) { out.gbGame = g; out.packs.push(...(await S.gbMods(g.id, { sort }))); } } catch {} }
       } else if (emus.length) {
         out.source = 'gb';
-        const g = await S.gbGame(rom.name);
-        if (!g) out.error = `GameBanana has no game called “${rom.name}”.`;
-        else { out.gbGame = g; out.packs = await S.gbMods(g.id, { sort }); }
+        const g = await S.gbGame(as || rom.name);
+        out.as = as || '';
+        if (!g) {
+          out.error = `GameBanana has no game called “${as || rom.name}”.`;
+          if (!as) for (const n of S.shorterTitles(rom.name)) { const h = await S.gbGame(n).catch(() => null); if (h) { out.suggest = { as: n, name: h.name }; break; } }
+        } else { out.gbGame = g; out.packs = await S.gbMods(g.id, { sort }); }
       }
     } catch (e) { out.error = e.message; }
     return out;
@@ -4513,7 +4520,7 @@ const handlers = {
       const spec = kind === 'folder' ? (base?.folder || base?.overProgram || base?.dirBuild ? base : null) : kind === 'program' && !base?.zipped && !base?.overProgram ? null : base;
       // 0.9.23: a copy that can't start (system libraries missing, e.g. Vita3K's Qt6 zip build on SteamOS)
       // is offered its update as a repair, newer or not
-      const broken = kind === 'program' || kind === 'folder' ? U.missingLibs(e.path) : [];
+      const broken = kind === 'program' || kind === 'folder' ? await U.missingLibsAsync(e.path) : [];
       // 0.9.47: an AppImage (or program) built for a newer glibc than this system has can't start: a repair too
       const gp = e.kind !== 'flatpak' && e.path && !/\.exe$/i.test(e.path) ? require('./detect').glibcProblem(e.path) : null;
       if (gp) broken.push(`glibc ${gp.need} (this system has ${gp.have})`);
@@ -4620,8 +4627,9 @@ const handlers = {
         const deep = !fb && L.searchForkFolder(f.exe, rel);
         const to = donor ? path.join(donor, rel) : null, from = fb ? path.join(fb.base, rel) : deep || null;
         const st = from && to ? L.status(from, to) : { state: !to ? 'no-donor' : 'no-folder' };
-        if (recs.some((r) => r.from === from)) continue; // already one of yours
-        suggestions.push({ fork: f.name, exe: f.exe, of: f.of, ofName: SV.NAMES[f.of] || f.of, label, rel, from, to, how: fb?.how || null, ...st });
+        if (recs.some((r) => r.from === from || (to && r.from === to))) continue; // already one of yours (either way round, 0.9.56)
+        // 0.9.56: what each folder holds, so you choose which one both use (the fork's, or the original's)
+        suggestions.push({ fork: f.name, exe: f.exe, of: f.of, ofName: SV.NAMES[f.of] || f.of, label, rel, from, to, how: fb?.how || null, fromInfo: from ? L.summary(from) : null, toInfo: to ? L.summary(to) : null, ...st });
       }
     }
     const links = recs.map((r) => ({ ...r, ...L.status(r.from, r.to) }));
@@ -4643,11 +4651,17 @@ const handlers = {
     }
     return out;
   },
-  'links:check': ({ from, to }) => { const L = require('./folderLinks'); return { why: L.check(from, to), ...L.status(from, to) }; },
-  'links:make': ({ from, to, label, fork, of }) => {
-    const r = require('./folderLinks').link(from, to);
+  'links:check': ({ from, to }) => { const L = require('./folderLinks'); return { why: L.check(from, to), ...L.status(from, to), fromInfo: L.summary(from), toInfo: L.summary(to) }; },
+  // merge: copy the games only the folder being replaced has into the one both will use first (copies only, never over)
+  // main: 'fork' when the original emulator takes the fork's folder (0.9.56, owner: ask which is the main folder)
+  'links:make': ({ from, to, label, fork, of, merge, main }) => {
+    const L = require('./folderLinks');
+    let copied = 0;
+    if (merge && L.status(from, to).state === 'folder') { const m = L.mergeInto(from, to); copied = m.copied.length; log('links merge', from, '->', to, `${m.copied.length} copied, ${m.skipped.length} already there`); }
+    const r = L.link(from, to);
+    r.copied = copied;
     const recs = loadJson(LINKS_FILE, []).filter((x) => x.from !== from);
-    if (!r.already) recs.push({ id: Date.now().toString(36), from, to, kept: r.kept, label: String(label || '').slice(0, 80), fork: fork || '', of: of || '', at: Date.now() });
+    if (!r.already) recs.push({ id: Date.now().toString(36), from, to, kept: r.kept, label: String(label || '').slice(0, 80), fork: fork || '', of: of || '', main: main === 'fork' ? 'fork' : '', at: Date.now() });
     saveJson(LINKS_FILE, recs);
     log('folder linked', from, '->', to, r.kept ? '(kept aside)' : '');
     return r;

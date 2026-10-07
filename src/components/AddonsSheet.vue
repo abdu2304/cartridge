@@ -52,7 +52,15 @@
           <!-- 0.9.32 (owner): sort, most downloaded first -->
           <div v-if="src !== 'rh' && packs.some((p) => p.source === 'gb' || p.source === 'nexus')" class="seg ad-sort"><button v-for="o in SORTS" :key="o.v" data-focus :class="{ on: sort === o.v }" @click="setSort(o.v)">{{ o.l }}</button></div>
         </div>
-        <div v-if="d.error && (kind !== 'tex' || d.source === 'ps2')" class="muted small">{{ d.error }}</div>
+        <div v-if="d.as && !d.error" class="muted small ad-as">Showing {{ srcName }}’s mods for “{{ d.as }}”. <button class="btn small" data-focus @click="useName('')">Use the Full Name</button></div>
+        <template v-if="d.error && (kind !== 'tex' || d.source === 'ps2')">
+          <div class="muted small">{{ d.error }}</div>
+          <!-- 0.9.56 (owner): found under a shorter name; one press shows its mods, installed by this game's rules -->
+          <button v-if="d.suggest" class="ad-row ad-sugg" data-focus @click="useName(d.suggest.as)">
+            <Icon name="mdiMagnify" :size="22" />
+            <span class="ad-mid"><b>Found on {{ srcName }}: {{ d.suggest.name }}</b><span class="muted small">Show its mods for this game. They install the same way, into this game’s folder.</span></span>
+          </button>
+        </template>
         <div v-else-if="!packs.length && src === 'nexus'" class="muted small">No mods for this game on Nexus Mods.</div>
         <div v-else-if="!packs.length && src === 'rh'" class="muted small">No ROM hacks for this game on Romhacking.net.</div>
         <div v-else-if="!packs.length" class="muted small">{{ !d.emus?.length ? 'No emulator for this console is set up here.' : kind === 'tex' ? (d.source === 'ps2' ? 'No texture packs for this game in the catalog yet.' : 'There’s no texture pack catalog for this console yet. A pack you put in the folder above is used once custom textures are on.') : 'No mods for this game on GameBanana.' }}</div>
@@ -75,7 +83,7 @@
         </template>
         <p v-if="packs.some((p) => p.source === 'ps2')" class="muted small">Packs from the EmuCoreX texture catalog, each credited to its creator. Checked against the catalog’s checksum before anything is installed.</p>
         <p v-if="packs.some((p) => p.source === 'gb')" class="muted small">Mods made by GameBanana’s community. Check a mod’s page for which version of the game it needs.</p>
-        <p v-if="src === 'nexus' && packs.length" class="muted small">Mods made by Nexus Mods’ community. Some are made for a game’s PC version: check a mod’s page says it’s for your emulator. Premium members download in one press with their key (Settings → Look & Feel → Metadata); everyone else downloads on the mod’s page, and Cartridge installs it.</p>
+        <p v-if="src === 'nexus' && packs.length" class="muted small">Mods made by Nexus Mods’ community. Some are made for a game’s PC version: check a mod’s page says it’s for your emulator. Premium members download in one press with their key (Settings → Emulators → Game Add-ons); everyone else downloads on the mod’s page, and Cartridge installs it.</p>
         <p v-if="src === 'rh' && packs.length" class="muted small">Hacks and translations from Romhacking.net’s archive. {{ d.hackMode?.retroarch ? 'RetroArch applies a hack as the game loads, so your game file is never changed.' : 'Cartridge makes a patched copy beside your game; the original is never changed.' }} Each hack names the exact copy of the game it needs.</p>
       </div>
 
@@ -143,7 +151,7 @@ const runText = computed(() => { const r = run.value; if (!r) return ''; return 
 // what is already in the game's folder (0.9.19), Cartridge's or not
 const present = ref([]);
 const here = computed(() => present.value.find((x) => x.emu === emu.value?.id) || null);
-function setSrc(id) { if (src.value === id) return; src.value = id; open.value = null; load(); }
+function setSrc(id) { if (src.value === id) return; src.value = id; open.value = null; asName.value = ''; load(); }
 // the right stick (and , .) steps through the sources, looping
 function stepSource(dir) {
   const l = srcs.value; if (l.length < 2) return false;
@@ -152,11 +160,15 @@ function stepSource(dir) {
   return true;
 }
 defineExpose({ stepSource });
+// the shorter name a site knows the game by, picked from its suggestion (0.9.56); a different source starts fresh
+const asName = ref('');
+const srcName = computed(() => (src.value === 'nexus' ? 'Nexus Mods' : src.value === 'rh' ? 'Romhacking.net' : 'GameBanana'));
+function useName(n) { asName.value = n; load(); }
 async function load() {
   call('addons:present', { romIds: [props.romId] }).then((m) => { present.value = m?.[props.romId] || []; }).catch(() => {});
   const keep = d.value?.sources;
   if (d.value) d.value = { ...d.value, packs: [], error: '' };
-  try { d.value = await call('addons:available', { romId: props.romId, sort: sort.value, source: src.value === 'nexus' || src.value === 'rh' ? src.value : '' }); if (!d.value.sources?.length && keep) d.value.sources = keep; } catch (e) { d.value = { emus: [], packs: [], installed: [], error: e.message }; }
+  try { d.value = await call('addons:available', { romId: props.romId, sort: sort.value, source: src.value === 'nexus' || src.value === 'rh' ? src.value : '', as: asName.value }); if (!d.value.sources?.length && keep) d.value.sources = keep; } catch (e) { d.value = { emus: [], packs: [], installed: [], error: e.message }; }
   // a console with no emulator folder for mods (SNES, NES...) opens on its ROM hacks
   if (!d.value.emus?.length && src.value === 'gb' && (d.value.sources || []).some((x) => x.id === 'rh')) { src.value = 'rh'; return load(); }
   if (!emu.value) emu.value = (d.value.source === 'ps2' ? emus.value.find((e) => e.id === 'pcsx2') : null) || emus.value[0] || null;
@@ -279,6 +291,8 @@ onBeforeUnmount(() => { layer?.pop(); off?.(); });
 .ad-files { margin-left: var(--s-5); }
 .ad-img { width: 64px; height: 36px; object-fit: cover; border-radius: var(--r-sm); flex: none; }
 .ad-mid { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.ad-sugg:focus .muted { color: var(--on-focus-dim); }
+.ad-as { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; }
 .ad-sub { font-size: var(--t-sm); opacity: 0.75;  overflow-wrap: anywhere; }
 .ad-end { flex: none; font-size: var(--t-sm); opacity: 0.85; }
 .ad-run { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-2) var(--s-3); border-radius: var(--r-md); background: var(--s2); }

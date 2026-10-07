@@ -26,7 +26,6 @@ import { RENDERERS, DARK_BASE, BG_BASE, LEGACY_ART, artPan, setInk } from '../bg
 import { consoleColors } from '../consoleColors.js';
 import { paletteOf, lightEffects } from '../themes.js';
 import { lastInput } from '../nav.js';
-import { governor } from '../motion.js';
 
 const mode = computed(() => {
   let m = (store.welcoming && !store.welcomeBg && 'ribbons') || store.config?.ui?.bgStyle || 'solid'; // the welcome is on Ribbons until one is picked in its Look step
@@ -83,20 +82,15 @@ function setup() {
   frame = rendererOf(mode.value)(ctx, w, h, S, pal, light.value);
   return true;
 }
-// CAE governor (0.9.47) and the idle glide (0.9.49, owner: after a while idle the background "looks like vomit"): idle
-// used to draw 8 times a second, which made the motion judder. Now the background's own clock slows to a stop over
-// about a second, at full smoothness, and then nothing is drawn at all (cheaper than before); any input and it eases
-// back into motion. If drawing gets expensive (a slow device, a 4K screen) the rate halves by itself.
-let idleT = 0, cost = 0, tv = 0, speed = 1, prevT = 0;
-function stop() { cancelAnimationFrame(raf); clearInterval(idleT); raf = 0; idleT = 0; prevT = 0; }
+// 0.9.56 (owner: the background stopping after a while felt broken; "only when a game is launched"): it never stops
+// for being idle any more. It stops only while a game or another app is in front (store.away, blur, a hidden window)
+// and starts again as soon as Cartridge is back. If drawing gets expensive (a slow device, a 4K screen) the rate halves.
+let cost = 0, tv = 0, prevT = 0;
+function stop() { cancelAnimationFrame(raf); raf = 0; prevT = 0; }
 function next() { raf = requestAnimationFrame(loop); }
-function park() { raf = 0; prevT = 0; clearInterval(idleT); idleT = setInterval(() => { if (governor.mode !== 'idle') { clearInterval(idleT); idleT = 0; if (!raf) raf = requestAnimationFrame(loop); } }, 200); }
 function loop(t) {
-  const want = governor.mode === 'idle' ? 0 : 1;
   const dt = prevT ? Math.min(100, t - prevT) : 16; prevT = t;
-  speed += (want - speed) * Math.min(1, dt / (want ? 450 : 380)); // eases out of idle a little slower than into it
-  tv += dt * speed;
-  if (!want && speed < 0.015) { speed = 0; park(); return; }
+  tv += dt;
   next();
   const gap = (light.value ? 50 : 33) * (cost > 8 ? 2 : 1); // ~30fps (20 in light mode) is plenty for a slow ambient drift
   if (t - last < gap) return;

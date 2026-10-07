@@ -225,3 +225,12 @@ test('the RomM client against a fake RomM server', async () => {
     await assert.rejects(bad.list(1, 'x'), /sign in/i);
   } finally { srv.close(); }
 });
+
+// 0.9.56 (owner: "which games didn't match, why, and what's the fix"): every unmatched save says what was read from it
+test('an unmatched save says why: a memory card, an ID not in the library, a name, or nothing', () => {
+  const SS = require('../electron/saveSync');
+  assert.deepStrictEqual(SS.whyUnmatched({ emu: 'pcsx2', keys: {} }, { card: true }), { code: 'card', console: 'ps2' });
+  assert.deepStrictEqual(SS.whyUnmatched({ emu: 'rpcs3', keys: { serial: 'blus30443', title: 'Demon’s Souls' } }), { code: 'id', id: 'BLUS30443', title: 'Demon’s Souls', console: 'ps3' });
+  assert.deepStrictEqual(SS.whyUnmatched({ emu: 'retroarch', keys: { name: 'Super Metroid (USA)' } }), { code: 'name', name: 'Super Metroid (USA)', console: null });
+  assert.deepStrictEqual(SS.whyUnmatched({ emu: 'dolphin', keys: {} }), { code: 'none', console: 'ngc' });
+});

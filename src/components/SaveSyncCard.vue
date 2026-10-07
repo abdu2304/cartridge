@@ -33,7 +33,8 @@
     <template v-if="st?.on && st?.last">
       <div class="subh">Last Sync</div>
       <div class="ssc-counts">
-        <div v-for="k in SHOWN" :key="k.v" class="ssc-count" :class="{ dim: !st.last.counts?.[k.v] }"><b>{{ st.last.counts?.[k.v] || 0 }}</b><span>{{ k.l }}</span></div>
+        <!-- 0.9.56 (owner): each count opens the saves behind it; Not Matched says why and what fixes it -->
+        <button v-for="k in SHOWN" :key="k.v" class="ssc-count" :class="{ dim: !st.last.counts?.[k.v], warn: k.v === 'unmatched' && st.last.counts?.[k.v] }" data-focus @click="openList(k)"><b>{{ st.last.counts?.[k.v] || 0 }}</b><span>{{ k.l }}</span><Icon name="mdiChevronRight" :size="16" class="ssc-go" /></button>
       </div>
       <p class="muted small">{{ ago(st.last.at) }}</p>
     </template>
@@ -50,7 +51,7 @@
 </template>
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { store, call, toast, choose, ago } from '../store.js';
+import { store, call, toast, choose, ago, romById, consoleName, go } from '../store.js';
 import Icon from './Icon.vue';
 
 const emit = defineEmits(['advanced']);
@@ -90,6 +91,38 @@ async function resolve(c) {
     if (st.value?.last) st.value.last.conflicts = conflicts.value.filter((x) => x.key !== c.key);
   } catch (e) { toast(e.message, 'error', 6000); }
 }
+// ---- the lists behind the counts (0.9.56)
+const ICON = { up: 'mdiCloudUploadOutline', down: 'mdiCloudDownloadOutline', same: 'mdiCheck', unmatched: 'mdiHelpCircleOutline' };
+const gameOf = (it) => romById(it.romId)?.name || it.why?.title || '';
+const conName = (slug) => (slug ? consoleName({ slug, fallback: slug.toUpperCase() }) : '');
+// a save that matched no game: why, in plain words, and what fixes it
+function explain(it) {
+  const w = it.why || { code: 'none' }, emu = it.emuName, con = conName(w.console);
+  if (w.code === 'card') return { short: `No ${con || 'game of its console'} in your library to keep it with`, why: `This is a whole memory card. Cartridge keeps a memory card in RomM with your oldest ${con || 'game of the same console'}, and your RomM library has none.`, fix: `Add any ${con || 'game of that console'} to RomM (or refresh your library if it’s there already), then press Sync Now.` };
+  if (w.code === 'id') return { short: `${w.id} isn’t in your library`, why: `${emu} keeps this save under the game ID ${w.id}${w.title ? ` (${w.title})` : ''}. No game in your library has that ID.`, fix: `If the game is in RomM, download it to this device once: Cartridge reads the ID from the game itself. Or add the ID to its file name in RomM, like “Game Name [${w.id}]”. If it isn’t in RomM, add it and refresh your library. Then press Sync Now.`, id: w.id };
+  if (w.code === 'name') return { short: `No game called “${w.name}”`, why: `${emu} names this save “${w.name}”, and no game in your library has that name${it.emu === 'retroarch' ? ' or file name' : ''}.`, fix: it.emu === 'retroarch' ? 'RetroArch names saves after the game’s file. Download the game from RomM to this device and play it there once, or rename the save to the game’s file name in RomM, then press Sync Now.' : 'Rename the game in RomM to match, or download it here so Cartridge can read its ID, then press Sync Now.' };
+  return { short: 'Nothing readable to match', why: `Cartridge couldn’t read a game ID or a name from this ${emu} save.`, fix: 'It stays on this device as it is; it just isn’t synced. Nothing to do unless you want it in RomM.' };
+}
+async function openList(k) {
+  const items = (st.value?.last?.items || []).filter((x) => x.result === k.v);
+  if (!st.value?.last?.items) return toast('Press Sync Now once and the list shows here.', 'info', 3500);
+  if (!items.length) return toast(`Nothing ${k.l.toLowerCase()} in the last sync`, 'info', 2500);
+  for (;;) {
+    const v = await choose({ sheet: true, title: `${k.l} · ${items.length}`, message: k.v === 'unmatched' ? 'Saves on this device that Cartridge couldn’t match to a game in your library, so they stay here and aren’t synced. Press one to see why and what fixes it.' : '', options: items.map((it, i) => ({ label: gameOf(it) || it.label || it.key, sub: `${it.emuName}${it.card ? ' · memory card' : ''}${it.states ? ' · save states' : ''}${k.v === 'unmatched' ? ' · ' + explain(it).short : ''}`, value: String(i), icon: ICON[k.v], raw: true })) });
+    if (v == null) return;
+    const it = items[Number(v)];
+    if (k.v !== 'unmatched') { if (romById(it.romId)) return go('game', { romId: it.romId }); continue; } // a matched save: its game's page
+    const e = explain(it);
+    const a = await choose({ title: gameOf(it) || it.label || it.key, message: `Why: ${e.why}\n\nWhat fixes it: ${e.fix}`, options: [
+      ...(e.id ? [{ label: 'Copy the ID', sub: e.id, value: 'copy', icon: 'mdiContentCopy', raw: true }] : []),
+      { label: 'Sync Now', sub: 'After the fix', value: 'sync', icon: 'mdiSync' },
+      { label: 'Back to the List', value: 'back', icon: 'mdiArrowLeft' },
+    ] });
+    if (a === 'copy') { await call('clip:write', { text: e.id }); toast('Copied', 'ok', 1800, 'mdiContentCopy'); }
+    if (a === 'sync') return run();
+    if (a == null) return;
+  }
+}
 let off = null;
 onMounted(() => { load(); off = window.cart.on('savesync', (p) => { if (p.state === 'run') { busy.value = true; prog.value = p; } else { busy.value = false; prog.value = {}; load(); } }); });
 onBeforeUnmount(() => off?.());
@@ -106,7 +139,11 @@ defineExpose({ load });
 .small { font-size: var(--t-sm); margin: 0; line-height: 1.45; }
 .stack { display: flex; flex-direction: column; gap: var(--s-2); }
 .ssc-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-2); }
-.ssc-count { display: flex; flex-direction: column; gap: 2px; padding: var(--s-3); border-radius: var(--r-md); background: var(--s1); }
+.ssc-count { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--s-3); border-radius: var(--r-md); background: var(--s1); text-align: left; }
+.ssc-count:focus-visible, .pad-mode .ssc-count:focus { background: var(--focus); color: var(--on-focus); }
+.ssc-count:is(:focus-visible, :focus) span, .ssc-count:is(:focus-visible, :focus) .ssc-go { color: var(--on-focus-dim); }
+.ssc-go { position: absolute; top: var(--s-3); right: var(--s-2); color: var(--muted); }
+.ssc-count.warn b { color: var(--gold); }
 .ssc-count b { font-family: var(--display); font-size: var(--t-xl); font-variant-numeric: tabular-nums; }
 .ssc-count span { font-size: var(--t-xs); color: var(--muted); }
 .ssc-count.dim b { color: var(--muted); }

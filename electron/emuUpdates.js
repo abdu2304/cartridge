@@ -76,6 +76,17 @@ function missingLibs(file) {
     return [...out.matchAll(/^\s*(\S+)\s*=>\s*not found/gm)].map((m) => m[1]).concat([...new Set([...out.matchAll(/version [`']([^']+)' not found/g)].map((m) => m[1]))]);
   } catch { return []; }
 }
+// the same without holding the app (0.9.56): ldd can take seconds on a big program, and the emulator list asked it of
+// every installed copy one after another on Electron's main thread, which Game Mode reads as Cartridge not responding
+function missingLibsAsync(file) {
+  return new Promise((resolve) => {
+    try { if (!file || /\.exe$/i.test(file) || require('./detect').appImageType(file)) return resolve([]); } catch { return resolve([]); }
+    require('child_process').execFile('ldd', [file], { env: plainEnv(), timeout: 8000, encoding: 'utf8' }, (e, out) => {
+      out = String(out || '');
+      resolve([...out.matchAll(/^\s*(\S+)\s*=>\s*not found/gm)].map((m) => m[1]).concat([...new Set([...out.matchAll(/version [`']([^']+)' not found/g)].map((m) => m[1]))]));
+    });
+  });
+}
 // which release source a copy uses: Xenia Edge's AppImage has its own; a Windows build its own files
 const specFor = (id, file = '') => (id === 'xenia' && /edge/i.test(path.basename(file)) ? REPOS.xeniaedge : id === 'xenia' && /\.exe$/i.test(file) ? REPOS['xenia-win'] : REPOS[id]);
 
@@ -313,4 +324,4 @@ async function replaceFolder(file, rel, download) {
   return true;
 }
 
-module.exports = { fitGlibc, layFolder, ranVersion, channelsOf, withChannel, flatpakRemove, installKind, missingLibs, looksRunnable, replaceFolder, specFor, pickAsset, fileFromTar, forgeRelease, appImageFromZip, REPOS, verOf, cmpVer, flatpakUpdates, flatpakUpdate, latestRelease, isNewer, replaceAppImage };
+module.exports = { fitGlibc, layFolder, ranVersion, channelsOf, withChannel, flatpakRemove, installKind, missingLibs, missingLibsAsync, looksRunnable, replaceFolder, specFor, pickAsset, fileFromTar, forgeRelease, appImageFromZip, REPOS, verOf, cmpVer, flatpakUpdates, flatpakUpdate, latestRelease, isNewer, replaceAppImage };

@@ -1265,8 +1265,8 @@ watch(() => store.play, loadWeek);
 .st-face { position: absolute; inset: 0; display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: clamp(10px, min(9cqh, 7cqw), 22px); border-radius: inherit; background: var(--s1); overflow: hidden; isolation: isolate; container-type: size;
   box-shadow: var(--weight-edge), var(--weight);
   transition: transform var(--spring-d) var(--spring), box-shadow var(--tint), opacity var(--fade-in);
-  animation: st-in var(--spring-soft-d) var(--spring-soft) both; animation-delay: calc(var(--n, 0) * 45ms); }
-/* tiles arrive one after another, rising and settling */
+  animation: st-in var(--spring-soft-d) var(--spring-soft) both; animation-delay: calc(min(var(--n, 0), 6) * 30ms); }
+/* tiles arrive one after another, rising and settling (0.9.56: 30 ms apart, the last within 180 ms, so a page is whole sooner) */
 @keyframes st-in { from { opacity: 0; transform: translateY(18px) scale(0.97); } }
 :global(body.motion-reduce .st-face) { animation: none; }
 /* focus (0.9.29, owner: choppy on handhelds): the ring and lift shadow sit on the tile's ::before and fade in
@@ -1412,10 +1412,12 @@ watch(() => store.play, loadWeek);
 .st-lname { min-width: 0; text-wrap: balance; }
 
 /* pages: the board slides a little and settles, its tiles arriving as they do on opening */
-.st-pg-next-leave-active, .st-pg-prev-leave-active { transition: opacity var(--fade-out), transform var(--spring-snappy-d) var(--spring-snappy); }
+/* 0.9.56 (owner: page turns slower than they used to be): out-in waits for the old page to leave, so it goes as fast as it
+   did before 0.9.52 (the snappy spring made that wait 344 ms); the new page then starts at full speed */
+.st-pg-next-leave-active, .st-pg-prev-leave-active { transition: opacity var(--fade-out), transform var(--fade-out); }
 .st-pg-next-leave-to { opacity: 0; transform: translateX(-3%); }
 .st-pg-prev-leave-to { opacity: 0; transform: translateX(3%); }
-.st-pg-next-enter-active, .st-pg-prev-enter-active { transition: opacity var(--fade-slow), transform var(--spring-d) var(--spring); }
+.st-pg-next-enter-active, .st-pg-prev-enter-active { transition: opacity var(--fade-in), transform var(--spring-d) var(--spring); }
 .st-pg-next-enter-from { opacity: 0; transform: translateX(4%); }
 .st-pg-prev-enter-from { opacity: 0; transform: translateX(-4%); }
 :global(body.motion-reduce .st-board) { transition: none !important; transform: none !important; }

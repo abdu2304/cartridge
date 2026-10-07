@@ -390,7 +390,7 @@ async function installVita({ cmd, prefs, item, zrif, onStep = () => {}, signal }
   try { fs.mkdirSync(path.join(prefs[0], 'ux0/app'), { recursive: true }); } catch {}
   // a copy that can't start at all (Vita3K's Qt6 zip build on SteamOS, which an older Cartridge update
   // put in place): say so plainly instead of a silent failure
-  const libs = require('./emuUpdates').missingLibs(cmd?.exe);
+  const libs = await require('./emuUpdates').missingLibsAsync(cmd?.exe); // 0.9.56: without holding the app
   if (libs.length) throw new Error(`Vita3K can’t start on this system (it needs ${libs.slice(0, 2).join(', ')}${libs.length > 2 ? '…' : ''}). Repair it in Settings → Emulators → Vita3K, then try again.`);
   const env = { ...process.env };
   for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];

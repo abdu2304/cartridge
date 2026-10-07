@@ -20,6 +20,12 @@ const titleOf = (t) => S.titleForms(t)[1] || S.titleForms(t)[0] || t;
 // GameBanana's helpers take a fetch: answer them through the web engine (pacing, retries, plain errors)
 const asFetch = (web) => async (url, o = {}) => { const data = await web.json(url, { headers: o.headers }); return { ok: true, status: 200, json: async () => data }; };
 
+// a site's game under a shorter form of the title (0.9.56): { as, name } for the first form it has, else null
+async function suggestFrom(g, find) {
+  for (const n of S.shorterTitles(g.name)) { try { const hit = await find(n); if (hit) return { as: n, name: String(hit.name || n).replace(NX_SUFFIX, '') }; } catch {} }
+  return null;
+}
+
 // ---------------------------------------------------------------- Nexus Mods
 // Its public API (v2 GraphQL) lists games, mods, files and descriptions with no key. A personal API key (Settings)
 // is only used for Premium members' direct downloads (v1 download_link); everyone else downloads on the mod's page.
@@ -42,10 +48,10 @@ function nexus({ web, key = () => null, log = () => {} }) {
     return j.data;
   };
   // the Nexus game for a library game: an exact title match (console suffix aside), the console's own when there are two
-  async function game(g) {
-    const want = loose(titleOf(g.name));
+  async function game(g, name = g.name) {
+    const want = loose(titleOf(name));
     if (!want) return null;
-    const words = titleOf(g.name).replace(/\(.*?\)|\[.*?\]/g, '').replace(/[^A-Za-z0-9 ]+/g, ' ').trim();
+    const words = titleOf(name).replace(/\(.*?\)|\[.*?\]/g, '').replace(/[^A-Za-z0-9 ]+/g, ' ').trim();
     const d = await gql('query($n: String!) { games(filter: { name: [{ value: $n, op: WILDCARD }] }, count: 20) { nodes { id domainName name modCount } } }', { n: words }, 'nexus-games-' + want, 7 * 864e5);
     const hits = (d?.games?.nodes || []).filter((x) => loose(String(x.name).replace(NX_SUFFIX, '')) === want && x.modCount > 0);
     const con = NX_CON[g.slug];
@@ -56,8 +62,10 @@ function nexus({ web, key = () => null, log = () => {} }) {
     id: 'nexus', name: 'Nexus Mods', kind: 'mods', site: 'https://www.nexusmods.com',
     forGame: (g) => !!g.name && g.mods !== false, // only with an emulator Cartridge knows how to install mods into (modRules)
     async list(g, { sort = 'downloads', page = 1 } = {}) {
-      const gm = await game(g);
-      if (!gm) return { items: [], error: `Nexus Mods has no game called “${titleOf(g.name)}”.` };
+      // g.as: a shorter name picked from a suggestion (0.9.56); otherwise, with no game under the full name, the
+      // shorter forms are tried and the first found is offered, never used without asking
+      const gm = await game(g, g.as || g.name);
+      if (!gm) return { items: [], error: `Nexus Mods has no game called “${titleOf(g.as || g.name)}”.`, suggest: g.as ? null : await suggestFrom(g, (n) => game(g, n)) };
       const d = await gql(`query($d: String!, $o: Int!) { mods(filter: { gameDomainName: [{ value: $d }], adultContent: [{ value: false }] }, sort: [{ ${SORT[sort] || 'downloads'}: { direction: DESC } }], count: 50, offset: $o) { totalCount nodes { modId name summary downloads endorsements author uploader { name } thumbnailUrl pictureUrl updatedAt createdAt version modCategory { name } } } }`,
         { d: gm.domainName, o: (page - 1) * 50 }, `nexus-mods-${gm.domainName}-${sort}-${page}`, 30 * 60e3);
       const items = (d?.mods?.nodes || []).map((m) => ({ source: 'nexus', id: m.modId, name: m.name, summary: m.summary || '', authors: [m.author || m.uploader?.name].filter(Boolean), category: m.modCategory?.name || '',
@@ -99,8 +107,8 @@ function gamebanana({ web }) {
     id: 'gb', name: 'GameBanana', kind: 'mods', site: 'https://gamebanana.com',
     forGame: (g) => !!g.name && g.mods !== false, // only with an emulator Cartridge knows how to install mods into (modRules)
     async list(g, { sort = 'downloads', page = 1 } = {}) {
-      const gm = await S.gbGame(g.name, { fetchImpl: f });
-      if (!gm) return { items: [], error: `GameBanana has no game called “${titleOf(g.name)}”.` };
+      const gm = await S.gbGame(g.as || g.name, { fetchImpl: f });
+      if (!gm) return { items: [], error: `GameBanana has no game called “${titleOf(g.as || g.name)}”.`, suggest: g.as ? null : await suggestFrom(g, (n) => S.gbGame(n, { fetchImpl: f })) };
       return { items: (await S.gbMods(gm.id, { fetchImpl: f, sort, page })).map((x) => ({ ...x, kind: 'mods' })), game: gm };
     },
     detail: (it) => S.gbMod(it.id, { fetchImpl: f }),

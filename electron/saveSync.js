@@ -96,14 +96,29 @@ function units({ home = os.homedir(), extra = {}, games = [], carriers = {} } = 
     const sh = shape(s); if (!sh) continue;
     const romId = sh.card ? carriers[CONSOLE[s.emu]] ?? s.romIds?.[0] ?? null : s.romIds?.[0] ?? null;
     const u = { key: sh.key, emu: s.emu, kind: sh.kind, path: s.path, base: s.base, label: s.label || '', romId, card: !!sh.card, slot: slotOf(s.emu, sh.key, sh.kind) };
+    if (romId == null) u.why = whyUnmatched(s, sh);
     if (seen.has(u.key)) continue; // the same save found twice (an EmuDeck link and the folder it points at)
     seen.add(u.key); out.push(u);
   }
   for (const s of states) {
     if (seen.has(s.key)) continue; seen.add(s.key);
-    out.push({ key: s.key, emu: 'retroarch', kind: 'files', path: s.dir, files: s.files, base: s.base, label: s.label, romId: s.romIds?.[0] ?? null, card: false, slot: slotOf('retroarch', s.key, 'files'), states: true });
+    const romId = s.romIds?.[0] ?? null;
+    out.push({ key: s.key, emu: 'retroarch', kind: 'files', path: s.dir, files: s.files, base: s.base, label: s.label, romId, card: false, slot: slotOf('retroarch', s.key, 'files'), states: true, ...(romId == null ? { why: whyUnmatched(s, {}) } : {}) });
   }
   return out;
+}
+// why a save matched no game (0.9.56, owner: "which games didn't match, why, and what's the fix"): what Cartridge
+// read from the save and so what to do about it. code: card (a memory card, but no game of its console in the
+// library to keep it with), id (an ID that no game in the library carries), name (matched by name only, and no game
+// is called that), none (nothing readable). The words are made in the UI from these.
+function whyUnmatched(s, sh = {}) {
+  const k = s.keys || {}, con = CONSOLE[s.emu] || null;
+  if (sh.card) return { code: 'card', console: con };
+  const id = k.switch || k.serial || k.gc || k.n3ds || k.wiiu || k.x360 || (s.serials || [])[0] || '';
+  if (id) return { code: 'id', id: String(id).toUpperCase(), title: k.title || '', console: con };
+  const name = k.title || k.name || '';
+  if (name) return { code: 'name', name, console: con };
+  return { code: 'none', console: con };
 }
 // RomM's slot for a unit: names the save so every device finds the same one (255 characters at most)
 const slotOf = (emu, key, kind) => `cartridge:${emu}:${kind}:${key}`.slice(0, 255);
@@ -346,4 +361,4 @@ function remoteOnly(remotes, localKeys) {
   return [...out.values()];
 }
 
-module.exports = { rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, CONSOLE, LABEL, SUPPORTED };
+module.exports = { rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };

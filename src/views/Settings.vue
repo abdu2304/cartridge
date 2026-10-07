@@ -223,6 +223,14 @@
                 </button>
               </div>
             <p v-if="!texEmus.length" class="muted">None of the emulators that take texture packs or mods (PCSX2, DuckStation, Dolphin, PPSSPP, Azahar, Cemu, Eden, Citron, Yuzu, Ryujinx) are set up here yet.</p>
+              <!-- 0.9.52: Nexus Mods lists mods without a key; Premium members' key makes their downloads one press. 0.9.56 (owner): here
+                   with the mods, not in Look & Feel -->
+              <div class="subh">Nexus Mods</div>
+              <p class="muted small" style="margin-top: -6px">Mods from Nexus Mods show in a game’s Mods without a key. With a Premium account, your personal API key (nexusmods.com → your profile → API Keys) downloads them in one press. {{ store.config.nexusKey ? (nexusWho ? 'Key saved: ' + nexusWho + '.' : 'Key saved.') : '' }}</p>
+              <div class="row" style="align-items: flex-end; gap: 12px">
+                <TextField v-model="nexusKey" label="Nexus Mods API key" placeholder="Paste your key" password icon="mdiKeyVariant" style="flex: 1" />
+                <button class="btn" data-focus :disabled="nexusBusy" @click="saveNexus"><Icon name="mdiCheck" :size="18" />{{ nexusBusy ? 'Checking…' : 'Save key' }}</button>
+              </div>
             </template>
             <LinkedFolders v-else-if="emuPage === 'links'" />
             <template v-else-if="emuPage === 'folders'">
@@ -296,7 +304,9 @@
                 <span class="ft-sw" :style="{ background: (ui.colors || {})[f.k] || f.def() }"><Icon v-if="!(ui.colors || {})[f.k]" name="mdiPaletteOutline" :size="14" /></span>
                 <span class="ft-t"><b>{{ f.l }}</b><small>{{ (ui.colors || {})[f.k] ? 'Custom' : 'From theme' }}</small></span>
               </button>
-              <button v-if="Object.values(ui.colors || {}).some(Boolean)" class="btn small" data-focus @click="saveConfig({ ui: { colors: { highlight: '', buttons: '', bars: '', background: '' } } })"><Icon name="mdiRestore" :size="16" />Use theme colours</button>
+              <!-- 0.9.56 (owner): Highlights, Buttons and Progress Bars in pure black in one press -->
+              <button class="btn small" data-focus :class="{ on: pureBlack }" @click="setPureBlack"><Icon name="mdiCircle" :size="16" />Pure Black</button>
+              <button v-if="Object.values(ui.colors || {}).some(Boolean)" class="btn small" data-focus @click="saveConfig({ ui: { colors: { highlight: '', buttons: '', bars: '', background: '' }, colorsAuto: '' } })"><Icon name="mdiRestore" :size="16" />Use Theme Colours</button>
             </div>
             <div class="row"><span class="lbl">Text</span><div class="seg"><button v-for="(v, k) in TEXTS" :key="k" data-focus :class="{ on: (ui.text || 'normal') === k }" @click="saveConfig({ ui: { text: k } })">{{ v.label }}</button></div></div>
 
@@ -339,13 +349,6 @@
               <div class="row" style="align-items: flex-end; gap: 12px">
                 <TextField v-model="sgdbKey" label="SteamGridDB API key" placeholder="Paste your key" password icon="mdiKeyVariant" style="flex: 1" />
                 <button class="btn" data-focus :disabled="sgdbBusy" @click="saveSgdb"><Icon name="mdiCheck" :size="18" />{{ sgdbBusy ? 'Checking…' : 'Save key' }}</button>
-              </div>
-              <!-- 0.9.52: Nexus Mods lists mods without a key; Premium members' key makes their downloads one press -->
-              <div class="subh">Nexus Mods</div>
-              <p class="muted small" style="margin-top: -6px">Mods from Nexus Mods show in a game’s Mods without a key. With a Premium account, your personal API key (nexusmods.com → your profile → API Keys) downloads them in one press. {{ store.config.nexusKey ? (nexusWho ? 'Key saved: ' + nexusWho + '.' : 'Key saved.') : '' }}</p>
-              <div class="row" style="align-items: flex-end; gap: 12px">
-                <TextField v-model="nexusKey" label="Nexus Mods API key" placeholder="Paste your key" password icon="mdiKeyVariant" style="flex: 1" />
-                <button class="btn" data-focus :disabled="nexusBusy" @click="saveNexus"><Icon name="mdiCheck" :size="18" />{{ nexusBusy ? 'Checking…' : 'Save key' }}</button>
               </div>
               <div class="subh">Fetch Ahead of Time</div>
               <p class="muted small" style="margin-top: -6px">Gets art now, instead of as you browse, so pages open with everything in place.</p>
@@ -582,7 +585,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { store, call, go, tab, saveConfig, pickFolder, choose, confirm, toast, openModal, bytes, ago, resync, scanServer, allRoms, romById, cover, resetLogos, askText, activeTabs, TAB_DEFS, consoleName, openTour } from '../store.js';
 import { useView } from '../useView.js';
 import { input, focusFirst, setPointerPref, setRumble, rumble, stopScroll } from '../nav.js';
-import { THEMES, STYLES, styleOf, dockOf, TEXTS, FONTS, CARD_SHAPES, CARD_SIZES, DENSITIES, themeFrom, themeOf, paletteOf } from '../themes.js';
+import { THEMES, STYLES, styleOf, dockOf, TEXTS, FONTS, CARD_SHAPES, CARD_SIZES, DENSITIES, themeFrom, themeOf, paletteOf, autoColors } from '../themes.js';
 import { BACKGROUNDS, RENDERERS, LEGACY_ART, bgPreview } from '../bgRenderers.js';
 import { setSoundEnabled, setSoundStyle, previewSound, SOUND_PACKS } from '../sfx.js';
 import Icon from '../components/Icon.vue';
@@ -663,7 +666,7 @@ const SEARCH = [
   ['New games go to', 'Library · Games and Storage', 'library', 'folders'], ['Always ask where downloads go', 'Library · Games and Storage', 'library', 'folders'],
   ['BIOS folder', 'Library · Games and Storage', 'library', 'folders'], ['Free up space, storage manager', 'Library · Games and Storage', 'library', 'folders'], ['Check downloaded games', 'Library · Games and Storage', 'library', 'folders'],
   ['Get and update emulators', 'Emulators', 'emu', 'emus'], ['Vita3K, RPCS3, shadPS4, Dolphin, PCSX2...', 'Emulators', 'emu', 'emus'],
-  ['Game add-ons, mods, texture packs, patches', 'Emulators · Game Add-ons', 'emu', 'addons'], ['BIOS and firmware', 'Emulators · Setup and Health', 'emu', 'overview'],
+  ['Game add-ons, mods, texture packs, patches', 'Emulators · Game Add-ons', 'emu', 'addons'], ['Nexus Mods API key', 'Emulators · Game Add-ons', 'emu', 'addons'], ['BIOS and firmware', 'Emulators · Setup and Health', 'emu', 'overview'],
   ['Shortcut health, issues', 'Emulators · Setup and Health', 'emu', 'overview'], ['Console folders', 'Emulators · Console Folders', 'emu', 'folders'], ['Linked folders, share saves with a fork', 'Emulators · Linked Folders', 'emu', 'links'],
   ['Add games to Steam', 'Steam', 'steam'], ['Steam collections', 'Steam', 'steam'], ['Add Cartridge to Steam', 'Steam', 'steam'], ['Frame generation', 'Steam', 'steam'],
   ['RetroAchievements sign in', 'Achievements', 'ra'], ['Sign in to emulators', 'Achievements', 'ra'], ['Trophy folders', 'Achievements', 'ra'], ['Hidden games', 'Achievements', 'ra'], ['Trophy sync', 'Achievements', 'ra'],
@@ -815,6 +818,8 @@ const fineTune = [
   { k: 'bars', l: 'Progress bars', sub: 'Downloads, trophies', def: () => cssVar('--primary') },
   { k: 'background', l: 'Background', sub: 'Waves and gradients', def: () => cssVar('--g2') },
 ];
+const pureBlack = computed(() => ['highlight', 'buttons', 'bars'].every((k) => String((ui.value.colors || {})[k] || '').toLowerCase() === '#000000'));
+function setPureBlack() { saveConfig({ ui: { colors: { highlight: '#000000', buttons: '#000000', bars: '#000000' }, colorsAuto: '' } }); }
 async function pickPart(f) {
   const c = await openModal('color', { value: (ui.value.colors || {})[f.k] || f.def(), title: f.l, note: f.sub, allowReset: !!(ui.value.colors || {})[f.k] });
   if (c === '__theme') await saveConfig({ ui: { colors: { [f.k]: '' } } });
@@ -823,7 +828,7 @@ async function pickPart(f) {
 const customT = computed(() => themeFrom(ui.value.customColor || '#8b74e8'));
 async function pickColor() {
   const c = await openModal('color', { value: ui.value.customColor || THEMES[ui.value.theme]?.accent?.[0] || '#8b74e8' });
-  if (c) await saveConfig({ ui: { theme: 'custom', customColor: c, gameTheme: null } });
+  if (c) await saveConfig({ ui: { theme: 'custom', customColor: c, gameTheme: null, ...autoColors('custom', ui.value) } });
 }
 async function setBg(v) {
   if (v === 'wallpaper' && !ui.value.wallpaper) { await chooseWallpaper(); return; }
@@ -836,31 +841,16 @@ async function chooseWallpaper() {
 }
 // A (0.9.15): each console with enough covers in your library can be the background
 const artBgs = computed(() => (store.lib?.platforms || []).filter((p) => p.rom_count >= 6).map((p) => ({ v: 'art:' + p.slug, l: consoleName(p), sub: 'Your games, slowly panning', group: 'Art' })).sort((a, b) => a.l.localeCompare(b.l)));
-// your five most used consoles first (0.9.16): play time, then games on this device, each as its
-// own games panning (0.9.19: the console scenes were retired)
-const topConsoles = computed(() => {
-  const score = {};
-  for (const r of allRoms()) {
-    const pl = store.play[r.id], inst = !!store.installed[r.id];
-    if (!pl?.min && !inst) continue;
-    const s = (score[r.platform_slug] ||= { min: 0, inst: 0 });
-    s.min += pl?.min || 0; s.inst += inst ? 1 : 0;
-  }
-  return (store.lib?.platforms || []).filter((p) => score[p.slug]).sort((a, b) => score[b.slug].min - score[a.slug].min || score[b.slug].inst - score[a.slug].inst).slice(0, 5);
-});
-const allBgs = computed(() => {
-  const theme = BACKGROUNDS.filter((b) => b.group === 'Theme'), scenes = BACKGROUNDS.filter((b) => b.group === 'Scenes'), other = BACKGROUNDS.filter((b) => b.group === 'Other');
-  const top = topConsoles.value.map((p) => ({ v: 'art:' + p.slug, l: consoleName(p), sub: 'Your games, slowly panning', group: 'Top' }));
-  const used = new Set(top.map((b) => b.v));
-  return [...theme, ...scenes, ...top, ...artBgs.value.filter((b) => !used.has(b.v)), ...other];
-});
-const bgNow = computed(() => { const v = ui.value.bgStyle || 'solid'; const m = LEGACY_ART[v] ? 'art:' + LEGACY_ART[v] : v; return allBgs.value.find((b) => b.v === m) || BACKGROUNDS[0]; });
+// 0.9.56 (owner): the menu is your theme's colours, the scenes' own colours and the rest; the console and game art
+// backgrounds left the menu (a background already set to one keeps working and shows as the current one)
+const allBgs = computed(() => ['Theme', 'Scenes', 'Other'].flatMap((g) => BACKGROUNDS.filter((b) => b.group === g)));
+const bgNow = computed(() => { const v = ui.value.bgStyle || 'solid'; const m = LEGACY_ART[v] ? 'art:' + LEGACY_ART[v] : v; return allBgs.value.find((b) => b.v === m) || artBgs.value.find((b) => b.v === m) || BACKGROUNDS[0]; });
 const BG_ICON = { Theme: 'mdiWaves', Scenes: 'mdiWaves', Top: 'mdiStarOutline', Consoles: 'mdiGamepadVariantOutline', Art: 'mdiImageMultipleOutline', Other: 'mdiImageOutline' };
 async function pickBg() {
   let last = '';
   const pal = paletteOf(ui.value);
   // a picture of each animated one (0.9.3 L); still, artwork and wallpaper keep their icon
-  const options = allBgs.value.map((b) => { const o = { label: b.l, sub: b.sub, value: b.v, icon: BG_ICON[b.group], img: RENDERERS[b.v] ? bgPreview(b.v, pal) : '', selected: bgNow.value.v === b.v, raw: b.group === 'Art' || (b.group === 'Top' && b.v.startsWith('art:')), heading: b.group !== last ? { Theme: 'Your theme colours', Scenes: 'Their own colours', Top: 'Your most played consoles', Art: 'Your games', Other: 'Other' }[b.group] : '' }; last = b.group; return o; });
+  const options = allBgs.value.map((b) => { const o = { label: b.l, sub: b.sub, value: b.v, icon: BG_ICON[b.group], img: RENDERERS[b.v] ? bgPreview(b.v, pal) : '', selected: bgNow.value.v === b.v, heading: b.group !== last ? { Theme: 'Your Theme Colours', Scenes: 'Their Own Colours', Other: 'Other' }[b.group] : '' }; last = b.group; return o; });
   const v = await choose({ title: 'Background', options });
   if (v) await setBg(v);
 }
@@ -882,7 +872,7 @@ function moveTab(n, d) {
   [l[i], l[j]] = [l[j], l[i]];
   saveConfig({ ui: { tabs: l } });
 }
-const LOOK_KEYS = ['theme', 'customColor', 'colors', 'idle', 'style', 'surface', 'elements', 'text', 'font', 'bgStyle', 'wallDim', 'cardShape', 'density', 'gridSize', 'cardTitles', 'mediaBar', 'mediaSize', 'logos', 'motion', 'effects', 'sounds', 'soundPack', 'volume', 'rumble'];
+const LOOK_KEYS = ['theme', 'customColor', 'colors', 'colorsAuto', 'idle', 'style', 'surface', 'elements', 'text', 'font', 'bgStyle', 'wallDim', 'cardShape', 'density', 'gridSize', 'cardTitles', 'mediaBar', 'mediaSize', 'logos', 'motion', 'effects', 'sounds', 'soundPack', 'volume', 'rumble'];
 const presets = computed(() => store.config.lookPresets || []);
 const presetStyle = (p) => { const g = themeOf(p.ui).grad; return { background: `linear-gradient(135deg, ${g[0]}, ${g[2]} 60%, ${g[4]})` }; };
 function lookNow() { const o = {}; for (const k of LOOK_KEYS) if (ui.value[k] !== undefined) o[k] = JSON.parse(JSON.stringify(ui.value[k])); return o; }
@@ -1225,7 +1215,7 @@ function pickStyle(k) { saveConfig({ ui: { style: k, surface: k === 'glass' ? 'g
 function pickTheme(k) {
   const light = !!THEMES[k]?.light, dock = ui.value.dockColor;
   const dockColor = light && dock === 'black' ? 'white' : !light && dock === 'white' && THEMES[ui.value.theme]?.light ? 'black' : undefined;
-  saveConfig({ ui: { theme: k, gameTheme: null, ...(dockColor ? { dockColor } : {}) } });
+  saveConfig({ ui: { theme: k, gameTheme: null, ...(dockColor ? { dockColor } : {}), ...autoColors(k, ui.value) } }); // Light: black parts, OLED: white (0.9.56)
 }
 const DOCK_COLOR = [{ v: 'black', l: 'Black' }, { v: 'white', l: 'White' }, { v: 'accent', l: 'Accent' }]; // Plain only: in Glass the Dock is glass (0.9.45)
 const BAR_ALIGN = [{ v: 'start', l: 'Aligned' }, { v: 'center', l: 'Centred' }];

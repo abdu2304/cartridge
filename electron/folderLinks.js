@@ -9,6 +9,10 @@ const os = require('os');
 
 const KEPT = '.cartridge-kept';
 const lst = (p) => { try { return fs.lstatSync(p); } catch { return null; } };
+// through links (0.9.56, owner: "it says the folder to share doesn't exist, I'm sure it exists"): EmuDeck makes an
+// emulator's save folder a link into Emulation/saves, and lstat calls that a link, not a folder. Whether a folder is
+// there is asked through links; only what's at the fork's place (ours to replace) is looked at without following.
+const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
 const entries = (p) => { try { return fs.readdirSync(p).filter((n) => !n.startsWith('.')); } catch { return []; } };
 
@@ -25,7 +29,7 @@ function forkBases(exe, home = os.homedir()) {
 // The fork's base whose layout matches: the save folder's parent (e.g. user/ for user/savedata) exists there
 function findForkBase(exe, rel, home) {
   const top = String(rel).split('/')[0];
-  return forkBases(exe, home).find((b) => top && lst(path.join(b.base, top))?.isDirectory()) || null;
+  return forkBases(exe, home).find((b) => top && isDir(path.join(b.base, top))) || null;
 }
 
 // what's at a link's place now
@@ -50,7 +54,7 @@ function check(from, to, home = os.homedir()) {
   const a = real(from), b = real(to);
   if (a === b) return 'Those are the same folder.';
   if (b.startsWith(a + '/') || a.startsWith(b + '/')) return 'One folder is inside the other.';
-  if (!lst(to)?.isDirectory()) return 'The folder to share doesn’t exist.';
+  if (!isDir(to)) return `The folder to share isn’t there: ${to}`;
   return '';
 }
 
@@ -97,7 +101,7 @@ function mergeInto(from, to, depth = 0) {
     const a = path.join(from, n), b = path.join(to, n), sa = lst(a), sb = lst(b);
     if (!sa || sa.isSymbolicLink()) continue;
     if (!sb) { fs.cpSync(a, b, { recursive: true, errorOnExist: false, force: false, preserveTimestamps: true }); out.copied.push(n); continue; }
-    if (sa.isDirectory() && sb.isDirectory() && !isGame(n)) { const r = mergeInto(a, b, depth + 1); out.copied.push(...r.copied.map((x) => n + '/' + x)); out.skipped.push(...r.skipped.map((x) => n + '/' + x)); continue; }
+    if (sa.isDirectory() && isDir(b) && !isGame(n)) { const r = mergeInto(a, b, depth + 1); out.copied.push(...r.copied.map((x) => n + '/' + x)); out.skipped.push(...r.skipped.map((x) => n + '/' + x)); continue; }
     out.skipped.push(n); // both have it: the original's stays
   }
   return out;
@@ -109,12 +113,28 @@ function searchForkFolder(exe, rel, maxDepth = 3) {
   const walk = (d, n) => {
     if (n > maxDepth || seen.has(d)) return null; seen.add(d);
     const hit = path.join(d, rel);
-    if (lst(hit)?.isDirectory()) return hit;
-    if (parts.length > 1 && path.basename(d) === parts[parts.length - 2] && lst(path.join(d, parts[parts.length - 1]))?.isDirectory()) return path.join(d, parts[parts.length - 1]);
+    if (isDir(hit)) return hit;
+    if (parts.length > 1 && path.basename(d) === parts[parts.length - 2] && isDir(path.join(d, parts[parts.length - 1]))) return path.join(d, parts[parts.length - 1]);
     for (const c of entries(d)) { const p = path.join(d, c); if (lst(p)?.isDirectory() && !/^(lib|plugins|translations|shaders|cache|log)s?$/i.test(c)) { const r = walk(p, n + 1); if (r) return r; } }
     return null;
   };
   return last ? walk(root, 0) : null;
 }
 
-module.exports = { KEPT, forkBases, findForkBase, status, check, link, unlink, mergeInto, searchForkFolder, GAME_DIR };
+// what a save folder holds, for choosing which one both should use (0.9.56): how many entries (games, mostly) and when
+// anything in it last changed, two levels down, through links, at most 3000 entries looked at
+function summary(dir) {
+  if (!isDir(dir)) return { there: false, count: 0, newest: 0 };
+  const top = entries(dir);
+  let newest = 0, seen = 0;
+  const look = (p, d) => {
+    if (seen++ > 3000) return;
+    let st; try { st = fs.statSync(p); } catch { return; }
+    if (st.mtimeMs > newest) newest = st.mtimeMs;
+    if (d < 2 && st.isDirectory()) for (const n of entries(p)) look(path.join(p, n), d + 1);
+  };
+  for (const n of top) look(path.join(dir, n), 1);
+  return { there: true, count: top.length, newest: Math.round(newest), link: !!lst(dir)?.isSymbolicLink() };
+}
+
+module.exports = { KEPT, forkBases, findForkBase, status, check, link, unlink, mergeInto, searchForkFolder, summary, GAME_DIR };
