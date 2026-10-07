@@ -82,3 +82,26 @@ test('Find and Link Saves copies only the games the original lacks, whole, and f
   fs.mkdirSync(path.join(H, 'apps/GR2/data/portable/user/savedata'), { recursive: true }); fs.writeFileSync(exe, '');
   assert.strictEqual(FL.searchForkFolder(exe, 'user/savedata'), path.join(H, 'apps/GR2/data/portable/user/savedata'));
 });
+
+// 0.9.56 (owner: "it says the folder to share doesn't exist, I'm sure it exists"): EmuDeck keeps an emulator's save
+// folder as a link into Emulation/saves; the check went by lstat, which calls that a link, not a folder
+test('a save folder that is itself a link (EmuDeck) can be shared', () => {
+  mk('Emulation/saves/shadps4/savedata/CUSA00003', { 'save.dat': 'x' });
+  mk('.var-like/shadPS4/user');
+  const to = path.join(H, '.var-like/shadPS4/user/savedata');
+  fs.symlinkSync(path.join(H, 'Emulation/saves/shadps4/savedata'), to, 'dir');
+  mk('Applications/GR3/user/savedata');
+  const from = path.join(H, 'Applications/GR3/user/savedata');
+  assert.strictEqual(L.check(from, to, H), '');
+  const r = L.link(from, to, H);
+  assert.ok(fs.existsSync(path.join(from, 'CUSA00003/save.dat')));
+  assert.strictEqual(L.status(from, to).state, 'linked');
+  assert.ok(r.kept);
+});
+test('a folder\'s summary counts its games and when they last changed, through links', () => {
+  const s = L.summary(path.join(H, '.var-like/shadPS4/user/savedata'));
+  assert.strictEqual(s.there, true);
+  assert.strictEqual(s.count, 1);
+  assert.ok(s.newest > Date.now() - 60000);
+  assert.deepStrictEqual(L.summary(path.join(H, 'nothing-here')), { there: false, count: 0, newest: 0 });
+});

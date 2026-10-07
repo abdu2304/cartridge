@@ -1,6 +1,6 @@
 <template>
   <div class="lf">
-    <p class="muted small" style="margin: 0">Link a fork’s save folder to the emulator it comes from, and both play with the same saves. Find and Link Saves does every fork at once; pick one below to do it yourself. Nothing is deleted: a fork’s own saves are set aside and come back when you remove the link.</p>
+    <p class="muted small" style="margin: 0">A fork and the emulator it comes from can play with the same saves. Pick a pair below and choose whose saves both use; the other one’s folder becomes a link to it. Nothing is deleted: the saves it had are set aside and come back when you remove the link. Find and Link Saves does every fork at once, using each emulator’s own saves.</p>
     <div v-if="!d" class="muted small"><Icon name="mdiSync" :size="16" class="spin" /> Looking for forks and their folders…</div>
     <template v-else>
       <div class="lf-head"><b>Suggested</b><button v-if="ready.length" class="btn primary" data-focus :disabled="auto" @click="findAndLink"><Icon :name="auto ? 'mdiSync' : 'mdiAutoFix'" :class="{ spin: auto }" />Find and Link Saves</button><span v-else class="muted small">{{ d.suggestions.length ? 'Forks found on this device' : '' }}</span></div>
@@ -9,7 +9,7 @@
       <button v-for="s in d.suggestions" :key="s.exe + s.rel" class="lf-card" data-focus @click="suggest(s)">
         <div class="lf-pair">
           <span class="lf-end"><span class="lf-name">{{ s.fork }}</span><span class="lf-path mono">{{ short(s.from) || 'Its folder wasn’t found' }}</span></span>
-          <span class="lf-wire" :class="{ on: s.state === 'linked' || s.state === 'same' }"><Icon name="mdiLinkVariant" :size="18" /></span>
+          <span class="lf-wire" :class="{ on: s.state === 'linked' || s.state === 'same' }"><Icon name="mdiSwapHorizontal" :size="18" /></span>
           <span class="lf-end"><span class="lf-name">{{ s.ofName }}</span><span class="lf-path mono">{{ short(s.to) || `${s.ofName} hasn’t made it yet` }}</span></span>
         </div>
         <div class="lf-foot"><span class="chip">{{ s.label }}</span><span class="lf-note">{{ noteOf(s) }}</span><span class="status" :class="toneOf(s)">{{ stateOf(s) }}</span></div>
@@ -18,11 +18,11 @@
       <div v-if="!d.links.length" class="muted small">None yet. New Link joins any two folders: pick the one to replace, then the one it should use.</div>
       <button v-for="l in d.links" :key="l.id" class="lf-card" data-focus @click="manage(l)">
         <div class="lf-pair">
-          <span class="lf-end"><span class="lf-name">{{ l.fork || base(l.from) }}</span><span class="lf-path mono">{{ short(l.from) }}</span></span>
+          <span class="lf-end"><span class="lf-name">{{ userOf(l) }}</span><span class="lf-path mono">{{ short(l.from) }}</span></span>
           <span class="lf-wire" :class="{ on: l.state === 'linked', bad: l.state !== 'linked' }"><Icon :name="l.state === 'linked' ? 'mdiLinkVariant' : 'mdiLinkVariantOff'" :size="18" /></span>
-          <span class="lf-end"><span class="lf-name">{{ l.of ? nameOf(l.of) : base(l.to) }}</span><span class="lf-path mono">{{ short(l.to) }}</span></span>
+          <span class="lf-end"><span class="lf-name">{{ mainOf(l) }}</span><span class="lf-path mono">{{ short(l.to) }}</span></span>
         </div>
-        <div class="lf-foot"><span v-if="l.label" class="chip">{{ l.label }}</span><span class="lf-note">{{ l.kept ? `Its own saves are kept in ${base(l.kept)}` : 'It had no saves of its own' }} · {{ ago(l.at) }}</span><span class="status" :class="l.state === 'linked' ? 'ok' : 'warn'">{{ l.state === 'linked' ? 'Linked' : 'Changed outside Cartridge' }}</span></div>
+        <div class="lf-foot"><span v-if="l.label" class="chip">{{ l.label }}</span><span class="lf-note">{{ usesText(l) }}. {{ l.kept ? `Its own saves are kept in ${base(l.kept)}` : 'It had no saves of its own' }} · {{ ago(l.at) }}</span><span class="status" :class="l.state === 'linked' ? 'ok' : 'warn'">{{ l.state === 'linked' ? 'Linked' : 'Changed outside Cartridge' }}</span></div>
       </button>
     </template>
   </div>
@@ -32,7 +32,7 @@
 // Settings → Emulators → Linked Folders (0.9.33, owner): forks sharing the original emulator's saves through a
 // link (electron/folderLinks.js). Suggestions for each fork found; New Link for any two folders.
 import { computed, onMounted, ref } from 'vue';
-import { call, toast, confirm, choose, pickFolder, ago, store } from '../store.js';
+import { call, toast, confirm, choose, pickFolder, ago, store, openModal } from '../store.js';
 import Icon from './Icon.vue';
 
 const d = ref(null), auto = ref(false);
@@ -47,13 +47,17 @@ const stateOf = (s) => ({ linked: 'Linked', same: 'Already Shared', folder: 'Rea
 const toneOf = (s) => (s.state === 'linked' || s.state === 'same' ? 'ok' : s.state === 'other-link' || s.state === 'no-folder' ? 'warn' : '');
 function noteOf(s) {
   if (s.state === 'same') return `It already uses ${s.ofName}’s folder`;
-  if (s.state === 'folder') return 'It has saves of its own: they’re set aside, not deleted';
-  if (s.state === 'empty' || s.state === 'missing') return 'Its folder is empty: nothing to set aside';
+  if (s.state === 'folder') return 'Both have saves: press to choose whose both use';
+  if (s.state === 'empty' || s.state === 'missing') return `${s.fork} has no saves yet: press to share ${s.ofName}’s`;
   if (s.state === 'no-folder') return 'Start it once so it makes its folder, or choose it';
   if (s.state === 'no-donor') return `Start ${s.ofName} once first`;
   if (s.state === 'other-link') return 'Already a link to another folder';
   return '';
 }
+// a link's two sides in words (0.9.56): who uses whose saves, whichever way round it was made
+const userOf = (l) => (l.main === 'fork' ? (l.of ? nameOf(l.of) : base(l.from)) : l.fork || base(l.from));
+const mainOf = (l) => (l.main === 'fork' ? l.fork || base(l.to) : l.of ? nameOf(l.of) : base(l.to));
+const usesText = (l) => `${userOf(l)} uses ${mainOf(l)}’s saves`;
 async function make(from, to, meta) {
   const st = await call('links:check', { from, to });
   if (st.why && st.state !== 'linked') return toast(st.why, 'error', 5000);
@@ -73,14 +77,28 @@ async function suggest(s) {
     if (!dir) return;
     from = dir.replace(/\/$/, '') + '/' + s.rel;
   }
-  await make(from, s.to, { label: s.label, fork: s.fork, of: s.of });
+  // 0.9.56 (owner: which way does it go? ask which is the main folder): the setup shows both folders and what they hold
+  const st = await call('links:check', { from, to: s.to }).catch(() => null);
+  const pair = { ...s, from, fromInfo: st?.fromInfo || s.fromInfo, toInfo: st?.toInfo || s.toInfo };
+  const r = await openModal('linksetup', { s: pair });
+  if (!r) return;
+  const fork = r.main === 'fork';
+  const [a, b] = fork ? [s.to, from] : [from, s.to]; // a becomes a link to b
+  const why = (await call('links:check', { from: a, to: b }).catch(() => null))?.why;
+  if (why) return toast(why, 'error', 6000);
+  try {
+    const res = await call('links:make', { from: a, to: b, label: s.label, fork: s.fork, of: s.of, merge: r.merge, main: fork ? 'fork' : '' });
+    const user = fork ? s.ofName : s.fork, main = fork ? s.fork : s.ofName;
+    toast(`${user} uses ${main}’s saves now${res.copied ? ` · ${res.copied} copied across first` : ''}`, 'ok', 4500, 'mdiLinkVariant');
+  } catch (e) { toast(e.message, 'error', 6000); }
+  load();
 }
 // 0.9.37 (owner: a smart button that finds the saves and links them; the manual way stays): every fork ready to
 // link at once; games only the fork has saves for are copied to the original first, so none go missing
 async function findAndLink() {
   const list = await call('links:auto', { dry: true }).catch((e) => { toast(e.message, 'error'); return []; });
   if (!list.length) return toast('Nothing to link right now', 'info', 3000);
-  const lines = list.map((s) => `${s.fork} → ${s.ofName} · ${s.label}`).join('\n');
+  const lines = list.map((s) => `${s.fork} uses ${s.ofName}’s saves · ${s.label}`).join('\n');
   if (!(await confirm(`Link ${list.length} folder${list.length === 1 ? '' : 's'}?`, `${lines}\n\nGames only a fork has saves for are copied to the original first (copies only, nothing is overwritten). Each fork’s own folder is set aside and comes back if you remove its link. Close the emulators first.`, 'Find and Link'))) return;
   auto.value = true;
   try {
@@ -99,7 +117,7 @@ async function newLink() {
   await make(from.replace(/\/$/, ''), to.replace(/\/$/, ''), {});
 }
 async function manage(l) {
-  const v = await choose({ title: l.label || 'Linked Folder', message: `${short(l.from)} → ${short(l.to)}`, options: [
+  const v = await choose({ title: l.label || 'Linked Folder', message: `${usesText(l)}.\n${short(l.from)} is a link to ${short(l.to)}`, options: [
     { label: 'Remove Link', sub: l.kept ? 'Its own saves come back from where they were set aside' : 'It gets an empty folder of its own again', value: 'rm', icon: 'mdiLinkVariantOff', danger: true },
     { label: 'Copy the Fork’s Folder', value: 'cf', icon: 'mdiContentCopy' },
     { label: 'Copy the Shared Folder', value: 'ct', icon: 'mdiContentCopy' },

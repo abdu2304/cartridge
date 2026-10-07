@@ -6,7 +6,17 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
-## 7 Oct 2026 · after 0.9.54: Home dims a second after coming back from a game (fixed, not released yet)
+## 7 Oct 2026 · 0.9.56 Quick and Clear (new account session)
+- Owner moved back to this account; read every handover, CLAUDE.md, the session log and the engine docs first, and confirmed the codebase back. Container note: Electron's own download fails through the proxy; fetch `electron-v44.4.5-linux-x64.zip` from GitHub with curl into `node_modules/electron/dist` (and `path.txt` = `electron`). Playwright is global (`NODE_PATH=$(npm root -g)`).
+- Owner's list (15 items) with answers: colour boxes and Update All layout "you recommend"; the "freeze" item was the background stopping (the real freeze was fixed in 0.9.55); Glass "weird white shadows that move around the card" in dark mode; Linked Folders "build your best version".
+- Built (details in CLAUDE.md 0.9.56): background never stops when idle; dark Glass light fixed in place, no focus halo, no press sweep, gentler edge bend; springs start at full speed (the cause of "sluggish": a critically damped spring from rest eases in); page turns and pages quicker (measured); Save Sync counts open their saves, unmatched ones say why and the fix; Update All; Linked Folders setup (choose whose saves) and the EmuDeck link bug ("folder to share doesn't exist": lstat on a link); smart mod names; Nexus key moved; Pure Black, Light/OLED colour boxes; Light cards stand out; background menu trimmed; blocking ldd/flatpak calls made async.
+- Not reproduced: Glass to Plain switching back. Pressing Plain works in the stub and in the real app with both the controller and the mouse. Ask the owner exactly where (Settings or the welcome's Look step, which colour) and what they see.
+- Checked: npm test (263), vite build, launch check, `npm run audit:ui`, screenshots of every changed screen in Plain/Glass and dark/Light, Start page-turn and navigation timings against 0.9.55.
+- Owner to test on a device: motion feel (handheld with light effects and the TV with the GPU), dark Glass while moving down a page, Linked Folders with GR2 and shadPS4 (both directions, EmuDeck links), Save Sync's lists after Sync Now, Update All with two updates, Nexus suggestion for Bloodborne GOTY, the background after a minute idle and after a game.
+
+---
+
+## 7 Oct 2026 · 0.9.55 Steady: Home dims a second after coming back from a game, freeze after start (released)
 - Owner: open a game from Home, go back, and about a second later the screen dims and comes back up.
 - Cause: `store.back()` added `morph-back` (page arrival animations off while the cover flies back) and took it off 900 ms later. Taking `animation: none` away re-applied `settle`/`viewBack` to the page already showing, so Home faded in from opacity 0 a second time. Reproduced in Chromium (Home opacity 1 → 0 → 1 at 900 ms after back).
 - Fix: `calm()` in store.js takes `morph-back` off just before the next page change (`goNow`, `back`, `tab`); no timer. Checked: Home stays at opacity 1 going back after 0.3, 1 and 3 s; the next game page still arrives with `viewDeeper` and a tab with `viewFromR`. Other classes that gate animations checked: `modal-in` stays on (the same bug in pop-ups, fixed in 0.9.44), `rows-measure` doesn't touch animations, `cae-idle` pauses rather than removes.

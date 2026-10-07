@@ -82,3 +82,30 @@ test('a source that fails says why, in words, without breaking the others', asyn
   assert.match(r.error, /can’t reach Nexus Mods/);
   assert.strictEqual(M.bbText('[b]Bold[/b] [url=https://x]link[/url]<br />next [color=#f00]red[/color]'), 'Bold link\nnext red');
 });
+
+// 0.9.56 (owner: "Nexus Mods has no game called Bloodborne Game of the Year Edition. It does have Bloodborne"): no game
+// under the full title offers the first shorter form the site has, and listing with it (as) finds the mods
+test('Nexus: a shorter name is offered when the full title has no game, and used when picked', async () => {
+  const nodes = [{ id: 5, domainName: 'bloodborne', name: 'Bloodborne', modCount: 40 }];
+  let asked = null;
+  const web = fakeWeb((url, o) => {
+    const b = JSON.parse(o.body || '{}');
+    if (/games\(/.test(b.query)) return gamesAnswer(nodes);
+    asked = b.variables.d;
+    return { data: { mods: { totalCount: 1, nodes: [{ modId: 1, name: '60 FPS', downloads: 1, endorsements: 1, author: 'a', createdAt: '2025-01-01T00:00:00Z', updatedAt: '2025-01-01T00:00:00Z' }] } } };
+  });
+  const nx = M.nexus({ web });
+  let r = await nx.list({ name: 'Bloodborne Game of the Year Edition', slug: 'ps4' });
+  assert.ok(!r.items.length && /no game called “Bloodborne Game of the Year Edition”/.test(r.error));
+  assert.deepStrictEqual(r.suggest, { as: 'Bloodborne', name: 'Bloodborne' });
+  r = await nx.list({ name: 'Bloodborne Game of the Year Edition', slug: 'ps4', as: 'Bloodborne' });
+  assert.strictEqual(asked, 'bloodborne');
+  assert.strictEqual(r.items.length, 1);
+});
+test('shorter titles: edition words, then the subtitle; never the full title', () => {
+  const S = require('../electron/addonSources');
+  assert.deepStrictEqual(S.shorterTitles('Bloodborne Game of the Year Edition'), ['Bloodborne']);
+  assert.deepStrictEqual(S.shorterTitles('Dark Souls: Remastered'), ['Dark Souls']);
+  assert.deepStrictEqual(S.shorterTitles('God of War III Remastered (USA)'), ['God of War III']);
+  assert.deepStrictEqual(S.shorterTitles('Bloodborne'), []);
+});

@@ -60,6 +60,21 @@ function titleForms(title) {
   const moved = t.replace(/^(.*?),\s*(The|A|An)\b(.*)$/i, '$2 $1$3'); // "Zelda, The - X" -> "The Zelda - X"
   return [...new Set([t, moved, moved.replace(/\s+-\s+/g, ': ')].filter(Boolean))];
 }
+// Shorter forms of a title for when a site has no game under the full one (0.9.56, owner: "Nexus Mods has no game called
+// Bloodborne Game of the Year Edition. It does have Bloodborne"): the edition words off, then the subtitle off. Longest
+// first, the full title never included. "Bloodborne Game of the Year Edition" -> ["Bloodborne"];
+// "Dark Souls: Remastered" -> ["Dark Souls"]; "Ratchet & Clank: Up Your Arsenal" -> ["Ratchet & Clank"].
+const EDITION = /\s*[-:–]?\s*\b(?:game of the year(?: edition)?|goty(?: edition)?|definitive edition|complete edition|complete|deluxe edition|deluxe|special edition|ultimate edition|enhanced edition|anniversary edition|collector'?s edition|gold edition|platinum(?: hits)?|greatest hits|director'?s cut|remastered|remaster|hd(?: remaster(?:ed)?)?|edition)\s*$/i;
+function shorterTitles(title) {
+  const base = titleForms(title)[titleForms(title).length - 1] || String(title || '');
+  const out = [];
+  let t = base.replace(/\s*[([][^)\]]*[)\]]\s*/g, ' ').replace(/\s+/g, ' ').trim();
+  for (let i = 0; i < 4; i++) { const n = t.replace(EDITION, '').trim(); if (n === t || !n) break; t = n; out.push(t); }
+  const sub = /^(.{3,}?)\s*(?::|\s[-–]\s)\s*.+$/.exec(t);
+  if (sub) out.push(sub[1].trim());
+  const full = loose(base);
+  return [...new Set(out)].filter((x) => x.length >= 3 && loose(x) !== full);
+}
 async function gbGame(title, { fetchImpl = webFetch } = {}) {
   for (const q of titleForms(title)) {
     const j = await gbGet(`/Util/Search/Results?_sModelName=Game&_sOrder=best_match&_nPage=1&_sSearchString=${encodeURIComponent(q)}`, fetchImpl);
@@ -184,4 +199,4 @@ function featuredFor(ids = {}, live = []) {
   return out;
 }
 
-module.exports = { sortMods, gbMod, FEATURED, HENRIKO, featuredFor, parseHenriko, henrikoCatalog, namesGame, PS2_CATALOG, parsePs2Catalog, ps2Catalog, ps2For, gbGame, gbMods, gbFiles, parseGbMods, parseGbFiles, key, titleForms };
+module.exports = { sortMods, gbMod, FEATURED, HENRIKO, featuredFor, parseHenriko, henrikoCatalog, namesGame, PS2_CATALOG, parsePs2Catalog, ps2Catalog, ps2For, gbGame, gbMods, gbFiles, parseGbMods, parseGbFiles, key, titleForms, shorterTitles };

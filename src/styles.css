@@ -52,7 +52,7 @@
   --ease: cubic-bezier(0.2, 0, 0, 1);
   /* 0.9.23 motion (owner: other menus should feel like Start, smooth and not distracting): one strong
      ease-out for things arriving, one ease-in-out for things moving on screen */
-  --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); --d-settle: 520ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1); --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1); --d-settle: 380ms;
   /* CAE's named timings (0.9.52, owner: every animation on the Cartridge Animation Engine). Movement uses the springs
      (--spring-snappy, --spring, --spring-soft, --spring-pop, written by motion.js); everything else uses these, so no
      .vue or .css file writes its own curve or duration (test/cae.test.js checks it). docs/cae.md has the rules. */
@@ -226,7 +226,7 @@ body.bar-left main.main[data-dir='l'] > * { animation-name: viewFromT; }
 @keyframes viewFromL { from { opacity: 0; transform: translateX(-24px); } }
 @keyframes viewDeeper { from { opacity: 0; transform: translateY(12px) scale(0.985); } }
 @keyframes viewBack { from { opacity: 0; transform: scale(1.015); } }
-main.main[data-dir] > * { animation-duration: var(--spring-soft-d, 460ms); animation-timing-function: var(--spring-soft, var(--ease-out)); } /* CAE: pages are big surfaces, the heavy profile */
+main.main[data-dir] > * { animation-duration: var(--spring-d, 340ms); animation-timing-function: var(--spring, var(--ease-out)); } /* CAE: pages on the settle spring (0.9.56: the heavy one made every page change feel slow) */
 /* without the GPU a whole page moving or fading is the one costly thing (measured in 0.9.38: going back to a full
    Library doubled the slow frames), so pages keep their short fade there; the picture flying in, the sliding pills,
    presses and pop-ups carry the motion instead */
@@ -234,7 +234,7 @@ body.light-fx main.main[data-dir] > * { animation-name: viewIn; animation-durati
 main.main[data-dir='r'] > * { animation-name: viewFromR; }
 main.main[data-dir='l'] > * { animation-name: viewFromL; }
 main.main[data-dir='in'] > * { animation-name: viewDeeper; }
-main.main[data-dir='out'] > * { animation-name: viewBack; animation-duration: var(--spring-d, 340ms); animation-timing-function: var(--spring, var(--ease-out)); } /* back: quicker than going in */
+main.main[data-dir='out'] > * { animation-name: viewBack; animation-duration: var(--spring-snappy-d, 260ms); animation-timing-function: var(--spring-snappy, var(--ease-out)); } /* back: quicker than going in (as quick as 0.9.46's 260 ms) */
 body.motion-reduce main.main[data-dir] > * { animation-name: viewIn; animation-duration: var(--d-fast); }
 /* 0.9.23: Start's arrival everywhere. A page's parts (its header, then each section or row) settle in one
    after another: up a little, from just smaller, 40 ms apart, once when the page opens. Only opacity
@@ -489,7 +489,7 @@ body.light-fx .coll .art, body.light-fx .coll .mosaic { transition-property: tra
 /* section titles are words only (docs/design.md): the icons some screens put in front are hidden */
 .subh > svg.icon:first-child { display: none; }
 /* rows that turn white on focus don't also get the ring */
-.pad-mode :is(.menu-item, .rail-item, .prow, .qm-item, .up-row, .sm-row, .ss-emu, .lrow, .toggle, .tab, .ga-row, .cc-row, .lf-card, .tl-e, .aa-row, .ad-row, .eg-emu, .pt-row, .file, .eg-drive):focus, :is(.menu-item, .rail-item, .prow, .qm-item, .up-row, .sm-row, .ss-emu, .lrow, .ga-row, .cc-row, .lf-card, .tl-e, .aa-row, .ad-row, .eg-emu, .pt-row, .file, .eg-drive):focus-visible { box-shadow: none; } /* rows: the fill is the focus (0.9.37: About, Its Games, Linked Folders had the ring too) */
+.pad-mode :is(.menu-item, .rail-item, .prow, .qm-item, .up-row, .sm-row, .ss-emu, .lrow, .toggle, .tab, .ga-row, .cc-row, .lf-card, .tl-e, .aa-row, .ad-row, .eg-emu, .pt-row, .file, .eg-drive, .ssc-count, .ls-pick):focus, :is(.menu-item, .rail-item, .prow, .qm-item, .up-row, .sm-row, .ss-emu, .lrow, .ga-row, .cc-row, .lf-card, .tl-e, .aa-row, .ad-row, .eg-emu, .pt-row, .file, .eg-drive, .ssc-count, .ls-pick):focus-visible { box-shadow: none; } /* rows: the fill is the focus (0.9.37: About, Its Games, Linked Folders had the ring too) */
 
 /* a small count on a page tab (Emulators → Updates, 0.9.16) */
 .count-dot { display: inline-grid; place-items: center; min-width: 1.4em; height: 1.4em; padding: 0 0.35em; margin-left: 6px; border-radius: 999px; background: #f5c542; color: #1a1400; font-size: 0.75em; font-weight: 700; }
@@ -569,10 +569,11 @@ body.theme-light {
   --green: #1f8a3a; --green-l: #1b7a33; --red: #c8332a; --gold: #9a6b00;
   --text-2: #3c3c43; --score: #1b7a33; --danger-t: #c0281f; --ondev: #1b7a33; --faint: rgba(0, 0, 0, 0.5); --line-2: rgba(0, 0, 0, 0.12);
   /* 0.9.41 rebuilt: soft, cool shadows that lift near-white cards off the grey page, a fine edge instead of a glow */
-  --shadow-card: 0 1px 2px rgba(20, 20, 30, 0.06), 0 10px 24px -6px rgba(20, 20, 30, 0.16);
-  --shadow-pop: 0 2px 6px rgba(20, 20, 30, 0.06), 0 24px 60px -12px rgba(20, 20, 30, 0.24);
-  --weight: 0 1px 2px rgba(20, 20, 30, 0.06), 0 8px 20px -8px rgba(20, 20, 30, 0.16);
-  --weight-edge: inset 0 0 0 1px rgba(0, 0, 0, 0.05);
+  /* 0.9.56 (owner: cards blended into the page): a firmer edge and a deeper shadow under white cards */
+  --shadow-card: 0 1px 3px rgba(20, 20, 30, 0.1), 0 12px 28px -8px rgba(20, 20, 30, 0.24);
+  --shadow-pop: 0 2px 6px rgba(20, 20, 30, 0.08), 0 24px 60px -12px rgba(20, 20, 30, 0.28);
+  --weight: 0 1px 3px rgba(20, 20, 30, 0.1), 0 10px 24px -8px rgba(20, 20, 30, 0.24);
+  --weight-edge: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
   --tile-bg: #e3e3e8; --tile-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05), 0 4px 10px -4px rgba(20, 20, 30, 0.18);
 }
 /* Light: cards, rows and dialogs are raised; what's chosen is a grey fill, where you are is near-black */
@@ -588,9 +589,9 @@ body.theme-light .top-search:not(.open):not(:focus-within) { color: rgba(28, 28,
 body.theme-light .top-search:not(.open):not(:focus-within):hover { color: #1c1c1e; background: rgba(0, 0, 0, 0.05); }
 body.theme-light :is(.ss-warn, .status.warn, .chip.none, .lf-wire.bad, .sv-badge.pre, .sp-e.skip) { color: #8a5a00; }
 body.theme-light .btn:not(.primary):not(:focus):not(:focus-visible) { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06); }
-body.theme-light .scrim { background: rgba(235, 235, 239, 0.6); }
-body.theme-light .statusbar::before { background: linear-gradient(180deg, rgba(235, 235, 239, 0.9) 0%, rgba(235, 235, 239, 0.5) 62%, rgba(235, 235, 239, 0) 100%); }
-body.theme-light.bar-bottom .statusbar::before { background: linear-gradient(0deg, rgba(235, 235, 239, 0.9) 0%, rgba(235, 235, 239, 0.5) 62%, rgba(235, 235, 239, 0) 100%); }
+body.theme-light .scrim { background: rgba(227, 227, 233, 0.6); }
+body.theme-light .statusbar::before { background: linear-gradient(180deg, rgba(227, 227, 233, 0.9) 0%, rgba(227, 227, 233, 0.5) 62%, rgba(227, 227, 233, 0) 100%); }
+body.theme-light.bar-bottom .statusbar::before { background: linear-gradient(0deg, rgba(227, 227, 233, 0.9) 0%, rgba(227, 227, 233, 0.5) 62%, rgba(227, 227, 233, 0) 100%); }
 body.theme-light.bar-pill.dock-white .tabs { background: rgba(255, 255, 255, 0.92); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06), 0 10px 30px -10px rgba(20, 20, 30, 0.28); }
 body.theme-light .card:focus .title { color: var(--text); }
 /* console wordmarks: dark on the page, white where they sit on a picture or the idle screen */
@@ -648,7 +649,9 @@ body.elements-glass {
   --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.12'/%3E%3C/svg%3E");
   --lg-lit: rgba(var(--lg-hi), 0.88); /* prominent glass: the highlight colour nearly solid, so focus reads white with dark text (owner: not grey) */
   --lg-lit-rim: linear-gradient(var(--lg-angle, 135deg), #fff 0%, rgba(255, 255, 255, 0.55) 30%, rgba(255, 255, 255, 0.3) 55%, rgba(255, 255, 255, 0.9) 100%);
-  --lg-lit-glow: 0 0 0 1px rgba(255, 255, 255, 0.35), 0 0 26px -2px rgba(var(--lg-hi), 0.45), 0 14px 34px -14px rgba(0, 0, 0, 0.6);
+  /* 0.9.56 (owner: white shadows moving round whatever is focused in dark Glass): no white halo round focus any more,
+     only a fine edge and the same contact shadow as everything else */
+  --lg-lit-glow: 0 0 0 1px rgba(255, 255, 255, 0.35), 0 4px 10px rgba(0, 0, 0, 0.5);
   --lg-on-lit: var(--lg-on-hi);
   --lg-sel: rgba(255, 255, 255, 0.16); /* chosen but not focused (0.9.47): brighter glass with white text, never the lit focus look */
 }
@@ -717,10 +720,12 @@ body.elements-glass.theme-light.bar-pill.dock-glass .tab:not(.active):hover { co
 body.elements-glass.theme-light.bar-pill.dock-glass .tab-trig { filter: invert(1); }
 /* interactive: pressed glass lights up from inside */
 /* ...and a band of light sweeps across it (liquid-glass skill: interactive glass scales, bounces and shimmers) */
-body.elements-glass .btn.lg-shine::after { background: var(--lg-gloss), linear-gradient(105deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.42) 50%, rgba(255, 255, 255, 0) 62%) no-repeat; background-size: auto, 260% 100%; animation: lg-shine var(--spring-soft-d) var(--spring-soft) both; }
+body.elements-glass.theme-light .btn.lg-shine::after { background: var(--lg-gloss), linear-gradient(105deg, rgba(255, 255, 255, 0) 38%, rgba(255, 255, 255, 0.42) 50%, rgba(255, 255, 255, 0) 62%) no-repeat; background-size: auto, 260% 100%; animation: lg-shine var(--spring-soft-d) var(--spring-soft) both; }
+/* 0.9.56: in dark Glass a press no longer sends a white band across the button (owner: white shapes moving that
+   correspond to nothing); Light keeps it */
 @keyframes lg-shine { from { background-position: 0 0, 115% 0; } to { background-position: 0 0, -15% 0; } }
 body.elements-glass.motion-reduce .btn.lg-shine::after { animation: none; background: var(--lg-gloss); }
-@media (prefers-reduced-motion: reduce) { body.elements-glass .btn.lg-shine::after { animation: none; background: var(--lg-gloss); } }
+@media (prefers-reduced-motion: reduce) { body.elements-glass.theme-light .btn.lg-shine::after { animation: none; background: var(--lg-gloss); } }
 /* clear glass over the game's art (the skill's .clear: media-rich backgrounds): more see-through and brighter, the
    label kept legible by a soft shadow */
 body.elements-glass:not(.light-fx):not(.theme-light) .g-actions .btn:not(.primary):not(:focus) { background: color-mix(in srgb, var(--lg-ob) 38%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.45) contrast(1.05); backdrop-filter: blur(14px) saturate(1.45) contrast(1.05); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55); } /* 0.9.54: smoked, not brightened */
@@ -765,9 +770,8 @@ body.style-plain:not(.theme-light):not(.theme-oled).bar-pill:is(.dock-black, .do
 body.style-plain:not(.theme-light):not(.theme-oled).bar-pill .tab-ink { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.6); }
 body.style-plain:not(.theme-light):not(.theme-oled) .top-search { box-shadow: var(--pl-sink); }
 
-/* CAE governor (0.9.47, motion.js): idle for a minute, the slow decorative loops hold still (they cost frames for
-   nothing while nobody looks); any input lets them run on from where they were */
-body.cae-idle :is(.bg-stage .layer, .media img, .sc-clouds g, .sc-clouds .c1, .sc-clouds .c2, .sc-stars circle, .st-img) { animation-play-state: paused !important; }
+/* CAE governor: idle no longer pauses anything you can see (0.9.56, owner: the background stopping after a while felt
+   broken). Scenery stops only while a game or another app is in front (body.away). */
 
 /* ---- Glass engine (0.9.47, src/glassEngine.js; Glass only, dark and light): real refraction. Each glass surface gets
    an SVG lens as its backdrop-filter (frost, then the view bent at the rim); the rim's highlight follows --lg-angle.

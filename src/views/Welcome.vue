@@ -483,7 +483,7 @@ import EmuSetup from './EmuSetup.vue';
 import EmuGet from '../components/EmuGet.vue';
 import RommLocal from '../components/RommLocal.vue';
 import { padInfo, detectPad, padKind } from '../pad.js';
-import { THEMES, STYLES, styleOf, paletteOf } from '../themes.js';
+import { THEMES, STYLES, styleOf, paletteOf, autoColors } from '../themes.js';
 import { BACKGROUNDS, RENDERERS, bgPreview } from '../bgRenderers.js';
 
 // 0.9.52 (owner): RomM first (the rest needs it), your name with the look, Controls only with a controller of your own,
@@ -521,7 +521,7 @@ function pickStyle(k) { saveConfig({ ui: { style: k, surface: k === 'glass' ? 'g
 function pickTheme(k) {
   const ui = store.config.ui, light = !!THEMES[k]?.light, dock = ui.dockColor;
   const dockColor = light && dock === 'black' ? 'white' : !light && dock === 'white' && THEMES[ui.theme]?.light ? 'black' : undefined;
-  saveConfig({ ui: { theme: k, gameTheme: null, ...(dockColor ? { dockColor } : {}) } });
+  saveConfig({ ui: { theme: k, gameTheme: null, ...(dockColor ? { dockColor } : {}), ...autoColors(k, ui) } }); // Light: black parts, OLED: white (0.9.56)
 }
 // the animated ones and Still (game artwork and wallpapers need a library or a file, so they stay in Settings)
 const LOOK_BGS = BACKGROUNDS.filter((b) => b.group === 'Theme' || b.v === 'solid');

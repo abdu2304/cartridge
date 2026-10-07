@@ -557,9 +557,12 @@ function glibcNeeded(file) {
 }
 const isElfBuf = (b) => b.length > 4 && b[0] === 0x7f && b.toString('latin1', 1, 4) === 'ELF';
 const cmpV = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] || 0) - (b[i] || 0); if (d) return d; } return 0; };
+// asked once per run (0.9.56): a full process report was made for every emulator in the list, on the main thread
+let glibcKnown;
 function systemGlibc() {
-  try { const v = process.report?.getReport?.()?.header?.glibcVersionRuntime; if (v) return v; } catch {}
-  try { const m = /(\d+\.\d+)\s*$/m.exec(require('child_process').execFileSync('ldd', ['--version'], { encoding: 'utf8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] }).split('\n')[0]); return m ? m[1] : null; } catch { return null; }
+  if (glibcKnown !== undefined) return glibcKnown;
+  try { const v = process.report?.getReport?.()?.header?.glibcVersionRuntime; if (v) return (glibcKnown = v); } catch {}
+  try { const m = /(\d+\.\d+)\s*$/m.exec(require('child_process').execFileSync('ldd', ['--version'], { encoding: 'utf8', timeout: 4000, stdio: ['ignore', 'pipe', 'ignore'] }).split('\n')[0]); return (glibcKnown = m ? m[1] : null); } catch { return (glibcKnown = null); }
 }
 // { need, have } when the program wants a newer glibc than this system has, else null
 function glibcProblem(file) {

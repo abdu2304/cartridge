@@ -100,7 +100,8 @@ export const TEXTS = {
 // (never paper white), cards and panels nearly white and raised with a soft shadow, controls inside them a light grey,
 // dark text in Apple's light greys, the highlight near-black with white text
 const LIGHT_TEXTS = { normal: { text: '#1c1c1e', muted: '#6b6b73', dim: '#9a9aa2' }, bright: { text: '#000000', muted: '#3c3c43', dim: '#6b6b73' }, soft: { text: '#3a3a3c', muted: '#7c7c84', dim: '#a5a5ad' } };
-const LIGHT_S = ['#ebebef', '#fafafb', '#e3e3e8', '#d6d6dc']; // page, cards (raised: lighter), controls, pressed/borders
+// 0.9.56 (owner: Light cards blended into the page): a deeper page and pure white cards
+const LIGHT_S = ['#e3e3e9', '#ffffff', '#e8e8ed', '#d4d4db']; // page, cards (raised: lighter), controls, pressed/borders
 // Bundled open-source fonts (SIL Open Font License), display + body
 export const FONTS = {
   cartridge: { label: 'Archivo + Inter', display: "'Archivo Variable', 'Inter Variable', Roboto, sans-serif", body: "'Inter Variable', Roboto, 'Noto Sans', system-ui, sans-serif" },
@@ -114,6 +115,18 @@ export const FONTS = {
 export const CARD_SHAPES = { rounded: { label: 'Rounded', r: '6px' }, square: { label: 'Square', r: '2px' }, soft: { label: 'Soft', r: '14px' }, round: { label: 'Extra Round', r: '22px' } };
 export const CARD_SIZES = { sm: { label: 'Small', w: '128px' }, md: { label: 'Medium', w: '152px' }, lg: { label: 'Large', w: '184px' }, xl: { label: 'Huge', w: '220px' } };
 export const DENSITIES = { compact: { label: 'Compact', x: '12px', y: '14px' }, normal: { label: 'Normal', x: '18px', y: '22px' }, spacious: { label: 'Spacious', x: '28px', y: '34px' } };
+
+// Highlights, Buttons and Progress Bars set by picking a colour (0.9.56, owner): Light sets them to black, OLED to white,
+// and leaving either puts back the theme's own, unless you changed them since (ui.colorsAuto says which set them)
+export const AUTO_PARTS = ['highlight', 'buttons', 'bars'];
+export const PURE = { black: '#000000', white: '#ffffff' };
+export function autoColors(key, ui = {}) {
+  const want = THEMES[key]?.light ? PURE.black : key === 'oled' ? PURE.white : '';
+  const col = ui.colors || {}, was = ui.colorsAuto ? PURE[ui.colorsAuto] : '';
+  const out = {};
+  for (const k of AUTO_PARTS) if (want) out[k] = want; else if (was && col[k] === was) out[k] = '';
+  return { colors: out, colorsAuto: want ? (want === PURE.black ? 'black' : 'white') : '' };
+}
 
 export function themeOf(ui) {
   if (ui?.theme === 'custom' && /^#[0-9a-f]{6}$/i.test(ui.customColor || '')) return themeFrom(ui.customColor);
@@ -130,7 +143,8 @@ export function applyTheme(uiOrName) {
   const r = document.documentElement.style;
   const lum = (h) => { const [x, y, z] = hex2rgb(h); return (0.299 * x + 0.587 * y + 0.114 * z) / 255; };
   // themeFrom turns white into grey (it clamps lightness), so near-white picks stay white
-  const accentOf = (c) => lum(c) > 0.85 ? [c, c, '#d4d4d8'] : themeFrom(c).accent;
+  // ...and pure black stays black (0.9.56, owner's Pure Black)
+  const accentOf = (c) => lum(c) > 0.85 ? [c, c, '#d4d4d8'] : lum(c) < 0.06 ? [c, '#2a2a2e', c] : themeFrom(c).accent;
   const [a, al, ad] = ok(col.highlight) ? accentOf(col.highlight) : t.accent;
   if (ok(col.buttons)) {
     const [b, bl, bd] = accentOf(col.buttons);
@@ -188,9 +202,9 @@ export function applyTheme(uiOrName) {
   // Cartridge's own theme: a flat page, so art and panels meet it without a seam
   if (t.neutral) { r.setProperty('--xmb', black ? '#000' : S[0]); r.setProperty('--xmb-base', black ? '#000' : S[0]); }
   for (let i = 0; i < 6; i++) r.setProperty('--g' + i, g[i]);
-  r.setProperty('--tint-rgb', black ? '0, 0, 0' : lightT ? '235, 235, 239' : tint);
+  r.setProperty('--tint-rgb', black ? '0, 0, 0' : lightT ? '227, 227, 233' : tint);
   // Light (0.9.47): white frosted panels; the dark tint made grey slabs with unreadable text in Light + Glass
-  r.setProperty('--glass-bg', el.glassA < 1 ? `rgba(${lightT ? '250, 250, 251' : black ? '0, 0, 0' : tint}, ${lightT ? 0.72 : el.glassA})` : S[1]);
+  r.setProperty('--glass-bg', el.glassA < 1 ? `rgba(${lightT ? '255, 255, 255' : black ? '0, 0, 0' : tint}, ${lightT ? 0.84 : el.glassA})` : S[1]);
   // Liquid Glass tokens (0.9.42): the material's tint (the theme's hue, white glass on Light, black on OLED) and the
   // prominent colour (the highlight) for focused controls and primary buttons
   r.setProperty('--lg-tint', lightT ? '255, 255, 255' : black || t.oled ? '0, 0, 0' : tint);
@@ -225,9 +239,10 @@ export function applyTheme(uiOrName) {
 export function paletteOf(ui) {
   let t = themeOf(ui);
   if (/^#[0-9a-f]{6}$/i.test(ui?.colors?.background || '')) t = { ...t, grad: themeFrom(ui.colors.background).grad };
-  if (/^#[0-9a-f]{6}$/i.test(ui?.colors?.highlight || '')) t = { ...t, accent: themeFrom(ui.colors.highlight).accent };
-  // animated backgrounds keep the brand colour when the highlights are plain white
-  const [pa, pl] = !ui?.colors?.highlight && t.bgAccent ? t.bgAccent : t.accent;
+  // animated backgrounds keep the brand colour when the highlights are plain white, or pure black or white (0.9.56)
+  const hl = String(ui?.colors?.highlight || '').toLowerCase(), plainHl = !hl || hl === PURE.black || hl === PURE.white;
+  if (!plainHl && /^#[0-9a-f]{6}$/i.test(hl)) t = { ...t, accent: themeFrom(hl).accent };
+  const [pa, pl] = plainHl && t.bgAccent ? t.bgAccent : t.accent;
   return { accent: pa, light: pl, warm: t.warm, grad: t.grad, black: !!t.black, ink: t.light ? '24,25,29' : '' };
 }
 // "Light effects" when the GPU is off (software rendering), unless the user picked otherwise

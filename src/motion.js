@@ -28,9 +28,13 @@ export function frame(fn) {
 
 // ---------- 1. spring curves for CSS
 // x'' = -k (x - 1) - c x', from 0 at rest; k = (2π / response)², c = 4π ζ / response
-export function springCurve({ damping = 1, response = 0.35, samples = 48 } = {}) {
+// 0.9.56 (owner: "animations don't feel snappy or fluid anymore, extremely sluggish"): a spring let go from rest starts
+// slowly (zero speed at the start), so every move eased in and only reached full speed a third of the way through. The
+// critically damped ones now start at their natural speed (v0 = ω): the curve is 1 - e^(-ωt), at full speed the moment
+// it starts, never past the target, settled about a third sooner. Springs with give (damping < 1) still start from rest.
+export function springCurve({ damping = 1, response = 0.35, samples = 48, kick = damping >= 1 } = {}) {
   const k = (2 * Math.PI / response) ** 2, c = (4 * Math.PI * damping) / response, dt = 1 / 1000;
-  let x = 0, v = 0, t = 0;
+  let x = 0, v = kick ? 2 * Math.PI / response : 0, t = 0;
   const pts = [];
   while (t < 3) {
     for (let i = 0; i < 4; i++) { const a = -k * (x - 1) - c * v; v += a * dt; x += v * dt; t += dt; }
@@ -82,6 +86,8 @@ export function springTo(st, target, { response = 0.3, damping = 1, apply, done 
   st.target = target; st.k = (2 * Math.PI / response) ** 2; st.c = (4 * Math.PI * damping) / response; st.apply = apply; st.done = done;
   if (st.v == null) st.v = 0;
   if (st.raf) return st;
+  // from rest it starts at its natural speed (0.9.56, as springCurve): a glide never eases in; already moving, it keeps its speed
+  if (damping >= 1 && !st.v && st.x != null) st.v = Math.sqrt(st.k) * (target - st.x);
   st.raf = 1; // running (nav.js reads it)
   st.stop = frame((now, dt0) => {
     if (!st.raf) return false;
@@ -125,13 +131,13 @@ export function morph(fromEl, change, toSel, nextTick) {
     // frame. It moves while the flight runs (the new page settles in, a list scrolls the card into view), and the
     // old flight was aimed at where it was in the first frame. A critically damped spring (no overshoot) carries the
     // picture from where it was picked to wherever the target is now, so the last frame is exactly on it.
-    const w = (2 * Math.PI) / SPRINGS.spring.response, dur = 7.5 / w; // x(t) = 1 - (1 + wt) e^(-wt), done at 99.6%
+    const w = (2 * Math.PI) / SPRINGS.spring.response, dur = 6 / w; // x(t) = 1 - e^(-wt) (0.9.56: starts at full speed), done at 99.75%
     const t0 = performance.now();
     let stop = null, alive = true;
     const end = () => { if (!alive) return; alive = false; stop?.(); to.style.visibility = ''; fly.remove(); if (running?.end === end) running = null; };
     const step = (now) => {
       if (!alive) return false;
-      const t = (now - t0) / 1000, p = t >= dur ? 1 : Math.min(1, (1 - (1 + w * t) * Math.exp(-w * t)) / 0.985); // the last 1.5% folded in: it ends on the target, never a few pixels short
+      const t = (now - t0) / 1000, p = t >= dur ? 1 : Math.min(1, (1 - Math.exp(-w * t)) / 0.9975); // the last bit folded in: it ends on the target, never a few pixels short
       const c = to.isConnected ? to.getBoundingClientRect() : b;
       if (c.width >= 8 && c.height >= 8) {
         const x = a.left + (c.left - a.left) * p, y = a.top + (c.top - a.top) * p, wd = a.width + (c.width - a.width) * p, ht = a.height + (c.height - a.height) * p;

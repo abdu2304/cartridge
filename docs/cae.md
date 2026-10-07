@@ -18,7 +18,8 @@ These are the rules every new motion must follow. If something can't follow them
    Nothing wobbles, nothing overshoots more than that.
 2. **Short distances.** Things move 8 to 24 px, never across the screen. Pages slide 24 px (12 px with a 0.985 scale
    when going deeper, back the other way), toasts 16 px, page content settles 10 px.
-3. **Big is slower than small.** Pages and sheets use the heavy curve, everyday movement the settle curve, presses,
+3. **Big is slower than small.** Sheets use the heavy curve, pages and everyday movement the settle curve (0.9.56: the
+   heavy one made every page change feel slow), going back, presses,
    rings, chips and focus the snap curve. Never a big surface faster than a small one.
 4. **Closing is quicker than opening.** Pop-ups open on `--spring` (sheets `--spring-soft`) and leave in 150 ms.
 5. **Interruptible.** Every move starts from where the thing is now, with its speed kept. Presses in a row blend;
@@ -33,8 +34,8 @@ These are the rules every new motion must follow. If something can't follow them
 9. **Plain and Glass are separate.** A motion made for Glass (the liquid morph of pop-ups, the light on the rim)
    never leaks into Plain, and the other way round.
 10. **Felt, not just seen.** With Rumble on, a soft tap on the heavy motor when something comes to rest: a Start tile settling into place, a cover landing on its page, the first push against the end of a list (`rumble('settle')`, at most one every 250 ms). Never a buzz while a direction is held.
-11. **Quiet when nobody is looking.** The governor (below) pauses decoration when you're idle and stops nearly
-    everything while a game is in front.
+11. **Quiet while a game runs.** The governor (below) stops nearly everything while a game or another app is in
+    front, and everything carries on the moment Cartridge is back. Being idle never stops what you can see (0.9.56).
 
 ## The parts
 
@@ -44,14 +45,17 @@ everything: the scroll glide, shared-element flights, the Glass light, the Glass
 
 ### 1. Spring curves for CSS
 `springCurve({ damping, response })` integrates the spring `x'' = -k (x - 1) - c x'` (k = (2π / response)²,
-c = 4π ζ / response) and turns it into a CSS `linear()` easing with its natural duration. `installSprings()` writes
+c = 4π ζ / response) and turns it into a CSS `linear()` easing with its natural duration. Since 0.9.56 the critically
+damped ones start at their natural speed (v0 = ω, so x = 1 - e^(-ωt)): at full speed from the first frame, never past
+the target. Started from rest they eased in, and the owner felt every move as sluggish. `springTo` and the card flight
+do the same; springs with give (`spring-pop`, `spring-bounce`) still start from rest. `installSprings()` writes
 them as custom properties at start, so CSS uses springs without any script per frame:
 
 | Token | Damping | Response | Used for |
 |---|---|---|---|
-| `--spring-snappy` | 1 | 0.22 s | presses, focus rings, chips, small things |
-| `--spring` | 1 | 0.34 s | most movement, pop-ups opening, going back |
-| `--spring-soft` | 1 | 0.46 s | pages, sheets, big surfaces |
+| `--spring-snappy` | 1 | 0.22 s (276 ms) | presses, focus rings, chips, small things, going back |
+| `--spring` | 1 | 0.34 s (392 ms) | most movement, pages, pop-ups opening |
+| `--spring-soft` | 1 | 0.46 s (500 ms) | sheets, big surfaces |
 | `--spring-pop` | 0.86 | 0.36 s | a press let go, toggle knobs, sliding pills |
 | `--spring-bounce` | 0.86 | 0.36 s | after momentum only (a flick) |
 
@@ -100,7 +104,7 @@ Three states, set from input and from main's `background` event:
 | State | When | What runs |
 |---|---|---|
 | active | you're using Cartridge | everything; controller read every 8 ms |
-| idle | nothing pressed for 60 s | decorative loops paused (`body.cae-idle`: background drift, cover drift, clock clouds and stars, picture drift); the animated background eases to a stop over about a second and then draws nothing (0.9.49: 8 frames a second judders and made people feel sick); controller read every 16 ms |
+| idle | nothing pressed for 60 s | controller read every 16 ms; nothing on screen stops (0.9.56, owner: the background must keep moving and only stop while a game runs) |
 | away | a game or another app is in front, or the window is hidden | CSS animations paused (`body.away`), the background stops drawing, the controller is read 4 times a second |
 
 The animated background also halves its own frame rate when drawing a frame starts costing more than 8 ms (a slow device or a 4K screen). Any input wakes it at once.

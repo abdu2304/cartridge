@@ -65,9 +65,13 @@
       <div class="eg-bar">
         <div class="eg-sum"><b>{{ haveCount }} of {{ allCount }}</b><span class="muted small">emulators on this device{{ store.config.emuDir ? ' · new ones go in ' + short(store.config.emuDir) : '' }}</span></div>
         <span v-if="running" class="eg-now"><Icon name="mdiArrowDownCircle" :size="16" />{{ runningName }} {{ running.pct != null ? running.pct + '%' : '' }}<template v-if="waiting"> · {{ waiting }} waiting</template></span>
-        <button class="btn small" data-focus :disabled="!missingFirst.length" @click="getAll"><Icon name="mdiDownloadMultiple" :size="18" />{{ missingFirst.length ? `Download all (${missingFirst.length})` : 'Everything is here' }}</button>
-        <button v-if="!flow" class="btn small" data-focus @click="phase = 'where'; loadDrives()"><Icon name="mdiFolderMove" :size="18" />Where they go</button>
-        <button v-if="updates" class="btn small" data-focus :disabled="upBusy" @click="loadUps(true)"><Icon name="mdiRefresh" :size="18" :class="{ spin: upBusy }" />{{ upCount ? `Check updates (${upCount} ready)` : 'Check for updates' }}</button>
+        <!-- 0.9.56 (owner: an Update All box beside the others): the summary on its own line, the actions as one even row -->
+        <div class="eg-acts" :class="{ four: updates && !flow }">
+          <button class="btn small" data-focus :disabled="!missingFirst.length" @click="getAll"><Icon name="mdiDownloadMultiple" :size="18" />{{ missingFirst.length ? `Download All (${missingFirst.length})` : 'Everything Is Here' }}</button>
+          <button v-if="!flow" class="btn small" data-focus @click="phase = 'where'; loadDrives()"><Icon name="mdiFolderMove" :size="18" />Where They Go</button>
+          <button v-if="updates" class="btn small" data-focus :disabled="upBusy" @click="loadUps(true)"><Icon name="mdiRefresh" :size="18" :class="{ spin: upBusy }" />{{ upBusy ? 'Checking…' : 'Check for Updates' }}</button>
+          <button v-if="updates" class="btn small" :class="{ primary: upCount && !upRun }" data-focus :disabled="!upCount || !!upRun" @click="updateAll"><Icon name="mdiUpdate" :size="18" :class="{ spin: !!upRun && allRun }" />{{ allRun ? `Updating ${allRun.done + 1} of ${allRun.of}` : upCount ? `Update All (${upCount})` : 'All Up to Date' }}</button>
+        </div>
       </div>
       <div v-if="fpNote" class="eg-fp small"><Icon name="mdiPackageVariant" :size="18" />{{ fpNote }}</div>
       <div v-if="!list" class="muted small"><Icon name="mdiSync" :size="16" class="spin" /> Looking at what's installed…</div>
@@ -172,6 +176,27 @@ async function runUpdate(u, force = false) {
   upRun.value = u.path || u.fp; upPct.value = null;
   try { await call('emuup:run', { id: u.id, kind: u.kind, fp: u.fp, where: u.where, path: u.path, force: force || !!u.broken }); toast(u.broken ? `${u.label} is repaired` : `${u.label} is up to date`, 'ok', 3000, 'mdiUpdate'); } catch (err) { toast(err.message, 'error', 6000); }
   upRun.value = ''; await loadUps(true);
+}
+// Update All (0.9.56, owner): every emulator with an update ready, one after another, after one question. A failure
+// doesn't stop the rest; what couldn't be updated is said at the end. Repairs (a copy that can't start) stay one by one.
+const allRun = ref(null);
+async function updateAll() {
+  if (upRun.value) return toast('One update at a time: wait for this one to finish.', 'info', 3000);
+  const list = (ups.value || []).filter((u) => u.update && !u.broken);
+  if (!list.length) return;
+  const names = list.map((u) => `${u.label}: ${u.version || 'this copy'} → ${shortVer(u.update)}`).join('\n');
+  if (!(await confirm(`Update ${list.length} Emulator${list.length === 1 ? '' : 's'}?`, `${names}\n\nOne after another, each at the same path, so your Steam shortcuts keep working. Close them first.`, 'Update All'))) return;
+  const bad = [];
+  for (const [i, u] of list.entries()) {
+    allRun.value = { done: i, of: list.length };
+    upRun.value = u.path || u.fp; upPct.value = null;
+    try { await call('emuup:run', { id: u.id, kind: u.kind, fp: u.fp, where: u.where, path: u.path, force: false }); }
+    catch (err) { bad.push(`${u.label}: ${err.message}`); }
+  }
+  allRun.value = null; upRun.value = '';
+  const ok = list.length - bad.length;
+  toast(bad.length ? `${ok} updated · ${bad.length} couldn’t be: ${bad[0]}` : `${ok} emulator${ok === 1 ? '' : 's'} updated`, bad.length ? 'error' : 'ok', bad.length ? 8000 : 3500, 'mdiUpdate');
+  await loadUps(true);
 }
 // 0.9.23 (owner: delete and download emulators again, stable or pre-release, shadPS4's versions):
 // an installed emulator opens one sheet with everything you can do to it
@@ -427,6 +452,10 @@ defineExpose({ load });
 .eg-space { width: 100%; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 .eg-space i { display: block; height: 100%; background: currentColor; opacity: 0.7; }
 .eg-bar { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.eg-acts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s-2); flex: 1 1 100%; }
+.eg-acts.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.eg-acts > .btn { justify-content: center; min-width: 0; white-space: normal; text-align: center; }
+@media (max-width: 1100px) { .eg-acts.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .eg-sum { display: flex; flex-direction: column; flex: 1; min-width: 200px; }
 .eg-sum b { font-size: var(--t-xl); font-family: var(--display); }
 .eg-now { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-sm); color: var(--muted); }

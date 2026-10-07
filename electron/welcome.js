@@ -64,8 +64,9 @@ async function getEmuDeck(onProgress = () => {}, { fetchImpl = webFetch, home = 
 // RetroDECK from Flathub, for this user only (no password); flatpak prints "NN%" while it works
 function getRetroDeck(onProgress = () => {}, { run = true } = {}) {
   if (!has('flatpak')) return Promise.reject(new Error("Flatpak isn't installed on this system, so RetroDECK can't be installed from here."));
-  return new Promise((resolve, reject) => {
-    try { execFileSync('flatpak', ['remote-add', '--user', '--if-not-exists', 'flathub', 'https://dl.flathub.org/repo/flathub.flatpakrepo'], { stdio: 'ignore', env: plainEnv(), timeout: 60000 }); } catch {}
+  // 0.9.56: Flathub added without holding the app (it waited up to a minute on Electron's main thread)
+  const remote = new Promise((ok) => require('child_process').execFile('flatpak', ['remote-add', '--user', '--if-not-exists', 'flathub', 'https://dl.flathub.org/repo/flathub.flatpakrepo'], { env: plainEnv(), timeout: 60000 }, () => ok()));
+  return remote.then(() => new Promise((resolve, reject) => {
     const p = spawn('flatpak', ['install', '--user', '-y', '--noninteractive', 'flathub', RETRODECK], { env: plainEnv() });
     let tail = '';
     const read = (b) => {
@@ -80,7 +81,7 @@ function getRetroDeck(onProgress = () => {}, { run = true } = {}) {
       if (run) start('flatpak', ['run', RETRODECK]);
       resolve({ id: RETRODECK });
     });
-  });
+  }));
 }
 
 // Flatpak itself, when a system has none (0.9.17, owner: offer it instead of stopping). Image-based
