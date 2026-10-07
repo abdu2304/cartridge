@@ -6,6 +6,16 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 7 Oct 2026 · 0.9.57 Seamless
+- Owner's list (photos from the TV) discussed first, then "start building". Picks: highlight B (your colour, solid), Start "whatever looks best" (a slow pan, no zoom), Syncthing flattened into the section's row, Vita3K zips/VPKs must install without its window ("we nailed this with PS3"). Added mid-build: redesign the Cloud Sync screen, and a game sheet in Cartridge Save Sync (poster, where the save is, history, Go to Game Page).
+- Vita3K root cause, found by running build 4111 in the container: CLI11 Windows-style options swallow "/..." arguments (the owner's "13.zip" was the half after the space), and killing the AppImage left the real Vita3K running. Both fixed and tested end to end (no window, ~0.6 s).
+- shadPS4's save path checked against its source (save_instance.cpp, path_util.cpp): the owner was right.
+- Names for codes: PCSX2/DuckStation databases; RomM has no serials, so nothing to read there.
+- Checked: npm test, vite build, launch check, `npm run audit:ui`, screenshots of the new screens in Plain, Glass and Light.
+- Owner to test on a device: a Vita zip install (Unit 13), Glass on OLED, the chosen colours in Settings, Start's pan on the TV and the handheld, the Save Sync game sheet, Syncthing games after the first name download, shadPS4 saves and Linked Folders with a shadPS4 fork.
+
+---
+
 ## 7 Oct 2026 · 0.9.56 Quick and Clear (new account session)
 - Owner moved back to this account; read every handover, CLAUDE.md, the session log and the engine docs first, and confirmed the codebase back. Container note: Electron's own download fails through the proxy; fetch `electron-v44.4.5-linux-x64.zip` from GitHub with curl into `node_modules/electron/dist` (and `path.txt` = `electron`). Playwright is global (`NODE_PATH=$(npm root -g)`).
 - Owner's list (15 items) with answers: colour boxes and Update All layout "you recommend"; the "freeze" item was the background stopping (the real freeze was fixed in 0.9.55); Glass "weird white shadows that move around the card" in dark mode; Linked Folders "build your best version".
