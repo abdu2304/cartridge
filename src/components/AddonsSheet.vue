@@ -193,7 +193,8 @@ async function install(p, f) {
   if (p.source === 'nexus') {
     try {
       const r = await call('addons:install', { romId: props.romId, emuRoot: emu.value.emuRoot, pack: JSON.parse(JSON.stringify(p)), file: f ? JSON.parse(JSON.stringify(f)) : null });
-      if (r?.page) { run.value = null; return toast('Sign in to Nexus Mods on the page if it asks, then press Manual Download: Cartridge installs the file for this game.', 'info', 8000, 'mdiDownload'); }
+      // 0.9.57: why the page opens (a key only downloads for Premium), and the sign-in only the first time
+      if (r?.page) { run.value = null; return toast(r.signedIn ? 'Press Slow Download on the page: Cartridge installs the file for this game.' : `Nexus Mods only lets Premium accounts download with ${r.keyed ? 'an API key' : 'Cartridge'}. Sign in on the page once (Cartridge remembers it), then press Slow Download: Cartridge installs the file for this game.`, 'info', 9000, 'mdiDownload'); }
       toast(`Installed in ${emu.value.name}: ${r.files.toLocaleString()} files`, 'ok', 5000, 'mdiPuzzleOutline');
     } catch (e) { if (!/abort/i.test(e.message)) toast(e.message, 'error', 6000); }
     run.value = null; load(); return;

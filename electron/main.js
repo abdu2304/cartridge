@@ -2489,6 +2489,9 @@ function watchJoin() {
   };
   tick(); joinT = setInterval(tick, 30000);
 }
+async function nexusSignedIn() {
+  try { const c = await require('electron').session.fromPartition('persist:addons').cookies.get({ domain: 'nexusmods.com' }); return c.some((x) => /session|sid|jwt|auth|remember/i.test(x.name) && (!x.expirationDate || x.expirationDate * 1000 > Date.now())); } catch { return false; }
+}
 // Game names from their codes (0.9.57): the emulators' own game databases, read once and kept (electron/titleDb.js);
 // AppImages aren't opened for it (reading one can hold the main thread), the file from the emulator's repo instead
 const titles = require('./titleDb').createTitleDb({ dataDir: USER_DATA, fetchImpl: (u) => require('./webFetch')(u), log });
@@ -4210,7 +4213,7 @@ const handlers = {
     // the download (after Nexus's own sign-in) is caught and installed like any other (addons:browse)
     if (pack.source === 'nexus') {
       const d = await modsEng().download('nexus', pack, file);
-      if (d.page) { handlers['addons:browse']({ url: d.page, romId, emuRoot, kind: 'mods', name: pack.name }); return { page: true }; }
+      if (d.page) { const signedIn = await nexusSignedIn(); handlers['addons:browse']({ url: d.page, romId, emuRoot, kind: 'mods', name: pack.name }); return { page: true, signedIn, keyed: !!config.nexusKey }; }
       file = { ...file, url: d.url };
     }
     // each emulator's own layout (addonInstall.plan, 0.9.18); PCSX2 and DuckStation: the game folder is
@@ -4267,6 +4270,10 @@ const handlers = {
   // 0.9.32 (owner: a download clicked on a mod's website did nothing): the page opens in a Cartridge
   // window; a .zip/.7z/.rar it downloads is caught, shown in Downloads, then installed for this game
   // the same way as Install a Download. The file is deleted after it installs.
+  // 0.9.57 (owner: don't make me sign in when my key is there): Nexus only gives Premium members files through an API
+  // key; free accounts download on its site, signed in. The site's sign-in is kept in Cartridge's add-on window
+  // (persist:addons), so it is asked once: this says whether it is there already
+  'nexus:signedIn': () => nexusSignedIn(),
   'addons:browse': ({ url, romId, emuRoot, kind, name }) => {
     if (!/^https:\/\//i.test(String(url || ''))) throw new Error('That page can’t be opened.');
     if (addonBrowser && !addonBrowser.isDestroyed()) addonBrowser.close();

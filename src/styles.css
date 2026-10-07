@@ -571,9 +571,11 @@ body.theme-light {
   --text-2: #3c3c43; --score: #1b7a33; --danger-t: #c0281f; --ondev: #1b7a33; --faint: rgba(0, 0, 0, 0.5); --line-2: rgba(0, 0, 0, 0.12);
   /* 0.9.41 rebuilt: soft, cool shadows that lift near-white cards off the grey page, a fine edge instead of a glow */
   /* 0.9.56 (owner: cards blended into the page): a firmer edge and a deeper shadow under white cards */
-  --shadow-card: 0 1px 3px rgba(20, 20, 30, 0.1), 0 12px 28px -8px rgba(20, 20, 30, 0.24);
+  /* 0.9.57 (owner: card shadows clipped in Light): no deeper than 18 px below a card, inside the 20 px rows and
+     scrollers leave under it (they reached 26 to 32 px and were cut at the row's edge); as firm, just tighter */
+  --shadow-card: 0 1px 3px rgba(20, 20, 30, 0.12), 0 8px 18px -8px rgba(20, 20, 30, 0.3);
   --shadow-pop: 0 2px 6px rgba(20, 20, 30, 0.08), 0 24px 60px -12px rgba(20, 20, 30, 0.28);
-  --weight: 0 1px 3px rgba(20, 20, 30, 0.1), 0 10px 24px -8px rgba(20, 20, 30, 0.24);
+  --weight: 0 1px 3px rgba(20, 20, 30, 0.12), 0 8px 18px -8px rgba(20, 20, 30, 0.3);
   --weight-edge: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
   --tile-bg: #e3e3e8; --tile-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05), 0 4px 10px -4px rgba(20, 20, 30, 0.18);
 }
