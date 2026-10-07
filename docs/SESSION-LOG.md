@@ -6,6 +6,13 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 7 Oct 2026 · 0.9.54 Obsidian Glass · handover written
+- Owner: dark Glass looked like milky grey plastic; sent a prompt for obsidian glass and asked if it made sense. Answered (it did, with changes: keep saturation near 1.45 not lower, tint with the chosen colour, keep the moving rim light, blur 28 not 40, deep shadow only on floating pieces, update the engine's own filter and the no-GPU values). Built, showed before/after over Solar Flare; owner: "a tiny bit darker without losing the glass look" (fill 66 to 72%, sheets 74 to 80%, base blacker). Light untouched.
+- Handover for the move back to the other account: docs/HANDOVER-0.9.38-to-0.9.54.md, pointer at the top of CLAUDE.md.
+- Owner to test on a device: dark Glass on the Deck (GPU and light effects) and the TV.
+
+---
+
 ## 7 Oct 2026 · 0.9.53: brand B and the new README
 - Owner picked brand B (Marquee) and the README Showcase layout, asked for logos and metadata in the pictures (SteamGridDB key given), real console pictures instead of placeholders, an Achievements screen (RA key given), private details hidden, and a fluid header GIF.
 - Done: logos for 154 games and heroes from SteamGridDB, RomM console pictures (Sony fix applied), RA overview with the user shown as "player"; all 32 shots in four looks plus achievements; GIF at about 33 fps; brand assets from tools/brand/gen.js; README rewritten. Found and fixed: console card names dark in Light.

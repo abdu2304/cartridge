@@ -628,21 +628,29 @@ body.theme-oled .statusbar::before { background: linear-gradient(0deg, #000 0%, 
    The focused or chosen control is lit glass: more fill (the highlight colour), a brighter rim and a glow. Glass
    inside glass (tabs in the Dock, buttons in a sheet) keeps rim and gloss but never blurs again. Light effects and
    reduced transparency keep every layer but the blur, with a denser fill; more contrast gives a solid edge. */
+/* 0.9.54 (owner: dark Glass read as milky "plastic slate grey"; Light was right): dark glass is smoked obsidian now.
+   The white fill and the brightened backdrop made the grey film; the body is near-black with a hint of the chosen colour
+   (kept under 10% lightness), the backdrop is blurred denser and its colours kept rich (saturate, a little contrast,
+   no brightening), and the glass gets its shape from its edges: a hairline catching the light on the lit side, a dark
+   refraction line on the other, a faint top-down sheen inside, and a two-layer shadow (contact plus a deep one on the
+   pieces that float). Light keeps its own values below. */
 body.elements-glass {
-  --lg-fill: rgba(255, 255, 255, 0.055);
-  --lg-fill-hover: rgba(255, 255, 255, 0.1);
-  --lg-pane: rgba(var(--lg-tint), 0.5); /* sheets and pop-ups: dark glass so long text reads, like the frosted window */
-  --lg-blur: blur(22px) saturate(1.8) brightness(1.08);
-  --lg-rim-grad: linear-gradient(var(--lg-angle, 135deg), rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.26) 20%, rgba(255, 255, 255, 0.07) 46%, rgba(255, 255, 255, 0.14) 74%, rgba(255, 255, 255, 0.72) 100%);
-  --lg-bevel: inset 0 1px 1px rgba(255, 255, 255, 0.26), inset 0 -1px 2px rgba(0, 0, 0, 0.34), inset 0 0 0 3px rgba(255, 255, 255, 0.03), inset 0 12px 26px -16px rgba(255, 255, 255, 0.22);
-  --lg-drop: 0 18px 44px -16px rgba(0, 0, 0, 0.62), 0 2px 6px rgba(0, 0, 0, 0.22);
-  --lg-gloss: linear-gradient(166deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.06) 36%, rgba(255, 255, 255, 0) 36.4%);
-  --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.2'/%3E%3C/svg%3E");
+  --lg-ob: color-mix(in srgb, rgb(var(--lg-tint)) 9%, rgb(7, 9, 13)); /* owner: a touch darker, still glass */
+  --lg-fill: color-mix(in srgb, var(--lg-ob) 72%, transparent);
+  --lg-fill-hover: color-mix(in srgb, var(--lg-ob) 82%, transparent);
+  --lg-pane: color-mix(in srgb, var(--lg-ob) 80%, transparent); /* sheets and pop-ups: smoked glass so long text reads */
+  --lg-blur: blur(28px) saturate(1.45) contrast(1.05);
+  --lg-rim-grad: linear-gradient(var(--lg-angle, 135deg), rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.14) 22%, rgba(255, 255, 255, 0.04) 50%, rgba(0, 0, 0, 0.3) 78%, rgba(0, 0, 0, 0.45) 100%);
+  --lg-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.45), inset -1px 0 0 rgba(0, 0, 0, 0.3);
+  --lg-drop: 0 4px 8px rgba(0, 0, 0, 0.5);
+  --lg-drop-deep: 0 4px 8px rgba(0, 0, 0, 0.5), 0 20px 40px rgba(0, 0, 0, 0.65);
+  --lg-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 40%, rgba(0, 0, 0, 0.25) 100%), linear-gradient(166deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 36%, rgba(255, 255, 255, 0) 36.4%);
+  --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.12'/%3E%3C/svg%3E");
   --lg-lit: rgba(var(--lg-hi), 0.88); /* prominent glass: the highlight colour nearly solid, so focus reads white with dark text (owner: not grey) */
   --lg-lit-rim: linear-gradient(var(--lg-angle, 135deg), #fff 0%, rgba(255, 255, 255, 0.55) 30%, rgba(255, 255, 255, 0.3) 55%, rgba(255, 255, 255, 0.9) 100%);
   --lg-lit-glow: 0 0 0 1px rgba(255, 255, 255, 0.35), 0 0 26px -2px rgba(var(--lg-hi), 0.45), 0 14px 34px -14px rgba(0, 0, 0, 0.6);
   --lg-on-lit: var(--lg-on-hi);
-  --lg-sel: rgba(255, 255, 255, 0.2); /* chosen but not focused (0.9.47): brighter glass with white text, never the lit focus look */
+  --lg-sel: rgba(255, 255, 255, 0.16); /* chosen but not focused (0.9.47): brighter glass with white text, never the lit focus look */
 }
 body.elements-glass.theme-light {
   --lg-fill: rgba(255, 255, 255, 0.42);
@@ -652,6 +660,7 @@ body.elements-glass.theme-light {
   --lg-rim-grad: linear-gradient(var(--lg-angle, 135deg), #fff 0%, rgba(255, 255, 255, 0.7) 24%, rgba(0, 0, 0, 0.06) 50%, rgba(255, 255, 255, 0.6) 76%, #fff 100%);
   --lg-bevel: inset 0 1px 1px #fff, inset 0 -1px 2px rgba(30, 30, 45, 0.12), inset 0 0 0 3px rgba(255, 255, 255, 0.25);
   --lg-drop: 0 16px 40px -18px rgba(30, 30, 45, 0.32), 0 1px 3px rgba(30, 30, 45, 0.1);
+  --lg-drop-deep: var(--lg-drop);
   --lg-gloss: linear-gradient(166deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.2) 36%, rgba(255, 255, 255, 0) 36.4%);
   --lg-lit: rgba(var(--lg-hi), 0.96); /* 0.9.49 (owner: black frosted buttons in Light): crisp dark, not a muddy see-through grey */
   --lg-lit-rim: linear-gradient(var(--lg-angle, 135deg), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.12) 40%, rgba(255, 255, 255, 0.5));
@@ -664,6 +673,7 @@ body.elements-glass.theme-light {
 body.elements-glass :is(.bar-pill.dock-glass .tabs, .top-search, .dialog, .toast, .btn, .seg) { isolation: isolate; }
 body.elements-glass.bar-pill.dock-glass .tabs, body.elements-glass :is(.top-search, .dialog, .toast, .btn:not(.primary), .seg) { background: var(--lg-fill); box-shadow: var(--lg-bevel), var(--lg-drop); }
 body.elements-glass :is(.dialog, .toast) { background: var(--lg-pane); }
+body.elements-glass.bar-pill.dock-glass .tabs, body.elements-glass :is(.top-search, .dialog, .toast) { box-shadow: var(--lg-bevel), var(--lg-drop-deep); } /* they float: contact plus deep shadow (0.9.54) */
 body.elements-glass.bar-pill.dock-glass .tabs, body.elements-glass :is(.top-search, .dialog, .toast) { -webkit-backdrop-filter: var(--lg-blur); backdrop-filter: var(--lg-blur); }
 body.elements-glass .g-actions .btn:not(.primary) { -webkit-backdrop-filter: var(--lg-blur); backdrop-filter: var(--lg-blur); } /* over the game's art */
 /* the rim (::before) and the reflection (::after, under the content) */
@@ -675,11 +685,11 @@ body.elements-glass.bar-pill.dock-glass .tabs::after, body.elements-glass :is(.t
   content: ''; position: absolute; inset: 0; border-radius: inherit; background: var(--lg-gloss); pointer-events: none; z-index: -1;
 }
 body.elements-glass :is(.dialog, .toast)::after { background: var(--lg-gloss), var(--lg-grain); background-size: auto, 160px 160px; opacity: 0.9; }
-body.elements-glass .dialog::after { background: linear-gradient(170deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.025) 22%, rgba(255, 255, 255, 0) 22.3%), var(--lg-grain); background-size: auto, 160px 160px; }
+body.elements-glass .dialog::after { background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 30%), var(--lg-grain); background-size: auto, 160px 160px; }
 body.elements-glass.theme-light .dialog::after { background: linear-gradient(170deg, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0.2) 22%, rgba(255, 255, 255, 0) 22.3%); }
 body.elements-glass .btn:not(.primary):hover { background: var(--lg-fill-hover); }
 /* rows in a glass sheet sit on the glass (no grey blocks), only a hairline marks them; the focused one is lit glass */
-body.elements-glass .dialog .menu-item { background: rgba(255, 255, 255, 0.035); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05); }
+body.elements-glass .dialog .menu-item { background: rgba(255, 255, 255, 0.025); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.3); }
 body.elements-glass.theme-light .dialog .menu-item { background: rgba(255, 255, 255, 0.4); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7); }
 body.elements-glass .dialog .menu-item:hover { background: var(--lg-fill-hover); }
 body.elements-glass .dialog .menu-item:focus { background: var(--lg-lit); color: var(--lg-on-lit); box-shadow: var(--lg-bevel), var(--lg-lit-glow); }
@@ -713,17 +723,17 @@ body.elements-glass.motion-reduce .btn.lg-shine::after { animation: none; backgr
 @media (prefers-reduced-motion: reduce) { body.elements-glass .btn.lg-shine::after { animation: none; background: var(--lg-gloss); } }
 /* clear glass over the game's art (the skill's .clear: media-rich backgrounds): more see-through and brighter, the
    label kept legible by a soft shadow */
-body.elements-glass:not(.light-fx):not(.theme-light) .g-actions .btn:not(.primary):not(:focus) { background: rgba(255, 255, 255, 0.025); -webkit-backdrop-filter: blur(12px) saturate(2) brightness(1.18); backdrop-filter: blur(12px) saturate(2) brightness(1.18); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55); }
+body.elements-glass:not(.light-fx):not(.theme-light) .g-actions .btn:not(.primary):not(:focus) { background: color-mix(in srgb, var(--lg-ob) 38%, transparent); -webkit-backdrop-filter: blur(14px) saturate(1.45) contrast(1.05); backdrop-filter: blur(14px) saturate(1.45) contrast(1.05); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55); } /* 0.9.54: smoked, not brightened */
 /* concentric corners: a shape inside another follows its curve (outer radius less the gap) */
 body.elements-glass .seg-ink { border-radius: calc(var(--r-md) - 4px); }
-body.elements-glass :is(.btn, .seg button):is(:active, .pressed) { box-shadow: var(--lg-bevel), inset 0 0 24px rgba(255, 255, 255, 0.3), var(--lg-drop); }
+body.elements-glass :is(.btn, .seg button):is(:active, .pressed) { box-shadow: var(--lg-bevel), inset 0 0 24px rgba(255, 255, 255, 0.18), var(--lg-drop); }
 /* without blur: every layer stays, the fill gets denser so it still reads */
 body.elements-glass.light-fx :is(.tabs, .top-search, .dialog, .toast, .btn) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
-body.elements-glass.light-fx { --lg-fill: rgba(var(--lg-tint), 0.72); --lg-fill-hover: rgba(var(--lg-tint), 0.82); --lg-pane: rgba(var(--lg-tint), 0.94); }
+body.elements-glass.light-fx { --lg-fill: color-mix(in srgb, var(--lg-ob) 88%, transparent); --lg-fill-hover: color-mix(in srgb, var(--lg-ob) 94%, transparent); --lg-pane: color-mix(in srgb, var(--lg-ob) 96%, transparent); }
 body.elements-glass.light-fx.theme-light { --lg-fill: rgba(250, 250, 251, 0.88); --lg-fill-hover: #fff; --lg-pane: rgba(250, 250, 251, 0.97); }
 @media (prefers-reduced-transparency: reduce) {
   body.elements-glass :is(.tabs, .top-search, .dialog, .toast, .btn) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
-  body.elements-glass { --lg-fill: rgba(var(--lg-tint), 0.92); --lg-pane: rgba(var(--lg-tint), 0.97); --lg-lit: rgb(var(--lg-hi)); }
+  body.elements-glass { --lg-fill: color-mix(in srgb, var(--lg-ob) 94%, transparent); --lg-pane: color-mix(in srgb, var(--lg-ob) 98%, transparent); --lg-lit: rgb(var(--lg-hi)); }
 }
 @media (prefers-contrast: more) {
   body.elements-glass { --lg-rim-grad: linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)); }
