@@ -14,7 +14,7 @@ const DATA = {
   primehack: { app: '.local/share/primehack', fp: '.var/app/io.github.shiiion.primehack/data/dolphin-emu', saves: { GC: 'GC', Wii: 'Wii', states: 'StateSaves' }, storage: { textures: 'Load/Textures' } },
   ppsspp: { app: '.config/ppsspp', fp: '.var/app/org.ppsspp.PPSSPP/config/ppsspp', saves: { saves: 'PSP/SAVEDATA', states: 'PSP/PPSSPP_STATE' }, storage: { textures: 'PSP/TEXTURES' } },
   rpcs3: { app: '.config/rpcs3', fp: '.var/app/net.rpcs3.RPCS3/config/rpcs3', saves: { saves: 'dev_hdd0/home/00000001/savedata' }, storage: { games: 'dev_hdd0/game' } },
-  shadps4: { app: '.local/share/shadPS4', saves: { saves: 'user/savedata' }, storage: { mods: 'mods' } },
+  shadps4: { app: '.local/share/shadPS4', saves: { saves: 'home' }, storage: { mods: 'mods' } }, // 0.9.57: saves are in home/<user ID>/savedata (shadPS4's save_instance.cpp)
   vita3k: { app: '.local/share/Vita3K/Vita3K', saves: { saves: 'ux0/user/00/savedata' }, storage: { games: 'ux0/app' } },
   cemu: { app: '.local/share/Cemu', fp: '.var/app/info.cemu.Cemu/data/Cemu', saves: { saves: 'mlc01/usr/save' }, storage: { graphicPacks: 'graphicPacks' } },
   eden: { app: '.local/share/eden', fp: '.var/app/dev.eden_emu.eden/data/eden', saves: { saves: 'nand/user/save' }, storage: { mods: 'load', nand: 'nand' } },

@@ -4620,7 +4620,10 @@ const handlers = {
     let forks = []; try { forks = steamMgr.forksAll(); } catch (e) { log('links forks', e.message); }
     for (const f of forks) {
       if (f.how === 'flatpak') continue;
-      for (const [, label, rel] of SV.SYNC[f.of] || []) {
+      for (let [, label, rel] of SV.SYNC[f.of] || []) {
+        // 0.9.57: shadPS4 keeps saves in home/<user ID>/savedata, so its forks share the whole home folder (older
+        // builds: savedata/), whichever the original has
+        if (f.of === 'shadps4') rel = ['home', 'savedata'].find((x) => baseOf('shadps4', x) && fs.existsSync(path.join(baseOf('shadps4', x), x))) || 'home';
         if (typeof rel !== 'string') continue;
         const donor = baseOf(f.of, rel), fb = L.findForkBase(f.exe, rel, home);
         // 0.9.37: not in its usual places: looked for under the fork's own folder

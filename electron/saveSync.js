@@ -136,7 +136,8 @@ function placeFor(emu, key, { home = os.homedir(), extra = {} } = {}) {
       case 'ps3': { const u = path.join(b, 'dev_hdd0/home/00000001/savedata'); if (isDir(path.dirname(u))) return path.join(u, id); break; }
       case 'psp': if (isDir(path.join(b, 'PSP'))) return path.join(b, 'PSP/SAVEDATA', id); break;
       case 'vita': if (isDir(path.join(b, 'ux0'))) return path.join(b, 'ux0/user/00/savedata', id); break;
-      case 'ps4': { const sd = path.join(b, 'user/savedata'); const u = ls(sd).find((e) => e.isDirectory() && !/^(CUSA|PCJS|PLJM|PCAS|PCKS)\d{5}$/.test(e.name)); if (u) return path.join(sd, u.name, id); break; }
+      // 0.9.57: shadPS4's <home>/<user ID>/savedata (saves.shadSaveDir), the older layouts as they are found
+      case 'ps4': { const sd = S.shadSaveDirs(b)[0]; if (!sd) break; if (/[\/]home[\/][^\/]+[\/]savedata$/.test(sd)) return path.join(sd, id); const u = ls(sd).find((e) => e.isDirectory() && !/^(CUSA|PCJS|PLJM|PCAS|PCKS)\d{5}$/.test(e.name)); if (u) return path.join(sd, u.name, id); break; }
       case 'ps2card': case 'ps1card': if (isDir(path.join(b, 'memcards'))) return path.join(b, 'memcards', id); break;
       case 'gccard': case 'gc': { const [region, file] = id.split('/'); if (isDir(path.join(b, 'GC', region))) return kind === 'gc' ? path.join(b, 'GC', region, 'Card A', file) : path.join(b, 'GC', region, file); break; }
       case 'wii': if (isDir(path.join(b, 'Wii/title'))) return path.join(b, 'Wii/title/00010000', id, 'data'); break;
