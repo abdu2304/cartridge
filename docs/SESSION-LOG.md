@@ -6,6 +6,14 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 7 Oct 2026 · after 0.9.54: Home dims a second after coming back from a game (fixed, not released yet)
+- Owner: open a game from Home, go back, and about a second later the screen dims and comes back up.
+- Cause: `store.back()` added `morph-back` (page arrival animations off while the cover flies back) and took it off 900 ms later. Taking `animation: none` away re-applied `settle`/`viewBack` to the page already showing, so Home faded in from opacity 0 a second time. Reproduced in Chromium (Home opacity 1 → 0 → 1 at 900 ms after back).
+- Fix: `calm()` in store.js takes `morph-back` off just before the next page change (`goNow`, `back`, `tab`); no timer. Checked: Home stays at opacity 1 going back after 0.3, 1 and 3 s; the next game page still arrives with `viewDeeper` and a tab with `viewFromR`. Other classes that gate animations checked: `modal-in` stays on (the same bug in pop-ups, fixed in 0.9.44), `rows-measure` doesn't touch animations, `cae-idle` pauses rather than removes.
+- README pictures and header GIF reshot with the obsidian dark Glass (PR #72). GitHub About text suggested to the owner (no tool here can edit repo settings).
+
+---
+
 ## 7 Oct 2026 · 0.9.54 Obsidian Glass · handover written
 - Owner: dark Glass looked like milky grey plastic; sent a prompt for obsidian glass and asked if it made sense. Answered (it did, with changes: keep saturation near 1.45 not lower, tint with the chosen colour, keep the moving rim light, blur 28 not 40, deep shadow only on floating pieces, update the engine's own filter and the no-GPU values). Built, showed before/after over Solar Flare; owner: "a tiny bit darker without losing the glass look" (fill 66 to 72%, sheets 74 to 80%, base blacker). Light untouched.
 - Handover for the move back to the other account: docs/HANDOVER-0.9.38-to-0.9.54.md, pointer at the top of CLAUDE.md.
