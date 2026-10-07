@@ -319,7 +319,8 @@ module.exports = function createSteamManager(ctx) {
   let flatpaks = null;
   function flatpakApps() {
     if (flatpaks) return flatpaks;
-    try { flatpaks = execFileSync('flatpak', ['list', '--app', '--columns=application'], { encoding: 'utf8', timeout: 8000 }).split('\n').map((s) => s.trim()).filter(Boolean); } catch { flatpaks = []; }
+    flatpaks = require('./detect').flatpakApps(HOME); // from Flatpak's folders: `flatpak list` froze the app for seconds
+    if (!flatpaks) try { flatpaks = execFileSync('flatpak', ['list', '--app', '--columns=application'], { encoding: 'utf8', timeout: 8000 }).split('\n').map((s) => s.trim()).filter(Boolean); } catch { flatpaks = []; }
     return flatpaks;
   }
   // ---------------------------------------------------------------- 0.9: emulators found anywhere (Setup)
@@ -405,7 +406,9 @@ module.exports = function createSteamManager(ctx) {
   // what emulators exist and how each starts: electron/emulators.js (only installed ones are offered)
   const { EMU, CORES, RA_FIRST, emulatorsFor, argsFor, coreName, DISC_FIRST, GAME_EXT, DIR_GAMES, forkOf, realName } = require('./emulators');
   let extraBins = null; // Snap, Nix, Homebrew, a login shell's PATH (looked up once)
-  const BIN_DIRS = () => [...new Set([...(process.env.PATH || '').split(':'), '/usr/bin', '/usr/local/bin', '/usr/games', '/app/bin', path.join(HOME, '.local/bin'), '/var/lib/flatpak/exports/bin', ...(extraBins ||= detect.extraBinDirs(HOME))].filter((d) => d && d.startsWith('/') && !d.includes('/tmp/.mount_')))];
+  // kept only once the login shell has answered (it's asked in the background, never waited for)
+  const binsNow = () => { const d = detect.extraBinDirs(HOME); if (detect.loginPathKnown()) extraBins = d; return d; };
+  const BIN_DIRS = () => [...new Set([...(process.env.PATH || '').split(':'), '/usr/bin', '/usr/local/bin', '/usr/games', '/app/bin', path.join(HOME, '.local/bin'), '/var/lib/flatpak/exports/bin', ...(extraBins || binsNow())].filter((d) => d && d.startsWith('/') && !d.includes('/tmp/.mount_')))];
   const findBin = (names) => { for (const d of BIN_DIRS()) for (const n of names || []) { const f = path.join(d, n); if (exists(f) && !isDir(f)) return f; } return null; };
   const kindOf = (key) => (key === 'ps4' ? 'eboot' : key === 'wiiu' ? 'rpx' : 'path');
   // Every emulator for this console that is installed here: [{ id, label, t }]. Each copy is listed

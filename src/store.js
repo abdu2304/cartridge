@@ -74,7 +74,12 @@ export function go(name, params = {}) {
   if (card?.querySelector('.art img')) return morph(card.querySelector('.art'), () => goNow(name, params), '.g-cover', nextTick);
   goNow(name, params);
 }
+// 0.9.55 (owner: open a game from Home, go back, and a second later the screen dims and comes back): morph-back
+// switched Home's arrival animations off and a 900 ms timer switched them on again, which restarted them on the page
+// already showing, so it faded in from nothing a second time. The class now stays until the next page change.
+const calm = () => document.documentElement.classList.remove('morph-back');
 function goNow(name, params) {
+  calm();
   // leaving Settings for one of its screens: remember the row (Settings puts focus back on it, 0.9.3 L)
   const el = document.activeElement;
   if (store.route.name === 'settings' && el?.closest?.('.pane')) store.settingsSpot = { sec: store.settingsSection, page: store.settingsPage, text: (el.textContent || '').trim().slice(0, 60) };
@@ -86,13 +91,13 @@ export function back() {
   if (!store.history.length) return false;
   const from = store.route.name === 'game' && document.querySelector('.g-cover img') && store.route.params?.romId;
   const prev = store.history[store.history.length - 1];
+  calm();
   const change = () => { store.navDir = 'out'; store.route = store.history.pop(); };
   if (from && prev?.focusKey === 'rom-' + from) {
     // 0.9.49 (owner: "the return feels glitchy", on Home only): Home's rows settle in one after another (up to 720 ms)
     // while the cover flies back into one of them, so it chased a moving card and the card kept moving after it
     // landed. Coming back to a card, the page arrives still; going to a game is unchanged.
-    const root = document.documentElement;
-    root.classList.add('morph-back'); clearTimeout(back.t); back.t = setTimeout(() => root.classList.remove('morph-back'), 900);
+    document.documentElement.classList.add('morph-back');
     morph(document.querySelector('.g-cover'), change, `.card[data-key="rom-${from}"] .art`, nextTick);
   } else change();
   return true;
@@ -102,6 +107,7 @@ export function tab(name) {
   const order = activeTabs(), from = order.indexOf(store.history[0]?.name || store.route.name), to = order.indexOf(name);
   store.navDir = from < 0 || to < 0 || from === to ? 'in' : to > from ? 'r' : 'l';
   store.history = [];
+  calm();
   store.route = { name, params: {} };
 }
 
