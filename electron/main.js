@@ -289,6 +289,9 @@ function watchGamescopeFocus() {
 // Game Mode, another app in front or just closed (0.9.23, owner: closing a game started from Steam closed
 // Cartridge too). Steam ends a game by signalling its launch session, and on the way back Cartridge got
 // one as well. A signal in that moment is logged and ignored; a second one within 10 s still quits.
+// flatpak override in the background (after 0.9.54): run synchronously it held the whole app while Flatpak worked,
+// up to 15 s, and Steam dimmed Cartridge as not responding
+const flatpakAsync = (args) => new Promise((res, rej) => require('child_process').execFile('flatpak', args, { timeout: 15000 }, (e) => (e ? rej(e) : res())));
 const gameFocus = { watched: false, away: false, otherAt: 0, ignoredAt: 0, gameApp: null, endedAt: 0, lastApp: null };
 function ignoreSignal(sig) {
   if (!gameFocus.watched || sig === 'SIGINT') return false;
@@ -3524,14 +3527,14 @@ const handlers09 = {
   'setup:use': ({ key, file, as, args }) => steamMgr.useFile(key, file, { as, args }),
   'setup:report': () => steamMgr.setupReport(),
   // give a Flatpak emulator your games folder (asked first in Setup): only its Flatpak permissions change
-  'setup:flatpakAllow': ({ id, dir }) => {
+  'setup:flatpakAllow': async ({ id, dir }) => {
     if (!/^[A-Za-z0-9_.-]+$/.test(String(id || '')) || !path.isAbsolute(String(dir || ''))) throw new Error('Not a Flatpak app or folder');
-    require('child_process').execFileSync('flatpak', ['override', '--user', `--filesystem=${dir}`, id], { timeout: 15000 });
+    await flatpakAsync(['override', '--user', `--filesystem=${dir}`, id]);
     return true;
   },
   // Flatpak Steam may start programs outside its sandbox (flatpak-spawn --host): 0.9.3 K, K2
-  'setup:steamFlatpakAllow': () => {
-    require('child_process').execFileSync('flatpak', ['override', '--user', '--talk-name=org.freedesktop.Flatpak', 'com.valvesoftware.Steam'], { timeout: 15000 });
+  'setup:steamFlatpakAllow': async () => {
+    await flatpakAsync(['override', '--user', '--talk-name=org.freedesktop.Flatpak', 'com.valvesoftware.Steam']);
     return true;
   },
   'setup:done': () => { config.setupDone = Date.now(); saveConfig(); return true; },
@@ -3702,7 +3705,7 @@ const handlers = {
     const d = P.setPath(id, rid, value);
     log('emulator folder', id, rid, Array.isArray(value) ? value.join(', ') : value || '(default)');
     // PPSSPP's Flatpak follows the link only when it may see where it points (0.9.49)
-    if (id === 'ppsspp' && value && P.locate('ppsspp')?.flatpak) try { require('child_process').execFileSync('flatpak', ['override', '--user', `--filesystem=${value}`, 'org.ppsspp.PPSSPP'], { timeout: 15000 }); } catch (e) { log('ppsspp flatpak access', e.message); }
+    if (id === 'ppsspp' && value && P.locate('ppsspp')?.flatpak) flatpakAsync(['override', '--user', `--filesystem=${value}`, 'org.ppsspp.PPSSPP']).catch((e) => { log('ppsspp flatpak access', e.message); });
     return d;
   },
   'fs:openFolder': async ({ path: p }) => { if (!p || !isDir(p)) throw new Error('That folder isn’t there yet.'); const err = await require('electron').shell.openPath(p); if (err) throw new Error(err); return true; },
@@ -4923,7 +4926,7 @@ const handlers = {
     const lists = handlers['setup:gameFolders']();
     // Flatpak emulators only see folders they were given: this one is given to each that's installed
     let opened = 0;
-    try { for (const e of steamMgr.installedEmulators().filter((x) => x.kind === 'flatpak')) { try { require('child_process').execFileSync('flatpak', ['override', '--user', `--filesystem=${real(root)}`, e.fp], { timeout: 15000 }); opened++; } catch {} } } catch {}
+    try { for (const e of steamMgr.installedEmulators().filter((x) => x.kind === 'flatpak')) { try { await flatpakAsync(['override', '--user', `--filesystem=${real(root)}`, e.fp]); opened++; } catch {} } } catch {}
     computeInstalled();
     return { root, lists: lists.filter((x) => x.added.length).map((x) => x.name), opened };
   },
@@ -5215,6 +5218,7 @@ setInterval(() => { try { noteShadRun(); } catch {} }, 60000);
 // a GPU trial nobody confirmed (a blank window can't be answered) goes back to Auto and restarts
 if (gpuTrial) setTimeout(() => { if (config.gpuKept || config.graphics !== 'gpu') return; log('gpu trial not confirmed, back to auto'); config.graphics = 'auto'; saveConfig(); relaunch(); }, GPU_TRIAL_MS);
 app.whenReady().then(() => {
+  require('./detect').warmLoginPath(); // in the background: emulator lookups use it, and waiting for it froze the app
   // readable by the page's canvas too (Theme from this game reads a cover's colours)
   protocol.handle('romimg', async (req) => { const r = await handleImage(req); try { r.headers.set('Access-Control-Allow-Origin', '*'); } catch {} return r; });
   createWindow();

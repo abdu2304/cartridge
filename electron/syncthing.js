@@ -30,7 +30,7 @@ function parseConfig(xml) {
   return out;
 }
 const onPath = (bin) => { try { execFileSync('sh', ['-c', `command -v ${bin}`], { stdio: 'ignore' }); return true; } catch { return false; } };
-const flatpakApps = () => { try { return execFileSync('flatpak', ['list', '--app', '--columns=application'], { encoding: 'utf8', timeout: 8000 }).split('\n').map((s) => s.trim()); } catch { return []; } };
+const flatpakApps = () => require('./detect').flatpakApps() || (() => { try { return execFileSync('flatpak', ['list', '--app', '--columns=application'], { encoding: 'utf8', timeout: 8000 }).split('\n').map((s) => s.trim()).filter(Boolean); } catch { return []; } })(); // folders first: `flatpak list` froze the app
 // which emulator a synced folder's path points at, by the folder names emulators keep saves in
 const SAVE_HINTS = [[/retroarch/i, 'RetroArch'], [/pcsx2/i, 'PCSX2'], [/duckstation/i, 'DuckStation'], [/rpcs3/i, 'RPCS3'], [/dolphin/i, 'Dolphin'], [/ppsspp|\/PSP\b/i, 'PPSSPP'], [/vita3k/i, 'Vita3K'], [/shadps4/i, 'shadPS4'], [/cemu/i, 'Cemu'], [/(eden|yuzu|citron|sudachi|ryujinx)/i, 'Switch'], [/(azahar|citra|lime3ds)/i, 'Azahar'], [/melonds/i, 'melonDS'], [/xemu/i, 'xemu'], [/xenia/i, 'Xenia'], [/emulation\/saves|\/saves?\b/i, 'Saves']];
 const saveHint = (p) => (SAVE_HINTS.find(([re]) => re.test(p)) || [])[1] || null;

@@ -379,14 +379,35 @@ function srmConfigs(home) {
 
 // More places programs live than the PATH Steam gives us: Snap, Nix, Homebrew, user Flatpak exports,
 // and the PATH a login shell would have
+// The login shell's PATH (owner, after 0.9.54: a few seconds after start Cartridge stopped responding, Steam dimmed
+// it, and the controls were gone): asking for it held Electron's main thread up to 3 s. It's asked in the background
+// now; until it answers the list goes without it (loginPathKnown says when it's complete).
+let loginPath = null, loginAsk = null;
+function warmLoginPath() {
+  if (loginAsk) return loginAsk;
+  const sh = process.env.SHELL && /\/(bash|zsh|sh|dash|ksh)$/.test(process.env.SHELL) ? process.env.SHELL : '/bin/bash';
+  loginAsk = new Promise((res) => require('child_process').execFile(sh, ['-lc', 'printf %s "$PATH"'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] }, (e, out) => { loginPath = e ? '' : String(out || ''); res(loginPath); }));
+  return loginAsk;
+}
+const loginPathKnown = () => loginPath != null;
 function extraBinDirs(home) {
   const dirs = ['/snap/bin', path.join(home, '.nix-profile/bin'), '/run/current-system/sw/bin', '/nix/var/nix/profiles/default/bin', '/home/linuxbrew/.linuxbrew/bin', path.join(home, '.linuxbrew/bin'), path.join(home, '.local/share/flatpak/exports/bin'), path.join(home, 'bin'), '/opt/bin'];
-  try {
-    const sh = process.env.SHELL && /\/(bash|zsh|sh|dash|ksh)$/.test(process.env.SHELL) ? process.env.SHELL : '/bin/bash';
-    const p = execFileSync(sh, ['-lc', 'printf %s "$PATH"'], { encoding: 'utf8', timeout: 3000, stdio: ['ignore', 'pipe', 'ignore'] });
-    dirs.push(...p.split(':'));
-  } catch {}
+  if (loginPath == null) warmLoginPath(); else dirs.push(...loginPath.split(':'));
   return [...new Set(dirs.filter((d) => d && d.startsWith('/') && !d.includes('/tmp/.mount_')))];
+}
+
+// Installed Flatpak apps, read from Flatpak's own folders (after 0.9.54): `flatpak list` held the main thread for
+// as long as it took (seconds on a Deck), which made Steam dim Cartridge as not responding. An app is installed when
+// <installation>/app/<id>/current/active exists, in the user and system installations and any extra ones named in
+// /etc/flatpak/installations.d. null when no installation folder exists (the caller can ask `flatpak` then).
+function flatpakApps(home = require('os').homedir()) {
+  const bases = [process.env.FLATPAK_USER_DIR || path.join(home, '.local/share/flatpak'), '/var/lib/flatpak'];
+  try { for (const f of fs.readdirSync('/etc/flatpak/installations.d')) { const m = /^Path=(.+)$/m.exec(fs.readFileSync(path.join('/etc/flatpak/installations.d', f), 'utf8')); if (m) bases.push(m[1].trim()); } } catch {}
+  const roots = bases.map((b) => path.join(b, 'app')).filter((d) => { try { return fs.statSync(d).isDirectory(); } catch { return false; } });
+  if (!roots.length) return null;
+  const ids = new Set();
+  for (const r of roots) { let names = []; try { names = fs.readdirSync(r); } catch {} for (const n of names) if (fs.existsSync(path.join(r, n, 'current/active'))) ids.add(n); }
+  return [...ids];
 }
 
 // ---------------------------------------------------------------- checks before a shortcut is made
@@ -546,4 +567,4 @@ function glibcProblem(file) {
   if (!need || !have) return null;
   return cmpV(need.split('.').map(Number), have.split('.').map(Number)) > 0 ? { need, have } : null;
 }
-module.exports = { glibcNeeded, glibcProblem, systemGlibc, readAppImageFile, identifyAll, identifyInWorker, missingFuse2, flatpakCanSee, appImageType, isElf, readAppImage, parseDesktop, parseAppStream, identify, identifyProgram, walk, menuEntries, srmConfigs, extraBinDirs, execName, FAMILY, KNOWN };
+module.exports = { flatpakApps, warmLoginPath, loginPathKnown, glibcNeeded, glibcProblem, systemGlibc, readAppImageFile, identifyAll, identifyInWorker, missingFuse2, flatpakCanSee, appImageType, isElf, readAppImage, parseDesktop, parseAppStream, identify, identifyProgram, walk, menuEntries, srmConfigs, extraBinDirs, execName, FAMILY, KNOWN };
