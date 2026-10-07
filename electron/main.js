@@ -4847,7 +4847,12 @@ const handlers = {
     emitQueue(); pump();
   },
   'dl:resumeAll': () => { for (const it of queue) if (it.status === 'cancelled') { it.status = 'queued'; it.error = null; } emitQueue(); pump(); },
-  'dl:clear': () => { for (let i = queue.length - 1; i >= 0; i--) if (!['queued', 'downloading'].includes(queue[i].status)) queue.splice(i, 1); emitQueue(); },
+  // 0.9.57 (owner: "clear downloads means clear"): finished background jobs (emulator updates, add-ons, installs) go too
+  'dl:clear': () => {
+    for (let i = queue.length - 1; i >= 0; i--) if (!['queued', 'downloading'].includes(queue[i].status)) queue.splice(i, 1);
+    emitQueue();
+    for (const [k, j] of bgJobs) if (j.state === 'done' || j.state === 'error') { bgJobs.delete(k); jobSent.delete(k); broadcast('bg-job', { key: k, gone: true }); }
+  },
   'bios:download': ({ platformId, slug }) => downloadBios(platformId, slug),
   'bios:setup': (o) => biosSetup(o || {}),
   // each console in the library that needs BIOS or firmware, and whether it's where its emulators read it (0.9.37)
@@ -5162,10 +5167,10 @@ const emuLabel = (id) => require('./emulators').EMU[String(id || '').split('@')[
 const romName = (id) => romIndexMain().get(Number(id))?.name || 'Game';
 let customJob = '';
 const JOBS = {
-  'emuup:run': (a) => ({ key: 'emu:' + (a.path || a.fp), kind: a.force ? 'Emulator Download' : 'Emulator Update', title: emuLabel(a.id), icon: 'mdiUpdate' }),
-  'emuget:install': (a) => ({ key: `get:${a.key}:${a.id}`, kind: 'Emulator', title: emuLabel(a.id), icon: 'mdiDownload' }),
+  'emuup:run': (a) => ({ key: 'emu:' + (a.path || a.fp), kind: a.force ? 'Emulator Download' : 'Emulator Update', title: emuLabel(a.id), emu: a.id, icon: 'mdiUpdate' }),
+  'emuget:install': (a) => ({ key: `get:${a.key}:${a.id}`, kind: 'Emulator', title: emuLabel(a.id), emu: a.id, icon: 'mdiDownload' }),
   'emuget:custom': (a) => { const repo = require('./customEmu').repoOf(a.link) || String(a.link || ''); customJob = 'custom:' + repo; return { key: customJob, kind: 'Emulator from GitHub', title: repo.split('/').pop() || repo, icon: 'mdiGithub' }; },
-  'shadv:install': (a) => ({ key: 'shadv:' + a.tag, kind: 'shadPS4 Version', title: String(a.tag), icon: 'mdiDownload' }),
+  'shadv:install': (a) => ({ key: 'shadv:' + a.tag, kind: 'shadPS4 Version', title: String(a.tag), emu: 'shadps4', icon: 'mdiDownload' }),
   'ps3up:install': (a) => ({ key: 'ps3:' + a.romId, kind: 'Game Update', title: romName(a.romId), romId: Number(a.romId), icon: 'mdiPackageUp' }),
   'pkg:install': (a) => ({ key: 'pkg:' + a.romId, kind: 'Install', title: romName(a.romId), romId: Number(a.romId), icon: 'mdiPackageDown' }),
   'bios:download': (a) => ({ key: 'bios:' + (a.slug || a.platformId), kind: 'BIOS and Firmware', title: String(a.slug || '').toUpperCase(), icon: 'mdiChip' }),

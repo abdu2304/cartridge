@@ -9,7 +9,7 @@
       <div class="row" style="gap: 10px">
         <button v-if="active.length" class="btn small" data-focus @click="call('dl:pauseAll')"><Icon name="mdiPause" :size="18" />Pause all</button>
         <button v-else-if="paused.length" class="btn small" data-focus @click="call('dl:resumeAll')"><Icon name="mdiPlay" :size="18" />Resume all · {{ paused.length }}</button>
-        <button class="btn small" data-focus :disabled="!finished.length" @click="call('dl:clear')"><Icon name="mdiBroom" :size="18" />Clear history</button>
+        <button class="btn small" data-focus :disabled="!anyDone" @click="clearDone"><Icon name="mdiBroom" :size="18" />Clear History</button>
       </div>
     </header>
 
@@ -18,7 +18,7 @@
       <div class="sec-title">Add-ons</div>
       <!-- 0.9.28 (owner): like a game download: the game's cover and logo, what it is, and the bar through unpacking -->
       <div v-for="a in addonJobs" :key="a.key" class="now-card glass dl-addon" data-focus tabindex="0">
-        <div class="now-art"><img v-if="romById(a.romId)" :src="cover(romById(a.romId))" alt="" /></div>
+        <div class="now-art"><img v-if="romById(a.romId)" :src="cover(romById(a.romId))" alt="" /><Icon v-else name="mdiPuzzleOutline" :size="40" /></div>
         <div class="now-body">
           <div class="eyebrow">{{ /texture/i.test(a.name + ' ' + (a.category || '')) ? 'Texture Pack' : 'Add-on' }}{{ a.emu ? ' · ' + a.emu : '' }}</div>
           <GameLogo v-if="romById(a.romId)" :logo="logoOf(romById(a.romId))" :name="a.game" cls="dl-addon-game" :area="9000" :max-w="320" :max-h="56" />
@@ -35,7 +35,7 @@
     <section v-if="bgList.length" class="dl-addons">
       <div class="sec-title">In the Background</div>
       <div v-for="j in bgList" :key="j.key" class="now-card glass dl-addon dl-bg" data-focus tabindex="0">
-        <div class="now-art"><img v-if="j.romId && romById(j.romId)" :src="cover(romById(j.romId))" alt="" /><Icon v-else :name="j.icon || 'mdiDownload'" :size="40" /></div>
+        <div class="now-art" :class="{ 'is-emu': j.emu && !(j.romId && romById(j.romId)) }"><img v-if="j.romId && romById(j.romId)" :src="cover(romById(j.romId))" alt="" /><EmuIcon v-else-if="j.emu" :id="j.emu" :size="72" :fallback="j.icon || 'mdiDownload'" /><Icon v-else :name="j.icon || 'mdiDownload'" :size="40" /></div>
         <div class="now-body">
           <div class="eyebrow">{{ j.kind }}</div>
           <b class="dl-addon-name">{{ j.title }}</b>
@@ -101,6 +101,7 @@ import { useView } from '../useView.js';
 import Icon from '../components/Icon.vue';
 import Btn from '../components/Btn.vue';
 import GameLogo from '../components/GameLogo.vue';
+import EmuIcon from '../components/EmuIcon.vue';
 const addonJobs = computed(() => Object.values(store.addonJobs || {}).sort((a, b) => b.at - a.at));
 const bgList = computed(() => Object.values(store.bgJobs || {}).sort((a, b) => b.at - a.at));
 
@@ -113,7 +114,15 @@ const active = computed(() => [...current.value, ...queued.value]);
 const finished = computed(() => store.downloads.filter((d) => !['downloading', 'queued'].includes(d.status)).sort((a, b) => b.addedAt - a.addedAt));
 const remaining = computed(() => active.value.reduce((s, d) => s + Math.max(0, (d.total || 0) - (d.received || 0)), 0));
 const speed = computed(() => current.value.reduce((s, d) => s + (d.speed || 0), 0));
-useView({ x: () => call('dl:clear') }, [{ b: 'A', label: 'Pause / Resume' }, { b: 'X', label: 'Clear history' }, { b: 'LT+RT', label: 'Tabs' }]);
+// 0.9.57 (owner: X cleared game downloads only): one clear for everything finished, games, add-ons and background jobs
+const ended = (s) => s === 'done' || s === 'error';
+const anyDone = computed(() => finished.value.length || addonJobs.value.some((a) => ended(a.state)) || bgList.value.some((j) => ended(j.state)));
+function clearDone() {
+  for (const [k, a] of Object.entries(store.addonJobs || {})) if (ended(a.state)) delete store.addonJobs[k];
+  for (const [k, j] of Object.entries(store.bgJobs || {})) if (ended(j.state)) delete store.bgJobs[k];
+  call('dl:clear');
+}
+useView({ x: clearDone }, [{ b: 'A', label: 'Pause / Resume' }, { b: 'X', label: 'Clear History' }, { b: 'LT+RT', label: 'Tabs' }]);
 
 const pct = (d) => (d.total ? Math.min(100, Math.floor((d.received / d.total) * 100)) : 0);
 function eta(d) {
@@ -148,7 +157,10 @@ DlRow.emits = ['act'];
 </script>
 
 <style scoped>
-.dl-bg .now-art { display: grid; place-items: center; color: var(--muted); }
+.dl-bg .now-art, .dl-addon .now-art { display: grid; place-items: center; color: var(--muted); }
+/* an emulator's own icon instead of an empty poster (0.9.57): a square tile, the icon contained */
+.dl-bg .now-art.is-emu { aspect-ratio: 1; align-self: center; }
+.dl-bg .now-art.is-emu .emu-icon { object-fit: contain; border-radius: 12px; }
 .dl-head { display: flex; align-items: flex-end; justify-content: space-between; margin: 18px 0 24px; }
 .big { font-size: var(--t-2xl); font-weight: 700; margin: 6px 0 6px; }
 .empty-dl { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 60px 0; text-align: center; }

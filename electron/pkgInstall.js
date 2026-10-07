@@ -206,6 +206,28 @@ function vita3kLogTail(exe, home = os.homedir()) {
   }
   return '';
 }
+// what ends an install from Vita3K's command line, either way (interface.cpp and main.cpp log lines)
+const VITA3K_END = /will auto-boot|not a supported content|Vitamin dump|Failed to refresh apps list|Failed to load archive|miniz error|NoNpDrm installation failed|Install app before patch|Param\.sfo file is missing|Failed to copy directory|No found any content|Successfully installed \d+ content|Failed to initiali[sz]e apps list/i;
+// the log file a Vita3K writes now (portable beside it, else the cache folder)
+function vita3kLogFile(exe, home = os.homedir()) {
+  const dir = exe ? path.dirname(real(exe)) : null;
+  const all = [dir && path.join(dir, 'portable/vita3k.log'), path.join(process.env.XDG_CACHE_HOME || path.join(home, '.cache'), 'Vita3K/vita3k.log'), dir && path.join(dir, 'vita3k.log')].filter(Boolean);
+  return all.find((f) => fs.existsSync(f)) || null;
+}
+// How a file is handed to Vita3K (0.9.57, read from Vita3K's config.cpp): its command line takes Windows-style options
+// (CLI11 allow_windows_style_options), so an argument starting with "/" is read as an option and dropped. A path with a
+// space lost everything up to the space ("Failed to load archive file in path: 13.zip" for .../Unit 13.zip), and one
+// without was ignored, so Vita3K skipped the install and opened its window. Vita3K is started in the file's folder and
+// given "./<name>", through a link without spaces in Cartridge's cache folder when the name has odd characters.
+function stageForVita3k(file, home = os.homedir()) {
+  const abs = path.resolve(file), base = path.basename(abs);
+  if (/^[\w.+-]+$/.test(base) && !base.startsWith('-')) return { cwd: path.dirname(abs), file: './' + base, done() {} };
+  const dir = path.join(process.env.XDG_CACHE_HOME || path.join(home, '.cache'), 'cartridge', 'vita-install');
+  const ext = isDir(abs) ? '' : path.extname(abs).toLowerCase().replace(/[^.\w]/g, '');
+  const name = `game-${process.pid}-${Date.now()}${ext}`, link = path.join(dir, name);
+  try { fs.mkdirSync(dir, { recursive: true }); fs.symlinkSync(abs, link); } catch { return { cwd: path.dirname(abs), file: './' + base, done() {} }; }
+  return { cwd: dir, file: './' + name, done() { try { fs.unlinkSync(link); } catch {} } };
+}
 // the reason Vita3K gave, from its own words: the last error line, without the time and level prefix
 const vita3kWhy = (text) => (String(text).match(/^.*(?:\b(?:error|critical)\b|failed|not a supported|Vitamin|Install app before patch|already installed)[^\n]*/gim) || []).map((l) => l.replace(/^\s*\[[^\]]*\]\s*/, '').replace(/^\|\w\|\s*/, '').replace(/^\[[^\]]*\]:\s*/, '').trim()).filter((l) => !/Failed to refresh apps list/i.test(l)).pop() || '';
 
@@ -362,8 +384,10 @@ async function installVita({ cmd, prefs, item, zrif, onStep = () => {}, signal }
   prefs = [...vita3kFsPaths(cmd?.exe), ...prefs].filter((p) => !seen.has(real(p)) && seen.add(real(p)));
   const before = appsIn(prefs);
   // 0.9.19: unencrypted archives never start Vita3K
+  let expect = 0; // how many contents Vita3K will report installed (0: unknown)
   if (item.kind === 'vpk') {
     const contents = await vitaArchiveContents(item.file);
+    expect = contents.length;
     if (!contents.length) throw new Error('No Vita game in this file (no sce_sys/param.sfo).');
     if (!contents.some((c) => c.encrypted)) {
       onStep({ step: 1, of: 1, file: path.basename(item.file), opens: false });
@@ -394,33 +418,59 @@ async function installVita({ cmd, prefs, item, zrif, onStep = () => {}, signal }
   if (libs.length) throw new Error(`Vita3K can’t start on this system (it needs ${libs.slice(0, 2).join(', ')}${libs.length > 2 ? '…' : ''}). Repair it in Settings → Emulators → Vita3K, then try again.`);
   const env = { ...process.env };
   for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
-  const args = item.kind === 'pkg' ? ['--pkg', item.file, '--zrif', zrif || item.zrif] : [item.file];
+  // 0.9.57 (owner: "Failed to load archive file in path: 13.zip" for Unit 13.zip, and Vita3K's window opening): the
+  // file goes over as a relative path (stageForVita3k: Vita3K dropped absolute ones). Read from Vita3K's main.cpp:
+  // what is given on its command line is installed before its main window is made, so Vita3K is stopped the moment its
+  // log says the install ended, either way, and its window never opens (tested with Vita3K build 4111).
+  const stage = stageForVita3k(item.file);
+  const args = item.kind === 'pkg' ? ['--pkg', stage.file, '--zrif', zrif || item.zrif] : [stage.file];
   onStep({ step: 1, of: 1, file: path.basename(item.file), opens: false });
   let said = '';
+  const logFile = vita3kLogFile(cmd?.exe);
   const run = () => new Promise((resolve, reject) => {
     said = '';
-    const p = spawn(cmd.exe, [...cmd.args, ...args], { env, stdio: ['ignore', 'pipe', 'pipe'] });
-    const kill = () => { try { p.kill('SIGKILL'); } catch {} };
+    // its own process group: an AppImage starts the real Vita3K as a child, which outlived a kill of the AppImage alone
+    // and went on to open its window (found running build 4111 in the container)
+    const p = spawn(cmd.exe, [...cmd.args, ...args], { env, cwd: stage.cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const kill = () => { try { process.kill(-p.pid, 'SIGKILL'); } catch { try { p.kill('SIGKILL'); } catch {} } };
     const timer = setTimeout(kill, 3 * 60 * 60e3);
     let quiet = null;
     signal?.addEventListener('abort', kill, { once: true });
-    const watch = (d) => {
-      said = (said + d.toString()).slice(-24000);
+    const check = () => {
       if (item.kind === 'pkg') return; // --pkg quits by itself without a window
       // all contents done (it boots the game next), or something it won't install: stop it now
-      if (/will auto-boot|not a supported content|Vitamin dump|Failed to refresh apps list/i.test(said)) return kill();
-      // a DLC-only archive has no auto-boot line: stop once it has been quiet after the last install
-      if (/installed successfully/i.test(said)) { clearTimeout(quiet); quiet = setTimeout(kill, 1200); }
+      if (VITA3K_END.test(said)) return kill();
+      // a content installed: the next content of the same archive starts at once with more install lines; anything
+      // else after it (the games list refresh, the main window being built) means it's done, so Vita3K stops there.
+      // A DLC-only archive has no auto-boot line, hence this.
+      if (expect && (said.match(/installed successfully|already installed, skipping/gi) || []).length >= expect) return kill(); // all of them: before its window is built
+      if (/installed successfully|already installed, skipping/i.test(said)) {
+        const after = said.split(/installed successfully[^\n]*\n|already installed, skipping[^\n]*\n/i).pop();
+        if (after.split('\n').some((l) => l.trim() && !/Extracting|install|Decrypt|param\.sfo|theme|miniz/i.test(l))) return kill();
+        clearTimeout(quiet); quiet = setTimeout(kill, 400);
+      }
     };
+    const watch = (d) => { said = (said + d.toString()).slice(-24000); check(); };
     p.stdout.on('data', watch); p.stderr.on('data', watch);
-    p.on('error', (e) => { clearTimeout(timer); reject(new Error(`Vita3K didn't start: ${e.message}`)); });
-    p.on('exit', () => { clearTimeout(timer); clearTimeout(quiet); resolve(); });
+    // its log file too (its console output can arrive late through a pipe)
+    let logAt = -1;
+    try { logAt = logFile ? fs.statSync(logFile).size : -1; } catch { logAt = 0; }
+    const poll = logFile ? setInterval(() => {
+      try {
+        const st = fs.statSync(logFile); if (st.size < logAt) logAt = 0;
+        if (st.size > logAt) { const fd = fs.openSync(logFile, 'r'), b = Buffer.alloc(Math.min(st.size - logAt, 256 * 1024)); fs.readSync(fd, b, 0, b.length, st.size - b.length); fs.closeSync(fd); logAt = st.size; watch(b); }
+      } catch {}
+    }, 100) : null;
+    p.on('error', (e) => { clearTimeout(timer); clearInterval(poll); reject(new Error(`Vita3K didn't start: ${e.message}`)); });
+    p.on('exit', () => { clearTimeout(timer); clearTimeout(quiet); clearInterval(poll); resolve(); });
   });
-  for (const qpa of QT_TRIES) {
-    if (qpa) env.QT_QPA_PLATFORM = qpa; else delete env.QT_QPA_PLATFORM;
-    await run();
-    if (!NO_QT.test(said)) break;
-  }
+  try {
+    for (const qpa of QT_TRIES) {
+      if (qpa) env.QT_QPA_PLATFORM = qpa; else delete env.QT_QPA_PLATFORM;
+      await run();
+      if (!NO_QT.test(said)) break;
+    }
+  } finally { stage.done(); }
   // where Vita3K really put it: its "Extracting <ux0>/app/<ID>/..." and "Decrypt layer: <ux0>/app/<ID>" lines
   const named = [...said.matchAll(/(?:Extracting|Decrypt layer:)\s+(.+?)[\/\\]ux0[\/\\](?:app|patch|addcont)[\/\\]/g)].map((m) => m[1].trim());
   for (const r of named) if (!prefs.some((p) => real(p) === real(r))) prefs.push(r);
@@ -487,14 +537,15 @@ async function installFirmware({ emu, cmd, file, signal }) {
   const env = { ...process.env };
   for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
   if (emu === 'vita3k') env.QT_QPA_PLATFORM = 'offscreen';
-  const args = emu === 'rpcs3' ? [...cmd.args, '--headless', '--installfw', file] : [...cmd.args, '--firmware', file];
+  const stage = emu === 'vita3k' ? stageForVita3k(file) : { file, done() {} }; // 0.9.57: a relative path for Vita3K (see stageForVita3k)
+  const args = emu === 'rpcs3' ? [...cmd.args, '--headless', '--installfw', file] : [...cmd.args, '--firmware', stage.file];
   let tail = '';
   const run = () => new Promise((resolve, reject) => {
     tail = '';
-    const p = spawn(cmd.exe, args, { env, stdio: ['ignore', 'pipe', 'pipe'] });
+    const p = spawn(cmd.exe, args, { env, cwd: stage.cwd, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     const keep = (b) => { tail = (tail + String(b)).slice(-4000); };
     p.stdout.on('data', keep); p.stderr.on('data', keep);
-    const kill = () => { try { p.kill(); } catch {} };
+    const kill = () => { try { process.kill(-p.pid, 'SIGTERM'); } catch { try { p.kill(); } catch {} } }; // the group: an AppImage's child too
     const timer = setTimeout(kill, 20 * 60e3);
     // RPCS3 may stay open after installing: once its log says it's done, it is closed (0.9.52)
     const watch = emu === 'rpcs3' ? setInterval(() => { if ((done = rpcs3FwDone(started, cmd.exe))) setTimeout(kill, 1500); }, 1000) : null;
@@ -505,11 +556,13 @@ async function installFirmware({ emu, cmd, file, signal }) {
   const started = Date.now();
   let done = null;
   let code;
-  for (const qpa of emu === 'vita3k' ? QT_TRIES : [undefined]) { // as installVita: no window either way (--firmware quits)
-    if (qpa) env.QT_QPA_PLATFORM = qpa; else if (qpa === null) delete env.QT_QPA_PLATFORM;
-    code = await run();
-    if (!NO_QT.test(tail)) break;
-  }
+  try {
+    for (const qpa of emu === 'vita3k' ? QT_TRIES : [undefined]) { // as installVita: no window either way (--firmware quits)
+      if (qpa) env.QT_QPA_PLATFORM = qpa; else if (qpa === null) delete env.QT_QPA_PLATFORM;
+      code = await run();
+      if (!NO_QT.test(tail)) break;
+    }
+  } finally { stage.done(); }
   if (emu === 'rpcs3') {
     if (done || (done = rpcs3FwDone(started, cmd.exe))) return true;
     if (signal?.aborted) throw new Error('Cancelled.');
@@ -518,4 +571,4 @@ async function installFirmware({ emu, cmd, file, signal }) {
   if (code && code !== 0) throw new Error(`Vita3K couldn't install the firmware: ${(tail.trim().split('\n').pop() || 'exit ' + code).slice(0, 200)}`);
   return true;
 }
-module.exports = { rpcs3FwDone, rpcs3Dirs, vita3kFsPaths, vita3kWhy, vita3kLogTail, installFirmware, pkgInfo, packagesIn, licencePlan, stageLicences, exdataHas, npdOf, rpcs3Hdds, sfoSerial, install, vitaPrefs, vitaContent, findZrif, installVita, vitaArchiveContents, vitaUnpack, safeToRemove };
+module.exports = { stageForVita3k, VITA3K_END, rpcs3FwDone, rpcs3Dirs, vita3kFsPaths, vita3kWhy, vita3kLogTail, installFirmware, pkgInfo, packagesIn, licencePlan, stageLicences, exdataHas, npdOf, rpcs3Hdds, sfoSerial, install, vitaPrefs, vitaContent, findZrif, installVita, vitaArchiveContents, vitaUnpack, safeToRemove };
