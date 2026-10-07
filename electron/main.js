@@ -2557,6 +2557,8 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
       broadcast('savesync', { state: 'run', done: i + 1, of: todo.length, why, romId });
       if (r.result === 'auth') break;
     }
+    // 0.9.57 (owner: a game's sheet with its sync history): what moved, per save, the last 30 times
+    if (!dry) for (const r of results) if (['up', 'down', 'conflict', 'error'].includes(r.result)) ssNote(r.key, { result: r.result, why, error: r.error || undefined, choice: key ? choice : undefined });
     const counts = {}; for (const r of results) counts[r.result] = (counts[r.result] || 0) + 1;
     // 0.9.56 (owner: each count opens the saves behind it): what each save did in the last whole sync, at most 600
     const items = results.filter((r) => ['up', 'down', 'same', 'unmatched'].includes(r.result)).slice(0, 600).map((r) => ({ key: r.key, label: r.label, emu: r.emu, emuName: r.emuName, romId: r.romId, card: r.card, states: r.states, result: r.result, why: r.why }));
@@ -2565,6 +2567,12 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
     return { results, counts };
   })().finally(() => { ssBusy = null; });
   return ssBusy;
+}
+// a save's sync history (save-sync.json history[key]: newest first, 30 at most)
+function ssNote(key, e) {
+  const h = (ssData.history ||= {});
+  h[key] = [{ at: Date.now(), ...e }, ...(h[key] || [])].slice(0, 30);
+  clearTimeout(ssSaveT); ssSaveT = setTimeout(() => saveJson(SAVESYNC_FILE, ssData, false), 500);
 }
 // Away from the server (0.9.52, owner: a RomM at home with no tunnel, played on a handheld away). Nothing special
 // is needed to keep a save: the emulator keeps writing it on this device, played again or not. What Cartridge adds is
@@ -3405,6 +3413,33 @@ const handlers08 = {
   // Cartridge Cloud Sync before a game starts: this game's saves checked against RomM, the newest brought here
   'savesync:before': ({ romId }) => saveSyncRun({ romId: Number(romId), why: 'before' }),
   'savesync:resolve': ({ key, choice, romId }) => saveSyncRun({ key, choice: choice === 'mine' ? 'mine' : 'theirs', romId: romId == null ? null : Number(romId), why: 'resolve' }),
+  // A game's saves in one place (0.9.57, owner: pressing a game in Cartridge Save Sync shows the game, where its save
+  // is and more): every save of it on this device (a memory card counts for each game on it), where it is, how big,
+  // when it last changed and last synced, its history, backups kept here, and the versions in RomM
+  'savesync:game': async ({ romId }) => {
+    romId = Number(romId);
+    const SS = require('./saveSync'), extra = saveExtras();
+    const all = SS.units({ extra, games: ssGames(), carriers: ssCarriers() });
+    const mine = all.filter((u) => u.romId === romId || (u.romIds || []).includes(romId));
+    const statOf = (u) => {
+      try {
+        const st = fs.statSync(u.path);
+        if (!st.isDirectory()) return { size: st.size, at: st.mtimeMs, files: 1 };
+        if (u.kind === 'files') { let size = 0, at = 0; for (const f of u.files || []) { try { const x = fs.statSync(path.join(u.path, f)); size += x.size; at = Math.max(at, x.mtimeMs); } catch {} } return { size, at, files: (u.files || []).length }; }
+        const z = require('./saves').sizeOf(u.path); return { size: z.size, at: z.at, files: z.files };
+      } catch { return { size: 0, at: 0, files: 0 }; }
+    };
+    const backupsOf = (key) => { try { return fs.readdirSync(path.join(SAVE_BACKUPS, key.replace(/[^\w.-]+/g, '_'))).sort().reverse(); } catch { return []; } };
+    const saves = mine.map((u) => {
+      const led = ssData.ledger[u.key] || null, b = backupsOf(u.key);
+      return { key: u.key, label: u.label || '', emu: u.emu, emuName: SS.LABEL[u.emu] || u.emu, kind: u.kind, path: u.path, card: u.card, states: !!u.states, shared: u.card ? (u.romIds || []).length : 0, ...statOf(u),
+        synced: led?.at || null, inRomm: !!led?.remoteId, history: (ssData.history?.[u.key] || []).slice(0, 30), backups: b.length, backupsDir: b.length ? path.join(SAVE_BACKUPS, u.key.replace(/[^\w.-]+/g, '_')) : null };
+    });
+    let versions = null;
+    if (saveSyncOn()) { try { versions = await Promise.race([handlers['savesync:versions']({ romId }), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 6000))]); } catch { versions = null; } }
+    const conflicts = (ssData.last?.conflicts || []).filter((c) => Number(c.romId) === romId);
+    return { romId, on: saveSyncOn(), saves, versions, conflicts, held: !!ssData.held?.romIds?.includes(romId), last: ssData.last?.at || null };
+  },
   // older versions of a game's saves in RomM, and putting one back
   'savesync:versions': async ({ romId }) => {
     const SS = require('./saveSync');
@@ -3422,6 +3457,7 @@ const handlers08 = {
     if (r.result === 'unplaced') throw new Error(`${SS.LABEL[u.emu] || u.emu} hasn’t made its save folders on this device yet. Open it once, then try again.`);
     if (r.result === 'damaged') throw new Error('That version didn’t match RomM’s check, so nothing was changed.');
     log('save sync: restored', u.key, 'version', id);
+    ssNote(u.key, { result: 'restored', why: 'restore', version: save.updated_at || null });
     return r;
   },
   'saves:forRom': async ({ romId }) => (await savesList()).filter((s) => (s.romIds || []).includes(Number(romId))),

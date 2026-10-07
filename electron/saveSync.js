@@ -95,7 +95,7 @@ function units({ home = os.homedir(), extra = {}, games = [], carriers = {} } = 
   for (const s of scanned) {
     const sh = shape(s); if (!sh) continue;
     const romId = sh.card ? carriers[CONSOLE[s.emu]] ?? s.romIds?.[0] ?? null : s.romIds?.[0] ?? null;
-    const u = { key: sh.key, emu: s.emu, kind: sh.kind, path: s.path, base: s.base, label: s.label || '', romId, card: !!sh.card, slot: slotOf(s.emu, sh.key, sh.kind) };
+    const u = { key: sh.key, emu: s.emu, kind: sh.kind, path: s.path, base: s.base, label: s.label || '', romId, romIds: s.romIds || [], card: !!sh.card, slot: slotOf(s.emu, sh.key, sh.kind) }; // romIds: every game on a card (0.9.57, the game sheet)
     if (romId == null) u.why = whyUnmatched(s, sh);
     if (seen.has(u.key)) continue; // the same save found twice (an EmuDeck link and the folder it points at)
     seen.add(u.key); out.push(u);
