@@ -139,7 +139,8 @@ test('Vita: installs a .pkg through a stand-in Vita3K with --pkg and --zrif', as
   const item = await P.vitaContent(path.join(TMP, 'vita/pkg'));
   const out = await P.installVita({ cmd: { exe, args: [] }, prefs: [pref], item });
   assert.deepStrictEqual(out.map((g) => [g.serial, g.created]), [['PCSB00456', true]]);
-  assert.strictEqual(fs.readFileSync(path.join(TMP, 'vargs'), 'utf8').trim(), `--pkg ${item.file} --zrif ${item.zrif}`);
+  // 0.9.57: relative to the file's folder (Vita3K drops arguments starting with a slash)
+  assert.strictEqual(fs.readFileSync(path.join(TMP, 'vargs'), 'utf8').trim(), `--pkg ./${path.basename(item.file)} --zrif ${item.zrif}`);
 });
 
 test('Vita: delete refuses anything that is not exactly the game Cartridge installed', () => {
