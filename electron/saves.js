@@ -41,7 +41,9 @@ function sfo(file) {
       const e = 20 + i * 16;
       const ko = buf.readUInt16LE(e), fmt = buf.readUInt16LE(e + 2), len = buf.readUInt32LE(e + 4), off = buf.readUInt32LE(e + 12);
       const k = buf.toString('latin1', keys + ko, buf.indexOf(0, keys + ko));
-      out[k] = fmt === 0x0404 ? buf.readUInt32LE(data + off) : buf.toString('utf8', data + off, data + off + len).replace(/\0+$/, '');
+      // a string ends at its first NUL; bytes after it, or ones that aren't UTF-8, are another field's (0.9.57: a PSP
+      // title read "Size Matters™��ENTR")
+      out[k] = fmt === 0x0404 ? buf.readUInt32LE(data + off) : buf.toString('utf8', data + off, data + off + len).split('\0')[0].replace(/\uFFFD[\s\S]*$/, '').trim();
     }
   } catch {}
   return out;
@@ -152,7 +154,9 @@ const SCAN = {
       const sd = path.join(base, 'dev_hdd0/home', u.name, 'savedata');
       for (const s of ls(sd)) if (s.isDirectory() && /^[A-Z]{4}\d{5}/.test(s.name)) {
         const p = sfo(path.join(sd, s.name, 'PARAM.SFO'));
-        out.push({ emu: 'rpcs3', kind: 'save', path: path.join(sd, s.name), label: p.TITLE || '', keys: { serial: s.name.slice(0, 9), title: p.TITLE || '' } });
+        // sub: what this save is (0.9.57, owner: two saves of one game at very different sizes): games keep progress and
+        // system data or settings in separate saves, each saying so in its SUB_TITLE
+        out.push({ emu: 'rpcs3', kind: 'save', path: path.join(sd, s.name), label: p.TITLE || '', sub: p.SUB_TITLE || String(p.DETAIL || '').split('\n')[0] || '', keys: { serial: s.name.slice(0, 9), title: p.TITLE || '' } });
       }
     }
     return out;
@@ -161,7 +165,7 @@ const SCAN = {
     const out = [], sd = path.join(base, 'PSP/SAVEDATA');
     for (const s of ls(sd)) if (s.isDirectory() && /^[A-Z]{4}\d{5}/.test(s.name)) {
       const p = sfo(path.join(sd, s.name, 'PARAM.SFO'));
-      out.push({ emu: 'ppsspp', kind: 'save', path: path.join(sd, s.name), label: p.TITLE || '', keys: { serial: s.name.slice(0, 9), title: p.TITLE || '' } });
+      out.push({ emu: 'ppsspp', kind: 'save', path: path.join(sd, s.name), label: p.TITLE || '', sub: p.SAVEDATA_TITLE || '', keys: { serial: s.name.slice(0, 9), title: p.TITLE || '' } });
     }
     return out;
   },
@@ -261,7 +265,9 @@ const SCAN = {
       for (const e of ls(d)) {
         const p = path.join(d, e.name);
         if (e.isDirectory()) { if (depth < 2) walk(p, depth + 1); continue; }
-        if (/\.(srm|sav|mcd|mcr|eep|sra|fla|mpk|rtc|dsv)$/i.test(e.name)) out.push({ emu: 'retroarch', kind: 'save', path: p, label: e.name, keys: { name: e.name.replace(/\.[^.]+$/, '') } });
+        // a PS1 memory card kept as a save (0.9.57: "SwanStation.srm" is SwanStation's card, named after the core when
+        // it's shared between games): the games on it, read from the card like PCSX2's and DuckStation's
+        if (/\.(srm|sav|mcd|mcr|eep|sra|fla|mpk|rtc|dsv)$/i.test(e.name)) { let ser = []; try { if (fs.statSync(p).size === 131072) ser = cardSerials(p); } catch {} out.push({ emu: 'retroarch', kind: 'save', path: p, label: e.name, keys: { name: e.name.replace(/\.[^.]+$/, '') }, ...(ser.length ? { serials: ser, sub: 'PS1 memory card' } : {}) }); }
       }
     };
     walk(sd, 0);
@@ -290,7 +296,9 @@ function scan({ home = os.homedir(), extra = {}, withSize = true } = {}) {
 // -> each save gets romIds (a shared card gets every game it holds)
 const norm = (s) => String(s || '').toLowerCase().replace(/&/g, 'and').replace(/\s*[([].*$/, '').replace(/[^a-z0-9]+/g, '');
 const idNorm = (s) => String(s || '').toUpperCase().replace(/[-_.\s]/g, '');
-function match(saves, games) {
+// opts.nameOf: a code's game name from the emulators' databases (titleDb.js, 0.9.57), so a save or a memory card
+// entry of a game that isn't on this device still finds it in the library by name
+function match(saves, games, { nameOf = null } = {}) {
   const byId = new Map(), byGc = new Map(), byName = new Map();
   for (const g of games) {
     for (const s of g.ids || []) if (s) { const u = idNorm(s); byId.set(u, g.id); if (/^0100[0-9A-F]{12}$/.test(u) && !byId.has(u.slice(0, 13) + '000')) byId.set(u.slice(0, 13) + '000', g.id); } // a Switch update's file still names its base game
@@ -309,8 +317,11 @@ function match(saves, games) {
     if (id == null && k.wiiu) id = byId.get(idNorm(k.wiiu));
     if (id == null && k.x360) id = byId.get(idNorm(k.x360));
     if (id == null && (k.title || k.name)) id = byName.get(norm(k.title || k.name));
+    const named = nameOf && k.serial ? nameOf(k.serial) : null;
+    if (named) s.codeName = named;
+    if (id == null && named) id = byName.get(norm(named));
     if (id != null) ids.add(id);
-    for (const ser of s.serials || []) { const g = byId.get(idNorm(ser)); if (g != null) ids.add(g); }
+    for (const ser of s.serials || []) { let g = byId.get(idNorm(ser)); if (g == null && nameOf) { const n = nameOf(ser); if (n) g = byName.get(norm(n)); } if (g != null) ids.add(g); }
     s.romIds = [...ids];
   }
   return saves;

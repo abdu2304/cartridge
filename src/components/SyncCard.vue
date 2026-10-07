@@ -186,7 +186,7 @@
           <span class="l-mid">
             <b>{{ g.name }}</b>
             <span class="st-chips">
-              <span v-for="x in g.local" :key="'l' + x.path" class="chip" :class="{ ok: x.synced }"><Icon :name="x.synced ? 'mdiSync' : 'mdiContentSaveOutline'" :size="14" />{{ x.emuName }} · {{ bytes(x.size || 0) }} · {{ ago(x.at) }}{{ x.synced ? ' · Synced' : '' }}{{ x.conflicts ? ` · ${x.conflicts} conflict ${x.conflicts === 1 ? 'copy' : 'copies'}` : '' }}</span>
+              <span v-for="x in g.local" :key="'l' + x.path" class="chip" :class="{ ok: x.synced }"><Icon :name="x.synced ? 'mdiSync' : 'mdiContentSaveOutline'" :size="14" />{{ x.emuName }}{{ x.sub ? ' · ' + x.sub : '' }} · {{ bytes(x.size || 0) }} · {{ ago(x.at) }}{{ x.synced ? ' · Synced' : '' }}{{ x.conflicts ? ` · ${x.conflicts} conflict ${x.conflicts === 1 ? 'copy' : 'copies'}` : '' }}</span>
               <span v-for="x in g.saves" :key="'s' + x.folder" class="chip"><Icon name="mdiCloudSyncOutline" :size="14" />{{ x.label }} · {{ x.files }} {{ x.files === 1 ? 'file' : 'files' }} · {{ ago(x.at) }}</span>
               <span v-for="x in g.textures" :key="'t' + x.folder" class="chip tex"><Icon name="mdiTextureBox" :size="14" />{{ x.label }} · {{ bytes(x.size) }}</span>
               <span v-for="x in g.patches" :key="'p' + x.folder" class="chip pat"><Icon name="mdiBandage" :size="14" />{{ x.label }} · {{ x.files }} {{ x.files === 1 ? 'file' : 'files' }}</span>
@@ -200,7 +200,7 @@
           <div class="sec-title">Saves Not Matched to a Game <span class="count">{{ loose.length }}</span></div>
           <div v-for="x in loose.slice(0, 40)" :key="x.path" class="lrow" data-focus tabindex="0">
             <Icon :name="x.shared ? 'mdiSdCard' : 'mdiContentSaveOutline'" :size="22" />
-            <span class="l-mid"><b>{{ x.label || x.keys?.title || x.keys?.serial || x.keys?.switch || x.keys?.name || 'Save' }}</b><span class="l-sub">{{ x.emuName }} · {{ bytes(x.size || 0) }} · {{ ago(x.at) }}{{ x.shared ? ' · a memory card for several games' : '' }}</span></span>
+            <span class="l-mid"><b>{{ x.label || x.keys?.title || x.keys?.serial || x.keys?.switch || x.keys?.name || 'Save' }}</b><span class="l-sub">{{ x.emuName }}{{ x.sub ? ' · ' + x.sub : '' }} · {{ bytes(x.size || 0) }} · {{ ago(x.at) }}{{ x.shared ? ' · a memory card for several games' : '' }}</span></span>
             <span v-if="x.synced" class="status ok">Synced</span>
           </div>
         </template>

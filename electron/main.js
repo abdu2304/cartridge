@@ -2489,10 +2489,16 @@ function watchJoin() {
   };
   tick(); joinT = setInterval(tick, 30000);
 }
+// Game names from their codes (0.9.57): the emulators' own game databases, read once and kept (electron/titleDb.js);
+// AppImages aren't opened for it (reading one can hold the main thread), the file from the emulator's repo instead
+const titles = require('./titleDb').createTitleDb({ dataDir: USER_DATA, fetchImpl: (u) => require('./webFetch')(u), log });
+const titlesReady = (ms = 8000) => Promise.race([titles.ready(), new Promise((ok) => setTimeout(ok, ms))]);
+setTimeout(() => titles.ready().catch(() => {}), 40000);
 async function savesList(fresh) {
   if (!fresh && savesCache && Date.now() - savesCache.at < 30000) return savesCache.list;
   const S = require('./saves');
-  const list = S.match(S.scan({ extra: saveExtras() }), savesGameList());
+  await titlesReady();
+  const list = S.match(S.scan({ extra: saveExtras() }), savesGameList(), { nameOf: titles.nameOf });
   // games that keep their save beside the game file (melonDS, mGBA and other emulators' default)
   for (const [id, where] of Object.entries(installedMap)) {
     if (!where || where === MARKED) continue;
@@ -2541,8 +2547,9 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
   if (ssBusy) return ssBusy; // one sync at a time; a second ask shares the running one
   ssBusy = (async () => {
     const SS = require('./saveSync'), extra = saveExtras();
+    if (why !== 'before') await titlesReady(4000); // names for codes of games not on this device (never holds up a game)
     romId = romId == null ? null : Number(romId);
-    const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers() });
+    const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf });
     let remotes = [];
     try { remotes = await (await ssRpcList(romId)); } catch (e) { log('save sync: RomM unreachable', e.message); if (why !== 'before' && !dry) ssHold(romId); return { offline: true, error: e.message, held: ssData.held || null }; }
     const devId = await rommDevice(), rpc = ssRpc(devId);
@@ -3365,7 +3372,7 @@ const handlers08 = {
     try {
       const games = syncGameList(), names = new Map(games.map((g) => [g.id, g.name]));
       // each file matched on its own, so it carries its game's name; the folder's real path and name decide textures or saves
-      for (const f of b.files) { const one = S.matchGames(games, [{ id: folder, label: b.label, path: b.path + '/' + b.label, files: [f] }]); const gid = Object.keys(one)[0]; if (gid) { f.game = names.get(Number(gid)) || ''; f.romId = Number(gid); f.kind = S.KIND_LABEL[Object.keys(one[gid]).find((k) => one[gid][k].length)] || 'Save'; } }
+      for (const f of b.files) { const one = S.matchGames(games, [{ id: folder, label: b.label, path: b.path + '/' + b.label, files: [f] }], { nameOf: titles.nameOf }); const gid = Object.keys(one)[0]; if (gid) { f.game = names.get(Number(gid)) || ''; f.romId = Number(gid); f.kind = S.KIND_LABEL[Object.keys(one[gid]).find((k) => one[gid][k].length)] || 'Save'; } }
     } catch {}
     return b;
   },
@@ -3419,7 +3426,7 @@ const handlers08 = {
   'savesync:game': async ({ romId }) => {
     romId = Number(romId);
     const SS = require('./saveSync'), extra = saveExtras();
-    const all = SS.units({ extra, games: ssGames(), carriers: ssCarriers() });
+    const all = SS.units({ extra, games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf });
     const mine = all.filter((u) => u.romId === romId || (u.romIds || []).includes(romId));
     const statOf = (u) => {
       try {
@@ -3432,7 +3439,7 @@ const handlers08 = {
     const backupsOf = (key) => { try { return fs.readdirSync(path.join(SAVE_BACKUPS, key.replace(/[^\w.-]+/g, '_'))).sort().reverse(); } catch { return []; } };
     const saves = mine.map((u) => {
       const led = ssData.ledger[u.key] || null, b = backupsOf(u.key);
-      return { key: u.key, label: u.label || '', emu: u.emu, emuName: SS.LABEL[u.emu] || u.emu, kind: u.kind, path: u.path, card: u.card, states: !!u.states, shared: u.card ? (u.romIds || []).length : 0, ...statOf(u),
+      return { key: u.key, label: u.label || '', sub: u.sub || '', folder: path.basename(u.path || ''), emu: u.emu, emuName: SS.LABEL[u.emu] || u.emu, kind: u.kind, path: u.path, card: u.card, states: !!u.states, shared: u.card ? (u.romIds || []).length : 0, ...statOf(u),
         synced: led?.at || null, inRomm: !!led?.remoteId, history: (ssData.history?.[u.key] || []).slice(0, 30), backups: b.length, backupsDir: b.length ? path.join(SAVE_BACKUPS, u.key.replace(/[^\w.-]+/g, '_')) : null };
     });
     let versions = null;
@@ -3450,7 +3457,7 @@ const handlers08 = {
     const SS = require('./saveSync'), extra = saveExtras();
     const saves = await ssRpcList(Number(romId)), save = saves.find((x) => x.id === Number(id));
     if (!save) throw new Error('That version isn’t in RomM any more.');
-    const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers() });
+    const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf });
     const u = local.find((x) => x.slot === save.slot) || SS.remoteOnly([save], new Set())[0];
     const r = await SS.restore(u, save, ssRpc(await rommDevice()), ssLedger, { extra, backupsRoot: SAVE_BACKUPS });
     if (r.result === 'busy') throw new Error(`Close ${SS.LABEL[u.emu] || u.emu} first: Cartridge never changes saves while the emulator is open.`);
@@ -3501,7 +3508,7 @@ const handlers08 = {
     return { on: true };
   },
   'sync:serviceState': async () => ({ on: fs.existsSync(path.join(os.homedir(), '.config/systemd/user/cartridge-syncthing.service')) }),
-  'sync:games': async () => require('./syncthing').gamesSynced(syncGameList(), { server: config.syncthing?.server || null }),
+  'sync:games': async () => { await titlesReady(); return require('./syncthing').gamesSynced(syncGameList(), { server: config.syncthing?.server || null, nameOf: titles.nameOf }); },
   // dates for a game's timeline (the game page adds trophies and achievements it already has)
   'rom:timeline': ({ romId }) => {
     const r = romIndexMain().get(romId);

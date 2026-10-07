@@ -98,7 +98,7 @@ const con = computed(() => (rom.value ? consoleName({ romId: props.romId, slug: 
 const short = (p) => String(p || '').replace(store.info?.home || '\u0000', '~');
 const dirOf = (p) => String(p).replace(/\/[^/]*$/, '');
 const when = (t) => (t ? (Date.now() - t < 7 * 86400e3 ? ago(t) : new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })) : '');
-const kindText = (s) => (s.card ? `Memory card${s.shared > 1 ? `, shared by ${s.shared} games` : ''}` : s.states ? 'Save states' : s.label && s.label !== rom.value?.name ? s.label : s.kind === 'dir' ? 'Save folder' : 'Save file');
+const kindText = (s) => (s.sub ? `${s.sub} · ${s.folder}` : s.card ? `Memory card${s.shared > 1 ? `, shared by ${s.shared} games` : ''}` : s.states ? 'Save states' : s.label && s.label !== rom.value?.name ? s.label : s.kind === 'dir' ? 'Save folder' : 'Save file');
 const EV = {
   up: { t: 'Sent to RomM', icon: 'mdiCloudUploadOutline' },
   down: { t: 'Brought to This Device', icon: 'mdiCloudDownloadOutline' },
