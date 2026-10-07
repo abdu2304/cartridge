@@ -158,7 +158,7 @@ export async function playGame(romId) {
   romId = Number(romId);
   if (saveSyncOn()) {
     const game = romById(romId)?.name || '';
-    const show = (o) => { store.cloudSync = { ...(store.cloudSync || {}), game, ...o }; };
+    const show = (o) => { store.cloudSync = { ...(store.cloudSync || {}), game, romId, ...o }; };
     const t0 = Date.now();
     show({ state: 'check', label: 'Checking your saves with RomM', done: 0, of: 0 });
     const off = window.cart.on('savesync', (p) => { if (p?.why === 'before' && store.cloudSync && p.state === 'run') show({ done: p.done, of: p.of, label: p.of ? `Checking your saves (${p.done} of ${p.of})` : 'Checking your saves with RomM' }); });
@@ -168,14 +168,14 @@ export async function playGame(romId) {
       show({ state: 'conflict', label: `${c.label || 'A save'} changed here and on another device` });
       const v = await choose({ title: 'Which Save?', message: `${c.label || 'This save'} (${c.emuName}) changed on this device and on another one since they last synced. The one you don't pick is kept as an older version.`, options: [{ label: 'Use the One From RomM', sub: 'The save from your other device', value: 'theirs', icon: 'mdiCloudDownloadOutline' }, { label: 'Keep This Device’s', sub: 'It goes to RomM as the newest', value: 'mine', icon: 'mdiCellphoneArrowDown' }] });
       if (!v) { store.cloudSync = null; return; } // B: nothing changes and the game doesn't start
-      show({ state: 'check', label: v === 'mine' ? 'Saving this device’s save to RomM' : 'Bringing the save from RomM' });
+      show({ state: 'check', dir: v === 'mine' ? 'up' : 'down', label: v === 'mine' ? 'Saving this device’s save to RomM' : 'Bringing the save from RomM' });
       try { await call('savesync:resolve', { key: c.key, choice: v, romId }); } catch (e) { toast(e.message, 'error', 5000); }
     }
     const res = r?.results || [], n = (k) => res.filter((x) => x.result === k).length;
     const busy = n('busy'), auth = res.find((x) => x.result === 'auth');
     if (r?.offline || r?.error || auth) show({ state: 'offline', label: auth ? auth.error : 'RomM couldn’t be reached. Playing with this device’s save.' });
     else if (busy) show({ state: 'error', label: 'The emulator is already open, so its saves weren’t changed.' });
-    else show({ state: 'done', label: n('down') ? 'Your latest save is here' : n('up') ? 'Your save is in RomM' : 'Your saves are up to date', done: 1, of: 1 });
+    else show({ state: 'done', dir: n('down') ? 'down' : 'up', label: n('down') ? 'Your latest save is here' : n('up') ? 'Your save is in RomM' : 'Your saves are up to date', done: 1, of: 1 });
     await new Promise((ok) => setTimeout(ok, Math.max(r?.offline || auth ? 1800 : 700, 1100 - (Date.now() - t0))));
     store.cloudSync = null;
   }
