@@ -104,11 +104,12 @@
           <!-- Syncthing (its own tab in 0.9.21; renamed with its logo in 0.9.23, owner) -->
           <template v-else-if="sec === 'syncthing'">
             <!-- 0.9.51: Cartridge Save Sync (RomM) or Syncthing, chosen in Advanced; a device uses one, never both (owner) -->
+            <!-- 0.9.57 (owner: Syncthing's own tabs and this row both used L1/R1): one row, Syncthing's pages in it -->
             <div class="lookpages"><Btn b="LB" /><div class="seg"><button v-for="p in SYNC_PAGES" :key="p.v" data-focus :data-key="'sync-' + p.v" :class="{ on: syncPage === p.v }" @click="syncPage = p.v">{{ p.l }}</button></div><Btn b="RB" /></div>
             <SaveSyncCard v-if="syncPage === 'saves'" @advanced="syncPage = 'advanced'" />
-            <template v-else-if="syncPage === 'syncthing'">
-              <p v-if="ssMode === 'cartridge'" class="muted small sync-lock"><Icon name="mdiLockOutline" :size="16" />This device syncs saves with Cartridge Save Sync, so Syncthing isn't used for saves here. Syncthing still shows what else it keeps in step.</p>
-              <SyncCard ref="syncRef" />
+            <template v-else-if="ST_VIEW[syncPage]">
+              <p v-if="ssMode === 'cartridge' && syncPage === 'syncthing'" class="muted small sync-lock"><Icon name="mdiLockOutline" :size="16" />This device syncs saves with Cartridge Save Sync, so Syncthing isn't used for saves here. Syncthing still shows what else it keeps in step.</p>
+              <SyncCard ref="syncRef" :page="ST_VIEW[syncPage]" />
             </template>
             <template v-else>
               <div class="subh">How This Device Syncs Saves</div>
@@ -635,7 +636,9 @@ const lead = computed(() => sections.find((x) => x.id === sec.value)?.lead || ''
 const LIB_PAGES = [{ v: 'server', l: 'RomM Server' }, { v: 'folders', l: 'Games and Storage' }];
 const DLUP_PAGES = [{ v: 'downloads', l: 'Downloads' }, { v: 'updates', l: 'Cartridge Updates' }];
 // Saves and Sync (0.9.51): Cartridge Save Sync, Syncthing, and Advanced (which one this device uses)
-const SYNC_PAGES = [{ v: 'saves', l: 'Cartridge Save Sync' }, { v: 'syncthing', l: 'Syncthing' }, { v: 'advanced', l: 'Advanced' }];
+// Syncthing's pages sit in this row (0.9.57): Games, Main Server and This Device (one page when this device is the main server)
+const ST_VIEW = { syncthing: 'games', 'st-server': 'server', 'st-here': 'here' };
+const SYNC_PAGES = computed(() => [{ v: 'saves', l: 'Cartridge Save Sync' }, { v: 'syncthing', l: 'Syncthing Games' }, ...(store.config.syncthing?.role === 'main' ? [{ v: 'st-here', l: 'Main Server' }] : [{ v: 'st-server', l: 'Main Server' }, { v: 'st-here', l: 'This Device' }]), { v: 'advanced', l: 'Advanced' }]);
 const ssLocked = computed(() => !!store.config.syncthing?.role);
 const ssMode = computed(() => (store.config.syncthing?.role ? 'syncthing' : store.config.saveSync === 'cartridge' ? 'cartridge' : store.config.saveSync === 'syncthing' ? 'syncthing' : null));
 const syncPage = ref(ssMode.value === 'syncthing' ? 'syncthing' : 'saves');
@@ -973,7 +976,7 @@ function paneLeft() {
   if (more) return false;
   focusFirst(el.value, `[data-key="sec-${sec.value}"]`);
 }
-useView({ right: railRight, left: paneLeft, back: () => { if (!document.activeElement?.closest('.rail')) { focusFirst(el.value, `[data-key="sec-${sec.value}"]`); return; } return false; }, lb: () => (sec.value === 'emu' ? stepEmu(-1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', -1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', -1) : sec.value === 'syncthing' ? stepPages(SYNC_PAGES, syncPage, 'sync', -1) : sec.value === 'steam' ? steamRef.value?.step(-1) : stepLook(-1)), rb: () => (sec.value === 'emu' ? stepEmu(1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', 1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', 1) : sec.value === 'syncthing' ? stepPages(SYNC_PAGES, syncPage, 'sync', 1) : sec.value === 'steam' ? steamRef.value?.step(1) : stepLook(1)), y: () => searchSettings() },
+useView({ right: railRight, left: paneLeft, back: () => { if (!document.activeElement?.closest('.rail')) { focusFirst(el.value, `[data-key="sec-${sec.value}"]`); return; } return false; }, lb: () => (sec.value === 'emu' ? stepEmu(-1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', -1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', -1) : sec.value === 'syncthing' ? stepPages(SYNC_PAGES.value, syncPage, 'sync', -1) : sec.value === 'steam' ? steamRef.value?.step(-1) : stepLook(-1)), rb: () => (sec.value === 'emu' ? stepEmu(1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', 1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', 1) : sec.value === 'syncthing' ? stepPages(SYNC_PAGES.value, syncPage, 'sync', 1) : sec.value === 'steam' ? steamRef.value?.step(1) : stepLook(1)), y: () => searchSettings() },
   [{ b: 'A', label: 'Select' }, { b: 'B', label: 'Back' }, { b: 'Y', label: 'Find a Setting' }, { b: 'LT+RT', label: 'Tabs' }]);
 // Settings → Emulators → Issues
 const issues = ref(null);

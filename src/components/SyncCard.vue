@@ -8,7 +8,7 @@
       </div>
     </div>
 
-    <div class="st-tabs-row"><Btn b="LB" /><div class="seg st-tabs">
+    <div v-if="!props.page" class="st-tabs-row"><Btn b="LB" /><div class="seg st-tabs">
       <button v-for="t in TABS_ALL" :key="t.v" data-focus :data-key="'st-' + t.v" :class="{ on: view === t.v }" @click="setView(t.v)">{{ t.l }}</button>
     </div><Btn b="RB" /></div>
 
@@ -174,9 +174,10 @@
           <button class="st-con" :class="{ on: !fCon }" data-focus @click="fCon = ''"><span>All Consoles</span><em>{{ found.length }}</em></button>
           <button v-for="c in cons" :key="c.slug" class="st-con" :class="{ on: fCon === c.slug }" data-focus @click="fCon = c.slug"><PIcon :p="c.p" :size="24" /><span>{{ c.name }}</span><em>{{ c.n }}</em></button>
         </div>
-        <div v-if="kinds.length > 1" class="st-cons" data-hscroll>
+        <!-- 0.9.57 (owner): always there, for every console; kinds a console has nothing of are dimmed -->
+        <div class="st-cons" data-hscroll>
           <button class="st-con" :class="{ on: !fKind }" data-focus @click="fKind = ''"><span>Everything</span></button>
-          <button v-for="k in kinds" :key="k.v" class="st-con" :class="{ on: fKind === k.v }" data-focus @click="fKind = k.v"><Icon :name="k.icon" :size="18" /><span>{{ k.l }}</span><em>{{ k.n }}</em></button>
+          <button v-for="k in kinds" :key="k.v" class="st-con" :class="{ on: fKind === k.v, none: !k.n }" data-focus @click="fKind = k.v"><Icon :name="k.icon" :size="18" /><span>{{ k.l }}</span><em>{{ k.n }}</em></button>
         </div>
         <div v-if="!shown.length" class="muted small">{{ q ? `Nothing for “${q}”.` : 'No saves were found for your games yet. Play a game once and they show here.' }}</div>
         <button v-for="g in shown" :key="g.id" class="lrow st-game" data-focus @click="go('game', { romId: g.id })">
@@ -210,7 +211,7 @@
 <script setup>
 // Settings → Syncthing (0.9.19 card, own tab 0.9.21; 0.9.23, owner: a proper integration with its logo,
 // a main server, which games have saves and textures synced). Read only, see electron/syncthing.js
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { store, call, ago, bytes, toast, go, confirm, romById, cover } from '../store.js';
 import Icon from './Icon.vue';
 import TextField from './TextField.vue';
@@ -222,7 +223,9 @@ import PIcon from './PIcon.vue';
 // (set up by Cartridge, config.syncthing.role 'main') the two are one tab
 const isMain = computed(() => store.config.syncthing?.role === 'main');
 const TABS_ALL = computed(() => (isMain.value ? [{ v: 'games', l: 'Games' }, { v: 'here', l: 'This Device · Main Server' }] : [{ v: 'games', l: 'Games' }, { v: 'server', l: 'Main Server' }, { v: 'here', l: 'This Device' }]));
-const s = ref(null), L = ref(null), open = ref(''), list = ref(null), view = ref('games'), SV = ref(null);
+// page: the page Settings shows (0.9.57: Syncthing's pages are in Settings' own row, so one L1/R1 for all of them)
+const props = defineProps({ page: { type: String, default: '' } });
+const s = ref(null), L = ref(null), open = ref(''), list = ref(null), view = ref(props.page || 'games'), SV = ref(null);
 const R = ref(null), G = ref(null), q = ref(''), addr = ref(''), key = ref(''), busy = ref(false), editing = ref(false), pasteKey = ref('');
 const srvCfg = computed(() => store.config.syncthing?.server || null);
 const short = (p) => String(p || '').replace(store.info?.home || '\0', '~');
@@ -243,7 +246,7 @@ const has = (g, k) => (k === 'saves' ? g.local.length || g.saves.length : g[k].l
 const fCon = ref(''), fKind = ref('');
 // the consoles and kinds that are there, each with how many games
 const cons = computed(() => { const m = new Map(); for (const g of found.value) { const c = m.get(g.slug) || { slug: g.slug, name: g.platform, p: { slug: g.slug, fs_slug: g.slug, id: g.pid }, n: 0 }; c.n++; m.set(g.slug, c); } return [...m.values()].sort((a, b) => a.name.localeCompare(b.name)); });
-const kinds = computed(() => KINDS.map((k) => ({ ...k, n: found.value.filter((g) => (!fCon.value || g.slug === fCon.value) && has(g, k.v)).length })).filter((k) => k.n));
+const kinds = computed(() => KINDS.map((k) => ({ ...k, n: found.value.filter((g) => (!fCon.value || g.slug === fCon.value) && has(g, k.v)).length })));
 const shown = computed(() => {
   const k = q.value.trim().toLowerCase();
   let l = k ? found.value.filter((g) => g.name.toLowerCase().includes(k) || g.platform.toLowerCase().includes(k)) : found.value;
@@ -266,6 +269,7 @@ async function useKey() {
 // L1/R1 move between This Device, Main Server and Games (0.9.24, owner)
 function step(d) { const T = TABS_ALL.value, i = T.findIndex((t) => t.v === view.value); setView(T[(i + d + T.length) % T.length].v); }
 defineExpose({ step });
+watch(() => props.page, (v) => { if (v) setView(v); }, { immediate: true });
 function setView(v) {
   view.value = v;
   if (v === 'server' && srvCfg.value && !R.value) loadServer();
@@ -355,6 +359,7 @@ async function toggleService() {
 .st-con em { font-style: normal; color: var(--muted); font-weight: 500; }
 .st-con.on { background: var(--sel); color: var(--on-sel); }
 .st-con.on em, .st-con.on :deep(svg) { color: var(--on-sel-dim); }
+.st-con.none:not(.on):not(:focus) { opacity: 0.5; }
 .st-con:focus-visible, .pad-mode .st-con:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; outline: none; }
 .pad-mode .st-con:focus em { color: var(--on-focus-dim); }
 .chip.ok { color: #9be8b4; }

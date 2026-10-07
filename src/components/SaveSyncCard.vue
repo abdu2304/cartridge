@@ -40,7 +40,7 @@
     </template>
 
     <div class="subh">How It Works</div>
-    <div class="ssc-how">
+    <div class="ssc-how glass">
       <div><Icon name="mdiPlayCircleOutline" :size="22" /><span><b>Before a game starts</b> Cartridge checks its saves with RomM and brings the newest here, like Steam Cloud. Games started from Steam sync when you come back to Cartridge.</span></div>
       <div><Icon name="mdiCloudUploadOutline" :size="22" /><span><b>After you play</b> your saves go to RomM, and every 30 minutes anything that changed.</span></div>
       <div><Icon name="mdiShieldCheckOutline" :size="22" /><span><b>Safe</b> Cartridge never changes a save while its emulator is open, never guesses when two devices changed the same save, and keeps 10 older versions on this device and 10 in RomM.</span></div>
@@ -147,7 +147,7 @@ defineExpose({ load });
 .ssc-count b { font-family: var(--display); font-size: var(--t-xl); font-variant-numeric: tabular-nums; }
 .ssc-count span { font-size: var(--t-xs); color: var(--muted); }
 .ssc-count.dim b { color: var(--muted); }
-.ssc-how { display: flex; flex-direction: column; gap: var(--s-2); }
+.ssc-how { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); border-radius: var(--r-lg); } /* a card (0.9.57, owner: it blended into the page) */
 .ssc-how > div { display: flex; gap: var(--s-3); align-items: flex-start; font-size: var(--t-sm); line-height: 1.45; color: var(--muted); }
 .ssc-how b { color: var(--text); margin-right: 4px; }
 .ssc-how .icon { flex: none; margin-top: 1px; color: var(--text); }
