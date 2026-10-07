@@ -200,13 +200,17 @@ function serialsIn(text) {
   return out;
 }
 // games: [{ id, name, ids: [serial or title id...] }] -> { [id]: { saves: [{ folder, files, at }], textures: [...] } }
-function matchGames(games, folders) {
-  const byId = new Map(), byName = [], byExact = new Map();
+// opts.nameOf (0.9.57): a code's name from the emulators' game databases (titleDb.js). Texture and save folders are
+// named by code (PCSX2's textures/SLUS-20946); a game not downloaded here had no code Cartridge knew, so most PS2
+// textures and games went unlisted. The name then finds the game in the library.
+function matchGames(games, folders, { nameOf = null } = {}) {
+  const byId = new Map(), byName = [], byExact = new Map(), byFull = new Map();
   for (const g of games) {
     for (const s of g.ids || []) if (s) byId.set(String(s).toUpperCase().replace(/[-_.]/g, ''), g.id);
     for (const s of g.discIds || []) { byExact.set(s.toUpperCase(), g.id); if (s.length === 6) byExact.set(s.slice(0, 3).toUpperCase(), g.id); }
     const k = norm(g.name.replace(/\s*[([].*$/, ''));
     if (k.length >= 5) byName.push([k, g.id]);
+    if (k.length >= 2 && !byFull.has(k)) byFull.set(k, g.id);
   }
   byName.sort((a, b) => b[0].length - a[0].length); // the longer name wins ("Sonic 2" over "Sonic")
   const out = {};
@@ -220,6 +224,7 @@ function matchGames(games, folders) {
     const kind = kindOf(folder.path + '/' + f.path);
     let gid = null;
     for (const s of serialsIn(f.path)) { if (byId.has(s)) { gid = byId.get(s); break; } }
+    if (gid == null && nameOf) for (const s of serialsIn(f.path)) { const n = nameOf(s); const k = n && norm(n.replace(/\s*[([].*$/, '')); if (k && byFull.has(k)) { gid = byFull.get(k); break; } }
     // a folder named exactly after a game's ID (Dolphin's GALE01 or GAL texture folders, 0.9.28)
     if (gid == null) for (const seg of f.path.split('/')) { const u = seg.toUpperCase(); if (byExact.has(u)) { gid = byExact.get(u); break; } }
     if (gid == null) { const parts = f.path.split('/').map((p) => norm(p.replace(/\.[^.]+$/, ''))); for (const [k, id] of byName) { if (parts.some((p) => p === k || (k.length >= 8 && p.includes(k)))) { gid = id; break; } } }
@@ -230,7 +235,7 @@ function matchGames(games, folders) {
 // 0.9.28 (owner: only a few games showed from the main server): this device's folders and the main server's
 // (when one is set), each read up to its own limit (one huge texture folder used to use up a shared limit and
 // hide every folder after it); texture folders only as deep as their game folders, saves deeper.
-async function gamesSynced(games, { fetchImpl = fetch, home = HOME, cap = 40000, server: srv = null } = {}) {
+async function gamesSynced(games, { fetchImpl = fetch, home = HOME, cap = 40000, server: srv = null, nameOf = null } = {}) {
   const sources = [];
   try { const l = await localApi(home, fetchImpl); sources.push(api(l.base, l.key, fetchImpl, 20000)); } catch (e) { if (!srv) throw e; }
   if (srv?.address && srv?.apikey) sources.push(api(srv.address, srv.apikey, fetchImpl, 20000));
@@ -247,7 +252,7 @@ async function gamesSynced(games, { fetchImpl = fetch, home = HOME, cap = 40000,
       folders.push({ id: x.id, label: x.label || x.id, path: String(x.path || ''), files: files.slice(0, cap) });
     }
   }
-  return { games: matchGames(games, folders), folders: folders.length, files: n };
+  return { games: matchGames(games, folders, { nameOf }), folders: folders.length, files: n };
 }
 // ---- Cartridge's save sync (0.9.29, The Syncthing Update). Only on a Syncthing nobody has set up yet (no other
 // devices, no folders but its empty default), or one Cartridge set up: an existing setup is never changed.

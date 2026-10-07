@@ -1,22 +1,25 @@
-## Cartridge 0.9.56 · Quick and Clear
+## Cartridge 0.9.57 · Seamless
 
 ### New
-- **Save Sync's counts open up.** Sent to RomM, Brought Here, Up to Date and Not Matched in Settings → Saves and Sync are buttons now. Each shows the saves behind it. A save that matched no game says why in plain words (its game ID isn't in your library, no game has that name, or a memory card with no game of its console to keep it with) and what fixes it, with Copy the ID and Sync Now. Press Sync Now once after updating to fill the lists.
-- **Update All.** Settings → Emulators has an Update All button beside Download All, Where They Go and Check for Updates. It updates every emulator with an update ready, one after another, after one question. The four buttons sit in one even row.
-- **Choose whose saves to share.** In Linked Folders, pressing a fork and its emulator now asks which saves both should use, showing how many items each folder has and when it last changed. The next step says exactly what happens: the main one keeps its saves, the other one's are set aside (never deleted), and games only it has can be copied over first. Either way round works. Your links now say who uses whose saves.
-- **Mods under a shorter name.** When a site has no game under the full title, Cartridge looks for a shorter one: "Nexus Mods has no game called Bloodborne Game of the Year Edition", then "Found on Nexus Mods: Bloodborne". Press it to see those mods. They install by the same rules as always. Works for Nexus Mods and GameBanana.
-- **Pure Black.** Look & Feel → Theme → Advanced has a Pure Black button for Highlights, Buttons and Progress Bars.
+- **A page for each game's saves.** In Settings → Saves and Sync, Cartridge Save Sync lists Your Games, and any game in the counts' lists opens its own sheet: its cover and whether it's in sync, every save of it on this device with where it is (copy the location, open the folder), its size, when it last changed and last synced, the backups kept here, its sync history (sent to RomM, brought here, changed on two devices, an older version put back), RomM's versions with Put Back, and Go to Game Page.
+- **Games named from their codes, without the game on this device.** Saves, memory cards and Syncthing folders are named by a game's code (SLUS-20946). Cartridge now reads every code's name from the emulators' own game databases (PCSX2's and DuckStation's, the copy on this device first, else downloaded once) and finds the game in your library by name. PS2 textures and PS1/PS2 games on memory cards show under their games, and Syncthing lists every game, not only the ones downloaded here.
+- **Change Icon for RetroAchievements games**, as trophies and gamerscore have it (the game's More).
+- **Start moves a little.** Continue Playing and big pinned games drift slowly sideways, a gentle camera pan with no zoom. It stops with light effects, Reduce Motion, while arranging and during a game.
 
 ### Changed
-- **Snappier motion everywhere.** Movement starts at full speed instead of easing in, and settles about a third sooner. Page changes, going back, opening a game, pop-ups and scrolling all feel quicker, and nothing overshoots.
-- **Start's page turns are quick again.** The new page shows in about 175 ms instead of 410 ms, and is complete in about 840 ms instead of 1.4 s. Tiles come in closer together.
-- **The background keeps moving.** It no longer slows to a stop when you leave Cartridge alone. It only stops while a game or another app is in front, and carries on as soon as you're back.
-- **Light and OLED set your colours.** Picking Light makes Highlights, Buttons and Progress Bars black; picking OLED makes them white. Picking another colour puts them back to the theme's own.
-- **Cards stand out in Light.** White cards on a slightly deeper page, with a firmer edge and shadow.
-- **Background menu:** just Your Theme Colours, Their Own Colours and Other. The console and game picture backgrounds left the menu (one you already use keeps working).
-- **Nexus Mods key** moved to Settings → Emulators → Game Add-ons, with the mods.
+- **Cloud Sync before a game, redesigned.** Your game on one side, your RomM server on the other, and the save travelling between them the way it's really going. When it's done the line fills and a tick lands in the middle (a break when RomM can't be reached, a fork when two devices changed the save).
+- **No more grey highlights.** In the dark looks, primary buttons (Update All and the rest) and everything chosen (the open Settings section, the chosen tab, chips) are your highlight colour, solid, with matching text. See-through white over a dark panel read as grey.
+- **Dark Glass is dark.** Near-black smoked glass, more solid panels and no white grain, so Glass on OLED reads black, not grey. Light Glass is unchanged.
+- **One L1/R1 row in Saves and Sync.** Syncthing's Games, Main Server and This Device are pages in the section's own row (they had their own L1/R1 row inside, which fought it). The Everything / Saves / Textures / Patches row always shows, whichever console is chosen. How It Works is a card.
+- **Two saves of one game say what they are.** RPCS3 and PPSSPP saves show their own subtitle and folder (a game's progress and its system data are separate saves of very different sizes).
+- **Nexus Mods says why its page opens.** Nexus only lets Premium accounts download with an API key; free accounts press Slow Download on its site. Cartridge remembers the site's sign-in, so it asks you to sign in only the first time.
+- **Downloads:** emulator updates and installs show the emulator's icon instead of an empty poster.
 
 ### Fixed
-- **Glass no longer has white shapes moving around.** In dark Glass the edge light turned to follow whatever was focused, a white glow surrounded focus, and a white band swept across buttons when pressed. The light now stays put (from the top left), the glow and the sweep are gone in dark Glass, and the bend at glass edges is gentler. Light Glass keeps its shine.
-- **"The folder to share doesn't exist"** in Linked Folders, for a folder that was there. When an emulator's save folder is itself a link (as EmuDeck sets them up), Cartridge looked at the link instead of where it leads.
-- **Less waiting on the system.** Checking emulators for updates, installing Vita games and adding Flathub for RetroDECK no longer hold Cartridge still while they ask the system.
+- **Vita3K installs without opening.** "Failed to load archive file in path: 13.zip" and Vita3K's window opening: Vita3K's command line reads any argument starting with "/" as an option, so a game's path was dropped (all of it, or everything before a space) and Vita3K skipped the install and opened its window. Cartridge now hands it the file from the file's own folder, stops Vita3K the moment its install ends (before its window is made), and stops the real Vita3K inside the AppImage too. Tested with Vita3K build 4111: installed in under a second, no window. Zips and VPKs that aren't encrypted are still installed by Cartridge itself, with no Vita3K at all.
+- **shadPS4 saves.** Current shadPS4 keeps saves in `~/.local/share/shadPS4/home/<user ID>/savedata` (its home folder setting is followed too), not `user/savedata`. Saves, Save Sync, the installer's links and Linked Folders' suggestions for shadPS4 forks now use it; older layouts are still read.
+- **X clears everything finished in Downloads**: games, add-ons, texture packs, emulator updates and installs.
+- **Light card shadows were cut** at the bottom of rows. They're as firm, just tighter, so they fit.
+- **Recently Played on Start** went see-through, then more see-through, when it changed game. The new picture now fades in over the old one.
+- **PSP save names** ended in junk ("Size Matters™��ENTR").
+- **SwanStation.srm** is a PS1 memory card (SwanStation's shared card): the games on it are read and matched.

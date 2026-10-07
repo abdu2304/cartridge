@@ -37,10 +37,21 @@
         <button v-for="k in SHOWN" :key="k.v" class="ssc-count" :class="{ dim: !st.last.counts?.[k.v], warn: k.v === 'unmatched' && st.last.counts?.[k.v] }" data-focus @click="openList(k)"><b>{{ st.last.counts?.[k.v] || 0 }}</b><span>{{ k.l }}</span><Icon name="mdiChevronRight" :size="16" class="ssc-go" /></button>
       </div>
       <p class="muted small">{{ ago(st.last.at) }}</p>
+      <!-- 0.9.57 (owner): every game with a synced save, each opening its own sheet (where its save is, its history) -->
+      <template v-if="games.length">
+        <div class="subh">Your Games · {{ games.length }}</div>
+        <div class="ssc-games">
+          <button v-for="g in games" :key="g.id" class="lrow ssc-game" data-focus @click="openGame(g.id)">
+            <img v-if="g.art" class="ssc-cov" :src="g.art" loading="lazy" alt="" /><span v-else class="ssc-cov" />
+            <div class="l-mid"><b>{{ g.name }}</b><span class="l-sub">{{ g.sub }}</span></div>
+            <Icon :name="ICON[g.result] || 'mdiCheck'" :size="20" class="ssc-gi" />
+          </button>
+        </div>
+      </template>
     </template>
 
     <div class="subh">How It Works</div>
-    <div class="ssc-how">
+    <div class="ssc-how glass">
       <div><Icon name="mdiPlayCircleOutline" :size="22" /><span><b>Before a game starts</b> Cartridge checks its saves with RomM and brings the newest here, like Steam Cloud. Games started from Steam sync when you come back to Cartridge.</span></div>
       <div><Icon name="mdiCloudUploadOutline" :size="22" /><span><b>After you play</b> your saves go to RomM, and every 30 minutes anything that changed.</span></div>
       <div><Icon name="mdiShieldCheckOutline" :size="22" /><span><b>Safe</b> Cartridge never changes a save while its emulator is open, never guesses when two devices changed the same save, and keeps 10 older versions on this device and 10 in RomM.</span></div>
@@ -51,7 +62,7 @@
 </template>
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { store, call, toast, choose, ago, romById, consoleName, go } from '../store.js';
+import { store, call, toast, choose, ago, romById, consoleName, go, openModal, cover } from '../store.js';
 import Icon from './Icon.vue';
 
 const emit = defineEmits(['advanced']);
@@ -94,6 +105,19 @@ async function resolve(c) {
 // ---- the lists behind the counts (0.9.56)
 const ICON = { up: 'mdiCloudUploadOutline', down: 'mdiCloudDownloadOutline', same: 'mdiCheck', unmatched: 'mdiHelpCircleOutline' };
 const gameOf = (it) => romById(it.romId)?.name || it.why?.title || '';
+// the games behind the last sync's saves, A to Z: a memory card's carrier game is left out unless it has its own save
+const games = computed(() => {
+  const by = new Map();
+  for (const it of st.value?.last?.items || []) {
+    if (it.result === 'unmatched' || it.card) continue;
+    const r = romById(it.romId); if (!r) continue;
+    const g = by.get(r.id) || { id: r.id, name: r.name, art: cover(r), emus: new Set(), result: it.result };
+    g.emus.add(it.emuName); if (it.result !== 'same') g.result = it.result;
+    by.set(r.id, g);
+  }
+  return [...by.values()].map((g) => ({ ...g, sub: [consoleName({ romId: g.id, fallback: '' }), [...g.emus].join(', ')].filter(Boolean).join(' · ') })).sort((a, b) => a.name.localeCompare(b.name));
+});
+async function openGame(romId) { const r = await openModal('savegame', { romId }); if (r === 'game') go('game', { romId }); }
 const conName = (slug) => (slug ? consoleName({ slug, fallback: slug.toUpperCase() }) : '');
 // a save that matched no game: why, in plain words, and what fixes it
 function explain(it) {
@@ -111,7 +135,8 @@ async function openList(k) {
     const v = await choose({ sheet: true, title: `${k.l} · ${items.length}`, message: k.v === 'unmatched' ? 'Saves on this device that Cartridge couldn’t match to a game in your library, so they stay here and aren’t synced. Press one to see why and what fixes it.' : '', options: items.map((it, i) => ({ label: gameOf(it) || it.label || it.key, sub: `${it.emuName}${it.card ? ' · memory card' : ''}${it.states ? ' · save states' : ''}${k.v === 'unmatched' ? ' · ' + explain(it).short : ''}`, value: String(i), icon: ICON[k.v], raw: true })) });
     if (v == null) return;
     const it = items[Number(v)];
-    if (k.v !== 'unmatched') { if (romById(it.romId)) return go('game', { romId: it.romId }); continue; } // a matched save: its game's page
+    // a matched save: its game's sheet (0.9.57, owner): the game, where its save is, its history; Go to Game Page there
+    if (k.v !== 'unmatched') { if (!romById(it.romId)) continue; const r = await openModal('savegame', { romId: it.romId }); if (r === 'game') return go('game', { romId: it.romId }); continue; }
     const e = explain(it);
     const a = await choose({ title: gameOf(it) || it.label || it.key, message: `Why: ${e.why}\n\nWhat fixes it: ${e.fix}`, options: [
       ...(e.id ? [{ label: 'Copy the ID', sub: e.id, value: 'copy', icon: 'mdiContentCopy', raw: true }] : []),
@@ -147,10 +172,14 @@ defineExpose({ load });
 .ssc-count b { font-family: var(--display); font-size: var(--t-xl); font-variant-numeric: tabular-nums; }
 .ssc-count span { font-size: var(--t-xs); color: var(--muted); }
 .ssc-count.dim b { color: var(--muted); }
-.ssc-how { display: flex; flex-direction: column; gap: var(--s-2); }
+.ssc-how { display: flex; flex-direction: column; gap: var(--s-3); padding: var(--s-4); border-radius: var(--r-lg); } /* a card (0.9.57, owner: it blended into the page) */
 .ssc-how > div { display: flex; gap: var(--s-3); align-items: flex-start; font-size: var(--t-sm); line-height: 1.45; color: var(--muted); }
 .ssc-how b { color: var(--text); margin-right: 4px; }
 .ssc-how .icon { flex: none; margin-top: 1px; color: var(--text); }
 .mono { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+.ssc-games { display: flex; flex-direction: column; gap: var(--s-2); }
+.ssc-game { flex: none; }
+.ssc-cov { width: 36px; height: 48px; border-radius: var(--r-sm); object-fit: cover; flex: none; background: var(--s2); }
+.ssc-gi { color: var(--muted); flex: none; }
 @media (max-width: 900px) { .ssc-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 </style>

@@ -2489,10 +2489,19 @@ function watchJoin() {
   };
   tick(); joinT = setInterval(tick, 30000);
 }
+async function nexusSignedIn() {
+  try { const c = await require('electron').session.fromPartition('persist:addons').cookies.get({ domain: 'nexusmods.com' }); return c.some((x) => /session|sid|jwt|auth|remember/i.test(x.name) && (!x.expirationDate || x.expirationDate * 1000 > Date.now())); } catch { return false; }
+}
+// Game names from their codes (0.9.57): the emulators' own game databases, read once and kept (electron/titleDb.js);
+// AppImages aren't opened for it (reading one can hold the main thread), the file from the emulator's repo instead
+const titles = require('./titleDb').createTitleDb({ dataDir: USER_DATA, fetchImpl: (u) => require('./webFetch')(u), log });
+const titlesReady = (ms = 8000) => Promise.race([titles.ready(), new Promise((ok) => setTimeout(ok, ms))]);
+setTimeout(() => titles.ready().catch(() => {}), 40000);
 async function savesList(fresh) {
   if (!fresh && savesCache && Date.now() - savesCache.at < 30000) return savesCache.list;
   const S = require('./saves');
-  const list = S.match(S.scan({ extra: saveExtras() }), savesGameList());
+  await titlesReady();
+  const list = S.match(S.scan({ extra: saveExtras() }), savesGameList(), { nameOf: titles.nameOf });
   // games that keep their save beside the game file (melonDS, mGBA and other emulators' default)
   for (const [id, where] of Object.entries(installedMap)) {
     if (!where || where === MARKED) continue;
@@ -2541,8 +2550,9 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
   if (ssBusy) return ssBusy; // one sync at a time; a second ask shares the running one
   ssBusy = (async () => {
     const SS = require('./saveSync'), extra = saveExtras();
+    if (why !== 'before') await titlesReady(4000); // names for codes of games not on this device (never holds up a game)
     romId = romId == null ? null : Number(romId);
-    const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers() });
+    const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf });
     let remotes = [];
     try { remotes = await (await ssRpcList(romId)); } catch (e) { log('save sync: RomM unreachable', e.message); if (why !== 'before' && !dry) ssHold(romId); return { offline: true, error: e.message, held: ssData.held || null }; }
     const devId = await rommDevice(), rpc = ssRpc(devId);
@@ -2557,6 +2567,8 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
       broadcast('savesync', { state: 'run', done: i + 1, of: todo.length, why, romId });
       if (r.result === 'auth') break;
     }
+    // 0.9.57 (owner: a game's sheet with its sync history): what moved, per save, the last 30 times
+    if (!dry) for (const r of results) if (['up', 'down', 'conflict', 'error'].includes(r.result)) ssNote(r.key, { result: r.result, why, error: r.error || undefined, choice: key ? choice : undefined });
     const counts = {}; for (const r of results) counts[r.result] = (counts[r.result] || 0) + 1;
     // 0.9.56 (owner: each count opens the saves behind it): what each save did in the last whole sync, at most 600
     const items = results.filter((r) => ['up', 'down', 'same', 'unmatched'].includes(r.result)).slice(0, 600).map((r) => ({ key: r.key, label: r.label, emu: r.emu, emuName: r.emuName, romId: r.romId, card: r.card, states: r.states, result: r.result, why: r.why }));
@@ -2565,6 +2577,12 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
     return { results, counts };
   })().finally(() => { ssBusy = null; });
   return ssBusy;
+}
+// a save's sync history (save-sync.json history[key]: newest first, 30 at most)
+function ssNote(key, e) {
+  const h = (ssData.history ||= {});
+  h[key] = [{ at: Date.now(), ...e }, ...(h[key] || [])].slice(0, 30);
+  clearTimeout(ssSaveT); ssSaveT = setTimeout(() => saveJson(SAVESYNC_FILE, ssData, false), 500);
 }
 // Away from the server (0.9.52, owner: a RomM at home with no tunnel, played on a handheld away). Nothing special
 // is needed to keep a save: the emulator keeps writing it on this device, played again or not. What Cartridge adds is
@@ -3357,7 +3375,7 @@ const handlers08 = {
     try {
       const games = syncGameList(), names = new Map(games.map((g) => [g.id, g.name]));
       // each file matched on its own, so it carries its game's name; the folder's real path and name decide textures or saves
-      for (const f of b.files) { const one = S.matchGames(games, [{ id: folder, label: b.label, path: b.path + '/' + b.label, files: [f] }]); const gid = Object.keys(one)[0]; if (gid) { f.game = names.get(Number(gid)) || ''; f.romId = Number(gid); f.kind = S.KIND_LABEL[Object.keys(one[gid]).find((k) => one[gid][k].length)] || 'Save'; } }
+      for (const f of b.files) { const one = S.matchGames(games, [{ id: folder, label: b.label, path: b.path + '/' + b.label, files: [f] }], { nameOf: titles.nameOf }); const gid = Object.keys(one)[0]; if (gid) { f.game = names.get(Number(gid)) || ''; f.romId = Number(gid); f.kind = S.KIND_LABEL[Object.keys(one[gid]).find((k) => one[gid][k].length)] || 'Save'; } }
     } catch {}
     return b;
   },
@@ -3405,6 +3423,33 @@ const handlers08 = {
   // Cartridge Cloud Sync before a game starts: this game's saves checked against RomM, the newest brought here
   'savesync:before': ({ romId }) => saveSyncRun({ romId: Number(romId), why: 'before' }),
   'savesync:resolve': ({ key, choice, romId }) => saveSyncRun({ key, choice: choice === 'mine' ? 'mine' : 'theirs', romId: romId == null ? null : Number(romId), why: 'resolve' }),
+  // A game's saves in one place (0.9.57, owner: pressing a game in Cartridge Save Sync shows the game, where its save
+  // is and more): every save of it on this device (a memory card counts for each game on it), where it is, how big,
+  // when it last changed and last synced, its history, backups kept here, and the versions in RomM
+  'savesync:game': async ({ romId }) => {
+    romId = Number(romId);
+    const SS = require('./saveSync'), extra = saveExtras();
+    const all = SS.units({ extra, games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf });
+    const mine = all.filter((u) => u.romId === romId || (u.romIds || []).includes(romId));
+    const statOf = (u) => {
+      try {
+        const st = fs.statSync(u.path);
+        if (!st.isDirectory()) return { size: st.size, at: st.mtimeMs, files: 1 };
+        if (u.kind === 'files') { let size = 0, at = 0; for (const f of u.files || []) { try { const x = fs.statSync(path.join(u.path, f)); size += x.size; at = Math.max(at, x.mtimeMs); } catch {} } return { size, at, files: (u.files || []).length }; }
+        const z = require('./saves').sizeOf(u.path); return { size: z.size, at: z.at, files: z.files };
+      } catch { return { size: 0, at: 0, files: 0 }; }
+    };
+    const backupsOf = (key) => { try { return fs.readdirSync(path.join(SAVE_BACKUPS, key.replace(/[^\w.-]+/g, '_'))).sort().reverse(); } catch { return []; } };
+    const saves = mine.map((u) => {
+      const led = ssData.ledger[u.key] || null, b = backupsOf(u.key);
+      return { key: u.key, label: u.label || '', sub: u.sub || '', folder: path.basename(u.path || ''), emu: u.emu, emuName: SS.LABEL[u.emu] || u.emu, kind: u.kind, path: u.path, card: u.card, states: !!u.states, shared: u.card ? (u.romIds || []).length : 0, ...statOf(u),
+        synced: led?.at || null, inRomm: !!led?.remoteId, history: (ssData.history?.[u.key] || []).slice(0, 30), backups: b.length, backupsDir: b.length ? path.join(SAVE_BACKUPS, u.key.replace(/[^\w.-]+/g, '_')) : null };
+    });
+    let versions = null;
+    if (saveSyncOn()) { try { versions = await Promise.race([handlers['savesync:versions']({ romId }), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 6000))]); } catch { versions = null; } }
+    const conflicts = (ssData.last?.conflicts || []).filter((c) => Number(c.romId) === romId);
+    return { romId, on: saveSyncOn(), saves, versions, conflicts, held: !!ssData.held?.romIds?.includes(romId), last: ssData.last?.at || null };
+  },
   // older versions of a game's saves in RomM, and putting one back
   'savesync:versions': async ({ romId }) => {
     const SS = require('./saveSync');
@@ -3415,13 +3460,14 @@ const handlers08 = {
     const SS = require('./saveSync'), extra = saveExtras();
     const saves = await ssRpcList(Number(romId)), save = saves.find((x) => x.id === Number(id));
     if (!save) throw new Error('That version isn’t in RomM any more.');
-    const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers() });
+    const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf });
     const u = local.find((x) => x.slot === save.slot) || SS.remoteOnly([save], new Set())[0];
     const r = await SS.restore(u, save, ssRpc(await rommDevice()), ssLedger, { extra, backupsRoot: SAVE_BACKUPS });
     if (r.result === 'busy') throw new Error(`Close ${SS.LABEL[u.emu] || u.emu} first: Cartridge never changes saves while the emulator is open.`);
     if (r.result === 'unplaced') throw new Error(`${SS.LABEL[u.emu] || u.emu} hasn’t made its save folders on this device yet. Open it once, then try again.`);
     if (r.result === 'damaged') throw new Error('That version didn’t match RomM’s check, so nothing was changed.');
     log('save sync: restored', u.key, 'version', id);
+    ssNote(u.key, { result: 'restored', why: 'restore', version: save.updated_at || null });
     return r;
   },
   'saves:forRom': async ({ romId }) => (await savesList()).filter((s) => (s.romIds || []).includes(Number(romId))),
@@ -3465,7 +3511,7 @@ const handlers08 = {
     return { on: true };
   },
   'sync:serviceState': async () => ({ on: fs.existsSync(path.join(os.homedir(), '.config/systemd/user/cartridge-syncthing.service')) }),
-  'sync:games': async () => require('./syncthing').gamesSynced(syncGameList(), { server: config.syncthing?.server || null }),
+  'sync:games': async () => { await titlesReady(); return require('./syncthing').gamesSynced(syncGameList(), { server: config.syncthing?.server || null, nameOf: titles.nameOf }); },
   // dates for a game's timeline (the game page adds trophies and achievements it already has)
   'rom:timeline': ({ romId }) => {
     const r = romIndexMain().get(romId);
@@ -4167,7 +4213,7 @@ const handlers = {
     // the download (after Nexus's own sign-in) is caught and installed like any other (addons:browse)
     if (pack.source === 'nexus') {
       const d = await modsEng().download('nexus', pack, file);
-      if (d.page) { handlers['addons:browse']({ url: d.page, romId, emuRoot, kind: 'mods', name: pack.name }); return { page: true }; }
+      if (d.page) { const signedIn = await nexusSignedIn(); handlers['addons:browse']({ url: d.page, romId, emuRoot, kind: 'mods', name: pack.name }); return { page: true, signedIn, keyed: !!config.nexusKey }; }
       file = { ...file, url: d.url };
     }
     // each emulator's own layout (addonInstall.plan, 0.9.18); PCSX2 and DuckStation: the game folder is
@@ -4224,6 +4270,10 @@ const handlers = {
   // 0.9.32 (owner: a download clicked on a mod's website did nothing): the page opens in a Cartridge
   // window; a .zip/.7z/.rar it downloads is caught, shown in Downloads, then installed for this game
   // the same way as Install a Download. The file is deleted after it installs.
+  // 0.9.57 (owner: don't make me sign in when my key is there): Nexus only gives Premium members files through an API
+  // key; free accounts download on its site, signed in. The site's sign-in is kept in Cartridge's add-on window
+  // (persist:addons), so it is asked once: this says whether it is there already
+  'nexus:signedIn': () => nexusSignedIn(),
   'addons:browse': ({ url, romId, emuRoot, kind, name }) => {
     if (!/^https:\/\//i.test(String(url || ''))) throw new Error('That page can’t be opened.');
     if (addonBrowser && !addonBrowser.isDestroyed()) addonBrowser.close();
@@ -4620,7 +4670,10 @@ const handlers = {
     let forks = []; try { forks = steamMgr.forksAll(); } catch (e) { log('links forks', e.message); }
     for (const f of forks) {
       if (f.how === 'flatpak') continue;
-      for (const [, label, rel] of SV.SYNC[f.of] || []) {
+      for (let [, label, rel] of SV.SYNC[f.of] || []) {
+        // 0.9.57: shadPS4 keeps saves in home/<user ID>/savedata, so its forks share the whole home folder (older
+        // builds: savedata/), whichever the original has
+        if (f.of === 'shadps4') rel = ['home', 'savedata'].find((x) => baseOf('shadps4', x) && fs.existsSync(path.join(baseOf('shadps4', x), x))) || 'home';
         if (typeof rel !== 'string') continue;
         const donor = baseOf(f.of, rel), fb = L.findForkBase(f.exe, rel, home);
         // 0.9.37: not in its usual places: looked for under the fork's own folder
@@ -4847,7 +4900,12 @@ const handlers = {
     emitQueue(); pump();
   },
   'dl:resumeAll': () => { for (const it of queue) if (it.status === 'cancelled') { it.status = 'queued'; it.error = null; } emitQueue(); pump(); },
-  'dl:clear': () => { for (let i = queue.length - 1; i >= 0; i--) if (!['queued', 'downloading'].includes(queue[i].status)) queue.splice(i, 1); emitQueue(); },
+  // 0.9.57 (owner: "clear downloads means clear"): finished background jobs (emulator updates, add-ons, installs) go too
+  'dl:clear': () => {
+    for (let i = queue.length - 1; i >= 0; i--) if (!['queued', 'downloading'].includes(queue[i].status)) queue.splice(i, 1);
+    emitQueue();
+    for (const [k, j] of bgJobs) if (j.state === 'done' || j.state === 'error') { bgJobs.delete(k); jobSent.delete(k); broadcast('bg-job', { key: k, gone: true }); }
+  },
   'bios:download': ({ platformId, slug }) => downloadBios(platformId, slug),
   'bios:setup': (o) => biosSetup(o || {}),
   // each console in the library that needs BIOS or firmware, and whether it's where its emulators read it (0.9.37)
@@ -5162,10 +5220,10 @@ const emuLabel = (id) => require('./emulators').EMU[String(id || '').split('@')[
 const romName = (id) => romIndexMain().get(Number(id))?.name || 'Game';
 let customJob = '';
 const JOBS = {
-  'emuup:run': (a) => ({ key: 'emu:' + (a.path || a.fp), kind: a.force ? 'Emulator Download' : 'Emulator Update', title: emuLabel(a.id), icon: 'mdiUpdate' }),
-  'emuget:install': (a) => ({ key: `get:${a.key}:${a.id}`, kind: 'Emulator', title: emuLabel(a.id), icon: 'mdiDownload' }),
+  'emuup:run': (a) => ({ key: 'emu:' + (a.path || a.fp), kind: a.force ? 'Emulator Download' : 'Emulator Update', title: emuLabel(a.id), emu: a.id, icon: 'mdiUpdate' }),
+  'emuget:install': (a) => ({ key: `get:${a.key}:${a.id}`, kind: 'Emulator', title: emuLabel(a.id), emu: a.id, icon: 'mdiDownload' }),
   'emuget:custom': (a) => { const repo = require('./customEmu').repoOf(a.link) || String(a.link || ''); customJob = 'custom:' + repo; return { key: customJob, kind: 'Emulator from GitHub', title: repo.split('/').pop() || repo, icon: 'mdiGithub' }; },
-  'shadv:install': (a) => ({ key: 'shadv:' + a.tag, kind: 'shadPS4 Version', title: String(a.tag), icon: 'mdiDownload' }),
+  'shadv:install': (a) => ({ key: 'shadv:' + a.tag, kind: 'shadPS4 Version', title: String(a.tag), emu: 'shadps4', icon: 'mdiDownload' }),
   'ps3up:install': (a) => ({ key: 'ps3:' + a.romId, kind: 'Game Update', title: romName(a.romId), romId: Number(a.romId), icon: 'mdiPackageUp' }),
   'pkg:install': (a) => ({ key: 'pkg:' + a.romId, kind: 'Install', title: romName(a.romId), romId: Number(a.romId), icon: 'mdiPackageDown' }),
   'bios:download': (a) => ({ key: 'bios:' + (a.slug || a.platformId), kind: 'BIOS and Firmware', title: String(a.slug || '').toUpperCase(), icon: 'mdiChip' }),

@@ -4,7 +4,7 @@
     <div v-else-if="error" class="empty">{{ error }}</div>
     <template v-else>
       <header class="rg-head">
-        <img class="rg-icon" :src="img(g.icon)" />
+        <GameIcon class="rg-icon" :title="g.title" :rom-id="g.romId || undefined" :fallback="img(g.icon)" :size="120" :grade="null" />
         <div class="rg-info">
           <div class="eyebrow">{{ g.console }}<template v-if="g.offline"> · offline</template></div>
           <h1 class="rg-title">{{ g.title }}</h1>
@@ -46,7 +46,8 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue';
-import { call, img, go, setBg, choose, store } from '../store.js';
+import { call, img, go, setBg, choose, store, iconKey, iconChanged, openModal, toast } from '../store.js';
+import GameIcon from '../components/GameIcon.vue';
 import { useView } from '../useView.js';
 import { focusFirst } from '../nav.js';
 import Icon from '../components/Icon.vue';
@@ -84,10 +85,21 @@ async function more() {
   if (!g.value) return;
   const v = await choose({ title: g.value.title, options: [
     { label: 'Go to Game Page', sub: g.value.romId ? '' : 'Searches your library for it', value: 'game', icon: 'mdiGamepadVariantOutline' },
+    // 0.9.57 (owner: as trophies and gamerscore have it): the icon this game shows on Achievements and here
+    { label: 'Change Icon', sub: 'SteamGridDB', value: 'icon', icon: 'mdiImageEditOutline' },
+    { label: 'Reset Icon', sub: 'Back to RetroAchievements’ own', value: 'reset', icon: 'mdiRestore' },
     { label: 'Refresh', sub: 'Reads it again from RetroAchievements', value: 'refresh', icon: 'mdiRefresh' },
   ] });
+  const key = iconKey(g.value.romId, g.value.title);
   if (v === 'game') toGame();
   else if (v === 'refresh') load(true);
+  else if (v === 'reset') { await call('icon:reset', { key }); iconChanged(key); toast('Icon reset', 'ok', 2000, 'mdiRestore'); }
+  else if (v === 'icon') {
+    if (!store.config.sgdbKey) return toast('Add a SteamGridDB API key in Settings → Look & Feel first', 'error', 4500);
+    const url = await openModal('art', { kind: 'icon', romName: String(g.value.title || '').replace(/[™®©]/g, '').replace(/\s*[\[(|~].*$/, '').trim() });
+    if (!url) return;
+    await call('icon:set', { key, url }); iconChanged(key); toast('Icon updated', 'ok', 2000, 'mdiCheck');
+  }
 }
 useView({ x: () => { const i = filters.findIndex((f) => f.v === filter.value); filter.value = filters[(i + 1) % filters.length].v; }, y: more },
   [{ b: 'X', label: 'Filter' }, { b: 'Y', label: 'More' }, { b: 'B', label: 'Back' }]);

@@ -41,7 +41,9 @@ function sfo(file) {
       const e = 20 + i * 16;
       const ko = buf.readUInt16LE(e), fmt = buf.readUInt16LE(e + 2), len = buf.readUInt32LE(e + 4), off = buf.readUInt32LE(e + 12);
       const k = buf.toString('latin1', keys + ko, buf.indexOf(0, keys + ko));
-      out[k] = fmt === 0x0404 ? buf.readUInt32LE(data + off) : buf.toString('utf8', data + off, data + off + len).replace(/\0+$/, '');
+      // a string ends at its first NUL; bytes after it, or ones that aren't UTF-8, are another field's (0.9.57: a PSP
+      // title read "Size Matters™��ENTR")
+      out[k] = fmt === 0x0404 ? buf.readUInt32LE(data + off) : buf.toString('utf8', data + off, data + off + len).split('\0')[0].replace(/\uFFFD[\s\S]*$/, '').trim();
     }
   } catch {}
   return out;
@@ -101,6 +103,24 @@ const SWITCH = ['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu'];
 const hex = (n, w) => /^[0-9A-F]+$/i.test(n) && n.length === w;
 
 // one emulator data folder -> its saves: { emu, kind, path, label, keys: { switch, serial, title, gc, n3ds, wiiu, x360, name }, shared, serials }
+// shadPS4's save folders under one of its folders (0.9.57): every <home>/<user ID>/savedata first (current builds),
+// then the older savedata/ and a portable copy's user/savedata. Each holds <CUSA…> folders or <user>/<CUSA…>.
+function shadHome(base) {
+  for (const f of [path.join(base, 'config.json'), path.join(base, 'user/config.json')]) {
+    const m = /"home_dir"\s*:\s*"([^"]+)"/.exec(readText(f));
+    if (m && path.isAbsolute(m[1])) return m[1];
+  }
+  return null;
+}
+function shadSaveDirs(base) {
+  const homes = [shadHome(base), path.join(base, 'home'), path.join(base, 'user/home')].filter(Boolean);
+  const out = [];
+  for (const h of homes) for (const u of ls(h)) if (u.isDirectory()) out.push(path.join(h, u.name, 'savedata'));
+  out.push(path.join(base, 'savedata'), path.join(base, 'user/savedata'));
+  return [...new Set(out)].filter((d) => { try { return fs.statSync(d).isDirectory(); } catch { return false; } });
+}
+// where shadPS4 keeps its saves on this device now: the first current-style folder, else the old one
+const shadSaveDir = (base) => shadSaveDirs(base).find((d) => /[\/]home[\/][^\/]+[\/]savedata$/.test(d)) || shadSaveDirs(base)[0] || path.join(base, 'home/1000/savedata');
 const SCAN = {
   // nand/user/save/0000000000000000/<user ID>/<title ID>/ and the newer account/<uuid>/<title ID>/0 layout
   switch(base, emu) {
@@ -134,7 +154,9 @@ const SCAN = {
       const sd = path.join(base, 'dev_hdd0/home', u.name, 'savedata');
       for (const s of ls(sd)) if (s.isDirectory() && /^[A-Z]{4}\d{5}/.test(s.name)) {
         const p = sfo(path.join(sd, s.name, 'PARAM.SFO'));
-        out.push({ emu: 'rpcs3', kind: 'save', path: path.join(sd, s.name), label: p.TITLE || '', keys: { serial: s.name.slice(0, 9), title: p.TITLE || '' } });
+        // sub: what this save is (0.9.57, owner: two saves of one game at very different sizes): games keep progress and
+        // system data or settings in separate saves, each saying so in its SUB_TITLE
+        out.push({ emu: 'rpcs3', kind: 'save', path: path.join(sd, s.name), label: p.TITLE || '', sub: p.SUB_TITLE || String(p.DETAIL || '').split('\n')[0] || '', keys: { serial: s.name.slice(0, 9), title: p.TITLE || '' } });
       }
     }
     return out;
@@ -143,7 +165,7 @@ const SCAN = {
     const out = [], sd = path.join(base, 'PSP/SAVEDATA');
     for (const s of ls(sd)) if (s.isDirectory() && /^[A-Z]{4}\d{5}/.test(s.name)) {
       const p = sfo(path.join(sd, s.name, 'PARAM.SFO'));
-      out.push({ emu: 'ppsspp', kind: 'save', path: path.join(sd, s.name), label: p.TITLE || '', keys: { serial: s.name.slice(0, 9), title: p.TITLE || '' } });
+      out.push({ emu: 'ppsspp', kind: 'save', path: path.join(sd, s.name), label: p.TITLE || '', sub: p.SAVEDATA_TITLE || '', keys: { serial: s.name.slice(0, 9), title: p.TITLE || '' } });
     }
     return out;
   },
@@ -153,16 +175,19 @@ const SCAN = {
     for (const s of ls(sd)) if (s.isDirectory() && /^[A-Z]{4}\d{5}$/.test(s.name)) out.push({ emu: 'vita3k', kind: 'save', path: path.join(sd, s.name), keys: { serial: s.name } });
     return out;
   },
-  // user/savedata/<user>/<CUSA…>/ (older builds: user/savedata/<CUSA…>/)
+  // 0.9.57 (owner: "that's not shadPS4's save folder"; read from shadPS4's save_instance.cpp and path_util.cpp): saves
+  // live in <home>/<user ID>/savedata/<CUSA…>/<slot>, <home> being its home_dir setting or <its folder>/home. Older
+  // builds: <its folder>/savedata/<user>/<CUSA…> or savedata/<CUSA…>; a portable copy keeps its folder in user/.
   shadps4(base) {
-    const out = [], sd = path.join(base, 'user/savedata'), seen = new Set();
+    const out = [], seen = new Set(), PS4 = /^(CUSA|PCJS|PLJM|PCAS|PCKS)\d{5}$/;
     const add = (p, id) => { if (seen.has(p)) return; seen.add(p); const t = [p, ...ls(p).filter((x) => x.isDirectory()).map((x) => path.join(p, x.name))].map((d) => sfo(path.join(d, 'sce_sys/param.sfo')).TITLE).find(Boolean); /* each save slot folder has its own param.sfo */ out.push({ emu: 'shadps4', kind: 'save', path: p, label: t || '', keys: { serial: id, title: t || '' } }); };
-    for (const a of ls(sd)) if (a.isDirectory()) {
-      if (/^(CUSA|PCJS|PLJM|PCAS|PCKS)\d{5}$/.test(a.name)) { add(path.join(sd, a.name), a.name); continue; }
-      for (const b of ls(path.join(sd, a.name))) if (b.isDirectory() && /^(CUSA|PCJS|PLJM|PCAS|PCKS)\d{5}$/.test(b.name)) add(path.join(sd, a.name, b.name), b.name);
+    for (const sd of shadSaveDirs(base)) for (const a of ls(sd)) if (a.isDirectory()) {
+      if (PS4.test(a.name)) { add(path.join(sd, a.name), a.name); continue; }
+      for (const b of ls(path.join(sd, a.name))) if (b.isDirectory() && PS4.test(b.name)) add(path.join(sd, a.name, b.name), b.name);
     }
     return out;
   },
+
   // memcards/*.ps2: one card holds many games (or a folder card per game)
   pcsx2(base) {
     const out = [], md = path.join(base, 'memcards');
@@ -240,7 +265,9 @@ const SCAN = {
       for (const e of ls(d)) {
         const p = path.join(d, e.name);
         if (e.isDirectory()) { if (depth < 2) walk(p, depth + 1); continue; }
-        if (/\.(srm|sav|mcd|mcr|eep|sra|fla|mpk|rtc|dsv)$/i.test(e.name)) out.push({ emu: 'retroarch', kind: 'save', path: p, label: e.name, keys: { name: e.name.replace(/\.[^.]+$/, '') } });
+        // a PS1 memory card kept as a save (0.9.57: "SwanStation.srm" is SwanStation's card, named after the core when
+        // it's shared between games): the games on it, read from the card like PCSX2's and DuckStation's
+        if (/\.(srm|sav|mcd|mcr|eep|sra|fla|mpk|rtc|dsv)$/i.test(e.name)) { let ser = []; try { if (fs.statSync(p).size === 131072) ser = cardSerials(p); } catch {} out.push({ emu: 'retroarch', kind: 'save', path: p, label: e.name, keys: { name: e.name.replace(/\.[^.]+$/, '') }, ...(ser.length ? { serials: ser, sub: 'PS1 memory card' } : {}) }); }
       }
     };
     walk(sd, 0);
@@ -269,7 +296,9 @@ function scan({ home = os.homedir(), extra = {}, withSize = true } = {}) {
 // -> each save gets romIds (a shared card gets every game it holds)
 const norm = (s) => String(s || '').toLowerCase().replace(/&/g, 'and').replace(/\s*[([].*$/, '').replace(/[^a-z0-9]+/g, '');
 const idNorm = (s) => String(s || '').toUpperCase().replace(/[-_.\s]/g, '');
-function match(saves, games) {
+// opts.nameOf: a code's game name from the emulators' databases (titleDb.js, 0.9.57), so a save or a memory card
+// entry of a game that isn't on this device still finds it in the library by name
+function match(saves, games, { nameOf = null } = {}) {
   const byId = new Map(), byGc = new Map(), byName = new Map();
   for (const g of games) {
     for (const s of g.ids || []) if (s) { const u = idNorm(s); byId.set(u, g.id); if (/^0100[0-9A-F]{12}$/.test(u) && !byId.has(u.slice(0, 13) + '000')) byId.set(u.slice(0, 13) + '000', g.id); } // a Switch update's file still names its base game
@@ -288,8 +317,11 @@ function match(saves, games) {
     if (id == null && k.wiiu) id = byId.get(idNorm(k.wiiu));
     if (id == null && k.x360) id = byId.get(idNorm(k.x360));
     if (id == null && (k.title || k.name)) id = byName.get(norm(k.title || k.name));
+    const named = nameOf && k.serial ? nameOf(k.serial) : null;
+    if (named) s.codeName = named;
+    if (id == null && named) id = byName.get(norm(named));
     if (id != null) ids.add(id);
-    for (const ser of s.serials || []) { const g = byId.get(idNorm(ser)); if (g != null) ids.add(g); }
+    for (const ser of s.serials || []) { let g = byId.get(idNorm(ser)); if (g == null && nameOf) { const n = nameOf(ser); if (n) g = byName.get(norm(n)); } if (g != null) ids.add(g); }
     s.romIds = [...ids];
   }
   return saves;
@@ -306,7 +338,7 @@ const SYNC = {
   rpcs3: [['ps3', 'PS3 Saves', 'dev_hdd0/home/00000001/savedata']],
   ppsspp: [['psp', 'PSP Saves', 'PSP/SAVEDATA']],
   vita3k: [['vita', 'Vita Saves', 'ux0/user/00/savedata']],
-  shadps4: [['ps4', 'PS4 Saves', 'user/savedata']],
+  shadps4: [['ps4', 'PS4 Saves', shadSaveDir]],
   pcsx2: [['ps2', 'PS2 Memory Cards', 'memcards']],
   duckstation: [['ps1', 'PS1 Memory Cards', 'memcards']],
   dolphin: [['gc', 'GameCube Saves', 'GC'], ['wii', 'Wii Saves', 'Wii/title/00010000']],
@@ -336,4 +368,4 @@ function syncRoots({ home = os.homedir(), extra = {} } = {}) {
   return [...best.values()];
 }
 
-module.exports = { scan, match, syncRoots, SYNC, SYNC_PREFIX, sfo, cardSerials, ryujinxIndex, sizeOf, DATA, NAMES, SCAN };
+module.exports = { scan, match, syncRoots, SYNC, SYNC_PREFIX, sfo, cardSerials, ryujinxIndex, sizeOf, DATA, NAMES, SCAN, shadSaveDirs, shadSaveDir };

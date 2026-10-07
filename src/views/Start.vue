@@ -11,7 +11,7 @@
     </div>
     <div class="st-scroll" data-scroll ref="scroller" @pointerdown="swipeDown">
       <Transition :name="'st-pg-' + pageDir" mode="out-in" @after-enter="afterPage">
-      <div class="st-board" :key="page" :data-pg="page" :style="{ height: boardH + 'px' }" @transitionend="tileSettled">
+      <div class="st-board" :class="{ editing }" :key="page" :data-pg="page" :style="{ height: boardH + 'px' }" @transitionend="tileSettled">
         <!-- arranging: the grid's empty cells show, and where the held tile will land -->
         <div v-if="editing" class="st-slots" aria-hidden="true"><i v-for="c in slots" :key="c.k" :style="c.s" /></div>
         <div v-if="ghost" class="st-ghost" :style="ghost" aria-hidden="true" />
@@ -24,7 +24,7 @@
           <!-- Continue playing: the game you played last, its art, logo and when -->
           <template v-if="t.type === 'continue'">
             <template v-if="cur">
-              <div class="st-art" :style="{ backgroundImage: bgUrl(artOf(cur)) }" />
+              <div class="st-art st-pan" :style="{ backgroundImage: bgUrl(artOf(cur)) }" />
               <div class="st-scrim" />
               <div class="st-label on-art">Continue playing</div>
               <div class="st-cp">
@@ -298,7 +298,7 @@
           <!-- One game, pinned -->
           <template v-else-if="t.type === 'game'">
             <template v-if="romById(t.romId)">
-              <div class="st-art" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(romById(t.romId), true) : artOf(romById(t.romId))) }" />
+              <div class="st-art" :class="{ 'st-pan': t.w * t.h >= 6 }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(romById(t.romId), true) : artOf(romById(t.romId))) }" />
               <div class="st-scrim" />
               <!-- 0.9.23 (owner): its logo, not its name in text -->
               <div class="st-pin">
@@ -1375,6 +1375,14 @@ watch(() => store.play, loadWeek);
 /* art tiles: the picture fills the tile, a scrim keeps the words readable */
 .st-art { position: absolute; inset: 0; z-index: -2; background-size: cover; background-position: center 30%; transition: transform var(--spring-soft-d) var(--spring-soft); }
 .st-tile.art:focus .st-art { transform: scale(1.04); }
+/* 0.9.57 (owner: Start looked a little still): Continue Playing and big pinned games drift slowly sideways, a camera
+   pan with no zoom (docs/design-rules.md: drift never changes scale; the disc that turned made the owner unwell). The
+   picture is a little bigger than the tile so its edge never shows; `translate` leaves the focus zoom's transform alone.
+   Still with light effects (no GPU), Reduce Motion, while arranging and while Cartridge is away (body.away). */
+.st-art.st-pan { inset: -4%; animation: st-pan 38s var(--ease-in-out) infinite alternate; will-change: translate; }
+@keyframes st-pan { from { translate: 2% 0.6%; } to { translate: -2% -0.6%; } }
+:global(body.light-fx .st-art.st-pan), :global(body.motion-reduce .st-art.st-pan), .st-board.editing .st-art.st-pan { animation: none; translate: none; will-change: auto; }
+@media (prefers-reduced-motion: reduce) { .st-art.st-pan { animation: none; } }
 /* 0.9.52: a soft band at the top too, so the tile's label reads on a bright cover */
 .st-scrim { position: absolute; inset: 0; z-index: -1; background: linear-gradient(to bottom, rgba(8, 9, 12, 0.6) 0%, rgba(8, 9, 12, 0.25) 16%, transparent 32%), linear-gradient(to top, rgba(8, 9, 12, 0.92) 0%, rgba(8, 9, 12, 0.55) 38%, rgba(8, 9, 12, 0.08) 72%), linear-gradient(to right, rgba(8, 9, 12, 0.5), transparent 60%); }
 .st-cp { margin-top: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; max-width: 100%; }
@@ -1480,8 +1488,13 @@ watch(() => store.play, loadWeek);
 .st-tile:focus .st-fan-c { transform: translateX(calc(var(--i) * 4.5cqh)) scale(calc(1 - var(--i) * 0.035)); }
 .st-tile:focus .st-fan-c:first-child { transform: translateY(-2%); }
 /* a row moving to its next game (0.9.28): the art crossfades, the name slides in, the covers glide along */
-.st-row-art.st-xf-enter-active, .st-row-art.st-xf-leave-active { transition: opacity var(--fade-cross); }
-.st-row-art.st-xf-enter-from, .st-row-art.st-xf-leave-to { opacity: 0; }
+/* 0.9.57 (owner: switching games the picture went see-through, then more see-through): the new picture fades in over
+   the old one, which stays as it is underneath until it's covered (two half see-through pictures fading against each
+   other dipped to about a quarter mid-way) */
+:is(.st-row-art, .st-media-bg).st-xf-enter-active { transition: opacity var(--fade-cross); }
+:is(.st-row-art, .st-media-bg).st-xf-enter-from { opacity: 0; }
+:is(.st-row-art, .st-media-bg).st-xf-leave-active { transition: visibility var(--fade-cross); z-index: -3; }
+:is(.st-row-art, .st-media-bg).st-xf-leave-to { visibility: hidden; }
 /* the old name and the new one share the spot and cross over (no empty moment between them) */
 .st-lead-wrap { margin-top: auto; display: grid; min-width: 0; }
 .st-lead-wrap > .st-row-lead { grid-area: 1 / 1; margin-top: 0; justify-content: flex-end; }

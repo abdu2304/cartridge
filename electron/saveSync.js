@@ -84,18 +84,18 @@ function retroarchStates(base) {
 
 // every unit on this device, matched to a library game. games: [{ id, name, platform, ids, discIds }]
 // carriers: { [consoleSlug]: romId } (the console's oldest game holds a whole memory card)
-function units({ home = os.homedir(), extra = {}, games = [], carriers = {} } = {}) {
+function units({ home = os.homedir(), extra = {}, games = [], carriers = {}, nameOf = null } = {}) {
   const scanned = S.scan({ home, extra, withSize: false }).filter((s) => SUPPORTED.includes(s.emu));
   for (const s of scanned) if (s.emu === 'retroarch') { const { saves } = retroarchDirs(s.base); s.rel = path.relative(saves, s.path); }
   const ra = [...new Set(scanned.filter((s) => s.emu === 'retroarch').map((s) => s.base))];
   for (const emu of ['retroarch']) for (const d of S.DATA[emu]) { const b = path.join(home, d); if (isDir(b) && !ra.includes(b)) ra.push(b); }
   const states = ra.flatMap(retroarchStates);
-  S.match(scanned, games); S.match(states, games);
+  S.match(scanned, games, { nameOf }); S.match(states, games, { nameOf });
   const out = [], seen = new Set();
   for (const s of scanned) {
     const sh = shape(s); if (!sh) continue;
     const romId = sh.card ? carriers[CONSOLE[s.emu]] ?? s.romIds?.[0] ?? null : s.romIds?.[0] ?? null;
-    const u = { key: sh.key, emu: s.emu, kind: sh.kind, path: s.path, base: s.base, label: s.label || '', romId, card: !!sh.card, slot: slotOf(s.emu, sh.key, sh.kind) };
+    const u = { key: sh.key, emu: s.emu, kind: sh.kind, path: s.path, base: s.base, label: s.label || '', sub: s.sub || '', romId, romIds: s.romIds || [], card: !!sh.card, slot: slotOf(s.emu, sh.key, sh.kind) }; // romIds: every game on a card (0.9.57, the game sheet)
     if (romId == null) u.why = whyUnmatched(s, sh);
     if (seen.has(u.key)) continue; // the same save found twice (an EmuDeck link and the folder it points at)
     seen.add(u.key); out.push(u);
@@ -115,7 +115,7 @@ function whyUnmatched(s, sh = {}) {
   const k = s.keys || {}, con = CONSOLE[s.emu] || null;
   if (sh.card) return { code: 'card', console: con };
   const id = k.switch || k.serial || k.gc || k.n3ds || k.wiiu || k.x360 || (s.serials || [])[0] || '';
-  if (id) return { code: 'id', id: String(id).toUpperCase(), title: k.title || '', console: con };
+  if (id) return { code: 'id', id: String(id).toUpperCase(), title: k.title || s.codeName || '', console: con }; // codeName: from the emulators' game databases (0.9.57)
   const name = k.title || k.name || '';
   if (name) return { code: 'name', name, console: con };
   return { code: 'none', console: con };
@@ -136,7 +136,8 @@ function placeFor(emu, key, { home = os.homedir(), extra = {} } = {}) {
       case 'ps3': { const u = path.join(b, 'dev_hdd0/home/00000001/savedata'); if (isDir(path.dirname(u))) return path.join(u, id); break; }
       case 'psp': if (isDir(path.join(b, 'PSP'))) return path.join(b, 'PSP/SAVEDATA', id); break;
       case 'vita': if (isDir(path.join(b, 'ux0'))) return path.join(b, 'ux0/user/00/savedata', id); break;
-      case 'ps4': { const sd = path.join(b, 'user/savedata'); const u = ls(sd).find((e) => e.isDirectory() && !/^(CUSA|PCJS|PLJM|PCAS|PCKS)\d{5}$/.test(e.name)); if (u) return path.join(sd, u.name, id); break; }
+      // 0.9.57: shadPS4's <home>/<user ID>/savedata (saves.shadSaveDir), the older layouts as they are found
+      case 'ps4': { const sd = S.shadSaveDirs(b)[0]; if (!sd) break; if (/[\/]home[\/][^\/]+[\/]savedata$/.test(sd)) return path.join(sd, id); const u = ls(sd).find((e) => e.isDirectory() && !/^(CUSA|PCJS|PLJM|PCAS|PCKS)\d{5}$/.test(e.name)); if (u) return path.join(sd, u.name, id); break; }
       case 'ps2card': case 'ps1card': if (isDir(path.join(b, 'memcards'))) return path.join(b, 'memcards', id); break;
       case 'gccard': case 'gc': { const [region, file] = id.split('/'); if (isDir(path.join(b, 'GC', region))) return kind === 'gc' ? path.join(b, 'GC', region, 'Card A', file) : path.join(b, 'GC', region, file); break; }
       case 'wii': if (isDir(path.join(b, 'Wii/title'))) return path.join(b, 'Wii/title/00010000', id, 'data'); break;

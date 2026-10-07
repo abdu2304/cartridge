@@ -33,7 +33,10 @@ put('.config/rpcs3/dev_hdd0/home/00000001/savedata/BLUS30001-SAVE00/PARAM.SFO', 
 put('.config/rpcs3/dev_hdd0/home/00000001/savedata/BLUS30001-SAVE00/DATA.sync-conflict-20261004-101010-ZZZZZZZ.BIN');
 put('.config/ppsspp/PSP/SAVEDATA/ULUS10041DATA/PARAM.SFO', sfo('Lumines'));
 put('.local/share/Vita3K/Vita3K/ux0/user/00/savedata/PCSE00120/sdslot.dat');
-put('.local/share/shadPS4/user/savedata/1/CUSA00900/SAVEDATA00/sce_sys/param.sfo', sfo('Bloodborne'));
+// shadPS4 (0.9.57, from its save_instance.cpp): <its folder>/home/<user ID>/savedata/<serial>/<slot>; the old
+// savedata/<user>/<serial> layout is still read
+put('.local/share/shadPS4/home/1000/savedata/CUSA00900/SAVEDATA00/sce_sys/param.sfo', sfo('Bloodborne'));
+put('.local/share/shadPS4/savedata/1/CUSA03173/SAVEDATA00/sce_sys/param.sfo', sfo('Bloodborne Old'));
 const card = Buffer.alloc(8192); card.write('BASLUS-21050', 1024, 'latin1'); card.write('BESLES-50330', 4096, 'latin1');
 put('.config/PCSX2/memcards/Mcd001.ps2', card);
 put('.local/share/duckstation/memcards/SCUS-94163_1.mcd');
@@ -65,7 +68,7 @@ test('PS3 and PSP saves give their serial and the title from PARAM.SFO', () => {
 });
 test('Vita, PS4, Cemu, Azahar and Xenia saves by title ID', () => {
   assert.deepStrictEqual(by('vita3k').map((s) => s.keys.serial), ['PCSE00120']);
-  assert.deepStrictEqual(by('shadps4').map((s) => [s.keys.serial, s.label]), [['CUSA00900', 'Bloodborne']]);
+  assert.deepStrictEqual(by('shadps4').map((s) => [s.keys.serial, s.label]), [['CUSA00900', 'Bloodborne'], ['CUSA03173', 'Bloodborne Old']]);
   assert.deepStrictEqual(by('cemu').map((s) => [s.keys.wiiu, s.label]), [['00050000101C9400', 'The Legend of Zelda Breath of the Wild']]);
   assert.deepStrictEqual(by('azahar').map((s) => s.keys.n3ds), ['0004000000055D00']);
   assert.deepStrictEqual(by('xenia').map((s) => s.keys.x360), ['4D5307E6']);
