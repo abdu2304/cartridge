@@ -2544,6 +2544,7 @@ function ssGames() {
 const ssRpc = (devId) => require('./saveSync').rommRpc({ base: resolveBase, headers: authHeaders, devId });
 // a game's saves: its own, plus the whole memory card of its console
 const ssFor = (u, romId) => { if (romId == null) return true; if (u.romId === romId) return true; const r = romIndexMain().get(romId); return u.card && require('./saveSync').CONSOLE[u.emu] === ssConsoleOf(r); };
+let upAll = null; // Update All while it runs (0.9.58)
 let ssBusy = null, ssProg = null; // ssProg: how far the running sync is, for a page that opens while it runs
 async function saveSyncRun({ romId = null, key = null, choice = null, dry = false, why = 'run' } = {}) {
   if (!saveSyncOn()) return { off: true, syncthing: syncthingSaves() };
@@ -4555,7 +4556,8 @@ const handlers = {
     // versions shadPS4's launcher keeps for itself; and the version an update put in (the file name keeps the old one)
     // 0.9.38: shadPS4's launcher installs as Shadps4-qt.AppImage, so only its SDL core copies are left out
     const isFork = (e) => (FORKS[e.id] || []).some(([re]) => re.test(path.basename(e.path || e.fp || '')));
-    const list = steamMgr.installedEmulators().filter((e) => !(e.path && (/_old\b|\.old\b|previous|\.cartridge-(old|new)/i.test(path.basename(e.path)) || /shadPS4QtLauncher\/versions|\/versions\//i.test(e.path))) && !isFork(e) && !(e.id === 'shadps4' && e.path && /sdl/i.test(path.basename(e.path))))
+    const realOf = (p) => { try { return fs.realpathSync(p); } catch { return p; } }, seenReal = new Set(); // 0.9.58: one row per file, however many paths reach it
+    const list = steamMgr.installedEmulators().filter((e) => !e.path || (!seenReal.has(realOf(e.path)) && seenReal.add(realOf(e.path)))).filter((e) => !(e.path && (/_old\b|\.old\b|previous|\.cartridge-(old|new)/i.test(path.basename(e.path)) || /shadPS4QtLauncher\/versions|\/versions\//i.test(e.path))) && !isFork(e) && !(e.id === 'shadps4' && e.path && /sdl/i.test(path.basename(e.path))))
       .map((e) => { const st = e.path && (() => { try { return fs.statSync(e.path); } catch { return null; } })(); const got = (cache.installed || {})[e.path]; const ran = e.path && U.ranVersion(e.id, e.path); /* the version that really runs, where the emulator says it (RPCS3's log, 0.9.37) */ return ran ? { ...e, version: ran } : got && st && got.size === st.size ? { ...e, version: got.version } : e; });
     const fpIds = list.filter((e) => e.kind === 'flatpak').map((e) => e.fp);
     const fpWant = !cached && fpIds.length && (fresh || !cache.fp || Date.now() - cache.fp.t > TTL);
@@ -4607,6 +4609,27 @@ const handlers = {
     saveJson(file, cache);
     return res;
   },
+  // Update All (0.9.58, owner: shadPS4 kept downloading again unless the Emulators page stayed open): one background
+  // job here, not a loop in the page, so leaving the page changes nothing. Each emulator once: the same file reached by
+  // two paths (a link in ~/Applications) or listed twice counts once. Each update is its own job in Downloads too.
+  'emuup:all': async ({ items } = {}) => {
+    if (upAll) throw new Error('Update All is already running.');
+    const seen = new Set(), list = [];
+    for (const u of items || []) { let k = u.fp || u.path; try { if (u.path) k = fs.realpathSync(u.path); } catch {} if (k && !seen.has(k)) { seen.add(k); list.push(u); } }
+    upAll = { done: 0, of: list.length, label: '', bad: [] };
+    broadcast('emu-all', upAll);
+    try {
+      for (const [i, u] of list.entries()) {
+        upAll = { ...upAll, done: i, label: u.label || u.id, path: u.path || u.fp }; broadcast('emu-all', upAll);
+        try { await handlers['emuup:run']({ id: u.id, kind: u.kind, fp: u.fp, where: u.where, path: u.path, force: false }); }
+        catch (e) { upAll.bad.push(`${u.label || u.id}: ${e.message}`); log('update all:', u.id, e.message); }
+      }
+      const r = { done: list.length, of: list.length, bad: upAll.bad };
+      broadcast('emu-all', { ...r, ended: true });
+      return r;
+    } finally { upAll = null; }
+  },
+  'emuup:allState': () => upAll,
   // force (0.9.23): Download again, the newest of its channel even when it's the same version
   'emuup:run': async ({ id, kind, fp, where, path: file, force }) => {
     const U = require('./emuUpdates');
@@ -5242,6 +5265,7 @@ const JOBS = {
   'sync:install': () => ({ key: 'sync:install', kind: 'Install', title: 'Syncthing', icon: 'mdiSync' }),
   // 0.9.58 (owner: Sync Now stopped when leaving the page): it never stopped, but nothing showed it; now it's a job
   'savesync:run': () => ({ key: 'savesync', kind: 'Save Sync', title: 'Cartridge Save Sync', icon: 'mdiCloudSyncOutline' }),
+  'emuup:all': (a) => ({ key: 'emu:all', kind: 'Update All', title: `${(a.items || []).length} Emulators`, icon: 'mdiUpdate' }),
 };
 for (const [ch, info] of Object.entries(JOBS)) {
   const fn = handlers[ch];
@@ -5256,6 +5280,7 @@ const JOB_EVENTS = {
   'ps3-update': (m) => ['ps3:' + m.romId, { pct: m.pct, text: m.state === 'installing' ? `Installing ${m.version || ''}`.trim() : m.version ? `Update ${m.version}` : '' }],
   'pkg-progress': (m) => ['pkg:' + m.romId, { pct: m.pct, text: m.text || m.step || '' }],
   'sync-install': (m) => ['sync:install', { pct: m.pct }],
+  'emu-all': (m) => ['emu:all', { pct: m.of ? Math.round((m.done / m.of) * 100) : null, text: m.ended ? '' : m.label ? `${m.label} · ${m.done + 1} of ${m.of}` : '' }],
   savesync: (m) => ['savesync', m.state === 'run' ? { pct: m.of ? Math.round((m.done / m.of) * 100) : null, text: m.of ? `${m.done} of ${m.of} saves` : 'Reading RomM' } : {}],
 };
 const sendRaw = broadcast;
