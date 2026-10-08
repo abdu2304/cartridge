@@ -82,16 +82,13 @@ at 1280x800, 1920x1080 and 3840x2160. When a rule and a request disagree, ask th
 ## 6. Focus and choice
 
 - **Focus is the brightest thing on screen:** a full fill (`--focus`, white in the Cartridge colour, dark in Light) on
-  buttons, rows, tabs, keys and menu items, with `--on-focus` text; on cards, tiles and pictures a lift with a soft glow
-  in the highlight colour (`--ring`, no stroke); Glass uses lit glass. **(checked: `tools/ui-audit/focus.js`, a focused
-  thing must look different from itself unfocused, six looks)**
-- **Never a white outline (owner, 0.9.60: "make it a rule").** Nothing gets a hard line drawn round it to show focus or
-  choice: no `0 0 0 Npx` ring in white or in the highlight colour, no white `outline`. Focus is a fill or a glow, chosen
-  a tint with a bar. **(checked: `test/designRules.test.js`)**
-- **Chosen is never focus.** Chosen is a soft tint of the highlight (`--sel-bg`) with a slim bar on one edge: on the left
-  in lists (`--sel-ring`), underneath in tabs, chips and swatches (`--sel-under`); Light keeps its grey fill; or a green
-  tick. A chosen row that's focused looks focused. A page's own chosen style must not beat the focus style (0.9.49:
-  RomM's chosen row).
+  buttons, rows, tabs and menu items, with `--on-focus` text; a ring with a lift on cards and tiles; Glass uses lit
+  glass. **(checked: `tools/ui-audit/focus.js`, a focused thing must look different from itself unfocused, six looks)**
+- **Chosen is never focus.** Chosen is a softer fill (`--sel`, or brighter glass `--lg-sel`) or a green tick. A chosen
+  row that's focused looks focused. A page's own chosen style must not beat the focus style (0.9.49: RomM's chosen row).
+- **Focus stays as it is (owner, 0.9.61: "I loved the old selection method").** 0.9.60's glow focus and tinted chosen
+  with a bar were tried and taken back: focus is the ring with a lift on cards and tiles and the fill elsewhere, chosen a
+  thin ring in the highlight colour. Don't change either without asking.
 - **Focus never falls off the page.** If the focused thing disappears, focus goes to the nearest thing on the page
   (`keepFocus`). After a button opens another page, the button that continues the flow keeps focus (the tour).
 - **Pointer and touch never show rings;** the controller and keyboard always do.

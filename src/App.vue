@@ -563,7 +563,7 @@ function modalFrom(el) {
 .top-search:not(.open):not(:focus-within) :deep(.pb) { margin-left: 8px; transform: scale(0.88); opacity: 0.55; }
 .top-search.open, .top-search:focus-within { width: min(300px, 26vw); background: rgba(255, 255, 255, 0.14); color: var(--text); }
 .top-search:not(.open):not(:focus-within) input { width: 0; flex: 0; opacity: 0; }
-.top-search:focus-within { box-shadow: var(--ring-soft); } /* 0.9.60: a glow, no outline */
+.top-search:focus-within { box-shadow: 0 0 0 2px var(--focus, #fff); }
 .top-search input { flex: 1; min-width: 0; height: 100%; font: inherit; font-size: var(--t-sm); color: var(--text); background: none; border: 0; outline: none; }
 .top-search input:focus { box-shadow: none !important; }
 .top-search input::placeholder { color: rgba(255, 255, 255, 0.5); }

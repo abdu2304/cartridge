@@ -184,12 +184,8 @@ export function applyTheme(uiOrName) {
   r.setProperty('--focus-solid', fo);
   r.setProperty('--on-focus', foLight ? '#0c0d10' : lightT ? '#fafafb' : '#ffffff');
   r.setProperty('--on-focus-dim', foLight ? 'rgba(12, 13, 16, 0.7)' : lightT ? 'rgba(250, 250, 251, 0.72)' : 'rgba(255, 255, 255, 0.75)');
-  // focus (0.9.60, owner: "never use the white outline", pick A): a lift with a soft glow in the highlight colour, no
-  // stroke; 14 px, so it fits the padding scrollers keep for focus
-  r.setProperty('--focus-glow', `color-mix(in srgb, ${fo} 55%, transparent)`);
-  r.setProperty('--focus-core', `color-mix(in srgb, ${fo} 85%, transparent)`); // the bright heart of the glow: soft-edged, never a stroke
-  r.setProperty('--ring', '0 0 6px 2px var(--focus-core), 0 0 22px 5px var(--focus-glow), 0 14px 28px -12px rgba(0, 0, 0, 0.7)');
-  r.setProperty('--ring-soft', '0 0 5px 1px var(--focus-core), 0 0 14px 2px var(--focus-glow)');
+  r.setProperty('--ring', `0 0 0 3px var(--s0), 0 0 0 6px ${fo}`);
+  r.setProperty('--ring-soft', `0 0 0 2px ${fo}`);
   // surfaces: neutral greys, tinted a little towards the theme for the coloured themes
   const sh = rgb2hsl(...hex2rgb(g[2])), ss = t.neutral ? 0 : Math.min(0.16, sh[1] * 0.25);
   // the page (s0) follows Background, the panels (s1 to s3) follow Elements (0.9.37)
@@ -202,12 +198,9 @@ export function applyTheme(uiOrName) {
   // then found chosen and focused looked the same (0.9.58: "makes the user think it's selected when it's not"). In the
   // dark looks chosen is now a thin ring in your highlight colour with normal text (--sel-ring, --sel-bg clear), and
   // only focus is the solid fill. Light keeps its soft grey fill, which reads as chosen on a light page.
-  // 0.9.60 (owner: "never use the white outline", pick A): chosen is a soft tint of the highlight with a slim bar on one
-  // edge, on the left in lists (--sel-ring) and underneath in tabs and chips (--sel-under); never a ring round it
   r.setProperty('--sel', lightT ? '#d1d1d8' : fo);
-  r.setProperty('--sel-bg', lightT ? '#d1d1d8' : `color-mix(in srgb, ${fo} 14%, transparent)`);
-  r.setProperty('--sel-ring', lightT ? 'inset 0 0 0 0 transparent' : `inset 3px 0 0 0 ${fo}`);
-  r.setProperty('--sel-under', lightT ? 'inset 0 0 0 0 transparent' : `inset 0 -3px 0 0 ${fo}`);
+  r.setProperty('--sel-bg', lightT ? '#d1d1d8' : 'transparent');
+  r.setProperty('--sel-ring', lightT ? 'inset 0 0 0 0 transparent' : `inset 0 0 0 2px ${fo}`);
   r.setProperty('--on-sel', tx.text);
   r.setProperty('--on-sel-dim', tx.muted);
   // 0.9.57 (owner: dark Glass looked grey): dark Glass panels are mostly solid, so the page behind only tints them
