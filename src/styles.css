@@ -284,6 +284,10 @@ body.surface-glass .glass, body.elements-glass .glass { background: var(--glass-
 .btn.primary { background: var(--btn, var(--primary)); color: var(--on-btn, var(--on-primary)); font-weight: 700; }
 .btn.danger { color: var(--danger-t, #ff9b93); }
 .btn.ok { color: var(--green-l); }
+/* Ready to Play (0.9.58, owner: in Light it looked nothing like Download): the game's main button, styled like Download,
+   with the green tick as its sign */
+.btn.primary.ok { color: var(--on-btn, var(--on-primary)); }
+.btn.primary.ok .icon { color: var(--green, #2fb36a); }
 .btn.small { height: 38px; padding: 0 16px; font-size: var(--t-sm); border-radius: var(--r-sm); }
 .btn.xl { height: 56px; padding: 0 28px; font-size: var(--t-lg); }
 .btn[disabled] { opacity: 0.4; pointer-events: none; }
@@ -383,7 +387,7 @@ body.light-fx .systile .glyph { filter: saturate(0.6) brightness(1.1); }
 .menu-list > * { flex: none; }
 .menu-item { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: var(--r-md); background: var(--s2); font-size: var(--t-md); font-weight: 500; transition: background var(--d-fast), color var(--d-fast); }
 .menu-item.danger { color: var(--danger-t, #ff9b93); }
-.menu-item.selected { background: var(--sel); color: var(--on-sel); }
+.menu-item.selected { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .menu-item.selected :is(.sub, .muted, small) { color: var(--on-sel-dim); }
 /* the chosen option's mark (0.9.49, owner: the tick vanished on a highlighted row; use the green tick everywhere): the
    same green disc with a white check as "On this device", readable on any fill, focused or not */
@@ -401,7 +405,7 @@ body.light-fx .systile .glyph { filter: saturate(0.6) brightness(1.1); }
 .field .box span.val { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .seg { display: inline-flex; background: var(--s2); border-radius: var(--r-md); padding: 4px; gap: 4px; }
 .seg button { padding: 8px 16px; border-radius: var(--r-sm); color: var(--muted); font-size: var(--t-sm); font-weight: 600; transition: background var(--d-fast), color var(--d-fast); }
-.seg button.on { background: var(--sel); color: var(--on-sel); }
+.seg button.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .seg button:focus-visible, .pad-mode .seg button:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; }
 .toggle { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 15px 18px; border-radius: var(--r-md); background: var(--s2); width: 100%; font-weight: 500; }
 .toggle:focus-visible, .pad-mode .toggle:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; }
@@ -490,7 +494,7 @@ body.light-fx .coll .art, body.light-fx .coll .mosaic { transition-property: tra
 /* section titles are words only (docs/design.md): the icons some screens put in front are hidden */
 .subh > svg.icon:first-child { display: none; }
 /* rows that turn white on focus don't also get the ring */
-.pad-mode :is(.menu-item, .rail-item, .prow, .qm-item, .up-row, .sm-row, .ss-emu, .lrow, .toggle, .tab, .ga-row, .cc-row, .lf-card, .tl-e, .aa-row, .ad-row, .eg-emu, .pt-row, .file, .eg-drive, .ssc-count, .ls-pick):focus, :is(.menu-item, .rail-item, .prow, .qm-item, .up-row, .sm-row, .ss-emu, .lrow, .ga-row, .cc-row, .lf-card, .tl-e, .aa-row, .ad-row, .eg-emu, .pt-row, .file, .eg-drive, .ssc-count, .ls-pick):focus-visible { box-shadow: none; } /* rows: the fill is the focus (0.9.37: About, Its Games, Linked Folders had the ring too) */
+.pad-mode :is(.menu-item, .rail-item, .prow, .qm-item, .up-row, .sm-row, .ss-emu, .lrow, .toggle, .tab, .ga-row, .cc-row, .lf-card, .tl-e, .aa-row, .ad-row, .eg-emu, .pt-row, .file, .eg-drive, .ssc-count, .ls-pick, .st-hub-card):focus, :is(.menu-item, .rail-item, .prow, .qm-item, .up-row, .sm-row, .ss-emu, .lrow, .ga-row, .cc-row, .lf-card, .tl-e, .aa-row, .ad-row, .eg-emu, .pt-row, .file, .eg-drive, .ssc-count, .ls-pick, .st-hub-card):focus-visible { box-shadow: none; } /* rows: the fill is the focus (0.9.37: About, Its Games, Linked Folders had the ring too) */
 
 /* a small count on a page tab (Emulators → Updates, 0.9.16) */
 .count-dot { display: inline-grid; place-items: center; min-width: 1.4em; height: 1.4em; padding: 0 0.35em; margin-left: 6px; border-radius: 999px; background: #f5c542; color: #1a1400; font-size: 0.75em; font-weight: 700; }
@@ -548,7 +552,7 @@ input, textarea, select { transition: box-shadow var(--spring-snappy-d) var(--sp
 /* segmented rows: one pill glides to the choice (motion.js slidingPills) */
 .seg { position: relative; }
 .seg > button { position: relative; z-index: 1; }
-.seg-ink { position: absolute; left: 0; top: 0; z-index: 0; border-radius: var(--r-sm); background: var(--sel); pointer-events: none; }
+.seg-ink { position: absolute; left: 0; top: 0; z-index: 0; border-radius: var(--r-sm); background: var(--sel-bg); box-shadow: var(--sel-ring); pointer-events: none; }
 .seg-ink.live { transition: transform var(--spring-pop-d) var(--spring-pop), width var(--spring-pop-d) var(--spring-pop), height var(--spring-d) var(--spring), opacity var(--d-fast); }
 .seg.inked > button.on { background: transparent; }
 /* 0.9.44 (owner: the selected pill went grey): the chosen button's own fill gives way to the sliding pill, but never its
@@ -573,9 +577,10 @@ body.theme-light {
   /* 0.9.56 (owner: cards blended into the page): a firmer edge and a deeper shadow under white cards */
   /* 0.9.57 (owner: card shadows clipped in Light): no deeper than 18 px below a card, inside the 20 px rows and
      scrollers leave under it (they reached 26 to 32 px and were cut at the row's edge); as firm, just tighter */
-  --shadow-card: 0 1px 3px rgba(20, 20, 30, 0.12), 0 8px 18px -8px rgba(20, 20, 30, 0.3);
+  /* 0.9.58 (owner: they end abruptly): more blur at the same reach, so the shadow fades out instead of stopping */
+  --shadow-card: 0 1px 2px rgba(20, 20, 30, 0.1), 0 2px 8px -2px rgba(20, 20, 30, 0.08), 0 6px 26px -12px rgba(20, 20, 30, 0.34);
   --shadow-pop: 0 2px 6px rgba(20, 20, 30, 0.08), 0 24px 60px -12px rgba(20, 20, 30, 0.28);
-  --weight: 0 1px 3px rgba(20, 20, 30, 0.12), 0 8px 18px -8px rgba(20, 20, 30, 0.3);
+  --weight: 0 1px 2px rgba(20, 20, 30, 0.1), 0 2px 8px -2px rgba(20, 20, 30, 0.08), 0 6px 26px -12px rgba(20, 20, 30, 0.34);
   --weight-edge: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
   --tile-bg: #e3e3e8; --tile-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.05), 0 4px 10px -4px rgba(20, 20, 30, 0.18);
 }
@@ -657,7 +662,7 @@ body.elements-glass {
      only a fine edge and the same contact shadow as everything else */
   --lg-lit-glow: 0 0 0 1px rgba(255, 255, 255, 0.35), 0 4px 10px rgba(0, 0, 0, 0.5);
   --lg-on-lit: var(--lg-on-hi);
-  --lg-sel: var(--sel); /* chosen (0.9.57, owner's pick B): the highlight colour, solid, as in Plain; focus adds its ring */
+  --lg-sel: var(--sel-bg); /* chosen (0.9.58, owner's pick A): a ring in the highlight colour (--sel-ring), as in Plain */
 }
 body.elements-glass.theme-light {
   --lg-fill: rgba(255, 255, 255, 0.42);
@@ -700,13 +705,14 @@ body.elements-glass .btn:not(.primary):hover { background: var(--lg-fill-hover);
 body.elements-glass .dialog .menu-item { background: rgba(255, 255, 255, 0.025); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(0, 0, 0, 0.3); }
 body.elements-glass.theme-light .dialog .menu-item { background: rgba(255, 255, 255, 0.4); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.7); }
 body.elements-glass .dialog .menu-item:hover { background: var(--lg-fill-hover); }
+body.elements-glass:not(.theme-light) .dialog .menu-item.selected:not(:focus) { box-shadow: var(--sel-ring); } /* chosen: the ring (0.9.58) */
 body.elements-glass .dialog .menu-item:focus { background: var(--lg-lit); color: var(--lg-on-lit); box-shadow: var(--lg-bevel), var(--lg-lit-glow); }
 body.elements-glass .dialog .menu-item:focus :is(.sub, .muted) { color: color-mix(in srgb, var(--lg-on-lit) 74%, transparent); }
 /* lit glass: the current tab, the chosen switch, the primary button, whatever is focused */
 body.elements-glass.bar-pill.dock-glass .tab-ink { background: var(--lg-lit); box-shadow: var(--lg-bevel), var(--lg-lit-glow); }
 /* 0.9.47 (owner: "I don't know what I'm selecting"): the chosen option of a switch was lit like focus (0.88 white against
    focus's white), so the two read the same. Chosen is brighter glass now; only focus is lit, as in Plain (grey vs white). */
-body.elements-glass .seg-ink { background: var(--lg-sel); box-shadow: var(--lg-bevel); }
+body.elements-glass .seg-ink { background: var(--lg-sel); box-shadow: var(--sel-ring), var(--lg-bevel); }
 body.elements-glass.bar-pill.dock-glass .tab.active, body.elements-glass.bar-pill.dock-glass .tab.active:hover { color: var(--lg-on-lit); }
 body.elements-glass .seg.inked > button.on { color: var(--on-sel); }
 body.elements-glass .btn.primary { background: var(--btn, var(--primary)); color: var(--on-btn, var(--on-primary)); box-shadow: var(--lg-bevel), var(--lg-drop); } /* 0.9.57: solid (see-through white over dark was the grey the owner hated) */
@@ -768,9 +774,10 @@ body.style-plain:not(.theme-light):not(.theme-oled) :is(.glass, .eg-con, .lrow, 
 body.style-plain:not(.theme-light):not(.theme-oled) .btn:not(.primary):not(:focus):not(:focus-visible) { box-shadow: var(--pl-top), var(--pl-raise); }
 body.style-plain:not(.theme-light):not(.theme-oled) .btn.primary:not(:focus):not(:focus-visible) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), var(--pl-raise); }
 body.style-plain:not(.theme-light):not(.theme-oled) .seg { box-shadow: var(--pl-sink); }
-body.style-plain:not(.theme-light):not(.theme-oled) .seg-ink { background: var(--sel); box-shadow: var(--pl-top), var(--pl-raise); }
+body.style-plain:not(.theme-light):not(.theme-oled) .seg-ink { background: var(--sel-bg); box-shadow: var(--sel-ring); }
 body.style-plain:not(.theme-light):not(.theme-oled) :is(.dialog, .toast) { box-shadow: var(--pl-top), var(--pl-edge), var(--shadow-pop); }
 body.style-plain:not(.theme-light):not(.theme-oled) .dialog .menu-item:not(:focus) { box-shadow: var(--pl-edge); }
+body.style-plain:not(.theme-light) .dialog .menu-item.selected:not(:focus) { box-shadow: var(--sel-ring); }
 body.style-plain:not(.theme-light):not(.theme-oled).bar-pill:is(.dock-black, .dock-accent) .tabs { box-shadow: var(--pl-top), var(--pl-edge), 0 10px 26px -10px rgba(0, 0, 0, 0.7); }
 body.style-plain:not(.theme-light):not(.theme-oled).bar-pill .tab-ink { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px -2px rgba(0, 0, 0, 0.6); }
 body.style-plain:not(.theme-light):not(.theme-oled) .top-search { box-shadow: var(--pl-sink); }

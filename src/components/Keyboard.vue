@@ -171,7 +171,7 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); laye
 .key.small { height: 38px; font-size: var(--t-sm); flex: none; padding: 0 12px; }
 .key.wide { flex: 1.6; font-size: var(--t-sm); }
 .key.space { flex: 4; font-size: var(--t-sm); }
-.key.on { background: var(--sel); color: var(--on-sel); }
+.key.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .key.done { background: var(--btn, var(--grad)); border: 0; color: var(--on-btn, var(--on-primary)); font-weight: 700; }
 .key:focus { box-shadow: var(--ring); transform: scale(1.06); z-index: 1; }
 .key:hover { background: rgba(255,255,255,.12); }

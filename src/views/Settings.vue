@@ -103,15 +103,29 @@
 
           <!-- Syncthing (its own tab in 0.9.21; renamed with its logo in 0.9.23, owner) -->
           <template v-else-if="sec === 'syncthing'">
-            <!-- 0.9.51: Cartridge Save Sync (RomM) or Syncthing, chosen in Advanced; a device uses one, never both (owner) -->
-            <!-- 0.9.57 (owner: Syncthing's own tabs and this row both used L1/R1): one row, Syncthing's pages in it -->
+            <!-- 0.9.51: Cartridge Save Sync (RomM) or Syncthing; a device uses one, never both (owner) -->
+            <!-- 0.9.58 (owner): two tabs, Cartridge Save Sync and Syncthing; Syncthing's parts are cards that open, and the
+                 choice of which one this device uses sits at the end of both tabs (it was a third tab, Advanced) -->
             <div class="lookpages"><Btn b="LB" /><div class="seg"><button v-for="p in SYNC_PAGES" :key="p.v" data-focus :data-key="'sync-' + p.v" :class="{ on: syncPage === p.v }" @click="syncPage = p.v">{{ p.l }}</button></div><Btn b="RB" /></div>
-            <SaveSyncCard v-if="syncPage === 'saves'" @advanced="syncPage = 'advanced'" />
-            <template v-else-if="ST_VIEW[syncPage]">
-              <p v-if="ssMode === 'cartridge' && syncPage === 'syncthing'" class="muted small sync-lock"><Icon name="mdiLockOutline" :size="16" />This device syncs saves with Cartridge Save Sync, so Syncthing isn't used for saves here. Syncthing still shows what else it keeps in step.</p>
-              <SyncCard ref="syncRef" :page="ST_VIEW[syncPage]" />
+            <SaveSyncCard v-if="syncPage === 'saves'" @advanced="toChoice" />
+            <template v-else-if="!stView">
+              <div class="st-hub-head"><SyncthingLogo :size="44" /><div><h2>Syncthing</h2><p class="muted small">Keeps folders the same on all your devices. Cartridge reads what it shares, and only sets it up when you ask.</p></div></div>
+              <p v-if="ssMode === 'cartridge'" class="muted small sync-lock"><Icon name="mdiLockOutline" :size="16" />This device syncs saves with Cartridge Save Sync, so Syncthing isn't used for saves here. Syncthing still shows what else it keeps in step.</p>
+              <div class="st-hub">
+                <button v-for="c in ST_CARDS" :key="c.v" class="st-hub-card glass" data-focus :data-key="'sth-' + c.v" @click="openSt(c.v)">
+                  <Icon :name="c.icon" :size="30" />
+                  <b>{{ c.l }}</b>
+                  <span class="muted small">{{ c.sub }}</span>
+                  <Icon name="mdiChevronRight" :size="20" class="st-hub-go" />
+                </button>
+              </div>
             </template>
             <template v-else>
+              <button class="lrow st-back" data-focus data-key="st-back" @click="closeSt"><Icon name="mdiArrowLeft" :size="22" /><div class="l-mid"><b>Syncthing</b><span class="l-sub">{{ ST_CARDS.find((c) => c.v === stView)?.l }} · B goes back</span></div></button>
+              <SyncCard ref="syncRef" :page="stView" />
+            </template>
+            <template v-if="syncPage === 'saves' || !stView">
+              <div data-key="ss-choice" tabindex="-1" class="ss-choice-anchor" />
               <div class="subh">How This Device Syncs Saves</div>
               <p class="muted small">One way per device: two ways moving the same saves would fight each other.</p>
               <div class="stack">
@@ -636,9 +650,17 @@ const lead = computed(() => sections.find((x) => x.id === sec.value)?.lead || ''
 const LIB_PAGES = [{ v: 'server', l: 'RomM Server' }, { v: 'folders', l: 'Games and Storage' }];
 const DLUP_PAGES = [{ v: 'downloads', l: 'Downloads' }, { v: 'updates', l: 'Cartridge Updates' }];
 // Saves and Sync (0.9.51): Cartridge Save Sync, Syncthing, and Advanced (which one this device uses)
-// Syncthing's pages sit in this row (0.9.57): Games, Main Server and This Device (one page when this device is the main server)
-const ST_VIEW = { syncthing: 'games', 'st-server': 'server', 'st-here': 'here' };
-const SYNC_PAGES = computed(() => [{ v: 'saves', l: 'Cartridge Save Sync' }, { v: 'syncthing', l: 'Syncthing Games' }, ...(store.config.syncthing?.role === 'main' ? [{ v: 'st-here', l: 'Main Server' }] : [{ v: 'st-server', l: 'Main Server' }, { v: 'st-here', l: 'This Device' }]), { v: 'advanced', l: 'Advanced' }]);
+// Saves and Sync (0.9.58, owner): two tabs; Syncthing's parts are cards that open in place (stView), B goes back to them
+const SYNC_PAGES = [{ v: 'saves', l: 'Cartridge Save Sync' }, { v: 'syncthing', l: 'Syncthing' }];
+const stView = ref('');
+const ST_CARDS = computed(() => [
+  { v: 'games', l: 'Games', icon: 'mdiGamepadVariantOutline', sub: 'Which games’ saves, textures and more Syncthing keeps in step' },
+  ...(store.config.syncthing?.role === 'main' ? [{ v: 'here', l: 'This Device · Main Server', icon: 'mdiServerOutline', sub: 'This device keeps everyone’s saves: its folders and devices' }]
+    : [{ v: 'here', l: 'This Device', icon: 'mdiLaptop', sub: 'Syncthing on this device: running, folders, devices' }, { v: 'server', l: 'Main Server', icon: 'mdiServerOutline', sub: 'The device that keeps everyone’s saves' }]),
+]);
+function openSt(v) { stView.value = v; nextTick(() => focusFirst(paneEl.value, '[data-key="st-back"]')); }
+function closeSt() { const v = stView.value; stView.value = ''; nextTick(() => focusFirst(paneEl.value, `[data-key="sth-${v}"]`)); }
+function toChoice() { nextTick(() => { const a = paneEl.value?.querySelector('[data-key="ss-choice"]'); a?.scrollIntoView({ block: 'start' }); focusFirst(a?.parentElement || paneEl.value, '.ss-choice-anchor ~ .stack .lrow'); }); }
 const ssLocked = computed(() => !!store.config.syncthing?.role);
 const ssMode = computed(() => (store.config.syncthing?.role ? 'syncthing' : store.config.saveSync === 'cartridge' ? 'cartridge' : store.config.saveSync === 'syncthing' ? 'syncthing' : null));
 const syncPage = ref(ssMode.value === 'syncthing' ? 'syncthing' : 'saves');
@@ -649,7 +671,7 @@ async function setSaveSync(v) {
     if (v === 'cartridge') await call('savesync:set', { on: true });
     else { await call('savesync:set', { on: false }); await saveConfig({ saveSync: v }); }
     store.config = await call('config:get');
-    if (v === 'syncthing') syncPage.value = 'syncthing'; else if (v === 'cartridge') syncPage.value = 'saves';
+    if (v === 'syncthing') { syncPage.value = 'syncthing'; stView.value = ''; } else if (v === 'cartridge') syncPage.value = 'saves';
   } catch (e) { toast(e.message, 'error', 6000); }
 }
 async function leaveSyncthing() {
@@ -976,7 +998,8 @@ function paneLeft() {
   if (more) return false;
   focusFirst(el.value, `[data-key="sec-${sec.value}"]`);
 }
-useView({ right: railRight, left: paneLeft, back: () => { if (!document.activeElement?.closest('.rail')) { focusFirst(el.value, `[data-key="sec-${sec.value}"]`); return; } return false; }, lb: () => (sec.value === 'emu' ? stepEmu(-1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', -1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', -1) : sec.value === 'syncthing' ? stepPages(SYNC_PAGES.value, syncPage, 'sync', -1) : sec.value === 'steam' ? steamRef.value?.step(-1) : stepLook(-1)), rb: () => (sec.value === 'emu' ? stepEmu(1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', 1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', 1) : sec.value === 'syncthing' ? stepPages(SYNC_PAGES.value, syncPage, 'sync', 1) : sec.value === 'steam' ? steamRef.value?.step(1) : stepLook(1)), y: () => searchSettings() },
+function stepSync(d) { stView.value = ''; stepPages(SYNC_PAGES, syncPage, 'sync', d); }
+useView({ right: railRight, left: paneLeft, back: () => { if (sec.value === 'syncthing' && syncPage.value === 'syncthing' && stView.value && !document.activeElement?.closest('.rail')) { closeSt(); return; } if (!document.activeElement?.closest('.rail')) { focusFirst(el.value, `[data-key="sec-${sec.value}"]`); return; } return false; }, lb: () => (sec.value === 'emu' ? stepEmu(-1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', -1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', -1) : sec.value === 'syncthing' ? stepSync(-1) : sec.value === 'steam' ? steamRef.value?.step(-1) : stepLook(-1)), rb: () => (sec.value === 'emu' ? stepEmu(1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', 1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', 1) : sec.value === 'syncthing' ? stepSync(1) : sec.value === 'steam' ? steamRef.value?.step(1) : stepLook(1)), y: () => searchSettings() },
   [{ b: 'A', label: 'Select' }, { b: 'B', label: 'Back' }, { b: 'Y', label: 'Find a Setting' }, { b: 'LT+RT', label: 'Tabs' }]);
 // Settings → Emulators → Issues
 const issues = ref(null);
@@ -1303,13 +1326,26 @@ onMounted(() => {
 .rail-item { display: flex; align-items: center; gap: 14px; padding: 13px 16px; border-radius: var(--r-md); color: var(--muted); font-weight: 500; transition: background var(--tint), color var(--tint); }
 /* the page follows the list as you move, so the current section only needs brighter text, no box */
 .sync-lock { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--s-2); }
-.rail-item.on { color: var(--on-sel); background: var(--sel); } /* the open section: chosen, the softer fill (docs/design-rules.md 6) */
+/* Syncthing's parts as cards (0.9.58) */
+.st-hub-head { display: flex; align-items: center; gap: var(--s-3); margin-bottom: var(--s-3); }
+.st-hub-head h2 { margin: 0 0 2px; font-size: var(--t-xl); }
+.st-hub-head p { margin: 0; }
+.st-hub { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: var(--s-3); }
+.st-hub-card { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: var(--s-4) var(--s-5) var(--s-4) var(--s-4); border-radius: var(--r-lg); text-align: left; min-height: 132px; transition: transform var(--spring-snappy-d) var(--spring-snappy), background var(--tint); }
+.st-hub-card b { font-family: var(--display); font-size: var(--t-lg); }
+.st-hub-card .small { overflow-wrap: anywhere; }
+.st-hub-go { position: absolute; top: var(--s-4); right: var(--s-3); color: var(--muted); }
+.st-hub-card:is(:focus-visible), .pad-mode .st-hub-card:focus { background: var(--focus); color: var(--on-focus); }
+.st-hub-card:is(:focus-visible, :focus) :is(.muted, .st-hub-go) { color: var(--on-focus-dim); }
+.st-back { margin-bottom: var(--s-3); }
+.ss-choice-anchor { height: 0; outline: none; }
+.rail-item.on { color: var(--on-sel); background: var(--sel-bg); box-shadow: var(--sel-ring); } /* the open section: chosen, the softer fill (docs/design-rules.md 6) */
 .rail-item:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; }
 .pane { overflow-y: auto; padding: 6px 12px 60px 24px; }
 .ga-cons { display: flex; gap: 8px; overflow-x: auto; padding: 8px 6px 10px; margin: 0 -6px; scrollbar-width: none; } /* room for a selected chip (0.9.28: it was cut off) */
 .ga-con { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--s1); box-shadow: var(--weight-edge); font-weight: 600; font-size: var(--t-sm); }
 .ga-con em { font-style: normal; color: var(--muted); font-weight: 500; }
-.ga-con.on { background: var(--sel); color: var(--on-sel); }
+.ga-con.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .ga-con:focus-visible, .pad-mode .ga-con:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; outline: none; } /* the standard highlight: white fill, dark text, no ring */
 .pad-mode .ga-con:focus em { color: var(--on-focus-dim); }
 .rail-st { color: inherit !important; }
@@ -1363,7 +1399,7 @@ onMounted(() => {
 .bgnow-t small { font-size: var(--t-xs); color: var(--muted); }
 .bgnow-c { display: inline-flex; align-items: center; gap: 2px; font-size: var(--t-sm); font-weight: 600; color: var(--primary-t); }
 .bgtile { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: var(--r-md); background: var(--s2); text-align: left; }
-.bgtile.on { background: var(--sel); color: var(--on-sel); }
+.bgtile.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .bgtile b { font-size: var(--t-sm); font-weight: 600; margin-top: 6px; }
 .bgtile small { font-size: var(--t-xs); color: var(--muted); }
 .bgp { position: relative; height: 54px; border-radius: var(--r-sm); overflow: hidden; background: var(--xmb); }
@@ -1385,7 +1421,7 @@ onMounted(() => {
 .fonttile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 8px; border-radius: var(--r-md); background: var(--s2); }
 .fonttile b { font-size: var(--t-xl); font-weight: 600; line-height: 1.1; }
 .fonttile span { font-size: var(--t-xs); color: var(--muted); }
-.fonttile.on { background: var(--sel); color: var(--on-sel); }
+.fonttile.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .steam-grid { width: 130px; border-radius: var(--r-sm); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5); flex: none; }
 .fadeup-enter-active { transition: opacity var(--fade-in), transform var(--spring-d) var(--spring); }
 .fadeup-enter-from { opacity: 0; transform: translateX(10px); }

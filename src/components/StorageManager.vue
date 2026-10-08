@@ -120,7 +120,7 @@ onMounted(load);
 .sm-row { display: flex; align-items: center; gap: 14px; padding: 8px 14px; border-radius: var(--r-md); background: var(--s2); border: 1px solid transparent; text-align: left; min-width: 0; }
 .sm-row:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; }
 .sm-row:focus .muted { color: var(--on-focus-dim); }
-.sm-row.on:not(:focus) { background: var(--sel); color: var(--on-sel); }
+.sm-row.on:not(:focus) { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .sm-row.on:not(:focus) :is(.muted, small) { color: var(--on-sel-dim); }
 .sm-ck { color: var(--muted); }
 .sm-row.on .sm-ck { color: var(--text); }

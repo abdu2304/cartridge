@@ -24,7 +24,7 @@
           <!-- Continue playing: the game you played last, its art, logo and when -->
           <template v-if="t.type === 'continue'">
             <template v-if="cur">
-              <div class="st-art st-pan" :style="{ backgroundImage: bgUrl(artOf(cur)) }" />
+              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(artOf(cur)) }" />
               <div class="st-scrim" />
               <div class="st-label on-art">Continue playing</div>
               <div class="st-cp">
@@ -97,7 +97,7 @@
                game in front with its art, logo and a line about it; the next ones fanned out beside it -->
           <template v-else-if="COVER_ROWS[t.type]">
             <template v-if="listOf(t).length">
-              <Transition name="st-xf"><div :key="rowView(t)[0].id" class="st-row-art" :style="{ backgroundImage: bgUrl(artOf(rowView(t)[0]) || cover(rowView(t)[0], true)) }" /></Transition>
+              <Transition name="st-xf"><div :key="steadyArt(t.id, rowView(t)[0]).id" class="st-row-art" :style="{ backgroundImage: bgUrl(steadyArt(t.id, rowView(t)[0]).url) }" /></Transition>
               <div class="st-row-fade" />
               <div class="st-row" :class="{ tall: t.h > 1, narrow: t.w <= 2 }">
                 <div class="st-row-info">
@@ -200,7 +200,7 @@
           <!-- Console Spotlight (0.9.28): a console's games take turns, with their art -->
           <template v-else-if="t.type === 'spotlight'">
             <template v-if="spotOf(t)">
-              <Transition name="st-spot"><div :key="spotOf(t).id" class="st-art" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(spotOf(t), true) : artOf(spotOf(t)) || cover(spotOf(t), true)) }" /></Transition>
+              <Transition name="st-spot"><div :key="spotOf(t).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(spotOf(t), true) : artOf(spotOf(t)) || cover(spotOf(t), true)) }" /></Transition>
               <div class="st-scrim" />
               <div class="st-label on-art">{{ platformById(t.platformId)?.display_name }} Spotlight</div>
               <div class="st-pin">
@@ -215,7 +215,7 @@
           <template v-else-if="t.type === 'media'">
             <template v-if="mediaOf(t)">
               <div class="st-label"><span class="st-lname">{{ platformById(t.platformId)?.display_name }}</span><span class="st-count">{{ (sel[t.id] || 0) + 1 }} / {{ conList(t.platformId).length }}</span></div>
-              <Transition name="st-xf"><div :key="mediaOf(t).id" class="st-media-bg" :class="{ tall: box(t).pw <= box(t).ph * 1.4 }" :style="{ backgroundImage: bgUrl(artOf(mediaOf(t)) || cover(mediaOf(t), true)) }" /></Transition>
+              <Transition name="st-xf"><div :key="steadyArt('m' + t.id, mediaOf(t)).id" class="st-media-bg" :class="{ tall: box(t).pw <= box(t).ph * 1.4 }" :style="{ backgroundImage: bgUrl(steadyArt('m' + t.id, mediaOf(t)).url) }" /></Transition>
               <div class="st-media" :class="[isDisc(t) ? 'disc' : 'cart', { wide: box(t).pw > box(t).ph * 1.4 }]">
                 <div class="st-media-stage" @click="ejectMedia($event, t)"><Transition name="st-media"><div :key="mediaOf(t).id" class="st-media-obj" :class="{ dev: store.installed[mediaOf(t).id] }">
                   <div v-if="isDisc(t)" class="st-disc-boost"><div class="st-disc" :style="{ backgroundImage: bgUrl(cover(mediaOf(t), true)) }"><i class="st-disc-sheen" /><i class="st-disc-hub" /></div></div>
@@ -276,7 +276,7 @@
           </template>
           <template v-else-if="t.type === 'daily'">
             <template v-if="daily">
-              <div class="st-art" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(daily, true) : artOf(daily) || cover(daily, true)) }" />
+              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(daily, true) : artOf(daily) || cover(daily, true)) }" />
               <div class="st-scrim" />
               <div class="st-label on-art">Game of the Day</div>
               <div class="st-pin">
@@ -298,7 +298,7 @@
           <!-- One game, pinned -->
           <template v-else-if="t.type === 'game'">
             <template v-if="romById(t.romId)">
-              <div class="st-art" :class="{ 'st-pan': t.w * t.h >= 6 }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(romById(t.romId), true) : artOf(romById(t.romId))) }" />
+              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(romById(t.romId), true) : artOf(romById(t.romId))) }" />
               <div class="st-scrim" />
               <!-- 0.9.23 (owner): its logo, not its name in text -->
               <div class="st-pin">
@@ -431,6 +431,25 @@ const isArt = (t) => t.type === 'continue' ? !!cur.value : (t.type === 'spotligh
 const BLANK = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
 const noImg = (e) => { if (e.target.src !== BLANK) e.target.src = BLANK; };
 const bgUrl = (u) => (u ? `url("${String(u).replace(/"/g, '%22')}")` : 'none');
+// 0.9.58 (owner: Recently Played "just cuts midway" when it changes game): the next game's picture used to start fading
+// in before it had loaded, so it appeared halfway through. A tile keeps showing its current picture until the next one
+// is loaded and decoded, then the new one fades in over it. decoded is reactive (set when a picture is ready, never
+// during a render); what each tile shows is plain bookkeeping.
+const decoded = reactive({}), started = new Set(), showing = new Map();
+function loadArt(url) {
+  if (!url || started.has(url)) return;
+  started.add(url);
+  const im = new Image(); im.decoding = 'async'; im.src = url;
+  (im.decode ? im.decode() : new Promise((ok, no) => { im.onload = ok; im.onerror = no; })).then(() => { decoded[url] = true; }, () => { decoded[url] = true; });
+}
+const bigArt = (t) => t.w >= 2 && t.h >= 2; // the art tiles that move (0.9.58)
+function steadyArt(key, r) {
+  const url = r ? artOf(r) || cover(r, true) : '', next = { id: r?.id ?? 0, url };
+  const cur = showing.get(key);
+  if (!cur || !url || cur.url === url || decoded[url]) { showing.set(key, next); if (url) loadArt(url); return next; }
+  loadArt(url);
+  return cur;
+}
 const artOf = (r) => heroArt(r)?.src || ''; // SteamGridDB's hero only, no RomM picture first (0.9.21)
 const platformById = (id) => store.lib?.platforms.find((p) => p.id === id) || null;
 
@@ -1375,13 +1394,14 @@ watch(() => store.play, loadWeek);
 /* art tiles: the picture fills the tile, a scrim keeps the words readable */
 .st-art { position: absolute; inset: 0; z-index: -2; background-size: cover; background-position: center 30%; transition: transform var(--spring-soft-d) var(--spring-soft); }
 .st-tile.art:focus .st-art { transform: scale(1.04); }
-/* 0.9.57 (owner: Start looked a little still): Continue Playing and big pinned games drift slowly sideways, a camera
-   pan with no zoom (docs/design-rules.md: drift never changes scale; the disc that turned made the owner unwell). The
-   picture is a little bigger than the tile so its edge never shows; `translate` leaves the focus zoom's transform alone.
-   Still with light effects (no GPU), Reduce Motion, while arranging and while Cartridge is away (body.away). */
-.st-art.st-pan { inset: -4%; animation: st-pan 38s var(--ease-in-out) infinite alternate; will-change: translate; }
-@keyframes st-pan { from { translate: 2% 0.6%; } to { translate: -2% -0.6%; } }
-:global(body.light-fx .st-art.st-pan), :global(body.motion-reduce .st-art.st-pan), .st-board.editing .st-art.st-pan { animation: none; translate: none; will-change: auto; }
+/* 0.9.57/0.9.58 (owner: Start looked still; "I don't see the pan anywhere"): big art tiles (2 by 2 or larger: Continue
+   Playing, a pinned game, Spotlight, Game of the Day) move like a slow camera: a pan across and a gentle zoom to 105%,
+   26 s each way. The picture is a little bigger than the tile so its edge never shows; `translate` and `scale` leave the
+   focus zoom's transform alone. It runs with light effects too (one layer, nothing redrawn); Reduce Motion, arranging
+   and Cartridge being away (body.away) stop it. */
+.st-art.st-pan { inset: -4%; animation: st-pan 26s var(--ease-in-out) infinite alternate; will-change: translate, scale; }
+@keyframes st-pan { from { translate: 2.5% 1%; scale: 1; } to { translate: -2.5% -1%; scale: 1.05; } }
+:global(body.motion-reduce .st-art.st-pan), .st-board.editing .st-art.st-pan { animation: none; translate: none; scale: none; will-change: auto; }
 @media (prefers-reduced-motion: reduce) { .st-art.st-pan { animation: none; } }
 /* 0.9.52: a soft band at the top too, so the tile's label reads on a bright cover */
 .st-scrim { position: absolute; inset: 0; z-index: -1; background: linear-gradient(to bottom, rgba(8, 9, 12, 0.6) 0%, rgba(8, 9, 12, 0.25) 16%, transparent 32%), linear-gradient(to top, rgba(8, 9, 12, 0.92) 0%, rgba(8, 9, 12, 0.55) 38%, rgba(8, 9, 12, 0.08) 72%), linear-gradient(to right, rgba(8, 9, 12, 0.5), transparent 60%); }

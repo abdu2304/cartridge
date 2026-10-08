@@ -840,7 +840,7 @@ onBeforeUnmount(() => { off?.(); clearTimeout(padT); window.removeEventListener(
 .small { font-size: var(--t-sm); margin: 0; line-height: 1.5; }
 .mono { font-family: ui-monospace, monospace; word-break: break-all; }
 .lrow .status { margin-left: 8px; vertical-align: middle; }
-.lrow.sel { background: var(--sel); color: var(--on-sel); }
+.lrow.sel { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .w-scan { text-align: left; align-items: stretch; }
 .w-scan-extra { display: flex; flex-direction: column; gap: var(--s-2); max-width: 1180px !important; text-align: left; }
 .w-scan-extra .l-end { color: var(--muted); font-size: var(--t-sm); white-space: nowrap; }
