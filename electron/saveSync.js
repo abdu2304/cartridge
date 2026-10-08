@@ -279,10 +279,23 @@ function writeUnit(u, files, target, backupsRoot) {
 // is the emulator running? (never write its saves under it). procs: lines of /proc/*/cmdline
 const SW_RUN = /\b(eden|citron|yuzu|sudachi|suyu|torzu)\b/i; // any of the family: Linked Folders can give them one save folder
 const RUN_MARK = { eden: SW_RUN, citron: SW_RUN, yuzu: SW_RUN, sudachi: SW_RUN, suyu: SW_RUN, torzu: SW_RUN, rpcs3: /rpcs3/i, ppsspp: /ppsspp/i, vita3k: /vita3k/i, shadps4: /shadps4/i, pcsx2: /pcsx2/i, duckstation: /duckstation/i, dolphin: /dolphin-emu|DolphinEmu/i, cemu: /\bcemu\b/i, azahar: /azahar|citra/i, xenia: /xenia/i, retroarch: /retroarch/i };
+// 0.9.58: judged by the program actually running, never by text anywhere in a command line. Matching "eden" anywhere
+// counted a file manager, an editor, a shell or a script naming a path with "eden" in it as Eden being open, and that
+// save was skipped as "busy" every time. A process counts when its program (argv[0]) is the emulator (an AppImage, its
+// program inside the AppImage's mount, a distro package), or when it's flatpak/bwrap running the emulator's app ID.
+// procs (tests): command lines as strings (split at spaces) or arrays of arguments.
+const WRAPPERS = /^(flatpak|bwrap|flatpak-spawn|wine|wine64|wine-preloader|wine64-preloader|proton)$/i; // what runs an emulator for it (Flatpaks, Windows builds through Proton)
 function running(emu, procs = null) {
   const re = RUN_MARK[emu]; if (!re) return false;
-  const list = procs || (() => { const o = []; for (const d of ls('/proc')) if (/^\d+$/.test(d.name)) { try { o.push(fs.readFileSync(`/proc/${d.name}/cmdline`, 'utf8').replace(/\0/g, ' ')); } catch {} } return o; })();
-  return list.some((c) => re.test(c) && !/cartridge|electron/i.test(c.split(' ')[0]));
+  const list = procs ? procs.map((c) => (Array.isArray(c) ? c : String(c).split(' '))) : (() => { const o = []; for (const d of ls('/proc')) if (/^\d+$/.test(d.name)) { try { o.push(fs.readFileSync(`/proc/${d.name}/cmdline`, 'utf8').split('\0').filter(Boolean)); } catch {} } return o; })();
+  return list.some((argv) => {
+    const prog = path.basename(argv[0] || '');
+    if (/cartridge|electron/i.test(prog)) return false;
+    const is = (x) => re.test(x) || re.test(x.replace(/[-_.]/g, ' '));
+    if (is(prog)) return true;
+    // flatpak run org.x.Emu / bwrap … / wine xenia_canary.exe: the app ID or the program it starts
+    return WRAPPERS.test(prog) && argv.slice(1).some((a) => !a.startsWith('-') && is(path.basename(a)));
+  });
 }
 
 // ---------------------------------------------------------------- the sync itself

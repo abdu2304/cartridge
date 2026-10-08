@@ -294,3 +294,17 @@ test('a save that can\'t be put in place says why: no emulator, or no user folde
   const r2 = await SS.syncUnit(SS.remoteOnly(romm.saves, new Set(), { home: fresh })[0], romm.rpcFor('B'), ledger(), { home: fresh, backupsRoot: bk, procs: [], remotes: romm.saves });
   assert.deepStrictEqual([r2.result, r2.why], ['unplaced', 'nofolder']);
 });
+
+// 0.9.58: "is the emulator open" looks at the program running, not at any text in a command line (a file manager open at
+// .local/share/eden, an editor, a shell) or every Switch save was skipped as busy
+test('an emulator counts as open only when its own program runs', () => {
+  const on = (emu, argv) => SS.running(emu, [argv]);
+  assert.ok(on('eden', ['/home/u/Applications/Eden-Linux-v0.0.3-x86_64.AppImage']));
+  assert.ok(on('eden', ['/tmp/.mount_EdenXy/usr/bin/eden', '-g', 'zelda.nsp']));
+  assert.ok(on('citron', ['flatpak', 'run', 'org.citron_emu.citron']));
+  assert.ok(on('dolphin', ['/usr/bin/dolphin-emu']));
+  assert.ok(on('xenia', ['/usr/bin/wine64-preloader', 'Z:/games/xenia_canary.exe']));
+  assert.ok(!on('eden', ['nautilus', '/home/u/.local/share/eden']));
+  assert.ok(!on('eden', ['/bin/bash', '-c', 'cd ~/.local/share/eden && ls']));
+  assert.ok(!on('eden', ['/home/u/Applications/Cartridge-x86_64.AppImage', '--eden']));
+});
