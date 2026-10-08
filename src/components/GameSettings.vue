@@ -122,7 +122,7 @@ onBeforeUnmount(() => layer?.pop());
 </script>
 
 <style scoped>
-.gs { width: min(760px, 94vw); max-height: 88vh; display: flex; flex-direction: column; gap: var(--s-3); }
+.gs { width: min(960px, 94vw); max-height: 88vh; display: flex; flex-direction: column; gap: var(--s-3); }
 .gs-head { display: flex; gap: var(--s-4); align-items: flex-start; }
 .gs-head h2 { margin: 2px 0 6px; font-size: var(--t-xl); line-height: 1.15; }
 .gs-head p { margin: 0; line-height: 1.45; }
@@ -130,5 +130,6 @@ onBeforeUnmount(() => layer?.pop());
 .gs-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 4px; }
 .gs-list > * { flex: none; }
 .gs-group { flex: none; padding: 10px 4px 2px; font-size: var(--t-xs); font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
-.gs-tabs { display: flex; align-items: center; gap: 10px; align-self: flex-start; }
+.gs-tabs { display: flex; align-items: center; gap: 10px; align-self: flex-start; max-width: 100%; }
+.gs-tabs .seg { flex-wrap: wrap; } /* 0.9.61: Dolphin has eight tabs; on a narrow window they wrap rather than run off */
 </style>
