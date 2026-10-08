@@ -50,6 +50,13 @@
       </template>
     </template>
 
+    <!-- 0.9.59 (owner: "search all layouts to find accurate saves"): every place each emulator keeps saves, Search for Saves -->
+    <button class="lrow ssc-where" data-focus @click="openModal('savelocations', {})">
+      <Icon name="mdiFolderSearchOutline" :size="24" />
+      <div class="l-mid"><b>Where Your Saves Are</b><span class="l-sub">Each emulator’s save folders, old copies, and Search for Saves</span></div>
+      <Icon name="mdiChevronRight" :size="20" />
+    </button>
+
     <div class="subh">How It Works</div>
     <div class="ssc-how glass">
       <div><Icon name="mdiPlayCircleOutline" :size="22" /><span><b>Before a game starts</b> Cartridge checks its saves with RomM and brings the newest here, like Steam Cloud. Games started from Steam sync when you come back to Cartridge.</span></div>
@@ -76,7 +83,7 @@ const countOf = (k) => (st.value?.last?.items ? st.value.last.items.filter((x) =
 function issue(it) {
   const emu = it.emuName || 'The emulator', game = gameOf(it) || 'this game';
   if (it.result === 'unplaced' && it.place === 'noemu') return { short: `No ${emu} set up here`, why: `This save of ${game} is in RomM, from another device, and no ${emu} is set up on this device to put it in.`, fix: `Set up ${emu} here (Settings → Emulators) and open it once, then press Sync Now.` };
-  if (it.result === 'unplaced') return { short: `${emu} hasn’t made its save folder yet`, why: `${emu} is here, but it hasn’t made the folder this save goes in yet${/switch/.test(it.key) ? ' (Switch emulators make their user folder the first time a game saves)' : ''}.`, fix: `Open ${emu}, start any game and save once, then press Sync Now. Cartridge never makes an emulator’s folders for it.` };
+  if (it.result === 'unplaced') return { short: `${emu} hasn’t made its save folder yet`, why: `${emu} is here, but it hasn’t made the folder this save goes in yet${/switch/.test(it.key) ? ' (Switch emulators make their user folder the first time a game saves)' : ''}.`, fix: `Open ${emu}, start any game and save once, then press Sync Now. Cartridge never makes an emulator’s folders for it. If ${emu} keeps saves somewhere unusual, Where Your Saves Are can search for them.` };
   if (it.result === 'busy') return { short: `${emu} was open`, why: `${emu} was running, and Cartridge never changes saves while their emulator is open.`, fix: `Close ${emu}, then press Sync Now.` };
   if (it.result === 'damaged') return { short: 'The download didn’t match RomM’s check', why: 'What came from RomM didn’t match the check RomM gave for it, so nothing was written.', fix: 'Press Sync Now to try again. If it keeps happening, the copy in RomM may be damaged: put back an older version from the game’s page.' };
   if (it.result === 'conflict') return { short: 'Changed on two devices', why: 'This save changed here and on another device since they last agreed. Cartridge never guesses which to keep.', fix: 'Choose which to keep in “Choose Which Save to Keep” above.' };
@@ -206,7 +213,7 @@ defineExpose({ load });
 .ssc-how .icon { flex: none; margin-top: 1px; color: var(--text); }
 .mono { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
 .ssc-games { display: flex; flex-direction: column; gap: var(--s-2); }
-.ssc-game { flex: none; }
+.ssc-game, .ssc-where { flex: none; }
 .ssc-cov { width: 36px; height: 48px; border-radius: var(--r-sm); object-fit: cover; flex: none; background: var(--s2); }
 .ssc-gi { color: var(--muted); flex: none; }
 @media (max-width: 1100px) { .ssc-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

@@ -38,6 +38,9 @@
               <div><span>In RomM</span><b>{{ s.inRomm ? 'Yes' : 'Not yet' }}</b></div>
               <div><span>Backups Here</span><b>{{ s.backups || 'None' }}</b></div>
             </div>
+            <!-- 0.9.59: how it was matched when only its name fitted, and older copies of it that aren't synced -->
+            <p v-if="s.loose" class="muted small">Matched by name: the save’s own title is the start of this game’s name, and no other game on this console fits.</p>
+            <p v-for="o in s.others || []" :key="o.path" class="muted small sg-other">An older copy in {{ o.emuName }} isn’t synced: <span class="mono">{{ short(o.path) }}</span></p>
             <button class="sg-path lrow" data-focus @click="copy(s.path)">
               <Icon name="mdiFolderOutline" :size="20" />
               <div class="l-mid"><span class="l-sub">Where It Is</span><b class="mono">{{ short(s.path) }}</b></div>
@@ -178,6 +181,7 @@ onBeforeUnmount(() => layer?.pop());
 .sg-facts > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .sg-facts span { font-size: var(--t-xs); color: var(--muted); }
 .sg-facts b { font-size: var(--t-sm); overflow-wrap: anywhere; }
+.sg-other .mono { overflow-wrap: anywhere; font-size: var(--t-xs); }
 .sg-path .mono { font-size: var(--t-xs); overflow-wrap: anywhere; font-weight: 500; }
 .sg-row-acts { gap: var(--s-2); flex-wrap: wrap; }
 /* the history: a line down the left with a dot per event */

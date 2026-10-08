@@ -62,9 +62,10 @@ function shape(s) {
     case 'pcsx2': return { key: 'ps2card:' + b, kind: isDir(p) ? 'dir' : 'file', card: true };
     case 'duckstation': return { key: 'ps1card:' + b, kind: 'file', card: !!s.shared };
     case 'dolphin':
-      if (s.kind === 'card') return { key: 'gccard:' + path.basename(path.dirname(p)) + '/' + b, kind: 'file', card: true };
-      if (/\/Wii\/title\/00010000\/[0-9a-f]{8}\/data$/i.test(p)) return { key: 'wii:' + path.basename(path.dirname(p)).toLowerCase(), kind: 'dir' };
-      return { key: 'gc:' + path.basename(path.dirname(path.dirname(p))) + '/' + b, kind: 'file' };
+      // region: the card's region folder (0.9.59: read by the scanner, as custom GCI folders hold one region each)
+      if (s.kind === 'card') return { key: 'gccard:' + (s.region || path.basename(path.dirname(p))) + '/' + b, kind: 'file', card: true };
+      if (/\/title\/00010000\/[0-9a-f]{8}\/data$/i.test(p)) return { key: 'wii:' + path.basename(path.dirname(p)).toLowerCase(), kind: 'dir' };
+      return { key: 'gc:' + (s.region || path.basename(path.dirname(path.dirname(p)))) + '/' + b, kind: 'file' };
     case 'cemu': return { key: 'wiiu:' + b.toLowerCase(), kind: 'dir' };
     case 'azahar': return { key: '3ds:' + path.basename(path.dirname(p)).toLowerCase(), kind: 'dir' };
     case 'xenia': return { key: 'x360:' + path.basename(path.dirname(p)).toUpperCase(), kind: 'dir' };
@@ -99,8 +100,11 @@ function retroarchStates(base) {
 
 // every unit on this device, matched to a library game. games: [{ id, name, platform, ids, discIds }]
 // carriers: { [consoleSlug]: romId } (the console's oldest game holds a whole memory card)
-function units({ home = os.homedir(), extra = {}, games = [], carriers = {}, nameOf = null } = {}) {
-  const scanned = S.scan({ home, extra, withSize: false }).filter((s) => SUPPORTED.includes(s.emu));
+// 0.9.59: only saves where the emulator reads them now (the save locator's 'use'); old copies are listed, not synced.
+// Two copies of one save in use (a Flatpak and an AppImage of one emulator): the newest is synced, the others are
+// named on it (others) so you can see why.
+function units({ home = os.homedir(), extra = {}, extraAt = {}, games = [], carriers = {}, nameOf = null } = {}) {
+  const scanned = S.scan({ home, extra, extraAt, withSize: false, oldToo: false }).filter((s) => SUPPORTED.includes(s.emu) && s.loc === 'use');
   for (const s of scanned) if (s.emu === 'retroarch') { const { saves } = retroarchDirs(s.base); s.rel = path.relative(saves, s.path); }
   const ra = [...new Set(scanned.filter((s) => s.emu === 'retroarch').map((s) => s.base))];
   for (const emu of ['retroarch']) for (const d of S.DATA[emu]) { const b = path.join(home, d); if (isDir(b) && !ra.includes(b)) ra.push(b); }
@@ -110,9 +114,16 @@ function units({ home = os.homedir(), extra = {}, games = [], carriers = {}, nam
   for (const s of scanned) {
     const sh = shape(s); if (!sh) continue;
     const romId = sh.card ? carriers[CONSOLE[s.emu]] ?? s.romIds?.[0] ?? null : s.romIds?.[0] ?? null;
-    const u = { key: sh.key, emu: s.emu, kind: sh.kind, path: s.path, base: s.base, label: s.label || '', sub: s.sub || '', romId, romIds: s.romIds || [], card: !!sh.card, slot: slotOf(s.emu, sh.key, sh.kind) }; // romIds: every game on a card (0.9.57, the game sheet)
+    const u = { key: sh.key, emu: s.emu, kind: sh.kind, path: s.path, base: s.base, label: s.label || '', sub: s.sub || '', romId, romIds: s.romIds || [], card: !!sh.card, slot: slotOf(s.emu, sh.key, sh.kind), ...(s.loose ? { loose: true } : {}) }; // romIds: every game on a card (0.9.57, the game sheet)
     if (romId == null) u.why = whyUnmatched(s, sh);
-    if (seen.has(u.key)) continue; // the same save found twice (an EmuDeck link and the folder it points at)
+    const twin = out.find((x) => x.key === u.key && !x.states);
+    if (twin) { // another copy of the same save: keep the newest
+      const a = changedAt(twin), b = changedAt(u);
+      const [keep, other] = b > a ? [u, twin] : [twin, u];
+      keep.others = [...(twin.others || []), { path: other.path, emu: other.emu, at: Math.min(a, b) }];
+      if (keep === u) out[out.indexOf(twin)] = u;
+      continue;
+    }
     seen.add(u.key); out.push(u);
   }
   for (const s of states) {
@@ -141,23 +152,38 @@ const slotOf = (emu, key, kind) => `cartridge:${familyOf(emu)}:${kind}:${key}`.s
 // ---------------------------------------------------------------- 2. place on this device
 // where a unit goes here when this device doesn't have it yet; null when it can't be placed safely (the emulator
 // hasn't made its folders yet: run it once)
-function placeFor(emu, key, { home = os.homedir(), extra = {} } = {}) {
+// 0.9.59: from the save locator's places in use (the emulator's own settings), folders you picked first
+function placeFor(emu, key, { home = os.homedir(), extra = {}, extraAt = {} } = {}) {
   const bases = [...(extra[emu] || []), ...(S.DATA[emu] || []).map((d) => path.join(home, d))].filter(isDir);
+  const spots = [...(extraAt[emu] || []).map((x) => ({ b: x.base || S.placeDir(x.at, ''), at: x.at || {} })), ...bases.flatMap((b) => { let ws = []; try { ws = S.whereOf(emu)(b); } catch {} return ws.filter((w) => w.loc === 'use').map((w) => ({ b, at: w.at || {} })); })];
   const [kind, id] = [key.slice(0, key.indexOf(':')), key.slice(key.indexOf(':') + 1)];
-  const firstDir = (d) => ls(d).filter((e) => e.isDirectory()).map((e) => path.join(d, e.name))[0] || null;
-  for (const b of bases) {
+  const firstDir = (d) => S.ls(d).filter((e) => e.isDirectory()).map((e) => path.join(d, e.name))[0] || null;
+  for (const { b, at } of spots) {
     switch (kind) {
-      case 'switch': { const u = firstDir(path.join(b, 'nand/user/save/0000000000000000')); if (u) return path.join(u, id); break; }
-      case 'ps3': { const u = path.join(b, 'dev_hdd0/home/00000001/savedata'); if (isDir(path.dirname(u))) return path.join(u, id); break; }
+      case 'switch': { const u = firstDir(path.join(at.nand || path.join(b, 'nand'), 'user/save/0000000000000000')); if (u) return path.join(u, id); break; }
+      case 'ps3': { const hdd = at.hdd0 || path.join(b, 'dev_hdd0'); if (isDir(path.join(hdd, 'home/00000001'))) return path.join(hdd, 'home/00000001/savedata', id); break; }
       case 'psp': if (isDir(path.join(b, 'PSP'))) return path.join(b, 'PSP/SAVEDATA', id); break;
-      case 'vita': if (isDir(path.join(b, 'ux0'))) return path.join(b, 'ux0/user/00/savedata', id); break;
-      // 0.9.57: shadPS4's <home>/<user ID>/savedata (saves.shadSaveDir), the older layouts as they are found
-      case 'ps4': { const sd = S.shadSaveDirs(b)[0]; if (!sd) break; if (/[\/]home[\/][^\/]+[\/]savedata$/.test(sd)) return path.join(sd, id); const u = ls(sd).find((e) => e.isDirectory() && !/^(CUSA|PCJS|PLJM|PCAS|PCKS)\d{5}$/.test(e.name)); if (u) return path.join(sd, u.name, id); break; }
-      case 'ps2card': case 'ps1card': if (isDir(path.join(b, 'memcards'))) return path.join(b, 'memcards', id); break;
-      case 'gccard': case 'gc': { const [region, file] = id.split('/'); if (isDir(path.join(b, 'GC', region))) return kind === 'gc' ? path.join(b, 'GC', region, 'Card A', file) : path.join(b, 'GC', region, file); break; }
-      case 'wii': if (isDir(path.join(b, 'Wii/title'))) return path.join(b, 'Wii/title/00010000', id, 'data'); break;
-      case 'wiiu': if (isDir(path.join(b, 'mlc01/usr'))) return path.join(b, 'mlc01/usr/save/00050000', id); break;
-      case '3ds': { const n = path.join(b, 'sdmc/Nintendo 3DS'), a = firstDir(n), c = a && firstDir(a); if (c) return path.join(c, 'title/00040000', id, 'data'); break; }
+      case 'vita': { const pref = at.pref || b; if (isDir(path.join(pref, 'ux0'))) return path.join(pref, 'ux0/user/00/savedata', id); break; }
+      // shadPS4: <home>/<user ID>/savedata on current builds; older builds' savedata/<user ID>
+      case 'ps4': {
+        const sd = (at.savedata || S.shadSaveDirs(b))[0]; if (!sd) break;
+        if (/[\/]home[\/][^\/]+[\/]savedata$/.test(sd)) { if (isDir(path.dirname(sd))) return path.join(sd, id); break; }
+        if (!isDir(sd)) break;
+        const u = S.ls(sd).find((e) => e.isDirectory() && !S.PS4_ID.test(e.name));
+        return path.join(sd, u ? u.name : '1', id);
+      }
+      case 'ps2card': case 'ps1card': { const md = at.memcards || path.join(b, 'memcards'); if (isDir(md)) return path.join(md, id); break; }
+      case 'gccard': case 'gc': {
+        const [region, file] = id.split('/');
+        const own = kind === 'gc' && (at.gci || []).find((d) => path.basename(d) === region);
+        if (own) return path.join(own, file);
+        const gc = at.gc === undefined ? path.join(b, 'GC') : at.gc;
+        if (gc && isDir(path.join(gc, region))) return kind === 'gc' ? path.join(gc, region, 'Card A', file) : path.join(gc, region, file);
+        break;
+      }
+      case 'wii': { const w = at.wii || path.join(b, 'Wii'); if (isDir(path.join(w, 'title'))) return path.join(w, 'title/00010000', id, 'data'); break; }
+      case 'wiiu': { const mlc = at.mlc || path.join(b, 'mlc01'); if (isDir(path.join(mlc, 'usr'))) return path.join(mlc, 'usr/save/00050000', id); break; }
+      case '3ds': { const n = path.join(at.sdmc || path.join(b, 'sdmc'), 'Nintendo 3DS'), a = firstDir(n), c = a && firstDir(a); if (c) return path.join(c, 'title/00040000', id, 'data'); break; }
       case 'x360': { const p = firstDir(path.join(b, 'content')); if (p) return path.join(p, id, '00000001'); break; }
       case 'ra': { const { saves } = retroarchDirs(b); if (isDir(saves)) return path.join(saves, id); break; }
       case 'rastate': { const { states } = retroarchDirs(b); const rel = id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : ''; if (isDir(states)) return path.join(states, rel); break; }
@@ -254,6 +280,9 @@ function backup(u, backupsRoot, keep = 10) {
   return dir;
 }
 function writeUnit(u, files, target, backupsRoot) {
+  // a save reached through a link (a folder moved to another drive and linked back) is written where it really is,
+  // so the link stays and the save doesn't land on this drive instead (0.9.59)
+  try { target = fs.realpathSync(target); } catch { try { target = path.join(fs.realpathSync(path.dirname(target)), path.basename(target)); } catch {} }
   const kept = backup({ ...u, path: target, files: u.kind === 'files' ? files.filter(([, b]) => b).map(([n]) => n) : u.files }, backupsRoot);
   if (u.kind === 'dir') {
     const tmp = target + '.cartridge-new', old = target + '.cartridge-old';
@@ -312,7 +341,7 @@ async function remotesOf(u, rpc, opts) {
   return remotesFor(rpc.listAll ? await rpc.listAll() : await rpc.list(u.romId, u.slot), u);
 }
 // is an emulator of this unit's family set up here? (why a save from another device can't be put in place)
-const hasEmu = (emu, { home = os.homedir(), extra = {} } = {}) => [...(extra[emu] || []), ...(S.DATA[emu] || []).map((d) => path.join(home, d))].some(isDir);
+const hasEmu = (emu, { home = os.homedir(), extra = {}, extraAt = {} } = {}) => (extraAt[emu] || []).length > 0 || [...(extra[emu] || []), ...(S.DATA[emu] || []).map((d) => path.join(home, d))].some(isDir);
 async function syncUnit(u, rpc, ledger, opts = {}) {
   if (u.romId == null && !u.remote) return { key: u.key, result: 'unmatched' };
   const remotes = await remotesOf(u, rpc, opts);
@@ -391,6 +420,33 @@ function rommRpc({ base, headers, devId = null, fetchImpl = fetch }) {
   };
 }
 
+// Move saves from an old place (or one the search found) into the place the emulator uses now (0.9.59, Where Your
+// Saves Are → Move). For each save: the copy in use is kept when it's newer (nothing to move), else it's backed up and
+// the old copy is written in its place, checked by hash, and the old copy is renamed "<name>.cartridge-moved" so it no
+// longer shows as a second copy. Nothing is deleted. Never while the emulator is open.
+// saves: scanned saves ({ emu, kind, path, region… }); opts as placeFor plus backupsRoot, procs
+function moveInto(saves, opts = {}) {
+  const out = [];
+  for (const s of saves) {
+    const sh = shape(s);
+    if (!sh || sh.kind === 'files') { out.push({ path: s.path, result: 'skipped' }); continue; }
+    if (running(s.emu, opts.procs)) { out.push({ path: s.path, key: sh.key, result: 'busy' }); continue; }
+    const target = placeFor(s.emu, sh.key, opts);
+    if (!target) { out.push({ path: s.path, key: sh.key, result: 'unplaced' }); continue; }
+    let realS = s.path, realT = target; try { realS = fs.realpathSync(s.path); } catch {} try { realT = fs.realpathSync(target); } catch {}
+    if (realS === realT) { out.push({ path: s.path, key: sh.key, result: 'same' }); continue; }
+    const from = { key: sh.key, kind: sh.kind, path: s.path }, to = { key: sh.key, kind: sh.kind, path: target };
+    if (exists(target) && changedAt(to) >= changedAt(from)) { out.push({ path: s.path, key: sh.key, target, result: 'newer' }); continue; }
+    const files = entriesOf(from).map(([n, p]) => [n, p ? fs.readFileSync(p) : null]);
+    const want = hashUnit(from);
+    writeUnit(to, files, target, opts.backupsRoot);
+    if (hashUnit(to) !== want) { out.push({ path: s.path, key: sh.key, target, result: 'error', error: 'The copy didn’t match the original.' }); continue; }
+    try { fs.renameSync(s.path, s.path + '.cartridge-moved'); } catch {}
+    out.push({ path: s.path, key: sh.key, target, result: 'moved' });
+  }
+  return out;
+}
+
 // units RomM has that this device doesn't (from another device), so they can be brought here: remote saves whose
 // slot is ours and whose key isn't among the local units
 function remoteOnly(remotes, localKeys, opts = {}) {
@@ -409,4 +465,4 @@ function remoteOnly(remotes, localKeys, opts = {}) {
   return [...out.values()];
 }
 
-module.exports = { FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };
+module.exports = { moveInto, FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };

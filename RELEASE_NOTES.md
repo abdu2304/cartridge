@@ -1,25 +1,24 @@
-## Cartridge 0.9.58 · Saves You Can Trust
-
-### Fixed
-- **Save Sync between devices.** Three things kept two devices from sharing a save:
-  - **A save was looked up only under this device's RomM entry for the game.** If the other device matched the game to a different entry (the game on one, its update file on the other), each device kept its own copy and never saw the other's. Saves are now found by the save itself, under any game in your RomM, and an upload joins the entry that already holds the save, so both devices end up on one.
-  - **A save's slot was named after the emulator.** Eden on one device and Citron (or any renamed build) on another never met. Slots are now one per game per console, and saves already in RomM from earlier versions are still found.
-  - **"Is the emulator open?" was fooled by any mention of its name.** A file manager or editor open at an Eden folder, or a script naming one, made every Switch save count as "emulator open", and it was skipped every time without a word. Only the emulator's own program counts now.
-  - Tested with two devices through a fake RomM and the real app: Zelda: Tears of the Kingdom matched to different RomM entries on each, saved on one, brought to the other, played there, and back.
-- **Vita3K's sheet opens again.** EmuDeck keeps Vita3K as an AppImage named "Vita3K" in its own folder, which the Emulators list skipped, so the card only said "already on this device".
-- **Vita3K installs are judged correctly.** Only what Vita3K says during this install counts (an old line in its log read as this install), and the game is found by Vita3K's own ID and the folders new since the install began, wherever Vita3K put it.
-- **Update All no longer downloads again.** It runs in the background as one job, so leaving the Emulators page changes nothing. Each emulator updates once, even when two paths lead to the same file.
-- **Sync Now keeps going when you leave the page.** It shows in Downloads, and Saves and Sync picks it back up when you return.
-- **Recently Played on Start** no longer cuts halfway: the next game's picture fades in only once it has loaded.
+## Cartridge 0.9.59 · Every Save, Found
 
 ### New
-- **Needs Attention** in Cartridge Save Sync: every save that couldn't move this time is counted, with the reason and what fixes it (the emulator isn't set up here, hasn't made its save folder yet, was open, or a download failed its check). Nothing is silent any more.
-- **Every game on a memory card is listed** under Your Games (PS2 and other memory cards), each opening its own sheet.
-- **Switch saves from the whole Eden family** (Eden, Citron, yuzu, Sudachi, suyu, torzu) sync with each other.
+- **The save locator.** Cartridge now reads where each emulator keeps saves from the emulator's own settings, the same way the emulator reads them, instead of a fixed list of folders. It covers every layout each one has used:
+  - **shadPS4:** current builds (`home/<user>/savedata`, or `home_dir` in config.json) and older builds (`savedata/<user>`, or `saveDataPath` in config.toml), portable copies and the Flatpak.
+  - **Eden and the yuzu family:** `save_directory` and `nand_directory`, and portable `user` folders.
+  - **RPCS3:** where `dev_hdd0` is set in vfs.yml.
+  - **PCSX2 and DuckStation:** their memory card folder settings.
+  - **Dolphin:** the Wii NAND folder, GCI folders and memory card files.
+  - **Cemu:** the `mlc_path` folder.
+  - **Azahar and Citra:** custom SD card storage.
+  - **Vita3K:** its `pref-path`.
+  - Save Sync and Syncthing both use it.
+- **Where Your Saves Are** (Saves and Sync → Cartridge Save Sync): every place each emulator keeps saves, how many are there and how new, and why Cartridge looks there.
+  - **In Use** folders are synced.
+  - **Old Copy** folders (a layout the emulator no longer reads) are shown and left alone. Press **Move Into Use** to bring them over: when the save already in use is newer it stays, the save a copy replaces is backed up first, and the old copy is kept, renamed, never deleted.
+- **Search for Saves** looks through your home folder and your other drives (microSD included) for save folders in unusual places, such as a portable emulator or a copy on another drive. It runs once by itself a few minutes after start, then whenever you press it. For a folder it finds, choose **Use This Folder** (that emulator really keeps saves there) or **Move Into Use**. It never syncs a found copy on its own.
 
-### Changed
-- **Chosen versus focused.** In the dark looks, something chosen (the open Settings section, the chosen tab, chips) is now a thin ring in your highlight colour; only where you are is the solid fill. Light keeps its soft grey.
-- **Start moves.** Big art tiles (2 by 2 or larger: Continue Playing, pinned games, Spotlight, Game of the Day) pan slowly with a gentle zoom, light effects on or off. Reduce Motion stops it.
-- **Saves and Sync has two tabs**, Cartridge Save Sync and Syncthing. Syncthing's Games, This Device and Main Server are cards that open in place (B goes back), and the choice of which one this device uses is at the end of both tabs.
-- **Ready to Play** looks like the Download button, with a green tick.
-- **Softer Light shadows** that fade out instead of ending sharply.
+### Fixed
+- **PS4 saves weren't matched to their games.** shadPS4 names a save after the game's code (CUSA…), and Cartridge only knew a PS4 game's code when it was in the RomM file name. It now reads the code from the downloaded game itself (its `param.sfo`, or the header of a `.pkg`).
+- **Saves matched by name only** now try a looser match when nothing else fits: "Bloodborne" finds "Bloodborne: The Old Hunters Edition". It only matches on the save's own console, and only when exactly one game fits.
+- **Saves moved to another drive and linked back weren't found.** Cartridge treated a linked folder as "not a folder" when listing, so saves behind a link were skipped, on every emulator. Links are followed now, and a save behind a link is written where it really is, so the link stays.
+- **A save matched a game of the same name on another console** (a PS4 save could land on a PS3 game). Names now match on the save's own console.
+- **Two copies of one save** (a Flatpak and an AppImage of the same emulator): the newest is synced, and the game's save sheet names the other copy.

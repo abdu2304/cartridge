@@ -12,6 +12,7 @@
 // - norm(title): the one title normalisation, shared by all of the above.
 // No network, no writes outside its own cache file. Pure enough to test with a fake library (test/gameId.test.js).
 const fs = require('fs');
+const path = require('path');
 
 // the serial patterns Syncthing matching already used (PS1 to PS3, PSP, Vita, PS4/PS5, Switch and 3DS title IDs)
 const { serialsIn } = require('./syncthing');
@@ -20,6 +21,25 @@ const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-
   .replace(/\s*[\(\[][^\)\]]*[\)\]]/g, '').replace(/\b(trophies|trophy set|achievements)\b/g, '').replace(/^the\s+|,\s*the\b/g, '')
   .replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
 const up = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+// PS4 games (0.9.59, owner: PS4 saves weren't matched): the title ID read from the game itself, so a save folder
+// named CUSA… finds it whatever RomM calls the file. A folder game: sce_sys/param.sfo's TITLE_ID (or the code in its
+// CONTENT_ID), in the folder or a folder inside it (the one holding eboot.bin); a .pkg: the content ID in its header
+// at 0x40 ("UP9000-CUSA00900_00-…", after the magic 7F 43 4E 54).
+function ps4Ids(where) {
+  const S = require('./saves'), out = new Set();
+  const fromDir = (d) => { const p = S.sfo(path.join(d, 'sce_sys/param.sfo')); const id = /^[A-Z]{4}\d{5}$/.test(p.TITLE_ID || '') ? p.TITLE_ID : (/-([A-Z]{4}\d{5})_/.exec(p.CONTENT_ID || '') || [])[1]; if (id) out.add(id); };
+  const fromPkg = (f) => {
+    let fd; try { fd = fs.openSync(f, 'r'); const b = Buffer.alloc(0x64); fs.readSync(fd, b, 0, 0x64, 0); if (b.readUInt32BE(0) !== 0x7F434E54) return; const m = /^[A-Z]{2}\d{4}-([A-Z]{4}\d{5})_/.exec(b.toString('latin1', 0x40, 0x64)); if (m) out.add(m[1]); } catch {} finally { if (fd != null) try { fs.closeSync(fd); } catch {} }
+  };
+  let st; try { st = fs.statSync(where); } catch { return []; }
+  if (st.isFile()) { if (/\.pkg$/i.test(where)) fromPkg(where); return [...out]; }
+  fromDir(where);
+  let ents = []; try { ents = fs.readdirSync(where, { withFileTypes: true }); } catch {}
+  for (const e of ents) { const p = path.join(where, e.name); if (e.isDirectory()) fromDir(p); else if (/\.pkg$/i.test(e.name)) fromPkg(p); }
+  return [...out];
+}
+const READERS = 2; // 2: PS4 (0.9.59)
 
 // ctx: { file (cache path), roms() -> [rom], whereOf(id) -> path or '', extract(rom, where) -> [id], log }
 function createIdentity(ctx) {
@@ -30,7 +50,7 @@ function createIdentity(ctx) {
   function fileIds(rom, where) {
     if (!where || !ctx.extract) return [];
     let st; try { st = fs.statSync(where); } catch { return []; }
-    const k = `${where}:${st.size}:${Math.round(st.mtimeMs)}`, c = load();
+    const k = `${where}:${st.size}:${Math.round(st.mtimeMs)}:${READERS}`, c = load(); // READERS: a new reader reads every game again
     if (c[k]) return c[k];
     let ids = [];
     try { ids = [...new Set((ctx.extract(rom, where) || []).filter(Boolean).map(up))]; } catch (e) { ctx.log?.('game id read failed', where, e.message); }
@@ -71,4 +91,4 @@ function createIdentity(ctx) {
   return { idsOf, fileIds, nameIds, findRom, index, bump: () => { memo = new Map(); } };
 }
 
-module.exports = { createIdentity, serialsIn, norm };
+module.exports = { ps4Ids, READERS, createIdentity, serialsIn, norm };
