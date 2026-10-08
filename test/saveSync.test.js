@@ -49,11 +49,12 @@ function fakeRomm() {
   const hashOf = (buf) => SS.hashArchive(SS.unzip(buf));
   const rpcFor = (dev) => ({
     list: async (romId, slot) => saves.filter((s) => s.rom_id === romId && s.slot === slot),
+    listAll: async () => saves.slice(),
     upload: async (u, buf, name, { overwrite } = {}) => {
       const slotSaves = saves.filter((s) => s.rom_id === u.romId && s.slot === u.slot).sort((a, b) => b.updated_at - a.updated_at);
       const latest = slotSaves[0], sync = latest && syncs.get(dev + ':' + latest.id);
       if (latest && !overwrite && (!sync || sync < latest.updated_at)) return { conflict: true }; // 409
-      const s = { id: ++id, rom_id: u.romId, slot: u.slot, buf, content_hash: hashOf(buf), updated_at: ++clock, file_name: name };
+      const s = { id: ++id, rom_id: u.romId, slot: u.slot, emulator: u.emu, buf, content_hash: hashOf(buf), updated_at: ++clock, file_name: name };
       saves.push(s); syncs.set(dev + ':' + s.id, s.updated_at);
       return s;
     },
@@ -76,15 +77,16 @@ test('units: every kind found, keyed without the device\'s own user folder, card
   const st = by['rastate:Snes9x/Super Metroid (USA)'];
   assert.deepStrictEqual(st.files, ['Super Metroid (USA).state', 'Super Metroid (USA).state1']);
   assert.strictEqual(st.romId, 3);
-  assert.match(by['switch:' + SWITCH_ID].slot, /^cartridge:eden:dir:switch:/);
+  assert.match(by['switch:' + SWITCH_ID].slot, /^cartridge:switch:dir:switch:/); // 0.9.58: the console family, not the emulator
 });
 
-test('only Eden for Switch saves', () => {
+test('the Eden family for Switch saves, never Ryujinx', () => {
   const h = device('AAAA1111');
   put(h, `.local/share/citron/nand/user/save/0000000000000000/X/${'0100000000010000'}/a.bin`, 'c');
   put(h, '.config/Ryujinx/bis/user/save/0000000000000001/0/a.bin', 'r');
-  const keys = SS.units({ home: h, games: GAMES }).map((u) => u.emu);
-  assert.ok(!keys.includes('citron') && !keys.includes('ryujinx'));
+  const us = SS.units({ home: h, games: GAMES });
+  assert.ok(us.some((u) => u.emu === 'citron' && u.slot.startsWith('cartridge:switch:dir:')));
+  assert.ok(!us.some((u) => u.emu === 'ryujinx'));
 });
 
 test('hash: the same as RomM\'s for the zip Cartridge uploads', () => {
@@ -183,7 +185,7 @@ test('the RomM client against a fake RomM server', async () => {
     for await (const c of req) body.push(c);
     const buf = Buffer.concat(body), send = (code, o) => { res.writeHead(code, { 'Content-Type': o instanceof Buffer ? 'application/octet-stream' : 'application/json' }); res.end(o instanceof Buffer ? o : JSON.stringify(o)); };
     if (req.headers.authorization !== 'Bearer t') return send(403, {});
-    if (req.method === 'GET' && url.pathname === '/api/saves') return send(200, saves.filter((s) => s.rom_id === Number(q.rom_id) && (!q.slot || s.slot === q.slot)).map(({ bytes, ...s }) => s));
+    if (req.method === 'GET' && url.pathname === '/api/saves') return send(200, saves.filter((s) => (!q.rom_id || s.rom_id === Number(q.rom_id)) && (!q.slot || s.slot === q.slot)).map(({ bytes, ...s }) => s));
     if (req.method === 'POST' && url.pathname === '/api/saves') {
       const form = await new Request('http://x', { method: 'POST', headers: { 'content-type': req.headers['content-type'] }, body: buf }).formData();
       const file = Buffer.from(await form.get('saveFile').arrayBuffer());
@@ -233,4 +235,76 @@ test('an unmatched save says why: a memory card, an ID not in the library, a nam
   assert.deepStrictEqual(SS.whyUnmatched({ emu: 'rpcs3', keys: { serial: 'blus30443', title: 'Demon’s Souls' } }), { code: 'id', id: 'BLUS30443', title: 'Demon’s Souls', console: 'ps3' });
   assert.deepStrictEqual(SS.whyUnmatched({ emu: 'retroarch', keys: { name: 'Super Metroid (USA)' } }), { code: 'name', name: 'Super Metroid (USA)', console: null });
   assert.deepStrictEqual(SS.whyUnmatched({ emu: 'dolphin', keys: {} }), { code: 'none', console: 'ngc' });
+});
+
+// 0.9.58 (owner: Zelda's save found on the Bazzite PC never reached the ROG Ally, both with Eden): saves meet by key and
+// console, whatever the emulator is called and whichever RomM entry each device matched the game to
+test('two devices meet: different RomM entries for the same game, Eden and Citron, saves from before 0.9.58', async () => {
+  const romm = fakeRomm(), bk = tmp(), opts = (home, extra = {}) => ({ home, backupsRoot: bk, procs: [], ...extra });
+  const GA = [{ id: 1, name: 'The Legend of Zelda', ids: [SWITCH_ID] }], GB = [{ id: 11, name: 'The Legend of Zelda [Update]', ids: [SWITCH_ID] }];
+  // A: Eden, Zelda as RomM entry 1
+  const A = tmp(); put(A, `.local/share/eden/nand/user/save/0000000000000000/AAAA/${SWITCH_ID}/save.bin`, 'zelda A');
+  const la = ledger();
+  const ua = SS.units({ home: A, games: GA }).find((u) => u.key === 'switch:' + SWITCH_ID);
+  assert.strictEqual((await SS.syncUnit(ua, romm.rpcFor('A'), la, opts(A))).result, 'up');
+  // B: Citron with no Zelda save yet, Zelda as RomM entry 11: it comes down into Citron's own user folder
+  const B = tmp(); fs.mkdirSync(path.join(B, '.local/share/citron/nand/user/save/0000000000000000/BBBB'), { recursive: true });
+  const lb = ledger();
+  const rem = SS.remoteOnly(romm.saves, new Set(SS.units({ home: B, games: GB }).map((u) => u.key)), { home: B });
+  assert.strictEqual(rem.length, 1); assert.strictEqual(rem[0].emu, 'citron');
+  assert.strictEqual((await SS.syncUnit(rem[0], romm.rpcFor('B'), lb, opts(B, { remotes: romm.saves }))).result, 'down');
+  assert.strictEqual(fs.readFileSync(path.join(B, `.local/share/citron/nand/user/save/0000000000000000/BBBB/${SWITCH_ID}/save.bin`), 'utf8'), 'zelda A');
+  // B plays: its upload goes into entry 1 (where the save already is), and A brings it down
+  put(B, `.local/share/citron/nand/user/save/0000000000000000/BBBB/${SWITCH_ID}/save.bin`, 'zelda B');
+  const ub = SS.units({ home: B, games: GB }).find((u) => u.key === 'switch:' + SWITCH_ID);
+  assert.strictEqual(ub.romId, 11);
+  assert.strictEqual((await SS.syncUnit(ub, romm.rpcFor('B'), lb, opts(B, { remotes: romm.saves }))).result, 'up');
+  assert.strictEqual(romm.saves[romm.saves.length - 1].rom_id, 1, 'kept with the copy already in RomM');
+  assert.strictEqual((await SS.syncUnit(ua, romm.rpcFor('A'), la, opts(A, { remotes: romm.saves }))).result, 'down');
+  assert.strictEqual(fs.readFileSync(path.join(A, `.local/share/eden/nand/user/save/0000000000000000/AAAA/${SWITCH_ID}/save.bin`), 'utf8'), 'zelda B');
+  // a device that had its own save before ever syncing: a question, never two separate copies
+  const C = tmp(); put(C, `.local/share/eden/nand/user/save/0000000000000000/CCCC/${SWITCH_ID}/save.bin`, 'zelda C');
+  const uc = SS.units({ home: C, games: GB }).find((u) => u.key === 'switch:' + SWITCH_ID);
+  assert.strictEqual((await SS.syncUnit(uc, romm.rpcFor('C'), ledger(), opts(C, { remotes: romm.saves }))).result, 'conflict');
+});
+
+test('saves written before 0.9.58 (slot named after the emulator) are still found', async () => {
+  const romm = fakeRomm(), bk = tmp();
+  const A = tmp(); put(A, `.local/share/eden/nand/user/save/0000000000000000/AAAA/${SWITCH_ID}/save.bin`, 'old zelda');
+  const ua = SS.units({ home: A, games: GAMES }).find((u) => u.key === 'switch:' + SWITCH_ID);
+  await romm.rpcFor('A').upload({ ...ua, slot: `cartridge:eden:dir:switch:${SWITCH_ID}` }, SS.zip(SS.entriesOf(ua)), 'x.zip', {});
+  const B = tmp(); fs.mkdirSync(path.join(B, '.local/share/eden/nand/user/save/0000000000000000/BBBB'), { recursive: true });
+  const rem = SS.remoteOnly(romm.saves, new Set(), { home: B });
+  assert.strictEqual(rem.length, 1);
+  assert.strictEqual(rem[0].slot, `cartridge:switch:dir:switch:${SWITCH_ID}`);
+  assert.strictEqual((await SS.syncUnit(rem[0], romm.rpcFor('B'), ledger(), { home: B, backupsRoot: bk, procs: [], remotes: romm.saves })).result, 'down');
+  assert.strictEqual(SS.parseSlot('cartridge:eden:dir:switch:X').family, 'switch');
+  assert.strictEqual(SS.parseSlot('cartridge:switch:dir:switch:X').family, 'switch');
+});
+
+test('a save that can\'t be put in place says why: no emulator, or no user folder yet', async () => {
+  const romm = fakeRomm(), bk = tmp();
+  const A = tmp(); put(A, `.local/share/eden/nand/user/save/0000000000000000/AAAA/${SWITCH_ID}/save.bin`, 'z');
+  const ua = SS.units({ home: A, games: GAMES }).find((u) => u.key === 'switch:' + SWITCH_ID);
+  await SS.syncUnit(ua, romm.rpcFor('A'), ledger(), { home: A, backupsRoot: bk, procs: [] });
+  const none = tmp();
+  const r1 = await SS.syncUnit(SS.remoteOnly(romm.saves, new Set(), { home: none })[0], romm.rpcFor('B'), ledger(), { home: none, backupsRoot: bk, procs: [], remotes: romm.saves });
+  assert.deepStrictEqual([r1.result, r1.why], ['unplaced', 'noemu']);
+  const fresh = tmp(); fs.mkdirSync(path.join(fresh, '.local/share/eden/nand/user/save'), { recursive: true });
+  const r2 = await SS.syncUnit(SS.remoteOnly(romm.saves, new Set(), { home: fresh })[0], romm.rpcFor('B'), ledger(), { home: fresh, backupsRoot: bk, procs: [], remotes: romm.saves });
+  assert.deepStrictEqual([r2.result, r2.why], ['unplaced', 'nofolder']);
+});
+
+// 0.9.58: "is the emulator open" looks at the program running, not at any text in a command line (a file manager open at
+// .local/share/eden, an editor, a shell) or every Switch save was skipped as busy
+test('an emulator counts as open only when its own program runs', () => {
+  const on = (emu, argv) => SS.running(emu, [argv]);
+  assert.ok(on('eden', ['/home/u/Applications/Eden-Linux-v0.0.3-x86_64.AppImage']));
+  assert.ok(on('eden', ['/tmp/.mount_EdenXy/usr/bin/eden', '-g', 'zelda.nsp']));
+  assert.ok(on('citron', ['flatpak', 'run', 'org.citron_emu.citron']));
+  assert.ok(on('dolphin', ['/usr/bin/dolphin-emu']));
+  assert.ok(on('xenia', ['/usr/bin/wine64-preloader', 'Z:/games/xenia_canary.exe']));
+  assert.ok(!on('eden', ['nautilus', '/home/u/.local/share/eden']));
+  assert.ok(!on('eden', ['/bin/bash', '-c', 'cd ~/.local/share/eden && ls']));
+  assert.ok(!on('eden', ['/home/u/Applications/Cartridge-x86_64.AppImage', '--eden']));
 });

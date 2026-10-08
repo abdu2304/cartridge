@@ -186,16 +186,15 @@ async function updateAll() {
   if (!list.length) return;
   const names = list.map((u) => `${u.label}: ${u.version || 'this copy'} → ${shortVer(u.update)}`).join('\n');
   if (!(await confirm(`Update ${list.length} Emulator${list.length === 1 ? '' : 's'}?`, `${names}\n\nOne after another, each at the same path, so your Steam shortcuts keep working. Close them first.`, 'Update All'))) return;
-  const bad = [];
-  for (const [i, u] of list.entries()) {
-    allRun.value = { done: i, of: list.length };
-    upRun.value = u.path || u.fp; upPct.value = null;
-    try { await call('emuup:run', { id: u.id, kind: u.kind, fp: u.fp, where: u.where, path: u.path, force: false }); }
-    catch (err) { bad.push(`${u.label}: ${err.message}`); }
-  }
+  // 0.9.58: the run happens in the background (emuup:all), so leaving this page changes nothing; progress comes back
+  // through emu-all events, and a page opened later picks it up (emuup:allState)
+  allRun.value = { done: 0, of: list.length };
+  try {
+    const r = await call('emuup:all', { items: JSON.parse(JSON.stringify(list.map((u) => ({ id: u.id, kind: u.kind, fp: u.fp, where: u.where, path: u.path, label: u.label })))) });
+    const ok = r.of - r.bad.length;
+    toast(r.bad.length ? `${ok} updated · ${r.bad.length} couldn’t be: ${r.bad[0]}` : `${ok} emulator${ok === 1 ? '' : 's'} updated`, r.bad.length ? 'error' : 'ok', r.bad.length ? 8000 : 3500, 'mdiUpdate');
+  } catch (err) { toast(err.message, 'error', 5000); }
   allRun.value = null; upRun.value = '';
-  const ok = list.length - bad.length;
-  toast(bad.length ? `${ok} updated · ${bad.length} couldn’t be: ${bad[0]}` : `${ok} emulator${ok === 1 ? '' : 's'} updated`, bad.length ? 'error' : 'ok', bad.length ? 8000 : 3500, 'mdiUpdate');
   await loadUps(true);
 }
 // 0.9.23 (owner: delete and download emulators again, stable or pre-release, shadPS4's versions):
@@ -377,7 +376,7 @@ async function getAll() {
 let ghCalling = false;
 watch(() => bgJob('emu:'), (j) => { if (j) { upRun.value = j.key.slice(4); upPct.value = j.pct ?? null; } else if (upRun.value) { upRun.value = ''; loadUps(true); } }, { immediate: true });
 watch(() => bgJob('custom:'), (j) => { if (j) { gh.value.open = true; gh.value.busy = true; gh.value.pct = j.pct ?? null; } else if (gh.value.busy && !ghCalling) { gh.value.busy = false; load(); loadUps(true); } }, { immediate: true });
-let off = null, offP = null, offU = null, lastDone = 0;
+let off = null, offP = null, offU = null, offA = null, lastDone = 0;
 const told = new Set();
 // masonry (0.9.47, owner: a console with one emulator shouldn't take a row as tall as one with three): same
 // column widths, each card as tall as what's in it, the next card moves up under it. Order stays left to right
@@ -407,11 +406,15 @@ onMounted(async () => {
   });
   offP = window.cart.on('emuget-progress', (m) => { const x = q.value.find((y) => y.key === m.key && y.id === m.id && y.state === 'run'); if (x && m.pct != null) x.pct = m.pct; });
   offU = window.cart.on('emu-update', (m) => { if (m.path === upRun.value && m.pct != null) upPct.value = m.pct; });
+  // Update All in the background (0.9.58): which one is updating, also after coming back to this page
+  const follow = (m) => { if (!m || m.ended) { if (allRun.value) { allRun.value = null; upRun.value = ''; loadUps(true); } return; } allRun.value = { done: m.done, of: m.of }; if (m.path) { upRun.value = m.path; upPct.value = null; } };
+  offA = window.cart.on('emu-all', follow);
+  call('emuup:allState').then((m) => m && follow(m)).catch(() => {});
   q.value = (await call('emuget:state').catch(() => null)) || q.value; // installs queued earlier carry on
   loadUps(); // at the same time as the list (0.9.37)
   if (phase.value === 'where') await loadDrives(); else { if (props.flow) fresh.value = await call('emuget:fresh').catch(() => ({ fresh: false })); await load(); }
 });
-onBeforeUnmount(() => { off?.(); offP?.(); offU?.(); });
+onBeforeUnmount(() => { off?.(); offP?.(); offU?.(); offA?.(); });
 defineExpose({ load });
 </script>
 
@@ -434,7 +437,7 @@ defineExpose({ load });
 .eg-gh.open { grid-column: 1 / -1; gap: var(--s-3); }
 .eg-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .eg-chip { padding: 8px 14px; border-radius: 999px; border: 0; background: var(--s2); color: inherit; font: inherit; font-size: var(--t-sm); }
-.eg-chip.on { background: var(--sel); color: var(--on-sel); }
+.eg-chip.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .eg-chip:focus { background: var(--focus); color: var(--on-focus); outline: none; }
 .eg-ghbar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 .eg-ghbar i { display: block; height: 100%; background: currentColor; transition: width var(--progress); }

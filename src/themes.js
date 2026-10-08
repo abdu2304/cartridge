@@ -194,12 +194,15 @@ export function applyTheme(uiOrName) {
   if (surf.bg && !black && !lightT && surf.glassA < 1) S[0] = surf.bg;
   // OLED (0.9.41, owner: "no difference from Cartridge"): black panels too, set apart by a fine edge (body.theme-oled)
   if (t.oled) { S[1] = '#000000'; S[2] = '#101012'; S[3] = '#1c1c1f'; }
-  // chosen but not where you are (0.9.2: a fill, never stripes). 0.9.57 (owner: the grey highlights "look like absolute
-  // shit"): in the dark looks the chosen fill is your highlight colour, solid, with its own text colour (--on-sel), the
-  // same as focus; focus adds its ring. Light keeps its soft grey, which reads as chosen on a light page.
+  // chosen but not where you are (0.9.2: a fill, never stripes). 0.9.57 made it your highlight colour, solid; the owner
+  // then found chosen and focused looked the same (0.9.58: "makes the user think it's selected when it's not"). In the
+  // dark looks chosen is now a thin ring in your highlight colour with normal text (--sel-ring, --sel-bg clear), and
+  // only focus is the solid fill. Light keeps its soft grey fill, which reads as chosen on a light page.
   r.setProperty('--sel', lightT ? '#d1d1d8' : fo);
-  r.setProperty('--on-sel', lightT ? tx.text : foLight ? '#0c0d10' : '#ffffff');
-  r.setProperty('--on-sel-dim', lightT ? tx.muted : foLight ? 'rgba(12, 13, 16, 0.66)' : 'rgba(255, 255, 255, 0.78)');
+  r.setProperty('--sel-bg', lightT ? '#d1d1d8' : 'transparent');
+  r.setProperty('--sel-ring', lightT ? 'inset 0 0 0 0 transparent' : `inset 0 0 0 2px ${fo}`);
+  r.setProperty('--on-sel', tx.text);
+  r.setProperty('--on-sel-dim', tx.muted);
   // 0.9.57 (owner: dark Glass looked grey): dark Glass panels are mostly solid, so the page behind only tints them
   const ga = el.glassA < 1 && !lightT ? Math.max(el.glassA, 0.86) : el.glassA;
   S.forEach((c, i) => r.setProperty('--s' + i, ga < 1 && i ? `rgba(${rgb(c)}, ${ga})` : c));

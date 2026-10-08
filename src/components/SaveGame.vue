@@ -105,9 +105,11 @@ const EV = {
   conflict: { t: 'Changed on Two Devices', icon: 'mdiCallSplit' },
   restored: { t: 'Older Version Put Back', icon: 'mdiHistory' },
   error: { t: 'Couldn’t Sync', icon: 'mdiAlertCircleOutline' },
+  unplaced: { t: 'Couldn’t Be Put in Place', icon: 'mdiFolderAlertOutline' },
+  damaged: { t: 'Download Didn’t Match RomM’s Check', icon: 'mdiAlertCircleOutline' },
 };
 const WHY = { before: 'Before you played', after: 'After you played', run: 'Sync Now', reconnected: 'When RomM was back in reach', resolve: 'You chose which save to keep', restore: 'From RomM’s older versions', scheduled: 'On its own' };
-const whyText = (h) => (h.error ? h.error : WHY[h.why] || 'On its own') + (h.choice ? (h.choice === 'mine' ? ' · this device’s' : ' · RomM’s') : '');
+const whyText = (h) => (h.error ? h.error : h.result === 'unplaced' ? (h.place === 'noemu' ? 'No emulator for it is set up here' : 'The emulator hasn’t made its save folder yet: open it and save once') : WHY[h.why] || 'On its own') + (h.choice ? (h.choice === 'mine' ? ' · this device’s' : ' · RomM’s') : '');
 const history = computed(() => (d.value?.saves || []).flatMap((s) => (s.history || []).map((h) => ({ ...h, emuName: s.emuName }))).sort((a, b) => b.at - a.at).slice(0, 30));
 const state = computed(() => {
   const x = d.value;
@@ -186,7 +188,7 @@ onBeforeUnmount(() => layer?.pop());
 .sg-ev:last-child::before { bottom: 50%; }
 .sg-dot { position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--s3); color: var(--text); }
 .sg-ev.up .sg-dot, .sg-ev.down .sg-dot, .sg-ev.restored .sg-dot { background: color-mix(in srgb, var(--green) 30%, var(--s2)); }
-.sg-ev.conflict .sg-dot, .sg-ev.error .sg-dot { background: color-mix(in srgb, var(--gold, #e7b84a) 30%, var(--s2)); }
+.sg-ev.conflict .sg-dot, .sg-ev.error .sg-dot, .sg-ev.unplaced .sg-dot, .sg-ev.damaged .sg-dot { background: color-mix(in srgb, var(--gold, #e7b84a) 30%, var(--s2)); }
 .sg-ev-mid { min-width: 0; display: flex; flex-direction: column; }
 .sg-ev-mid .small { overflow-wrap: anywhere; }
 .sg-when { white-space: nowrap; }

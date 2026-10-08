@@ -357,7 +357,7 @@ async function toggleService() {
 .st-cons { display: flex; gap: 8px; overflow-x: auto; padding: 6px 6px 8px; margin: 0 -6px; scrollbar-width: none; }
 .st-con { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--s1); box-shadow: var(--weight-edge); font-weight: 600; font-size: var(--t-sm); }
 .st-con em { font-style: normal; color: var(--muted); font-weight: 500; }
-.st-con.on { background: var(--sel); color: var(--on-sel); }
+.st-con.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .st-con.on em, .st-con.on :deep(svg) { color: var(--on-sel-dim); }
 .st-con.none:not(.on):not(:focus) { opacity: 0.5; }
 .st-con:focus-visible, .pad-mode .st-con:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; outline: none; }

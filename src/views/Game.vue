@@ -51,7 +51,7 @@
               <button class="btn danger" data-focus @click="call('dl:cancel', dl.id)"><Icon name="mdiClose" />Cancel</button>
             </template>
             <template v-else-if="installedPath && marked">
-              <button class="btn ok xl" data-focus data-autofocus @click="toast('You marked this game as installed', 'info', 3000, 'mdiCheckCircle')"><Icon name="mdiCheckCircle" />Marked as installed</button>
+              <button class="btn primary ok xl" data-focus data-autofocus @click="toast('You marked this game as installed', 'info', 3000, 'mdiCheckCircle')"><Icon name="mdiCheckCircle" />Marked as installed</button>
               <button class="btn" data-focus @click="dlNow"><Icon name="mdiDownload" />Download</button>
               <button class="btn" data-focus @click="setMark(false)"><Icon name="mdiCheckboxBlankOffOutline" />Unmark</button>
             </template>
@@ -59,7 +59,7 @@
               <button v-if="pkgBusy" class="btn xl" data-focus data-autofocus @click="cancelPkg"><Icon name="mdiLoading" class="spin" :size="22" />{{ pkgProg?.opens ? `Close ${emuName} to finish` : `Installing in ${emuName}` }}{{ pkgProg?.of > 1 ? ` · ${pkgProg.step} of ${pkgProg.of}` : '' }}</button>
               <button v-else-if="needsInstall" class="btn primary xl" data-focus data-autofocus @click="installPkg"><Icon name="mdiPackageDown" :size="22" />Install in {{ emuName }}</button>
               <button v-else-if="pkg?.licenceMissing?.length" class="btn primary xl" data-focus data-autofocus @click="addLicence"><Icon name="mdiKeyOutline" :size="22" />Get licence (.rap)</button>
-              <button v-else class="btn ok xl" data-focus data-autofocus @click="playNow"><Icon name="mdiCheckCircle" />Ready to play</button>
+              <button v-else class="btn primary ok xl" data-focus data-autofocus @click="playNow"><Icon name="mdiCheckCircle" />Ready to play</button>
               <!-- Re-download and Delete live in More → Options (owner, 0.9.16); the ring shows while deleting -->
               <button v-if="deleting != null" class="btn danger icon-btn" data-focus disabled><Ring :pct="deleting" :size="22" /><span>Deleting</span></button>
             </template>
