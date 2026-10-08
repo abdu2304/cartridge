@@ -48,12 +48,23 @@ const SCAN = () => {
   for (let n = tw2.nextNode(); n; n = tw2.nextNode()) {
     const el = n.parentElement;
     if (!n.textContent.trim() || !el || !el.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) || el.closest('.st-ov, [aria-hidden="true"], .morph-fly, .sr-only')) continue;
+    // what can be seen of each line: cut down to every clipping box around it (a spine's title runs on under its case)
+    let cl = { left: -1e9, top: -1e9, right: 1e9, bottom: 1e9 };
+    for (let p = el; p && p !== document.body; p = p.parentElement) {
+      const ps = getComputedStyle(p);
+      if (ps.overflowX !== 'visible' || ps.overflowY !== 'visible' || ps.contain.includes('paint')) { const q = p.getBoundingClientRect(); cl = { left: Math.max(cl.left, q.left), top: Math.max(cl.top, q.top), right: Math.min(cl.right, q.right), bottom: Math.min(cl.bottom, q.bottom) }; }
+    }
     const r = document.createRange(); r.selectNodeContents(n);
-    for (const b of r.getClientRects()) if (b.width > 2 && b.height > 2) lines.push({ el, b, t: n.textContent.trim().slice(0, 40) });
+    for (const x of r.getClientRects()) {
+      const b = { left: Math.max(x.left, cl.left), top: Math.max(x.top, cl.top), right: Math.min(x.right, cl.right), bottom: Math.min(x.bottom, cl.bottom) };
+      b.width = b.right - b.left; b.height = b.bottom - b.top;
+      if (b.width > 2 && b.height > 2) lines.push({ el, b, t: n.textContent.trim().slice(0, 40), tile: el.closest('.st-tile') });
+    }
   }
   for (let i = 0; i < lines.length; i++) for (let j = i + 1; j < lines.length; j++) {
     const A = lines[i], B = lines[j];
     if (A.el === B.el || A.el.contains(B.el) || B.el.contains(A.el)) continue;
+    if (A.tile !== B.tile) continue; // two Start tiles never share text
     const w = Math.min(A.b.right, B.b.right) - Math.max(A.b.left, B.b.left), h = Math.min(A.b.bottom, B.b.bottom) - Math.max(A.b.top, B.b.top);
     if (w > 4 && h > Math.min(A.b.height, B.b.height) * 0.4) out.push(`overlap: ${path(A.el)} "${A.t}" with ${path(B.el)} "${B.t}"`);
   }
