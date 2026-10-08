@@ -695,7 +695,7 @@ const SEARCH = [
   ['Shortcut health, issues', 'Emulators · Setup and Health', 'emu', 'overview'], ['Console folders', 'Emulators · Console Folders', 'emu', 'folders'], ['Linked folders, share saves with a fork', 'Emulators · Linked Folders', 'emu', 'links'],
   ['Add games to Steam', 'Steam', 'steam'], ['Steam collections', 'Steam', 'steam'], ['Add Cartridge to Steam', 'Steam', 'steam'], ['Frame generation', 'Steam', 'steam'],
   ['RetroAchievements sign in', 'Achievements', 'ra'], ['Sign in to emulators', 'Achievements', 'ra'], ['Trophy folders', 'Achievements', 'ra'], ['Hidden games', 'Achievements', 'ra'], ['Trophy sync', 'Achievements', 'ra'],
-  ['Syncthing', 'Saves and Sync', 'syncthing'], ['Save sync', 'Saves and Sync', 'syncthing'],
+  ['Syncthing', 'Saves and Sync', 'syncthing'], ['Save sync', 'Saves and Sync', 'syncthing'], ['Where your saves are, search for saves', 'Saves and Sync', 'syncthing'],
   ['Colour, theme', 'Look & Feel · Theme', 'ui', 'theme'], ['Plain or Glass style', 'Look & Feel · Theme', 'ui', 'theme'], ['Background', 'Look & Feel · Theme', 'ui', 'theme'], ['Light, OLED', 'Look & Feel · Theme', 'ui', 'theme'],
   ['Font, text size', 'Look & Feel · Text and Cards', 'ui', 'cards'], ['Interface size, scale', 'Look & Feel · Text and Cards', 'ui', 'cards'], ['Card shape and size', 'Look & Feel · Text and Cards', 'ui', 'cards'],
   ['Logos, SteamGridDB key', 'Look & Feel · Metadata', 'ui', 'meta'], ['Idle screen', 'Look & Feel · Motion and Sound', 'ui', 'motion'], ['Sounds', 'Look & Feel · Motion and Sound', 'ui', 'motion'], ['Rumble', 'Look & Feel · Motion and Sound', 'ui', 'motion'], ['Reduced motion, effects', 'Look & Feel · Motion and Sound', 'ui', 'motion'],

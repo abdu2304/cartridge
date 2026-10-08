@@ -9,7 +9,17 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-const ls = (d) => { try { return fs.readdirSync(d, { withFileTypes: true }); } catch { return []; } };
+// a folder's entries; a link counts as what it points at (0.9.59, owner: saves moved to a microSD and linked back were
+// never found: readdir's types call a link "not a folder"). Every walk here has a fixed depth, so a link that points
+// back into its own folder can't run away.
+const ls = (d) => {
+  let list; try { list = fs.readdirSync(d, { withFileTypes: true }); } catch { return []; }
+  return list.map((e) => {
+    if (!e.isSymbolicLink()) return e;
+    let st = null; try { st = fs.statSync(path.join(d, e.name)); } catch {}
+    return { name: e.name, isDirectory: () => !!st?.isDirectory(), isFile: () => !!st?.isFile(), isSymbolicLink: () => true };
+  });
+};
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 const readText = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
 
@@ -103,28 +113,137 @@ const SWITCH = ['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu'];
 const hex = (n, w) => /^[0-9A-F]+$/i.test(n) && n.length === w;
 
 // one emulator data folder -> its saves: { emu, kind, path, label, keys: { switch, serial, title, gc, n3ds, wiiu, x360, name }, shared, serials }
-// shadPS4's save folders under one of its folders (0.9.57): every <home>/<user ID>/savedata first (current builds),
-// then the older savedata/ and a portable copy's user/savedata. Each holds <CUSA…> folders or <user>/<CUSA…>.
-function shadHome(base) {
-  for (const f of [path.join(base, 'config.json'), path.join(base, 'user/config.json')]) {
-    const m = /"home_dir"\s*:\s*"([^"]+)"/.exec(readText(f));
-    if (m && path.isAbsolute(m[1])) return m[1];
+// ---- The save locator (0.9.59, owner: "search all layouts to find accurate saves … build a system around this").
+// Each emulator's rule card: where it keeps saves now, read from its own settings the way the emulator reads them,
+// and the places it used before or would use without the setting. A place is
+//   { loc: 'use' | 'old', why, at: { <role>: folder } }
+// 'use' is where the emulator reads saves today: only these are synced and only these receive saves. 'old' is a
+// place it no longer reads (an older layout, or the default after a setting moved saves): shown, never synced on
+// its own. why: default | setting (the emulator's own setting) | portable | older (a layout older builds used) |
+// unused (the default, no longer read because a setting moved saves) | added (a folder you picked).
+const uniq = (a) => [...new Set(a.filter(Boolean))];
+const exists = (p) => { try { fs.accessSync(p); return true; } catch { return false; } };
+// the settings folders for one data folder: itself (portable), its config/ (Eden portable), the XDG config twin
+// (~/.local/share/x -> ~/.config/x) and a Flatpak's (…/data/x -> …/config/x)
+const cfgDirs = (base) => uniq([base, path.join(base, 'config'), base.includes('/.local/share/') ? base.replace('/.local/share/', '/.config/') : '', /\/data\/[^/]+$/.test(base) ? base.replace(/\/data\/([^/]+)$/, '/config/$1') : '']);
+const firstText = (dirs, rel) => { for (const d of dirs) { const t = readText(path.join(d, rel)); if (t) return t; } return ''; };
+// key = value in an ini or simple toml [section] (Qt writes the section as "Data%20Storage")
+function iniGet(text, section, key) {
+  let cur = '';
+  for (const raw of String(text).split(/\r?\n/)) {
+    const line = raw.trim(), h = /^\[(.+)\]$/.exec(line);
+    if (h) { cur = h[1].replace(/%20/g, ' ').toLowerCase(); continue; }
+    if (cur !== section.toLowerCase()) continue;
+    const m = /^([^=]+?)\s*=\s*(.*)$/.exec(line);
+    if (m && m[1] === key) return m[2].trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1').trim();
   }
-  return null;
+  return '';
 }
-function shadSaveDirs(base) {
-  const homes = [shadHome(base), path.join(base, 'home'), path.join(base, 'user/home')].filter(Boolean);
-  const out = [];
-  for (const h of homes) for (const u of ls(h)) if (u.isDirectory()) out.push(path.join(h, u.name, 'savedata'));
-  out.push(path.join(base, 'savedata'), path.join(base, 'user/savedata'));
-  return [...new Set(out)].filter((d) => { try { return fs.statSync(d).isDirectory(); } catch { return false; } });
+// a setting's path: ~ expanded, relative ones from the emulator's folder (as PCSX2 and DuckStation read them)
+const abs = (p, root) => { p = String(p || '').trim().replace(/^~(?=\/|$)/, os.homedir()); if (!p) return ''; return path.isAbsolute(p) ? path.normalize(p) : root ? path.join(root, p) : ''; };
+const same = (a, b) => { try { return fs.realpathSync(a) === fs.realpathSync(b); } catch { return path.resolve(a) === path.resolve(b); } };
+// a setting that moves one folder: the setting's folder in use and the default as an old place, else the default
+function moved(setting, def, role) {
+  if (!setting || same(setting, def)) return [{ loc: 'use', why: 'default', at: { [role]: def } }];
+  return [{ loc: 'use', why: 'setting', at: { [role]: setting } }, { loc: 'old', why: 'unused', at: { [role]: def } }];
 }
-// where shadPS4 keeps its saves on this device now: the first current-style folder, else the old one
-const shadSaveDir = (base) => shadSaveDirs(base).find((d) => /[\/]home[\/][^\/]+[\/]savedata$/.test(d)) || shadSaveDirs(base)[0] || path.join(base, 'home/1000/savedata');
+const PS4_ID = /^(CUSA|PCJS|PLJM|PCAS|PCKS|PCJM|PLAS|PLES)\d{5}$/;
+// shadPS4 (path_util.cpp, save_instance.cpp, user_manager.cpp, emulator_settings.cpp). Builds from 0.16 keep saves in
+// <home>/<user ID>/savedata/<CUSA…>, <home> being home_dir in config.json or <user folder>/home; builds up to 0.15 used
+// <user folder>/savedata/<user ID>/<CUSA…>, moved by saveDataPath under [GUI] in config.toml. A new build moves the
+// old folder over on first start (and may leave a link behind). The user folder is the program's working folder's
+// user/ when there is one (portable), else ~/.local/share/shadPS4 (a Flatpak: its own data folder).
+function shadUserDir(base) { return [base, path.join(base, 'user')].find((d) => exists(path.join(d, 'config.json')) || exists(path.join(d, 'config.toml'))) || base; }
+const homeSaves = (home) => ls(home).filter((u) => u.isDirectory()).map((u) => path.join(home, u.name, 'savedata')).filter(isDir);
+function shadWhere(base) {
+  const user = shadUserDir(base), json = readText(path.join(user, 'config.json')), toml = readText(path.join(user, 'config.toml'));
+  const homeSet = abs((/"home_dir"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(json) || [])[1]?.replace(/\\(.)/g, '$1'));
+  const saveSet = abs(iniGet(toml, 'GUI', 'saveDataPath'));
+  const why = user !== base ? 'portable' : 'default';
+  const home = homeSet || path.join(user, 'home'), oldRoot = saveSet || path.join(user, 'savedata');
+  const fresh = homeSaves(home), older = [oldRoot, ...(saveSet ? [path.join(user, 'savedata')] : [])].filter(isDir);
+  if (json) { // a current build
+    const out = [{ loc: 'use', why: homeSet ? 'setting' : why, at: { savedata: fresh.length ? fresh : [path.join(home, '1000/savedata')] } }];
+    if (homeSet && !same(homeSet, path.join(user, 'home'))) { const d = homeSaves(path.join(user, 'home')); if (d.length) out.push({ loc: 'old', why: 'unused', at: { savedata: d } }); }
+    if (older.length) out.push({ loc: 'old', why: 'older', at: { savedata: older } });
+    return out;
+  }
+  if (toml) { // an older build
+    const out = [{ loc: 'use', why: saveSet ? 'setting' : why, at: { savedata: [oldRoot] } }];
+    if (saveSet && isDir(path.join(user, 'savedata')) && !same(saveSet, path.join(user, 'savedata'))) out.push({ loc: 'old', why: 'unused', at: { savedata: [path.join(user, 'savedata')] } });
+    return out;
+  }
+  // never started, or settings Cartridge can't see: every layout counts
+  return [{ loc: 'use', why, at: { savedata: uniq([...fresh, ...[path.join(user, 'savedata')].filter(isDir)]) } }];
+}
+const GC_REGIONS = ['USA', 'EUR', 'JAP', 'DEV'];
+const WHERE = {
+  // Eden and the yuzu family (frontend_common/config.cpp ReadDataStorageValues): save_directory, else nand_directory,
+  // else <data>/nand; saves under <that>/user/save. qt-config.ini in the config folder (portable: user/config/)
+  switch(base) {
+    const ini = firstText(cfgDirs(base), 'qt-config.ini');
+    const set = abs(iniGet(ini, 'Data Storage', 'save_directory')) || abs(iniGet(ini, 'Data Storage', 'nand_directory'));
+    return moved(set, path.join(base, 'nand'), 'nand');
+  },
+  // RPCS3 (Emu/vfs_config.h): config/vfs.yml "/dev_hdd0/", where $(EmulatorDir) is its own entry, else RPCS3's folder
+  rpcs3(base) {
+    const y = readText(path.join(base, 'config/vfs.yml'));
+    const get = (k) => { const m = new RegExp('^' + k.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&') + ':\\s*(.*)$', 'm').exec(y); return m ? m[1].trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1') : ''; };
+    let emuDir = abs(get('$(EmulatorDir)')) || base; emuDir = emuDir.replace(/\/?$/, '/');
+    const hdd = (get('/dev_hdd0/') || '$(EmulatorDir)dev_hdd0/').replace('$(EmulatorDir)', emuDir).replace(/\/+$/, '');
+    return moved(abs(hdd), path.join(base, 'dev_hdd0'), 'hdd0');
+  },
+  // Vita3K (config.yml pref-path): the folder holding ux0
+  vita3k(base) {
+    const y = firstText(uniq([...cfgDirs(base), ...cfgDirs(path.dirname(base))]), 'config.yml');
+    const pref = abs(((/^pref-path:\s*(.*)$/m.exec(y) || [])[1] || '').trim().replace(/^['"](.*)['"]$/, '$1'));
+    return moved(pref && isDir(path.join(pref, 'ux0')) ? pref : '', base, 'pref');
+  },
+  shadps4: shadWhere,
+  // PCSX2 (Pcsx2Config.cpp EmuFolders): inis/PCSX2.ini [Folders] MemoryCards, relative to its folder
+  pcsx2: (base) => moved(abs(iniGet(readText(path.join(base, 'inis/PCSX2.ini')), 'Folders', 'MemoryCards'), base), path.join(base, 'memcards'), 'memcards'),
+  // DuckStation (settings.cpp EmuFolders): settings.ini [MemoryCards] Directory
+  duckstation: (base) => moved(abs(iniGet(readText(path.join(base, 'settings.ini')), 'MemoryCards', 'Directory'), base), path.join(base, 'memcards'), 'memcards'),
+  // Dolphin (Config/MainSettings.cpp): [General] NANDRootPath moves Wii saves; [Core] GCIFolderAPath/BPath are card
+  // folders named for a region ("…/USA", any region swapped for the game's) and MemcardAPath/BPath card files, both
+  // as well as the GC folder. Dolphin.ini sits in its config folder (portable: Config/)
+  dolphin(base) {
+    const ini = firstText([...cfgDirs(base), path.join(base, 'Config')], 'Dolphin.ini');
+    const nand = abs(iniGet(ini, 'General', 'NANDRootPath'));
+    const gci = uniq(['GCIFolderAPath', 'GCIFolderBPath'].map((k) => abs(iniGet(ini, 'Core', k)))).flatMap((p) => {
+      const root = GC_REGIONS.includes(path.basename(p)) ? path.dirname(p) : p;
+      return GC_REGIONS.map((r) => path.join(root, r)).filter(isDir);
+    });
+    const cards = uniq(['MemcardAPath', 'MemcardBPath'].map((k) => abs(iniGet(ini, 'Core', k)))).filter((f) => exists(f) && !f.startsWith(path.join(base, 'GC') + '/'));
+    const wiiDef = path.join(base, 'Wii'), useWii = nand && !same(nand, wiiDef) ? nand : wiiDef;
+    const out = [{ loc: 'use', why: useWii !== wiiDef || gci.length || cards.length ? 'setting' : 'default', at: { gc: path.join(base, 'GC'), gci, cards, wii: useWii } }];
+    if (useWii !== wiiDef) out.push({ loc: 'old', why: 'unused', at: { gc: null, wii: wiiDef } });
+    return out;
+  },
+  // Cemu (config/CemuConfig.cpp): settings.xml <mlc_path>, else mlc01 in its folder
+  cemu(base) {
+    const x = firstText(cfgDirs(base), 'settings.xml');
+    const m = ((/<mlc_path>([^<]*)<\/mlc_path>/.exec(x) || [])[1] || '').trim().replace(/&amp;/g, '&').replace(/&apos;/g, "'").replace(/&quot;/g, '"');
+    return moved(abs(m), path.join(base, 'mlc01'), 'mlc');
+  },
+  // Azahar and Citra (citra_qt configuration/config.cpp ReadDataStorageValues): sdmc_directory, only with
+  // use_custom_storage=true
+  azahar(base) {
+    const ini = firstText(cfgDirs(base), 'qt-config.ini');
+    const on = /^true$/i.test(iniGet(ini, 'Data Storage', 'use_custom_storage'));
+    return moved(on ? abs(iniGet(ini, 'Data Storage', 'sdmc_directory')) : '', path.join(base, 'sdmc'), 'sdmc');
+  },
+};
+const whereOf = (emu) => (SWITCH.includes(emu) ? WHERE.switch : WHERE[emu]) || (() => [{ loc: 'use', why: 'default', at: {} }]);
+// the folder a place is about (for lists): its first named folder, else the emulator's folder
+const placeDir = (at, base) => { for (const v of Object.values(at || {})) { if (typeof v === 'string' && v) return v; if (Array.isArray(v) && v[0]) return v[0]; } return base; };
+// shadPS4's save folders in use under one of its folders (Syncthing, Linked Folders and Save Sync's placing use it)
+const shadSaveDirs = (base) => uniq(shadWhere(base).filter((w) => w.loc === 'use').flatMap((w) => w.at.savedata || [])).filter(isDir);
+const shadSaveDir = (base) => shadWhere(base).find((w) => w.loc === 'use')?.at.savedata?.[0] || path.join(base, 'home/1000/savedata');
 const SCAN = {
   // nand/user/save/0000000000000000/<user ID>/<title ID>/ and the newer account/<uuid>/<title ID>/0 layout
-  switch(base, emu) {
-    const out = [], root = path.join(base, 'nand/user/save');
+  switch(base, emu, at = {}) {
+    const out = [], root = path.join(at.nand || path.join(base, 'nand'), 'user/save');
     // Eden's game list cache (qt_common/game_list/worker.cpp): <cache>/game_list/<TITLE ID>.appname.txt holds
     // the game's name, so a save can be named even without the game's keys (data and cache folders sit side by side)
     const cache = base.includes('/.local/share/') ? base.replace('/.local/share/', '/.cache/') : base.replace(/\/data\/([^/]+)$/, '/cache/$1');
@@ -148,10 +267,10 @@ const SCAN = {
     return out;
   },
   // dev_hdd0/home/<user>/savedata/<SERIAL><suffix>/PARAM.SFO
-  rpcs3(base) {
-    const out = [];
-    for (const u of ls(path.join(base, 'dev_hdd0/home'))) if (u.isDirectory()) {
-      const sd = path.join(base, 'dev_hdd0/home', u.name, 'savedata');
+  rpcs3(base, at = {}) {
+    const out = [], hdd = at.hdd0 || path.join(base, 'dev_hdd0');
+    for (const u of ls(path.join(hdd, 'home'))) if (u.isDirectory()) {
+      const sd = path.join(hdd, 'home', u.name, 'savedata');
       for (const s of ls(sd)) if (s.isDirectory() && /^[A-Z]{4}\d{5}/.test(s.name)) {
         const p = sfo(path.join(sd, s.name, 'PARAM.SFO'));
         // sub: what this save is (0.9.57, owner: two saves of one game at very different sizes): games keep progress and
@@ -170,18 +289,18 @@ const SCAN = {
     return out;
   },
   // ux0/user/00/savedata/<title ID>
-  vita3k(base) {
-    const out = [], sd = path.join(base, 'ux0/user/00/savedata');
+  vita3k(base, at = {}) {
+    const out = [], sd = path.join(at.pref || base, 'ux0/user/00/savedata');
     for (const s of ls(sd)) if (s.isDirectory() && /^[A-Z]{4}\d{5}$/.test(s.name)) out.push({ emu: 'vita3k', kind: 'save', path: path.join(sd, s.name), keys: { serial: s.name } });
     return out;
   },
   // 0.9.57 (owner: "that's not shadPS4's save folder"; read from shadPS4's save_instance.cpp and path_util.cpp): saves
   // live in <home>/<user ID>/savedata/<CUSA…>/<slot>, <home> being its home_dir setting or <its folder>/home. Older
   // builds: <its folder>/savedata/<user>/<CUSA…> or savedata/<CUSA…>; a portable copy keeps its folder in user/.
-  shadps4(base) {
-    const out = [], seen = new Set(), PS4 = /^(CUSA|PCJS|PLJM|PCAS|PCKS)\d{5}$/;
+  shadps4(base, at = null) {
+    const out = [], seen = new Set(), PS4 = PS4_ID;
     const add = (p, id) => { if (seen.has(p)) return; seen.add(p); const t = [p, ...ls(p).filter((x) => x.isDirectory()).map((x) => path.join(p, x.name))].map((d) => sfo(path.join(d, 'sce_sys/param.sfo')).TITLE).find(Boolean); /* each save slot folder has its own param.sfo */ out.push({ emu: 'shadps4', kind: 'save', path: p, label: t || '', keys: { serial: id, title: t || '' } }); };
-    for (const sd of shadSaveDirs(base)) for (const a of ls(sd)) if (a.isDirectory()) {
+    for (const sd of at?.savedata || shadSaveDirs(base)) for (const a of ls(sd)) if (a.isDirectory()) {
       if (PS4.test(a.name)) { add(path.join(sd, a.name), a.name); continue; }
       for (const b of ls(path.join(sd, a.name))) if (b.isDirectory() && PS4.test(b.name)) add(path.join(sd, a.name, b.name), b.name);
     }
@@ -189,8 +308,8 @@ const SCAN = {
   },
 
   // memcards/*.ps2: one card holds many games (or a folder card per game)
-  pcsx2(base) {
-    const out = [], md = path.join(base, 'memcards');
+  pcsx2(base, at = {}) {
+    const out = [], md = at.memcards || path.join(base, 'memcards');
     for (const c of ls(md)) {
       const p = path.join(md, c.name);
       if (c.isDirectory() && /\.ps2$/i.test(c.name)) { // folder memory card: a folder per game
@@ -201,8 +320,8 @@ const SCAN = {
     return out;
   },
   // memcards/<title or serial>_1.mcd (per game by default) or shared_card_1.mcd
-  duckstation(base) {
-    const out = [], md = path.join(base, 'memcards');
+  duckstation(base, at = {}) {
+    const out = [], md = at.memcards || path.join(base, 'memcards');
     for (const c of ls(md)) if (c.isFile() && /\.mcd$/i.test(c.name)) {
       const p = path.join(md, c.name), stem = c.name.replace(/_\d+\.mcd$/i, '').replace(/\.mcd$/i, '');
       const shared = /^shared_card/i.test(stem);
@@ -212,16 +331,21 @@ const SCAN = {
     return out;
   },
   // GC/<region>/Card A|B/*.gci (GCI folders, "01-GALE-…") or MemoryCardA.*.raw (shared), Wii/title/00010000/<ID4 hex>/data
-  dolphin(base) {
-    const out = [];
-    for (const r of ls(path.join(base, 'GC'))) if (r.isDirectory()) {
-      for (const c of ls(path.join(base, 'GC', r.name))) {
-        const p = path.join(base, 'GC', r.name, c.name);
-        if (c.isDirectory()) for (const g of ls(p)) { const m = /^[0-9A-Z]{2}-([0-9A-Z]{4})-/i.exec(g.name); if (g.isFile() && m) out.push({ emu: 'dolphin', kind: 'save', path: path.join(p, g.name), label: g.name, keys: { gc: m[1].toUpperCase() } }); }
-        else if (/\.raw$/i.test(c.name)) out.push({ emu: 'dolphin', kind: 'card', path: p, label: c.name, keys: {}, shared: true, serials: [] });
+  // region: the card's region folder, part of a save's key on every device (custom GCI folders are named for it)
+  dolphin(base, at = {}) {
+    const out = [], gc = at.gc === undefined ? path.join(base, 'GC') : at.gc;
+    const gciIn = (p, region) => { for (const g of ls(p)) { const m = /^[0-9A-Z]{2}-([0-9A-Z]{4})-/i.exec(g.name); if (g.isFile() && m) out.push({ emu: 'dolphin', kind: 'save', path: path.join(p, g.name), label: g.name, region, keys: { gc: m[1].toUpperCase() } }); } };
+    const card = (p, region) => out.push({ emu: 'dolphin', kind: 'card', path: p, label: path.basename(p), region, keys: {}, shared: true, serials: [] });
+    if (gc) for (const r of ls(gc)) if (r.isDirectory()) {
+      for (const c of ls(path.join(gc, r.name))) {
+        const p = path.join(gc, r.name, c.name);
+        if (c.isDirectory()) gciIn(p, r.name);
+        else if (/\.raw$/i.test(c.name)) card(p, r.name);
       }
     }
-    const wt = path.join(base, 'Wii/title/00010000');
+    for (const d of at.gci || []) gciIn(d, path.basename(d));
+    for (const f of at.cards || []) card(f, (/\.(USA|EUR|JAP|DEV)\.raw$/i.exec(f) || [])[1]?.toUpperCase() || path.basename(path.dirname(f)));
+    const wt = at.wii === null ? '' : path.join(at.wii || path.join(base, 'Wii'), 'title/00010000'); // null: this place has no Wii folder
     for (const t of ls(wt)) if (t.isDirectory() && hex(t.name, 8) && isDir(path.join(wt, t.name, 'data'))) {
       const id4 = Buffer.from(t.name, 'hex').toString('latin1');
       if (/^[0-9A-Z]{4}$/.test(id4)) out.push({ emu: 'dolphin', kind: 'save', path: path.join(wt, t.name, 'data'), keys: { gc: id4 } });
@@ -229,18 +353,18 @@ const SCAN = {
     return out;
   },
   // mlc01/usr/save/00050000/<title ID low>/ ; the name from mlc01/usr/title/…/meta/meta.xml when installed
-  cemu(base) {
-    const out = [], sd = path.join(base, 'mlc01/usr/save/00050000');
+  cemu(base, at = {}) {
+    const mlc = at.mlc || path.join(base, 'mlc01'), out = [], sd = path.join(mlc, 'usr/save/00050000');
     for (const t of ls(sd)) if (t.isDirectory() && hex(t.name, 8)) {
-      const meta = readText(path.join(base, 'mlc01/usr/title/00050000', t.name, 'meta/meta.xml'));
+      const meta = readText(path.join(mlc, 'usr/title/00050000', t.name, 'meta/meta.xml'));
       const name = (/<longname_en[^>]*>([^<]+)</.exec(meta) || [])[1] || '';
       out.push({ emu: 'cemu', kind: 'save', path: path.join(sd, t.name), label: name.replace(/\s+/g, ' ').trim(), keys: { wiiu: ('00050000' + t.name).toUpperCase(), title: name } });
     }
     return out;
   },
   // sdmc/Nintendo 3DS/<id0>/<id1>/title/00040000/<title ID low>/data
-  azahar(base) {
-    const out = [], n = path.join(base, 'sdmc/Nintendo 3DS');
+  azahar(base, at = {}) {
+    const out = [], n = path.join(at.sdmc || path.join(base, 'sdmc'), 'Nintendo 3DS');
     for (const a of ls(n)) if (a.isDirectory()) for (const b of ls(path.join(n, a.name))) if (b.isDirectory()) {
       const td = path.join(n, a.name, b.name, 'title/00040000');
       for (const t of ls(td)) if (t.isDirectory() && hex(t.name, 8) && isDir(path.join(td, t.name, 'data'))) out.push({ emu: 'azahar', kind: 'save', path: path.join(td, t.name, 'data'), keys: { n3ds: ('00040000' + t.name).toUpperCase() } });
@@ -274,20 +398,50 @@ const SCAN = {
     return out;
   },
 };
-const scannerOf = (emu) => (SWITCH.includes(emu) ? (b) => SCAN.switch(b, emu) : SCAN[emu]);
+const scannerOf = (emu) => (SWITCH.includes(emu) ? (b, at) => SCAN.switch(b, emu, at) : SCAN[emu]);
 
-// every save on this device. extra: { [emu]: [more data folders] } (portable installs, custom folders)
-function scan({ home = os.homedir(), extra = {}, withSize = true } = {}) {
-  const out = [], seen = new Set();
+// every save on this device, each with where it was found: loc 'use' | 'old', why (see the save locator), place (the
+// folder the rule card names). extra: { [emu]: [more data folders] } (portable installs, Vita3K's storage);
+// extraAt: { [emu]: [{ base, at }] } folders you picked (Use This Folder), in use. The same save reached two ways (a
+// link and its folder) is listed once, in use when either way is.
+function scan({ home = os.homedir(), extra = {}, extraAt = {}, withSize = true, oldToo = true } = {}) {
+  const out = [], seenBase = new Set(), bySave = new Map();
+  const add = (emu, list, base, w) => {
+    for (const s of list) {
+      if (/\.cartridge-(moved|new|old|kept)\b/.test(s.path)) continue; // a moved copy, or Cartridge's own half-written one
+      let real = s.path; try { real = fs.realpathSync(s.path); } catch {}
+      const k = emu + '\0' + real, prev = bySave.get(k);
+      const meta = { loc: w.loc, why: w.why, place: placeDir(w.at, base) };
+      if (prev) { if (prev.loc === 'old' && w.loc === 'use') Object.assign(prev, meta, { base, path: s.path }); continue; }
+      const item = { ...s, emuName: NAMES[emu] || emu, base, ...meta, ...(withSize ? sizeOf(s.path) : {}) };
+      bySave.set(k, item); out.push(item);
+    }
+  };
   for (const emu of Object.keys(DATA)) {
+    for (const at of extraAt[emu] || []) { let list = []; try { list = scannerOf(emu)(at.base || placeDir(at.at, ''), at.at) || []; } catch {} add(emu, list, at.base || placeDir(at.at, ''), { loc: 'use', why: 'added', at: at.at }); }
     const dirs = [...DATA[emu].map((d) => path.join(home, d)), ...(extra[emu] || [])];
     for (const d of dirs) {
       let real; try { real = fs.realpathSync(d); } catch { continue; }
-      if (seen.has(emu + real)) continue; // EmuDeck links and the plain folder are the same folder
-      seen.add(emu + real);
-      let list = []; try { list = scannerOf(emu)(d) || []; } catch {}
-      for (const s of list) out.push({ ...s, emuName: NAMES[emu] || emu, base: d, ...(withSize ? sizeOf(s.path) : {}) });
+      if (seenBase.has(emu + real)) continue; // EmuDeck links and the plain folder are the same folder
+      seenBase.add(emu + real);
+      let places = []; try { places = whereOf(emu)(d); } catch { places = [{ loc: 'use', why: 'default', at: {} }]; }
+      for (const w of places) {
+        if (w.loc === 'old' && !oldToo) continue;
+        let list = []; try { list = scannerOf(emu)(d, w.at) || []; } catch {}
+        add(emu, list, d, w);
+      }
     }
+  }
+  return out;
+}
+// one emulator's places on this device, for the locator's list: [{ base, loc, why, place, at }]
+function places(emu, { home = os.homedir(), extra = {} } = {}) {
+  const out = [], seen = new Set();
+  for (const d of [...(DATA[emu] || []).map((x) => path.join(home, x)), ...(extra[emu] || [])]) {
+    let real; try { real = fs.realpathSync(d); } catch { continue; }
+    if (seen.has(real)) continue; seen.add(real);
+    let ws = []; try { ws = whereOf(emu)(d); } catch {}
+    for (const w of ws) out.push({ base: d, loc: w.loc, why: w.why, place: placeDir(w.at, d), at: w.at });
   }
   return out;
 }
@@ -298,12 +452,26 @@ const norm = (s) => String(s || '').toLowerCase().replace(/&/g, 'and').replace(/
 const idNorm = (s) => String(s || '').toUpperCase().replace(/[-_.\s]/g, '');
 // opts.nameOf: a code's game name from the emulators' databases (titleDb.js, 0.9.57), so a save or a memory card
 // entry of a game that isn't on this device still finds it in the library by name
+// 0.9.59 (owner: PS4 saves not matched): when nothing else matched, a title that is the start of exactly one game's
+// title on the save's own console ("Bloodborne" and "Bloodborne: The Old Hunters Edition", or the other way round),
+// at least 6 letters; two or more games that fit match none (no guessing). The save is marked loose.
+const EMU_CONSOLE = { shadps4: /^ps4$/, rpcs3: /^ps3$/, ppsspp: /^psp$/, vita3k: /^(psvita|vita)$/, pcsx2: /^ps2$/, duckstation: /^(psx|ps1|ps)$/, dolphin: /^(ngc|gc|gamecube|wii)$/, cemu: /^wiiu$/, azahar: /^(3ds|n3ds|new-nintendo-3ds)$/, xenia: /^xbox-?360$/, ...Object.fromEntries(['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu', 'ryujinx'].map((e) => [e, /^switch$/])) };
+function looseMatch(title, emu, games) {
+  const re = EMU_CONSOLE[emu], t = norm(title);
+  if (!re || t.length < 6) return null;
+  const ids = new Set();
+  for (const g of games) { if (!re.test(g.slug || '')) continue; const n = norm(g.name); if (n.length >= 6 && (n.startsWith(t) || t.startsWith(n))) ids.add(g.id); }
+  return ids.size === 1 ? [...ids][0] : null;
+}
 function match(saves, games, { nameOf = null } = {}) {
   const byId = new Map(), byGc = new Map(), byName = new Map();
+  // a title: the game of that name on the save's own console (0.9.59: a PS4 save named "Bloodborne" went to a PS3 game
+  // of the same name); a game whose console isn't known still counts; emulators of many consoles take the first
+  const named_ = (t, emu) => { const l = byName.get(norm(t)); if (!l) return undefined; const re = EMU_CONSOLE[emu]; const g = re ? l.find((x) => re.test(x.slug || '')) || l.find((x) => !x.slug) : l[0]; return g?.id; };
   for (const g of games) {
     for (const s of g.ids || []) if (s) { const u = idNorm(s); byId.set(u, g.id); if (/^0100[0-9A-F]{12}$/.test(u) && !byId.has(u.slice(0, 13) + '000')) byId.set(u.slice(0, 13) + '000', g.id); } // a Switch update's file still names its base game
     for (const s of g.discIds || []) if (s) { const u = idNorm(s); byId.set(u, g.id); if (u.length === 6) byGc.set(u.slice(0, 4), g.id); if (u.length === 4) byGc.set(u, g.id); }
-    const k = norm(g.name); if (k.length >= 3 && !byName.has(k)) byName.set(k, g.id);
+    const k = norm(g.name); if (k.length >= 3) { if (!byName.has(k)) byName.set(k, []); byName.get(k).push(g); }
   }
   // a Switch save is the base game's: updates (…800) and add-ons map back (the last three digits cleared)
   const sw = (id) => { const u = idNorm(id); return byId.get(u) ?? byId.get(u.slice(0, 13) + '000'); };
@@ -316,12 +484,13 @@ function match(saves, games, { nameOf = null } = {}) {
     if (id == null && k.n3ds) id = byId.get(idNorm(k.n3ds));
     if (id == null && k.wiiu) id = byId.get(idNorm(k.wiiu));
     if (id == null && k.x360) id = byId.get(idNorm(k.x360));
-    if (id == null && (k.title || k.name)) id = byName.get(norm(k.title || k.name));
+    if (id == null && (k.title || k.name)) id = named_(k.title || k.name, s.emu);
     const named = nameOf && k.serial ? nameOf(k.serial) : null;
     if (named) s.codeName = named;
-    if (id == null && named) id = byName.get(norm(named));
+    if (id == null && named) id = named_(named, s.emu);
+    if (id == null && (k.title || named)) { id = looseMatch(k.title || named, s.emu, games); if (id != null) s.loose = true; }
     if (id != null) ids.add(id);
-    for (const ser of s.serials || []) { let g = byId.get(idNorm(ser)); if (g == null && nameOf) { const n = nameOf(ser); if (n) g = byName.get(norm(n)); } if (g != null) ids.add(g); }
+    for (const ser of s.serials || []) { let g = byId.get(idNorm(ser)); if (g == null && nameOf) { const n = nameOf(ser); if (n) g = named_(n, s.emu); } if (g != null) ids.add(g); }
     s.romIds = [...ids];
   }
   return saves;
@@ -332,18 +501,22 @@ function match(saves, games, { nameOf = null } = {}) {
 // same on every device and the path is each device's own, so Eden on one device and Citron on another share
 // Switch saves. Ryujinx is left out: its saves are named by an index that differs per device.
 const retroarchSaves = (base) => { const cfg = readText(path.join(base, 'retroarch.cfg')); let d = (/^\s*savefile_directory\s*=\s*"([^"]*)"/m.exec(cfg) || [])[1] || ''; d = d.replace(/^~(?=\/|$)/, os.homedir()).replace(/^:(?=\/|$)/, base); return !d || d === 'default' ? path.join(base, 'saves') : d; };
+// 0.9.59: each folder from the save locator's place in use (a setting that moves saves moves Syncthing's folder too)
+const useAt = (emu, d) => { try { return whereOf(emu)(d).find((w) => w.loc === 'use')?.at || {}; } catch { return {}; } };
+const swSave = (emu) => (d) => path.join(useAt(emu, d).nand || path.join(d, 'nand'), 'user/save');
+// [folder ID suffix, label, path inside the emulator's folder (Linked Folders links it), where it is now (a setting may move it)]
 const SYNC = {
-  eden: [['switch', 'Switch Saves', 'nand/user/save']], citron: [['switch', 'Switch Saves', 'nand/user/save']], yuzu: [['switch', 'Switch Saves', 'nand/user/save']],
-  sudachi: [['switch', 'Switch Saves', 'nand/user/save']], suyu: [['switch', 'Switch Saves', 'nand/user/save']], torzu: [['switch', 'Switch Saves', 'nand/user/save']],
-  rpcs3: [['ps3', 'PS3 Saves', 'dev_hdd0/home/00000001/savedata']],
+  eden: [['switch', 'Switch Saves', 'nand/user/save', swSave('eden')]], citron: [['switch', 'Switch Saves', 'nand/user/save', swSave('citron')]], yuzu: [['switch', 'Switch Saves', 'nand/user/save', swSave('yuzu')]],
+  sudachi: [['switch', 'Switch Saves', 'nand/user/save', swSave('sudachi')]], suyu: [['switch', 'Switch Saves', 'nand/user/save', swSave('suyu')]], torzu: [['switch', 'Switch Saves', 'nand/user/save', swSave('torzu')]],
+  rpcs3: [['ps3', 'PS3 Saves', 'dev_hdd0/home/00000001/savedata', (d) => path.join(useAt('rpcs3', d).hdd0 || path.join(d, 'dev_hdd0'), 'home/00000001/savedata')]],
   ppsspp: [['psp', 'PSP Saves', 'PSP/SAVEDATA']],
-  vita3k: [['vita', 'Vita Saves', 'ux0/user/00/savedata']],
+  vita3k: [['vita', 'Vita Saves', 'ux0/user/00/savedata', (d) => path.join(useAt('vita3k', d).pref || d, 'ux0/user/00/savedata')]],
   shadps4: [['ps4', 'PS4 Saves', shadSaveDir]],
-  pcsx2: [['ps2', 'PS2 Memory Cards', 'memcards']],
-  duckstation: [['ps1', 'PS1 Memory Cards', 'memcards']],
-  dolphin: [['gc', 'GameCube Saves', 'GC'], ['wii', 'Wii Saves', 'Wii/title/00010000']],
-  cemu: [['wiiu', 'Wii U Saves', 'mlc01/usr/save']],
-  azahar: [['3ds', '3DS Saves', 'sdmc/Nintendo 3DS']],
+  pcsx2: [['ps2', 'PS2 Memory Cards', 'memcards', (d) => useAt('pcsx2', d).memcards || path.join(d, 'memcards')]],
+  duckstation: [['ps1', 'PS1 Memory Cards', 'memcards', (d) => useAt('duckstation', d).memcards || path.join(d, 'memcards')]],
+  dolphin: [['gc', 'GameCube Saves', 'GC'], ['wii', 'Wii Saves', 'Wii/title/00010000', (d) => path.join(useAt('dolphin', d).wii || path.join(d, 'Wii'), 'title/00010000')]],
+  cemu: [['wiiu', 'Wii U Saves', 'mlc01/usr/save', (d) => path.join(useAt('cemu', d).mlc || path.join(d, 'mlc01'), 'usr/save')]],
+  azahar: [['3ds', '3DS Saves', 'sdmc/Nintendo 3DS', (d) => path.join(useAt('azahar', d).sdmc || path.join(d, 'sdmc'), 'Nintendo 3DS')]],
   xenia: [['x360', 'Xbox 360 Saves', 'content']],
   retroarch: [['retroarch', 'RetroArch Saves', retroarchSaves]],
 };
@@ -357,8 +530,8 @@ function syncRoots({ home = os.homedir(), extra = {} } = {}) {
       let real; try { real = fs.realpathSync(d); } catch { continue; }
       if (seen.has(emu + real)) continue;
       seen.add(emu + real);
-      for (const [suffix, label, rel] of SYNC[emu]) {
-        const p = typeof rel === 'function' ? rel(d) : path.join(d, rel);
+      for (const [suffix, label, rel, now] of SYNC[emu]) {
+        const p = now ? now(d) : typeof rel === 'function' ? rel(d) : path.join(d, rel);
         let at = 0, exists = false; try { at = fs.statSync(p).mtimeMs; exists = true; } catch {}
         const id = SYNC_PREFIX + suffix, cur = best.get(id);
         if (!cur || (exists && !cur.exists) || (exists === cur.exists && at > cur.at)) best.set(id, { id, label, emu, emuName: NAMES[emu] || emu, path: p, exists, at });
@@ -368,4 +541,4 @@ function syncRoots({ home = os.homedir(), extra = {} } = {}) {
   return [...best.values()];
 }
 
-module.exports = { scan, match, syncRoots, SYNC, SYNC_PREFIX, sfo, cardSerials, ryujinxIndex, sizeOf, DATA, NAMES, SCAN, shadSaveDirs, shadSaveDir };
+module.exports = { WHERE, whereOf, places, placeDir, iniGet, cfgDirs, ls, PS4_ID, scan, match, syncRoots, SYNC, SYNC_PREFIX, sfo, cardSerials, ryujinxIndex, sizeOf, DATA, NAMES, SCAN, shadSaveDirs, shadSaveDir };
