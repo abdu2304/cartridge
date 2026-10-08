@@ -88,7 +88,7 @@
 // each is, its size and last change, when it last synced, its history, the backups kept here and RomM's versions.
 import { computed, onMounted, onBeforeUnmount, ref, nextTick } from 'vue';
 import { pushLayer, focusFirst } from '../nav.js';
-import { store, call, closeModal, toast, bytes, ago, romById, cover, consoleName, confirm } from '../store.js';
+import { store, call, closeModal, toast, bytes, ago, romById, cover, consoleName, confirm, openModal } from '../store.js';
 import Icon from './Icon.vue';
 import PIcon from './PIcon.vue';
 import EmuIcon from './EmuIcon.vue';
@@ -107,6 +107,7 @@ const EV = {
   down: { t: 'Brought to This Device', icon: 'mdiCloudDownloadOutline' },
   conflict: { t: 'Changed on Two Devices', icon: 'mdiCallSplit' },
   restored: { t: 'Older Version Put Back', icon: 'mdiHistory' },
+  refiled: { t: 'Filed Under This Game in RomM', icon: 'mdiFolderMoveOutline' }, // 0.9.60: it was under a game of another console
   error: { t: 'Couldn’t Sync', icon: 'mdiAlertCircleOutline' },
   unplaced: { t: 'Couldn’t Be Put in Place', icon: 'mdiFolderAlertOutline' },
   damaged: { t: 'Download Didn’t Match RomM’s Check', icon: 'mdiAlertCircleOutline' },
@@ -136,7 +137,8 @@ async function syncNow() {
   await load();
 }
 async function copy(p) { await call('clip:write', { text: p }); toast('Location copied', 'ok', 1800, 'mdiContentCopy'); }
-async function openFolder(p) { try { await call('fs:openFolder', { path: p }); } catch (e) { toast(e.message, 'error', 4000); } }
+// 0.9.60 (owner): Cartridge's own folder sheet, not another app; this sheet opens itself again after (one modal slot)
+async function openFolder(p) { const outer = store.modal.resolve; await openModal('folderview', { path: p, title: rom.value?.name || 'Saves' }); store.modal = { type: 'savegame', props: { romId: props.romId, name: props.name }, resolve: outer }; }
 // single modal slot: the question replaces this sheet, which opens itself again afterwards
 async function restore(v, i) {
   if (!i) return;
@@ -191,7 +193,7 @@ onBeforeUnmount(() => layer?.pop());
 .sg-ev:first-child::before { top: 50%; }
 .sg-ev:last-child::before { bottom: 50%; }
 .sg-dot { position: relative; z-index: 1; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--s3); color: var(--text); }
-.sg-ev.up .sg-dot, .sg-ev.down .sg-dot, .sg-ev.restored .sg-dot { background: color-mix(in srgb, var(--green) 30%, var(--s2)); }
+.sg-ev.up .sg-dot, .sg-ev.down .sg-dot, .sg-ev.restored .sg-dot, .sg-ev.refiled .sg-dot { background: color-mix(in srgb, var(--green) 30%, var(--s2)); }
 .sg-ev.conflict .sg-dot, .sg-ev.error .sg-dot, .sg-ev.unplaced .sg-dot, .sg-ev.damaged .sg-dot { background: color-mix(in srgb, var(--gold, #e7b84a) 30%, var(--s2)); }
 .sg-ev-mid { min-width: 0; display: flex; flex-direction: column; }
 .sg-ev-mid .small { overflow-wrap: anywhere; }

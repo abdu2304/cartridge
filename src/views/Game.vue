@@ -56,7 +56,7 @@
               <button class="btn" data-focus @click="setMark(false)"><Icon name="mdiCheckboxBlankOffOutline" />Unmark</button>
             </template>
             <template v-else-if="installedPath">
-              <button v-if="pkgBusy" class="btn xl" data-focus data-autofocus @click="cancelPkg"><Icon name="mdiLoading" class="spin" :size="22" />{{ pkgProg?.opens ? `Close ${emuName} to finish` : `Installing in ${emuName}` }}{{ pkgProg?.of > 1 ? ` · ${pkgProg.step} of ${pkgProg.of}` : '' }}</button>
+              <button v-if="pkgBusy" class="btn xl" data-focus data-autofocus @click="cancelPkg"><Icon name="mdiLoading" class="spin" :size="22" />{{ pkgProg?.opens ? `Close ${emuName} to finish` : `Installing in ${emuName}` }}{{ pkgPct != null ? ` · ${pkgPct}%` : '' }}{{ pkgProg?.of > 1 ? ` · ${pkgProg.step} of ${pkgProg.of}` : '' }}</button>
               <button v-else-if="needsInstall" class="btn primary xl" data-focus data-autofocus @click="installPkg"><Icon name="mdiPackageDown" :size="22" />Install in {{ emuName }}</button>
               <button v-else-if="pkg?.licenceMissing?.length" class="btn primary xl" data-focus data-autofocus @click="addLicence"><Icon name="mdiKeyOutline" :size="22" />Get licence (.rap)</button>
               <button v-else class="btn primary ok xl" data-focus data-autofocus @click="playNow"><Icon name="mdiCheckCircle" />Ready to play</button>
@@ -269,12 +269,13 @@ async function remove() {
 // the download, whether Cartridge installed it, and the install's progress.
 const pkg = ref(null);
 const pkgProg = ref(null);
+const pkgPct = computed(() => pkgProg.value?.pct ?? bgJob('pkg:' + props.romId)?.pct ?? null); // 0.9.60: also when the page opened mid-install
 const pkgBusy = computed(() => pkgProg.value?.state === 'running' || pkg.value?.running || !!bgJob('pkg:' + props.romId)); // 0.9.32: still installing from before
 const needsInstall = computed(() => pkg.value?.pkgs > 0 && !pkg.value.installed);
 const emuName = computed(() => pkg.value?.emuName || 'RPCS3');
 async function loadPkg() { pkg.value = installedPath.value ? await call('pkg:check', { romId: Number(props.romId) }).catch(() => null) : null; }
 watch(installedPath, loadPkg);
-const offPkg = window.cart.on('pkg-progress', (p) => { if (p.romId === Number(props.romId)) pkgProg.value = p; });
+const offPkg = window.cart.on('pkg-progress', (p) => { if (p.romId === Number(props.romId)) pkgProg.value = { ...pkgProg.value, ...p }; }); // 0.9.60: a step keeps the last percentage
 onBeforeUnmount(() => { try { offPkg?.(); } catch {} });
 async function installPkg() {
   const p = pkg.value, emu = emuName.value;
@@ -808,8 +809,10 @@ onMounted(async () => {
 .g-actions .btn:not(.xl) { padding: 0 var(--s-4); flex-shrink: 0; }
 @media (max-width: 1100px) { .g-actions .icon-btn span { display: none; } }
 .dlbox { width: 380px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
-.dest { display: flex; align-items: center; gap: 8px; font-size: var(--t-xs); color: var(--muted); max-width: 700px; white-space: nowrap; min-width: 0; }
-.dest .mono { min-width: 0; }
+.dest { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 4px 8px; font-size: var(--t-xs); color: var(--muted); max-width: 700px; min-width: 0; }
+.dest .icon { flex: none; margin-top: 1px; }
+.dest .mono { min-width: 0; overflow-wrap: anywhere; } /* 0.9.60: a long path wraps; it ran under the free space (owner's photo) */
+.dest .muted { white-space: nowrap; }
 .g-cover { flex: none; width: 250px; margin-top: -200px; z-index: 2; aspect-ratio: 2/3; border-radius: var(--r-md); overflow: hidden; box-shadow: var(--shadow-pop); background: var(--s2); }
 .g-cover img { width: 100%; height: 100%; object-fit: cover; }
 .noart { height: 100%; display: grid; place-items: center; padding: 20px; text-align: center; font-family: var(--display); font-size: var(--t-lg); }

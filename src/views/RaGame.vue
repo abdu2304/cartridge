@@ -114,9 +114,12 @@ onMounted(async () => { await load(); focusFirst(el.value); });
 .rg-title { font-size: var(--t-2xl); }
 .rg-bar { height: 8px; max-width: 560px; }
 .rg-bar i { background: linear-gradient(90deg, #f5c542, #ffdf80); }
-.rg-prog { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: var(--t-sm); color: #d4d8e2; }
+.rg-prog { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: var(--t-sm); color: var(--text-2, #d4d8e2); }
 .chip.gold { background: rgba(245, 197, 66, 0.18); color: #ffd978; display: inline-flex; gap: 5px; align-items: center; }
 .chip.hc { font-size: var(--t-xs); padding: 2px 6px; background: rgba(255, 90, 90, 0.18); color: #ff9b9b; }
+/* Light (0.9.60): the pale colours were made for dark pages */
+:global(body.theme-light .chip.gold) { color: #7a5600; }
+:global(body.theme-light .chip.hc) { color: #b3261e; }
 .rg-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; padding-bottom: 40px; }
 .rg-ach { display: flex; gap: 14px; padding: 12px 14px; border-radius: var(--r-md); outline: none; transition: transform var(--spring-snappy-d) var(--spring-snappy); }
 .rg-ach:focus { transform: scale(1.02); }

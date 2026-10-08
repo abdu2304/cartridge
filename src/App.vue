@@ -82,6 +82,7 @@
     <LinkSetup v-else-if="store.modal?.type === 'linksetup'" v-bind="store.modal.props" />
     <SaveGame v-else-if="store.modal?.type === 'savegame'" :key="'sg' + store.modal.props.romId" v-bind="store.modal.props" />
     <SaveLocations v-else-if="store.modal?.type === 'savelocations'" key="savelocations" />
+    <FolderView v-else-if="store.modal?.type === 'folderview'" :key="'fv' + store.modal.props.path" v-bind="store.modal.props" />
     <ManualViewer v-else-if="store.modal?.type === 'manual'" v-bind="store.modal.props" />
     <PatchesSheet v-else-if="store.modal?.type === 'patches'" v-bind="store.modal.props" />
     <AddonsSheet v-else-if="store.modal?.type === 'addons'" :key="'addons' + store.modal.props.romId" v-bind="store.modal.props" />
@@ -144,6 +145,7 @@ import ConsoleCollection from './components/ConsoleCollection.vue';
 import LinkSetup from './components/LinkSetup.vue';
 import SaveGame from './components/SaveGame.vue';
 import SaveLocations from './components/SaveLocations.vue';
+import FolderView from './components/FolderView.vue';
 import FirstTour from './components/FirstTour.vue';
 import CloudSync from './components/CloudSync.vue';
 // the manual reader brings pdf.js: loaded the first time a manual opens, not at start
@@ -561,7 +563,7 @@ function modalFrom(el) {
 .top-search:not(.open):not(:focus-within) :deep(.pb) { margin-left: 8px; transform: scale(0.88); opacity: 0.55; }
 .top-search.open, .top-search:focus-within { width: min(300px, 26vw); background: rgba(255, 255, 255, 0.14); color: var(--text); }
 .top-search:not(.open):not(:focus-within) input { width: 0; flex: 0; opacity: 0; }
-.top-search:focus-within { box-shadow: 0 0 0 2px var(--focus, #fff); }
+.top-search:focus-within { box-shadow: var(--ring-soft); } /* 0.9.60: a glow, no outline */
 .top-search input { flex: 1; min-width: 0; height: 100%; font: inherit; font-size: var(--t-sm); color: var(--text); background: none; border: 0; outline: none; }
 .top-search input:focus { box-shadow: none !important; }
 .top-search input::placeholder { color: rgba(255, 255, 255, 0.5); }

@@ -64,7 +64,7 @@
 // yours to do; nothing here syncs an old or found copy on its own.
 import { computed, onMounted, onBeforeUnmount, ref, nextTick } from 'vue';
 import { pushLayer, focusFirst } from '../nav.js';
-import { store, call, closeModal, toast, ago, confirm, choose } from '../store.js';
+import { store, call, closeModal, toast, ago, confirm, choose, openModal } from '../store.js';
 import Icon from './Icon.vue';
 import EmuIcon from './EmuIcon.vue';
 
@@ -100,7 +100,7 @@ async function search() {
   } catch (e) { toast(e.message, 'error', 5000); }
   searching.value = false; await load();
 }
-async function openFolder(p) { try { await call('fs:openFolder', { path: p }); } catch (e) { toast(e.message, 'error', 4000); } }
+async function openFolder(p) { const outer = store.modal.resolve; await openModal('folderview', { path: p, title: 'Where Your Saves Are' }); reopen(outer); } // Cartridge's own folder sheet (0.9.60)
 // single modal slot: a question replaces this sheet, which then opens itself again
 function reopen(outer) { store.modal = { type: 'savelocations', props: {}, resolve: outer }; }
 async function move(e, p, found = false) {

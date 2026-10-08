@@ -35,6 +35,9 @@ function stub(ui, extra = {}, lib = null, answers = {}) {
     'welcome:state': { emudeck: false, retrodeck: false, steam: true, live: { on: false, flag: false }, gamescope: false, appimage: true, inSteam: false, host: 'deck', device: 'Steam Deck' },
     'fs:space': { free: 5e11, total: 1e12 }, 'storage:overview': { drives: [], games: [] }, 'upload:list': { files: [] },
     'server:status': { base: 'http://x', route: 'local' }, 'pad:detect': { kind: 'xbox', devices: [] },
+    // pop-ups the audits open (0.9.60): Where Your Saves Are and the folder sheet, with long real-world paths
+    'saves:locations': { search: { at: now - 86400e3, done: true, dirs: 182340 }, searching: false, emus: [{ emu: 'shadps4', name: 'shadPS4', synced: true, places: [{ loc: 'use', why: 'default', place: '/home/u/.local/share/shadPS4/home/1000/savedata', saves: 14, newest: now - 600e3, exists: true, list: [] }, { loc: 'old', why: 'older', place: '/home/u/.local/share/shadPS4/savedata', saves: 2, newest: now - 90 * 86400e3, exists: true, list: [] }], found: [{ emu: 'vita3k', base: '/run/media/system/bazzite-deck_fedora/var/home/u/.local/share/Vita3K/Vita3K', at: {}, place: '/run/media/system/bazzite-deck_fedora/var/home/u/.local/share/Vita3K/Vita3K/ux0/user/00/savedata', saves: 1, newest: now - 100 * 86400e3, list: [] }] }] },
+    'fs:look': { path: '/home/u/.config/PCSX2/memcards', parent: '/home/u/.config/PCSX2', more: false, entries: [{ name: 'Mcd001.ps2', dir: false, size: 8650752, at: now - 3600e3 }, { name: 'Ratchet and Clank - Size Matters (USA) (En,Fr,De,Es,It) shared memory card.ps2', dir: false, size: 8650752, at: now - 86400e3 }, { name: 'folders', dir: true, size: 0, at: now }] },
   };
   Object.assign(H, ${JSON.stringify(answers)}); // 0.9.52: a run's own answers (the README pictures' real library)
   const merge = (t, x) => { for (const [k, v] of Object.entries(x || {})) { if (v && typeof v === 'object' && !Array.isArray(v) && t[k] && typeof t[k] === 'object') merge(t[k], v); else t[k] = v; } return t; };
@@ -58,6 +61,8 @@ async function open({ theme = 'cartridge', style = 'plain', bg = 'ribbons', widt
       if (!d || typeof d !== 'object') return d;
       if (ch === 'library:get') for (const list of Object.values(d.roms || {})) for (const r of list) r.name = L(r.name, r.id % 3);
       if (ch === 'trophies:overview') { for (const t of d.recent || []) { t.name = L(t.name, 1); t.desc = L(t.desc || 'Was pretty good', 2); t.game = L(t.game, 1); } for (const g of d.games || []) g.title = L(g.title, 1); }
+      // 0.9.60 (owner's photo: a long game path ran under the free space on the game page): long install paths
+      if (ch === 'installed:get') for (const k of Object.keys(d)) if (typeof d[k] === 'string') d[k] = '/run/media/player/Expansion Drive/EmuDeck/Emulation/roms/ps2/' + 'Ratchet and Clank - Size Matters (USA) (En,Fr,De,Es,It) [Disc 1 of 1] '.repeat(2) + 'game.chd';
       if (ch === 'ra:overview') { for (const a of d.recent || []) { a.title = L(a.title, 1); a.desc = L(a.desc, 2); a.game = L(a.game, 1); } for (const g of d.played || []) g.title = L(g.title, 1); }
       return d;
     };

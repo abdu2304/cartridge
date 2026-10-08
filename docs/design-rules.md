@@ -82,10 +82,16 @@ at 1280x800, 1920x1080 and 3840x2160. When a rule and a request disagree, ask th
 ## 6. Focus and choice
 
 - **Focus is the brightest thing on screen:** a full fill (`--focus`, white in the Cartridge colour, dark in Light) on
-  buttons, rows, tabs and menu items, with `--on-focus` text; a ring with a lift on cards and tiles; Glass uses lit
-  glass. **(checked: `tools/ui-audit/focus.js`, a focused thing must look different from itself unfocused, six looks)**
-- **Chosen is never focus.** Chosen is a softer fill (`--sel`, or brighter glass `--lg-sel`) or a green tick. A chosen
-  row that's focused looks focused. A page's own chosen style must not beat the focus style (0.9.49: RomM's chosen row).
+  buttons, rows, tabs, keys and menu items, with `--on-focus` text; on cards, tiles and pictures a lift with a soft glow
+  in the highlight colour (`--ring`, no stroke); Glass uses lit glass. **(checked: `tools/ui-audit/focus.js`, a focused
+  thing must look different from itself unfocused, six looks)**
+- **Never a white outline (owner, 0.9.60: "make it a rule").** Nothing gets a hard line drawn round it to show focus or
+  choice: no `0 0 0 Npx` ring in white or in the highlight colour, no white `outline`. Focus is a fill or a glow, chosen
+  a tint with a bar. **(checked: `test/designRules.test.js`)**
+- **Chosen is never focus.** Chosen is a soft tint of the highlight (`--sel-bg`) with a slim bar on one edge: on the left
+  in lists (`--sel-ring`), underneath in tabs, chips and swatches (`--sel-under`); Light keeps its grey fill; or a green
+  tick. A chosen row that's focused looks focused. A page's own chosen style must not beat the focus style (0.9.49:
+  RomM's chosen row).
 - **Focus never falls off the page.** If the focused thing disappears, focus goes to the nearest thing on the page
   (`keepFocus`). After a button opens another page, the button that continues the flow keeps focus (the tour).
 - **Pointer and touch never show rings;** the controller and keyboard always do.
@@ -130,6 +136,17 @@ at 1280x800, 1920x1080 and 3840x2160. When a rule and a request disagree, ask th
 - **Every slider, list and grid works with the D-pad.** A slider changes with left and right while it has focus.
 - **Hints show the buttons of the controller you hold,** only in controller mode; never a key and a button together.
 - **Hold A** expands a trailing text; B folds it back first.
+
+## 10b. Speed (owner, 0.9.60: "the whole app feels slower")
+
+- **Nothing heavy on Electron's main thread.** It answers the controller's window, every call and gamescope; a picture
+  shrunk there held it 25 to 120 ms (measured), and hundreds of them froze the app. Pictures are shrunk, probed and
+  converted in the window's image worker (`src/imageWorker.js`); games' IDs are read in the background a game at a time
+  (`gameId` lazy, `ready()`); never `execSync`/`execFileSync` in code that runs on its own (0.9.55).
+  **(checked: `test/designRules.test.js` pins the only places left that decode pictures there)**
+- **Pictures at the size they're drawn:** covers through `cover(rom)`, other pictures with a width (`img(p, w)`), never
+  full size in a card.
+- The log says how long the main thread was held up (`main thread: longest stall`), and the Performance overlay shows it.
 
 ## 11. A new screen is finished when
 

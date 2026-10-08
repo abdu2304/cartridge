@@ -156,6 +156,6 @@ onBeforeUnmount(() => layer?.pop());
 .pt-cat-l { font-size: var(--t-xs); color: var(--muted); font-weight: 600; }
 .pt-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .pt-chip { padding: 6px 12px; border-radius: 999px; border: 0; background: var(--s2); color: inherit; font: inherit; font-size: var(--t-sm); }
-.pt-chip.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); font-weight: 650; }
+.pt-chip.on { background: var(--sel-bg); box-shadow: var(--sel-under); color: var(--on-sel); font-weight: 650; }
 .pt-chip:focus { background: var(--focus); color: var(--on-focus); outline: none; }
 </style>

@@ -108,6 +108,7 @@ export function tab(name) {
   store.navDir = from < 0 || to < 0 || from === to ? 'in' : to > from ? 'r' : 'l';
   store.history = [];
   calm();
+  if (name !== 'search') store.lastSearch = ''; // 0.9.60 (owner): a search done stays done; another tab closes it
   store.route = { name, params: {} };
 }
 

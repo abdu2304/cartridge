@@ -463,6 +463,31 @@ function looseMatch(title, emu, games) {
   for (const g of games) { if (!re.test(g.slug || '')) continue; const n = norm(g.name); if (n.length >= 6 && (n.startsWith(t) || t.startsWith(n))) ids.add(g.id); }
   return ids.size === 1 ? [...ids][0] : null;
 }
+// The games a save that matched nothing is probably for (0.9.60, owner: Not Matched split into "not in my library" and "in
+// my library but not synced"): games on the save's own console whose name starts the save's title (or the other way
+// round) or shares most of its words. Up to 3, best first; shown as "Probably …" for you to confirm, never used on their own.
+const WORD_STOP = new Set(['the', 'of', 'and', 'a', 'an', 'edition', 'version', 'game', 'usa', 'europe', 'japan']);
+const wordsOf = (x) => new Set(String(x || '').toLowerCase().replace(/&/g, ' and ').replace(/\s*[([].*?[)\]]/g, ' ').replace(/[^a-z0-9]+/g, ' ').split(' ').filter((w) => w.length > 1 && !WORD_STOP.has(w)));
+function likely(save, games, { nameOf = null } = {}) {
+  const k = save.keys || {}, re = EMU_CONSOLE[save.emu];
+  const titles = [k.title, k.name, save.codeName, nameOf && k.serial ? nameOf(k.serial) : null].filter((t) => t && norm(t).length >= 4);
+  if (!titles.length) return [];
+  const best = new Map();
+  for (const g of games) {
+    if (re && g.slug && !re.test(g.slug)) continue;
+    const gn = norm(g.name), gw = wordsOf(g.name);
+    if (gn.length < 4) continue;
+    for (const t of titles) {
+      const tn = norm(t), tw = wordsOf(t);
+      let score = 0;
+      if (gn === tn) score = 1;
+      else if (gn.startsWith(tn) || tn.startsWith(gn)) score = 0.8;
+      else { const both = [...tw].filter((w) => gw.has(w)).length, all = new Set([...tw, ...gw]).size; if (tw.size >= 2 && both >= 2) score = both / all; }
+      if (score >= 0.5 && score > (best.get(g.id) || 0)) best.set(g.id, score);
+    }
+  }
+  return [...best.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id]) => id);
+}
 function match(saves, games, { nameOf = null } = {}) {
   const byId = new Map(), byGc = new Map(), byName = new Map();
   // a title: the game of that name on the save's own console (0.9.59: a PS4 save named "Bloodborne" went to a PS3 game
@@ -471,6 +496,9 @@ function match(saves, games, { nameOf = null } = {}) {
   for (const g of games) {
     for (const s of g.ids || []) if (s) { const u = idNorm(s); byId.set(u, g.id); if (/^0100[0-9A-F]{12}$/.test(u) && !byId.has(u.slice(0, 13) + '000')) byId.set(u.slice(0, 13) + '000', g.id); } // a Switch update's file still names its base game
     for (const s of g.discIds || []) if (s) { const u = idNorm(s); byId.set(u, g.id); if (u.length === 6) byGc.set(u.slice(0, 4), g.id); if (u.length === 4) byGc.set(u, g.id); }
+    // 0.9.60: a GameCube or Wii ID read from the game or its file name counts like a disc ID (Dolphin names saves by the
+    // first 4 characters; a game in a folder, or named "[RSBE01]", never matched)
+    if (!g.slug || /^(ngc|gc|gamecube|wii)$/i.test(g.slug)) for (const s of g.ids || []) { const u = idNorm(s); if (/^[A-Z0-9]{6}$/.test(u) && /^[A-Z]/.test(u) && !byGc.has(u.slice(0, 4))) byGc.set(u.slice(0, 4), g.id); }
     const k = norm(g.name); if (k.length >= 3) { if (!byName.has(k)) byName.set(k, []); byName.get(k).push(g); }
   }
   // a Switch save is the base game's: updates (…800) and add-ons map back (the last three digits cleared)
@@ -541,4 +569,4 @@ function syncRoots({ home = os.homedir(), extra = {} } = {}) {
   return [...best.values()];
 }
 
-module.exports = { WHERE, whereOf, places, placeDir, iniGet, cfgDirs, ls, PS4_ID, scan, match, syncRoots, SYNC, SYNC_PREFIX, sfo, cardSerials, ryujinxIndex, sizeOf, DATA, NAMES, SCAN, shadSaveDirs, shadSaveDir };
+module.exports = { likely, WHERE, whereOf, places, placeDir, iniGet, cfgDirs, ls, PS4_ID, scan, match, syncRoots, SYNC, SYNC_PREFIX, sfo, cardSerials, ryujinxIndex, sizeOf, DATA, NAMES, SCAN, shadSaveDirs, shadSaveDir };

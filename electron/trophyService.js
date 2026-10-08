@@ -437,6 +437,7 @@ module.exports = function createTrophyService(ctx) {
   const noted = new Set(loadJson(NOTED_FILE, [])); // ROMs seen with trophy notes (any device)
   let lastFull = 0;
   async function sync({ force } = {}) {
+    await ctx.idsReady?.(); // 0.9.60: games' IDs are read in the background; linking waits for them instead of guessing
     if (cfg().sync === false) { syncState = { state: 'off' }; return syncState; }
     if (!ctx.getConfig().configured) return syncState;
     syncState = { state: 'running', at: syncState.at };

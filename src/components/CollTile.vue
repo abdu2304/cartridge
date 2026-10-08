@@ -2,16 +2,16 @@
   <button class="coll" :class="{ wide }" data-focus :data-key="'col-' + c.id" @click="$emit('open', c)" @focus="$emit('focused', c)">
     <!-- wide: a game's artwork behind, covers fanned on the right, the icon or series logo on the left -->
     <div v-if="wide" class="art">
-      <img v-if="bg" class="bg" :class="{ blur: bg.blur }" :src="bg.src" loading="lazy" />
+      <img v-if="bg" class="bg" :class="{ blur: bg.blur }" :src="bg.src" loading="lazy" decoding="async" @error="fail(bg.src)" />
       <div class="shade" />
       <div class="lead">
         <GameLogo v-if="c.series && logo" :logo="logo" :name="c.name" cls="lead-t" :area="9000" :max-w="170" :max-h="70" />
         <div v-else class="badge"><Icon :name="c.favorite ? 'mdiStar' : c.smart ? 'mdiAutoFix' : c.icon || 'mdiBookmarkMultipleOutline'" :size="30" /></div>
       </div>
-      <div class="fan"><img v-for="(a, i) in fan" :key="i" :src="a" :style="{ '--i': i, '--n': fan.length }" loading="lazy" /></div>
+      <div class="fan"><img v-for="(a, i) in fan" :key="a" :src="a" :style="{ '--i': i, '--n': fan.length }" loading="lazy" decoding="async" @error="fail(a)" /></div>
     </div>
     <div v-else class="mosaic" :class="'n' + arts.length">
-      <img v-for="(a, i) in arts" :key="i" :src="a" loading="lazy" />
+      <img v-for="a in arts" :key="a" :src="a" loading="lazy" decoding="async" @error="fail(a)" />
       <div v-if="!arts.length" class="ph"><Icon :name="c.favorite ? 'mdiStar' : c.icon || 'mdiBookmarkMultipleOutline'" :size="40" /></div>
     </div>
     <div class="cap">
@@ -23,27 +23,33 @@
   </button>
 </template>
 <script setup>
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
 import { img, cover, romById, store, logoOf } from '../store.js';
 import Icon from './Icon.vue';
 import GameLogo from './GameLogo.vue';
 const props = defineProps({ c: Object, wide: Boolean });
 defineEmits(['open', 'focused']);
 const roms = computed(() => props.c.rom_ids.slice(0, 24).map((id) => romById(id)).filter(Boolean));
+// 0.9.60 (owner: collections took long to show and Favorites had empty cards): every picture at the size it's drawn, the
+// library's own covers first (RomM's collection covers can point at pictures that are gone), and a picture that fails is
+// left out instead of leaving an empty card
+const bad = reactive(new Set());
+const fail = (src) => bad.add(src);
 const arts = computed(() => {
-  if (props.c.covers?.length) return props.c.covers.slice(0, 4).map(img);
-  const fromRoms = roms.value.filter((r) => r.path_cover_small || r.url_cover).slice(0, 4).map((r) => cover(r));
-  if (fromRoms.length) return fromRoms;
-  return props.c.cover ? [img(props.c.cover)] : [];
+  const fromRoms = roms.value.filter((r) => r.path_cover_small || r.url_cover).map((r) => cover(r));
+  const theirs = (props.c.covers || []).map((p) => img(p, 360));
+  const list = [...new Set([...fromRoms, ...theirs, ...(props.c.cover ? [img(props.c.cover, 360)] : [])])].filter((a) => !bad.has(a));
+  return list.slice(0, 4);
 });
 const fan = computed(() => arts.value.slice(0, 3));
 // background: your chosen background for a game, else a screenshot, else a blurred cover
 const bg = computed(() => {
   const list = props.c.series ? [...roms.value].reverse() : roms.value; // series: the newest game
   const withHero = list.find((r) => store.art?.[r.id]?.hero);
-  if (withHero) return { src: img(store.art[withHero.id].hero) };
-  const withShot = list.find((r) => r.shot);
-  if (withShot) return { src: img(withShot.shot) };
+  const sized = (p) => img(p, 720); // the wide card is 330 px: 720 is sharp on the TV too
+  if (withHero && !bad.has(sized(store.art[withHero.id].hero))) return { src: sized(store.art[withHero.id].hero) };
+  const withShot = list.find((r) => r.shot && !bad.has(sized(r.shot)));
+  if (withShot) return { src: sized(withShot.shot) };
   return arts.value[0] ? { src: arts.value[0], blur: true } : null;
 });
 // series: the first game's logo usually carries the series name

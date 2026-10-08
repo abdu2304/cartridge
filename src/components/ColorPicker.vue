@@ -104,7 +104,7 @@ onBeforeUnmount(() => layer?.pop());
 
 /* the preview: a small Cartridge in the colour */
 .cp-prev { position: relative; min-height: 290px; height: 100%; border-radius: var(--r-lg); overflow: hidden; padding: var(--s-4); display: flex; flex-direction: column; gap: 12px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.12); transition: background var(--tint); }
-.pv-card { width: 34%; aspect-ratio: 3 / 4; border-radius: 10px; box-shadow: 0 0 0 2px #fff, 0 12px 26px -10px rgba(0, 0, 0, 0.6); position: relative; overflow: hidden; }
+.pv-card { width: 34%; aspect-ratio: 3 / 4; border-radius: 10px; box-shadow: 0 0 14px 2px color-mix(in srgb, var(--pv-hl, #fff) 55%, transparent), 0 12px 26px -10px rgba(0, 0, 0, 0.6); position: relative; overflow: hidden; }
 .pv-card i { position: absolute; inset: 0; background: linear-gradient(170deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0) 45%); }
 .pv-lines { display: flex; flex-direction: column; gap: 6px; }
 .pv-lines b, .pv-lines span { display: block; height: 9px; border-radius: 5px; background: rgba(255, 255, 255, 0.85); width: 62%; }
@@ -126,13 +126,13 @@ onBeforeUnmount(() => layer?.pop());
 .cp-sl-top b { font-variant-numeric: tabular-nums; color: var(--muted); font-weight: 600; }
 .cp-track { position: relative; height: 30px; border-radius: 15px; cursor: pointer; touch-action: none; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12), inset 0 2px 4px rgba(0, 0, 0, 0.25); outline: none; }
 .cp-knob { position: absolute; top: 50%; width: 26px; height: 26px; border-radius: 50%; translate: -50% -50%; box-shadow: 0 0 0 3px #fff, 0 3px 10px rgba(0, 0, 0, 0.45); transition: scale var(--spring-snappy-d) var(--spring-snappy); pointer-events: none; }
-.cp-track:focus-visible, .pad-mode .cp-track:focus { box-shadow: 0 0 0 3px var(--s1), 0 0 0 5px var(--focus-solid, var(--focus)); }
+.cp-track:focus-visible, .pad-mode .cp-track:focus { box-shadow: var(--ring); } /* 0.9.60: a glow, no ring */
 .cp-track:focus .cp-knob { scale: 1.15; }
 .cp-sub { font-size: var(--t-sm); font-weight: 600; margin-top: var(--s-1); }
 .cp-grid { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
 .cp-sw { aspect-ratio: 1; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); transition: transform var(--spring-snappy-d) var(--spring-snappy); display: grid; place-items: center; }
-.cp-sw:focus-visible, .pad-mode .cp-sw:focus { transform: scale(1.12); box-shadow: 0 0 0 3px var(--s1), 0 0 0 5px var(--focus-solid, var(--focus)); z-index: 1; }
-.cp-sw.on { box-shadow: 0 0 0 2px var(--s1), 0 0 0 4px var(--text); }
+.cp-sw:focus-visible, .pad-mode .cp-sw:focus { transform: scale(1.12); box-shadow: var(--ring); z-index: 1; }
+.cp-sw.on { box-shadow: inset 0 -3px 0 0 var(--text); } /* chosen: a bar underneath (0.9.60, no ring) */
 .cp-any { position: relative; cursor: pointer; background: conic-gradient(from 90deg, #f55, #fd5, #5f8, #5df, #85f, #f5c, #f55); color: #fff; }
 .cp-any input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .cp-act { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }

@@ -308,3 +308,50 @@ test('an emulator counts as open only when its own program runs', () => {
   assert.ok(!on('eden', ['/bin/bash', '-c', 'cd ~/.local/share/eden && ls']));
   assert.ok(!on('eden', ['/home/u/Applications/Cartridge-x86_64.AppImage', '--eden']));
 });
+
+test('games on several consoles: a save matches, files and shows only on its own console; a misfiled one is filed again', async () => {
+  const S = require('../electron/saves');
+  // Ratchet & Clank: Size Matters is in the library on PS2 and PSP under the same name
+  const games = [
+    { id: 20, name: 'Ratchet & Clank: Size Matters', slug: 'ps2', ids: [] },
+    { id: 21, name: 'Ratchet & Clank: Size Matters', slug: 'psp', ids: [] },
+  ];
+  const psp = [{ emu: 'ppsspp', keys: { serial: 'UCUS98633', title: 'Ratchet & Clank: Size Matters' } }];
+  S.match(psp, games);
+  assert.deepStrictEqual(psp[0].romIds, [21]);
+  const ps2only = [{ emu: 'ppsspp', keys: { title: 'Ratchet & Clank: Size Matters' } }];
+  S.match(ps2only, [games[0]]); // only the PS2 game in the library: the PSP save matches nothing
+  assert.deepStrictEqual(ps2only[0].romIds, []);
+  assert.strictEqual(SS.fitsConsole('ppsspp', ['ps2']), false);
+  assert.strictEqual(SS.fitsConsole('ppsspp', ['psp']), true);
+  assert.strictEqual(SS.fitsConsole('retroarch', ['snes']), true);
+
+  // in RomM the PSP save sits under the PS2 game (filed by name before 0.9.59): the next sync files it under the PSP one
+  const h = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-multi-'));
+  const dir = path.join(h, '.config/ppsspp/PSP/SAVEDATA/UCUS98633');
+  fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, 'DATA.BIN'), 'size matters');
+  const romm = fakeRomm(), rpc = romm.rpcFor('d1'), led = ledger();
+  const [u] = SS.units({ home: h, games: [games[0], { ...games[1], ids: ['UCUS98633'] }] }).filter((x) => x.emu === 'ppsspp');
+  assert.strictEqual(u.romId, 21);
+  await rpc.upload({ ...u, romId: 20 }, SS.zip(SS.entriesOf(u)), 'x.zip', { hash: SS.hashUnit(u) });
+  const slugsOf = (id) => ({ 20: ['ps2'], 21: ['psp'] }[id] || null);
+  const r = await SS.syncUnit(u, rpc, led, { home: h, slugsOf });
+  assert.strictEqual(r.result, 'refiled');
+  assert.deepStrictEqual(romm.saves.map((s) => s.rom_id), [20, 21]); // the old copy stays (nothing deleted), the right one is newest
+  assert.strictEqual((await SS.syncUnit(u, rpc, led, { home: h, slugsOf, remotes: await rpc.listAll() })).result, 'same');
+  // a change goes up under the PSP game, never the PS2 one
+  fs.writeFileSync(path.join(dir, 'DATA.BIN'), 'size matters 2');
+  assert.strictEqual((await SS.syncUnit(u, rpc, led, { home: h, slugsOf })).result, 'up');
+  assert.strictEqual(romm.saves[romm.saves.length - 1].rom_id, 21);
+  // another device without the save: it comes down for the PSP game
+  const only = SS.remoteOnly(await rpc.listAll(), new Set(), { slugsOf });
+  assert.strictEqual(only[0].romId, 21);
+});
+
+test('Dolphin saves match a GameCube or Wii game by the ID read from the game or its name', () => {
+  const S = require('../electron/saves');
+  const games = [{ id: 1, name: 'Super Smash Bros. Brawl', slug: 'wii', ids: ['RSBE01'], discIds: [] }, { id: 2, name: 'Wind Waker', slug: 'ngc', ids: [], discIds: ['GZLE01'] }];
+  const saves = [{ emu: 'dolphin', keys: { gc: 'RSBE' } }, { emu: 'dolphin', keys: { gc: 'GZLE' } }];
+  S.match(saves, games);
+  assert.deepStrictEqual(saves.map((s) => s.romIds[0]), [1, 2]);
+});
