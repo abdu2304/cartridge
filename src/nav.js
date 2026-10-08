@@ -143,7 +143,9 @@ function move(dir) {
   // Zones (0.9.2): the D-pad never leaves the part of the screen you're in. The page is a zone, so
   // up never lands on the top bar (LT/RT and Y reach that); Settings' right side is one too, left
   // with B, like other console menus.
-  const zone = cur.closest('[data-zone]');
+  // a pop-up is a zone of its own (0.9.60: without one, down in a pop-up's list went to its Close button whenever the next
+  // card was still below the visible part of the list; owner's photo of Where Your Saves Are)
+  const zone = cur.closest('[data-zone]') || (layer && layer.el !== document.body ? layer.el : null);
   // Up and down stay inside the list you're scrolling while it has more in that direction. The row
   // above can be scrolled behind a toolbar, which otherwise looked nearer (Library: A3).
   const sc = vertical ? cur.closest('[data-scroll]') : null;

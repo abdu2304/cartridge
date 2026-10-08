@@ -46,12 +46,17 @@ function createIdentity(ctx) {
   let cache = null, dirty = false, saveT = null;
   const load = () => { if (cache) return cache; try { cache = JSON.parse(fs.readFileSync(ctx.file, 'utf8')) || {}; } catch { cache = {}; } return cache; };
   const save = () => { dirty = true; clearTimeout(saveT); saveT = setTimeout(() => { if (!dirty || !ctx.file) return; dirty = false; try { fs.writeFileSync(ctx.file, JSON.stringify(cache)); } catch {} }, 2000); saveT.unref?.(); };
-  // IDs read from the game itself, once per file version
-  function fileIds(rom, where) {
+  // IDs read from the game itself, once per file version.
+  // 0.9.60 (owner: no controller for 15 seconds at start): reading means decrypting Switch files and opening CHDs, which
+  // held the main thread; with ctx.lazy a game not read yet is queued for warm() and answers [] for now. Whatever needs
+  // every ID (save matching) awaits ready(), which reads the rest a game at a time with pauses between, never in one go.
+  const queue = new Map();
+  function fileIds(rom, where, { now = !ctx.lazy } = {}) {
     if (!where || !ctx.extract) return [];
     let st; try { st = fs.statSync(where); } catch { return []; }
     const k = `${where}:${st.size}:${Math.round(st.mtimeMs)}:${READERS}`, c = load(); // READERS: a new reader reads every game again
     if (c[k]) return c[k];
+    if (!now) { queue.set(where, rom); warm(); return []; }
     let ids = [];
     try { ids = [...new Set((ctx.extract(rom, where) || []).filter(Boolean).map(up))]; } catch (e) { ctx.log?.('game id read failed', where, e.message); }
     for (const old of Object.keys(c)) if (old.startsWith(where + ':') && old !== k) delete c[old]; // the file changed: forget its old IDs
@@ -88,7 +93,30 @@ function createIdentity(ctx) {
     const loose = roms.filter((r) => { const a = norm(r.name); return a && (a.startsWith(n + ' ') || n.startsWith(a + ' ')); });
     return loose.length && new Set(loose.map((r) => norm(r.name))).size === 1 ? { id: oldest(loose).id, by: 'loose' } : null;
   }
-  return { idsOf, fileIds, nameIds, findRom, index, bump: () => { memo = new Map(); } };
+  // reads what's queued, one game per turn, pausing while ctx.busy() (a game is running) and between games
+  let warming = null;
+  const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  function warm() {
+    if (warming) return warming;
+    warming = (async () => {
+      while (queue.size) {
+        await pause(ctx.gap ?? 25); // never in the caller's turn: always a turn of its own
+        while (ctx.busy?.()) await pause(5000);
+        if (!queue.size) break;
+        const [where, rom] = queue.entries().next().value;
+        queue.delete(where);
+        fileIds(rom, where, { now: true });
+        memo.delete(rom.id);
+      }
+    })().finally(() => { warming = null; });
+    return warming;
+  }
+  // every downloaded game's IDs read (for save matching): queues the ones not read yet and waits for them
+  async function ready() {
+    for (const r of ctx.roms()) { const where = ctx.whereOf?.(r.id) || ''; if (where) fileIds(r, where); }
+    while (warming || queue.size) await (warming || warm());
+  }
+  return { idsOf, fileIds, nameIds, findRom, index, ready, warm, bump: () => { memo = new Map(); } };
 }
 
 module.exports = { ps4Ids, READERS, createIdentity, serialsIn, norm };

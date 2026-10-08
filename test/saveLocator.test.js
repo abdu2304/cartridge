@@ -255,3 +255,23 @@ test('Saves match by name on their own console only, and only when one game fits
   assert.strictEqual(saves[0].loose, true);
   assert.deepStrictEqual(saves[1].romIds, []);
 });
+
+test('Probably: games a save is likely for, on its own console only, best first, never more than three', () => {
+  const games = [
+    { id: 1, name: 'Ratchet & Clank: Going Commando', slug: 'ps2' }, { id: 2, name: 'Ratchet & Clank: Up Your Arsenal', slug: 'ps2' },
+    { id: 3, name: 'Ratchet & Clank: Size Matters', slug: 'psp' }, { id: 4, name: 'Jak and Daxter: The Precursor Legacy', slug: 'ps2' },
+  ];
+  assert.deepStrictEqual(S.likely({ emu: 'pcsx2', keys: { title: 'Ratchet & Clank 2' } }, games), [1]); // Going Commando shares half its words; Up Your Arsenal doesn't reach half
+  assert.deepStrictEqual(S.likely({ emu: 'ppsspp', keys: { title: 'Ratchet & Clank: Size Matters (EU)' } }, games), [3]);
+  assert.deepStrictEqual(S.likely({ emu: 'pcsx2', keys: { title: 'Kingdom Hearts' } }, games), []);
+  assert.deepStrictEqual(S.likely({ emu: 'pcsx2', keys: {} }, games), []);
+});
+
+test('a save you matched by hand is used while it fits the console', () => {
+  const h = fresh();
+  const dir = path.join(h, '.config/ppsspp/PSP/SAVEDATA/ULES00001'); mk(dir); put(path.join(dir, 'D.BIN'));
+  const games = [{ id: 7, name: 'A PSP Game', slug: 'psp', ids: [] }, { id: 8, name: 'A PS2 Game', slug: 'ps2', ids: [] }];
+  assert.strictEqual(SS.units({ home: h, games }).find((u) => u.emu === 'ppsspp').romId, null);
+  assert.strictEqual(SS.units({ home: h, games, matches: { 'psp:ULES00001': 7 } }).find((u) => u.emu === 'ppsspp').romId, 7);
+  assert.strictEqual(SS.units({ home: h, games, matches: { 'psp:ULES00001': 8 } }).find((u) => u.emu === 'ppsspp').romId, null); // another console: ignored
+});

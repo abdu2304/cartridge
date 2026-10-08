@@ -45,6 +45,19 @@ const familyOf = (x) => FAMILY[x] || x;
 const MEMBERS = (fam) => SUPPORTED.filter((e) => familyOf(e) === fam);
 const FAMILY_LABEL = { switch: 'Switch', ps3: 'RPCS3', psp: 'PPSSPP', vita: 'Vita3K', ps4: 'shadPS4', ps2: 'PCSX2', ps1: 'DuckStation', gc: 'Dolphin', wiiu: 'Cemu', '3ds': 'Azahar', x360: 'Xenia', retroarch: 'RetroArch' };
 const labelOf = (x) => LABEL[x] || FAMILY_LABEL[x] || x;
+// The RomM consoles each family's saves belong to (0.9.60, owner: "you have not accounted for games that are on multiple
+// platforms"). A game can be in the library on several consoles under one name (Ratchet & Clank: Size Matters on PSP
+// and PS2); a save is only ever filed under, matched to or shown for a game of its own console. RetroArch plays many
+// consoles: any game fits.
+const FAMILY_SLUGS = { switch: /^switch$/, ps3: /^ps3$/, psp: /^psp$/, vita: /^(psvita|vita)$/, ps4: /^ps4$/, ps2: /^ps2$/, ps1: /^(psx|ps1|ps)$/, gc: /^(ngc|gc|gamecube|wii)$/, wiiu: /^wiiu$/, '3ds': /^(3ds|n3ds|new-nintendo-3ds)$/, x360: /^xbox-?360$/ };
+// does a game with these RomM slugs fit a save of this emulator or family? unknown slugs fit (nothing to go on)
+function fitsConsole(emuOrFamily, slugs) {
+  const re = FAMILY_SLUGS[familyOf(emuOrFamily)]; if (!re) return true;
+  const list = [].concat(slugs || []).filter(Boolean);
+  return !list.length || list.some((x) => re.test(String(x).toLowerCase()));
+}
+// opts.slugsOf(romId) -> the game's RomM slugs, or null when it isn't in the library
+const fitsRom = (emu, romId, opts) => romId != null && (!opts?.slugsOf || fitsConsole(emu, opts.slugsOf(romId)));
 // "cartridge:<family or emulator>:<kind>:<key>" -> { family, kind, key } (null: not one of Cartridge's)
 function parseSlot(slot) { const m = /^cartridge:([^:]+):(dir|file|files):(.+)$/.exec(slot || ''); return m ? { family: familyOf(m[1]), kind: m[2], key: m[3] } : null; }
 // RomM's saves for this unit: the same key in the same console family, under any game and any slot spelling
@@ -103,7 +116,8 @@ function retroarchStates(base) {
 // 0.9.59: only saves where the emulator reads them now (the save locator's 'use'); old copies are listed, not synced.
 // Two copies of one save in use (a Flatpak and an AppImage of one emulator): the newest is synced, the others are
 // named on it (others) so you can see why.
-function units({ home = os.homedir(), extra = {}, extraAt = {}, games = [], carriers = {}, nameOf = null } = {}) {
+// matches: { [key]: romId } saves you matched by hand (0.9.60, "Probably …" confirmed), used when they fit the console
+function units({ home = os.homedir(), extra = {}, extraAt = {}, games = [], carriers = {}, nameOf = null, matches = {} } = {}) {
   const scanned = S.scan({ home, extra, extraAt, withSize: false, oldToo: false }).filter((s) => SUPPORTED.includes(s.emu) && s.loc === 'use');
   for (const s of scanned) if (s.emu === 'retroarch') { const { saves } = retroarchDirs(s.base); s.rel = path.relative(saves, s.path); }
   const ra = [...new Set(scanned.filter((s) => s.emu === 'retroarch').map((s) => s.base))];
@@ -115,7 +129,9 @@ function units({ home = os.homedir(), extra = {}, extraAt = {}, games = [], carr
     const sh = shape(s); if (!sh) continue;
     const romId = sh.card ? carriers[CONSOLE[s.emu]] ?? s.romIds?.[0] ?? null : s.romIds?.[0] ?? null;
     const u = { key: sh.key, emu: s.emu, kind: sh.kind, path: s.path, base: s.base, label: s.label || '', sub: s.sub || '', romId, romIds: s.romIds || [], card: !!sh.card, slot: slotOf(s.emu, sh.key, sh.kind), ...(s.loose ? { loose: true } : {}) }; // romIds: every game on a card (0.9.57, the game sheet)
-    if (romId == null) u.why = whyUnmatched(s, sh);
+    const mine = matches[sh.key];
+    if (mine != null && !sh.card && games.some((g) => g.id === mine && fitsConsole(s.emu, g.slug))) { u.romId = mine; u.romIds = [mine]; u.byHand = true; }
+    if (u.romId == null) { u.why = whyUnmatched(s, sh); if (!sh.card) u.likely = S.likely(s, games, { nameOf }); }
     const twin = out.find((x) => x.key === u.key && !x.states);
     if (twin) { // another copy of the same save: keep the newest
       const a = changedAt(twin), b = changedAt(u);
@@ -347,12 +363,21 @@ async function syncUnit(u, rpc, ledger, opts = {}) {
   const remotes = await remotesOf(u, rpc, opts);
   const newest = remotes.slice().sort((a, b) => ts(b.updated_at) - ts(a.updated_at) || (b.id || 0) - (a.id || 0))[0] || null;
   const remote = newest ? { id: newest.id, hash: newest.content_hash, romId: newest.rom_id ?? null, emulator: newest.emulator || null } : null;
+  // 0.9.60: the RomM entry this save lives under, only when that game is on the save's console; a save filed under a
+  // game of another console (matched by name before 0.9.59) is filed again under this device's game of the right one
+  const home = remote && fitsRom(u.emu, remote.romId, opts) ? remote.romId : u.romId;
+  const misfiled = !!remote && remote.romId != null && home !== remote.romId && u.romId != null && fitsRom(u.emu, u.romId, opts);
   const target = u.path || placeFor(u.emu, u.key, opts);
   const local = u.path ? hashUnit(u) : null;
   const base = ledger.get(u.key) || null;
   let what = decide(local, remote, base);
   if (what === 'conflict' && opts.choice) what = opts.choice === 'mine' ? 'up' : 'down';
   if (opts.dry || what === 'none') return { key: u.key, result: what };
+  if (what === 'same' && misfiled && local) { // the same save, under the wrong game: put it under the right one too (nothing deleted in RomM)
+    const r = await rpc.upload({ ...u, romId: home }, zip(entriesOf(u)), (u.key.replace(/^[^:]+:/, '').replace(/[^\w.-]+/g, '_') || 'save') + '.zip', { overwrite: true, hash: local });
+    ledger.set(u.key, { hash: local, remoteId: r?.id ?? null, remoteHash: r?.content_hash || local, at: Date.now() });
+    return { key: u.key, result: 'refiled', from: remote.romId, to: home };
+  }
   if (what === 'same') { ledger.set(u.key, { hash: local, remoteId: remote.id, remoteHash: remote.hash, at: Date.now() }); return { key: u.key, result: 'same' }; }
   if (what === 'conflict') return { key: u.key, result: 'conflict', local, remote };
   if ((what === 'down' || what === 'up') && running(u.emu, opts.procs)) return { key: u.key, result: 'busy' };
@@ -360,7 +385,7 @@ async function syncUnit(u, rpc, ledger, opts = {}) {
     const ents = entriesOf(u), buf = zip(ents);
     const name = (u.key.replace(/^[^:]+:/, '').replace(/[^\w.-]+/g, '_') || 'save') + '.zip';
     // into the RomM entry that already holds this save, so every device's copies stay together (0.9.58)
-    const r = await rpc.upload({ ...u, romId: remote?.romId ?? u.romId }, buf, name, { overwrite: !!opts.choice, hash: local });
+    const r = await rpc.upload({ ...u, romId: home ?? u.romId }, buf, name, { overwrite: !!opts.choice || misfiled, hash: local });
     if (r?.conflict) return { key: u.key, result: 'conflict', local, remote };
     ledger.set(u.key, { hash: local, remoteId: r?.id ?? null, remoteHash: r?.content_hash || local, at: Date.now() });
     return { key: u.key, result: 'up' };
@@ -460,9 +485,10 @@ function remoteOnly(remotes, localKeys, opts = {}) {
     if (!members.length) continue;
     const emu = members.find((e) => hasEmu(e, opts)) || members[0];
     const cur = out.get(p.key);
-    if (!cur || ts(r.updated_at) > ts(cur.updated_at)) out.set(p.key, { key: p.key, emu, kind: p.kind, romId: r.rom_id, slot: slotOf(emu, p.key, p.kind), path: null, files: [], remote: true, updated_at: r.updated_at });
+    if (!cur || ts(r.updated_at) > ts(cur.updated_at)) out.set(p.key, { key: p.key, emu, kind: p.kind, romId: fitsRom(emu, r.rom_id, opts) ? r.rom_id : cur?.romId ?? null, slot: slotOf(emu, p.key, p.kind), path: null, files: [], remote: true, updated_at: r.updated_at });
+    else if (cur.romId == null && fitsRom(emu, r.rom_id, opts)) cur.romId = r.rom_id;
   }
   return [...out.values()];
 }
 
-module.exports = { moveInto, FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };
+module.exports = { FAMILY_SLUGS, fitsConsole, fitsRom, moveInto, FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };

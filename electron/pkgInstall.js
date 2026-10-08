@@ -5,6 +5,7 @@
 // its game folder. Games installed this way are recorded (installs.json); only those can ever be
 // deleted from RPCS3's storage, and only after every check in safeToRemove passes.
 const fs = require('fs');
+const fsp = fs.promises;
 const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
@@ -579,4 +580,51 @@ async function installFirmware({ emu, cmd, file, signal }) {
   if (code && code !== 0) throw new Error(`Vita3K couldn't install the firmware: ${(tail.trim().split('\n').pop() || 'exit ' + code).slice(0, 200)}`);
   return true;
 }
-module.exports = { stageForVita3k, VITA3K_END, rpcs3FwDone, rpcs3Dirs, vita3kFsPaths, vita3kWhy, vita3kLogTail, installFirmware, pkgInfo, packagesIn, licencePlan, stageLicences, exdataHas, npdOf, rpcs3Hdds, sfoSerial, install, vitaPrefs, vitaContent, findZrif, installVita, vitaArchiveContents, vitaUnpack, safeToRemove };
+// ---------------------------------------------------------------- install progress (0.9.60, owner: "I don't know how
+// long it's going to take"). Neither RPCS3 nor Vita3K says how far an install is, so Cartridge measures it: how much the
+// package unpacks (its header says, or a zip's entries add up) against how much the game's folder has grown. Read only,
+// async, once a second; nothing about the install itself changes. Unknown (a header it can't read, a reinstall over the
+// same files): no number, never a made-up one.
+// a PKG's data size: u64 big-endian at 0x28 after the magic 7F 50 4B 47 (PS3 and Vita packages alike)
+async function pkgDataSize(file) {
+  let fh; try { fh = await fsp.open(file, 'r'); const b = Buffer.alloc(0x30); await fh.read(b, 0, 0x30, 0); if (b.readUInt32BE(0) !== 0x7f504b47) return 0; return Number(b.readBigUInt64BE(0x28)); } catch { return 0; } finally { await fh?.close().catch(() => {}); }
+}
+function zipSize(file) {
+  return new Promise((resolve) => {
+    let yauzl; try { yauzl = require('yauzl'); } catch { return resolve(0); }
+    yauzl.open(file, { lazyEntries: true }, (err, zip) => {
+      if (err) return resolve(0);
+      let n = 0; zip.on('entry', (e) => { n += e.uncompressedSize || 0; zip.readEntry(); }); zip.on('end', () => resolve(n)); zip.on('error', () => resolve(0)); zip.readEntry();
+    });
+  });
+}
+async function dirSize(dir, budget = { n: 30000 }) {
+  let n = 0, ents; try { ents = await fsp.readdir(dir, { withFileTypes: true }); } catch { return 0; }
+  for (const e of ents) {
+    if (budget.n-- <= 0) break;
+    const f = path.join(dir, e.name);
+    if (e.isDirectory()) n += await dirSize(f, budget); else if (e.isFile()) { try { n += (await fsp.stat(f)).size; } catch {} }
+  }
+  return n;
+}
+// how much these files unpack to: .pkg headers, zips' entries, folders' sizes
+async function unpackedSize(files) {
+  let n = 0;
+  for (const f of files) n += /\.pkg$/i.test(f) ? await pkgDataSize(f) : /\.(zip|vpk)$/i.test(f) ? await zipSize(f) : (await fsp.stat(f).catch(() => null))?.isDirectory() ? await dirSize(f) : 0;
+  return n;
+}
+// watches dirs grow towards total; onPct(0..99) each second while it moves; stop() ends it
+function growth({ dirs, total, onPct, every = 1000 }) {
+  let stopped = false, timer = null, base = null;
+  const size = async () => { let n = 0; for (const d of dirs) n += await dirSize(d); return n; };
+  const tick = async () => {
+    if (stopped) return;
+    const n = await size();
+    if (base == null) { base = n; if (total && n >= total * 0.9) { total = 0; } } // already there (a reinstall): no number
+    if (total && !stopped) onPct(Math.max(0, Math.min(99, Math.round(((n - base) / total) * 100))));
+    if (!stopped) timer = setTimeout(tick, every);
+  };
+  tick();
+  return () => { stopped = true; clearTimeout(timer); };
+}
+module.exports = { pkgDataSize, zipSize, dirSize, unpackedSize, growth, stageForVita3k, VITA3K_END, rpcs3FwDone, rpcs3Dirs, vita3kFsPaths, vita3kWhy, vita3kLogTail, installFirmware, pkgInfo, packagesIn, licencePlan, stageLicences, exdataHas, npdOf, rpcs3Hdds, sfoSerial, install, vitaPrefs, vitaContent, findZrif, installVita, vitaArchiveContents, vitaUnpack, safeToRemove };

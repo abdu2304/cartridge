@@ -929,19 +929,42 @@ async function scanServer() {
 // the original (<file>.w<width>), so the interface decodes a 360 px cover instead of a 600 px one, and a 1280 px
 // banner instead of a 3840 px one on a handheld. Only ever smaller; GIFs and SVGs (animation, drawings) untouched;
 // anything nativeImage can't read is served as it was.
+// Picture work in the window's image worker (0.9.60, src/imageWorker.js): nativeImage here held the main thread 25 to 120
+// ms a picture (measured), and the controller, every call and the window's answers to gamescope waited behind it. A few at
+// a time; anything not answered in 8 s, or before the window is up, falls back (a picture served as it is, a logo the old
+// way). imgWork(op, buf, opts) -> the worker's answer, or null
+let imgReady = false, imgSeq = 0;
+const imgWait = new Map(), imgQueue = [];
+let imgBusy = 0;
+function imgWork(op, buf, o = {}) {
+  if (!imgReady || !win || win.isDestroyed()) return Promise.resolve(null);
+  return new Promise((resolve) => { imgQueue.push({ op, buf, o, resolve }); imgPump(); });
+}
+function imgPump() {
+  while (imgBusy < 3 && imgQueue.length) {
+    const { op, buf, o, resolve } = imgQueue.shift(), id = ++imgSeq;
+    imgBusy++;
+    const done = (r) => { if (!imgWait.has(id)) return; imgWait.delete(id); clearTimeout(t); imgBusy--; resolve(r); imgPump(); };
+    const t = setTimeout(() => done(null), 8000);
+    imgWait.set(id, done);
+    try { win.webContents.send('img-work', { id, op, buf, ...o }); } catch { done(null); }
+  }
+}
+const sizing = new Map(); // one shrink per file and width at a time (a page asks for the same cover in several places)
 async function sizedImage(buf, type, w, file, jpeg = false) {
   if (!w || !buf || !/jpe?g|png|webp/i.test(type || '')) return null;
   const out = file + '.w' + w;
   try { const b = await fsp.readFile(out); return { buf: b, type: (await fsp.readFile(out + '.type', 'utf8').catch(() => '')) || 'image/jpeg' }; } catch {}
-  try {
-    const { nativeImage } = require('electron');
-    const im = nativeImage.createFromBuffer(buf);
-    if (im.isEmpty() || im.getSize().width <= w * 1.15) return null; // already about that size
-    const small = im.resize({ width: w, quality: 'better' });
-    const png = !jpeg && /png/i.test(type), b = png ? small.toPNG() : small.toJPEG(88), t = png ? 'image/png' : 'image/jpeg';
+  if (sizing.has(out)) return sizing.get(out);
+  const p = (async () => {
+    const r = await imgWork('size', buf, { type, w, jpeg });
+    if (!r || r.skip || !r.buf) return null; // already about that size, or no answer: served as it is
+    const b = Buffer.from(r.buf), t = r.type || 'image/jpeg';
     fsp.writeFile(out, b).then(() => fsp.writeFile(out + '.type', t)).catch(() => {});
     return { buf: b, type: t };
-  } catch { return null; }
+  })().finally(() => sizing.delete(out));
+  sizing.set(out, p);
+  return p;
 }
 async function trimImageCache(limit) {
   let names = []; try { names = await fsp.readdir(IMG_CACHE); } catch { return; }
@@ -1032,7 +1055,7 @@ async function handleImage(request) {
     const type = r.headers.get('content-type') || 'image/jpeg';
     await fsp.mkdir(IMG_CACHE, { recursive: true }).then(() => Promise.all([fsp.writeFile(file, buf), fsp.writeFile(file + '.type', type)])).catch(() => {});
     const sz = !sonySlug && want ? await sizedImage(buf, type, want, file) : null;
-    return new Response(sz ? sz.buf : mark(buf), { headers: { 'Content-Type': sz ? sz.type : type } });
+    return new Response(sz ? sz.buf : mark(buf), { headers: { 'Content-Type': sz ? sz.type : type, 'Cache-Control': 'max-age=31536000' } }); // 0.9.60: kept like the cached copies
   } catch {
     return (await fromLib()) || new Response('err', { status: 502 });
   }
@@ -1053,7 +1076,6 @@ async function libraryArt() {
   if (!want.size) return;
   let base; try { base = await resolveBase(); } catch { return; }
   if (!base || !(await probe(base, config.server, 4000).catch(() => null))?.ok) return; // not reachable: next time
-  const { nativeImage } = require('electron');
   let made = 0;
   for (const [k, p] of want) {
     if (total > LIB_ART_MAX || gameFocus.away || runOn) break; // a game started: stop, carry on next time
@@ -1062,9 +1084,10 @@ async function libraryArt() {
       if (/^https?:\/\//.test(p)) url = p; else { url = base + (p.startsWith('/') ? '' : '/') + p; headers = authHeaders(); delete headers.Accept; }
       const r = /^https?:\/\//.test(p) ? await webFetch(url, { signal: AbortSignal.timeout(20000) }) : await fetch(url, { headers, signal: AbortSignal.timeout(20000) });
       if (!r.ok) continue;
-      const im = nativeImage.createFromBuffer(Buffer.from(await r.arrayBuffer()));
-      if (im.isEmpty()) continue;
-      const b = (im.getSize().width > LIB_ART_W ? im.resize({ width: LIB_ART_W, quality: 'better' }) : im).toJPEG(82);
+      const src = Buffer.from(await r.arrayBuffer());
+      const sm = await imgWork('size', src, { type: r.headers.get('content-type') || 'image/jpeg', w: LIB_ART_W, jpeg: true }); // 0.9.60: in the image worker
+      if (!sm) continue; // no answer (the window isn't up): next time
+      const b = sm.skip ? src : Buffer.from(sm.buf);
       await fsp.writeFile(path.join(LIB_ART, k + '.jpg'), b);
       total += b.length; made++;
     } catch {}
@@ -1136,7 +1159,19 @@ async function fetchImage(src) {
   return Buffer.from(await r.arrayBuffer());
 }
 // Trim transparent edges, measure brightness, save a PNG. Returns null if it isn't a usable image.
-function prepareLogo(buf, key) {
+// 0.9.60: in the image worker (the same maths); here only when the worker can't answer
+async function prepareLogo(buf, key) {
+  const r = await imgWork('logo', buf, { type: 'image/png' });
+  if (r && r.none) return null;
+  if (r && r.buf) {
+    await fsp.mkdir(LOGO_DIR, { recursive: true });
+    const file = `${key}.png`;
+    await fsp.writeFile(path.join(LOGO_DIR, file), Buffer.from(r.buf));
+    return { file, w: r.w, h: r.h, dark: r.dark, lum: r.lum };
+  }
+  return prepareLogoHere(buf, key);
+}
+function prepareLogoHere(buf, key) {
   const { nativeImage } = require('electron');
   let im = nativeImage.createFromBuffer(buf);
   if (im.isEmpty()) return null;
@@ -1173,7 +1208,7 @@ async function logoFromSgdb(id, name) {
     let firstDark = null;
     for (const [i, l] of list.entries()) {
       try {
-        const got = prepareLogo(await fetchImage(l.url), `${id}-s${i}`);
+        const got = await prepareLogo(await fetchImage(l.url), `${id}-s${i}`);
         if (!got) continue;
         if (!got.dark) return { ...got, src: l.url };
         firstDark ||= { ...got, src: l.url };
@@ -1195,8 +1230,8 @@ async function logoFor({ id, name, romm }) {
   const job = (logoChain = logoChain.then(async () => {
     let got = null;
     try {
-      if (pick) got = prepareLogo(await fetchImage(pick), `${id}-p`);
-      else if (romm) { try { got = prepareLogo(await fetchImage(romm), `${id}-r`); } catch {} }
+      if (pick) got = await prepareLogo(await fetchImage(pick), `${id}-p`);
+      else if (romm) { try { got = await prepareLogo(await fetchImage(romm), `${id}-r`); } catch {} }
       if (!got && !pick && config.sgdbKey) got = await logoFromSgdb(id, name);
     } catch (e) { log('logo', name, e.message); if (e.auth) throw e; }
     logoCache[id] = { v: LOGO_VERSION, want, t: Date.now(), ...(got || {}) }; saveLogoCache();
@@ -2208,9 +2243,13 @@ async function installPkg(romId, zrif) {
   const files = [...pkgInst.stageLicences(plan, path.join(tmp, 'staged')), ...p.licences.filter((f) => /\.edat$/i.test(f)), ...p.pkgs.map((x) => x.file)];
   pkgRun = { romId, ac: new AbortController() };
   const send = (o) => broadcast('pkg-progress', { romId, ...o });
+  // 0.9.60: how far it is, from the game's folders growing towards what the packages unpack to
+  let pct = null, stopGrowth = () => {};
   try {
     send({ state: 'running', step: 0, of: files.length });
-    const got = await pkgInst.install({ cmd, hdds, files, titleIds: p.titleIds, signal: pkgRun.ac.signal, onStep: (s) => send({ state: 'running', ...s }) }).finally(() => fs.rmSync(tmp, { recursive: true, force: true }));
+    const total = await pkgInst.unpackedSize(p.pkgs.map((x) => x.file));
+    if (total) stopGrowth = pkgInst.growth({ dirs: hdds.flatMap((h) => (p.titleIds || []).map((id) => path.join(h, 'game', id))), total, onPct: (n) => { pct = n; send({ state: 'running', pct: n }); } });
+    const got = await pkgInst.install({ cmd, hdds, files, titleIds: p.titleIds, signal: pkgRun.ac.signal, onStep: (s) => send({ state: 'running', ...s, pct }) }).finally(() => { stopGrowth(); fs.rmSync(tmp, { recursive: true, force: true }); });
     const main = got.find((g) => g.created) || got.find((g) => g.touched) || got[0];
     if (!main || !(main.created || main.touched)) throw new Error('RPCS3 didn’t install it. Open RPCS3 and install the .pkg there (File → Install Packages) to see why.');
     const prev = installs[romId];
@@ -2464,7 +2503,11 @@ const identity = require('./gameId').createIdentity({
   whereOf: (id) => { const w = installedMap[id]; return w && w !== MARKED ? w : ''; },
   extract: gameFileIds,
   log,
+  lazy: true, // 0.9.60: read in the background a game at a time, never all at once on the main thread
+  busy: () => !!(gameFocus.away || runOn),
 });
+// every downloaded game's IDs read, for what needs all of them (save matching); a game start waits at most ms
+const idsReady = (ms = 120000) => Promise.race([identity.ready(), new Promise((ok) => setTimeout(ok, ms))]);
 const saveIdsOf = (r, where) => identity.fileIds(r, where);
 function savesGameList() {
   return syncGameList().map((g) => {
@@ -2504,7 +2547,7 @@ setTimeout(() => titles.ready().catch(() => {}), 40000);
 async function savesList(fresh) {
   if (!fresh && savesCache && Date.now() - savesCache.at < 30000) return savesCache.list;
   const S = require('./saves');
-  await titlesReady();
+  await titlesReady(); await idsReady();
   const list = S.match(S.scan({ extra: saveExtras(), extraAt: saveAt() }), savesGameList(), { nameOf: titles.nameOf });
   // games that keep their save beside the game file (melonDS, mGBA and other emulators' default)
   for (const [id, where] of Object.entries(installedMap)) {
@@ -2548,6 +2591,8 @@ function ssGames() {
 // RomM's saves API (electron/saveSync.js rommRpc, tested against a fake RomM server)
 const ssRpc = (devId) => require('./saveSync').rommRpc({ base: resolveBase, headers: authHeaders, devId });
 // a game's saves: its own, plus the whole memory card of its console
+// a game's RomM console slugs, so a save is only filed under or shown for a game of its own console (0.9.60)
+const ssSlugsOf = (id) => { const r = romIndexMain().get(Number(id)); return r ? [r.platform_slug, r.platform_fs_slug] : null; };
 const ssFor = (u, romId) => { if (romId == null) return true; if (u.romId === romId) return true; const r = romIndexMain().get(romId); return u.card && require('./saveSync').CONSOLE[u.emu] === ssConsoleOf(r); };
 let upAll = null; // Update All while it runs (0.9.58)
 let ssBusy = null, ssProg = null; // ssProg: how far the running sync is, for a page that opens while it runs
@@ -2558,35 +2603,36 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
     const SS = require('./saveSync'), extra = saveExtras();
     if (why !== 'before') await titlesReady(4000); // names for codes of games not on this device (never holds up a game)
     romId = romId == null ? null : Number(romId);
-    const local = SS.units({ extra, extraAt: saveAt(), games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf });
+    await idsReady(why === 'before' ? 8000 : 120000); // a game about to start never waits long for this
+    const local = SS.units({ extra, extraAt: saveAt(), games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf, matches: config.saveMatches || {} });
     // 0.9.58: every save of Cartridge's in RomM, read once: a save is found by its key and console under any game
     // (the other device may have matched the game to another RomM entry), never only under this device's entry
     let remotes = [];
     try { remotes = await ssRpcList(null); } catch (e) { log('save sync: RomM unreachable', e.message); if (why !== 'before' && !dry) ssHold(romId); return { offline: true, error: e.message, held: ssData.held || null }; }
     const devId = await rommDevice(), rpc = ssRpc(devId);
-    const all = [...local, ...SS.remoteOnly(remotes, new Set(local.map((u) => u.key)), { extra, extraAt: saveAt() })];
+    const all = [...local, ...SS.remoteOnly(remotes, new Set(local.map((u) => u.key)), { extra, extraAt: saveAt(), slugsOf: ssSlugsOf })];
     // one game (before or after playing it): its saves here, and every save RomM keeps under that game, by key
-    const want = romId == null ? null : new Set([...local.filter((u) => u.romId === romId || (u.romIds || []).includes(romId)).map((u) => u.key), ...remotes.filter((r) => r.rom_id === romId).map((r) => SS.parseSlot(r.slot)?.key).filter(Boolean)]);
+    const want = romId == null ? null : new Set([...local.filter((u) => u.romId === romId || (u.romIds || []).includes(romId)).map((u) => u.key), ...remotes.filter((r) => r.rom_id === romId && SS.fitsConsole(SS.parseSlot(r.slot)?.family, ssSlugsOf(romId))).map((r) => SS.parseSlot(r.slot)?.key).filter(Boolean)]);
     const todo = all.filter((u) => (romId == null || want.has(u.key) || ssFor(u, romId)) && (!key || u.key === key));
     const results = [];
     ssProg = { done: 0, of: todo.length, why };
     broadcast('savesync', { state: 'run', done: 0, of: todo.length, why, romId });
     for (const [i, u] of todo.entries()) {
       let r;
-      try { r = await SS.syncUnit(u, rpc, ssLedger, { extra, extraAt: saveAt(), backupsRoot: SAVE_BACKUPS, choice: key ? choice : null, dry, remotes }); } catch (e) { r = { key: u.key, result: e.code === 'auth' ? 'auth' : 'error', error: e.message }; }
-      results.push({ ...r, place: r.result === 'unplaced' ? r.why : undefined, label: u.label || u.key, emu: u.emu, emuName: SS.labelOf(u.emu), romId: u.romId, romIds: u.card ? u.romIds || [] : undefined, card: u.card, states: !!u.states, remote: !!u.remote, why: u.why || null });
+      try { r = await SS.syncUnit(u, rpc, ssLedger, { extra, extraAt: saveAt(), backupsRoot: SAVE_BACKUPS, choice: key ? choice : null, dry, remotes, slugsOf: ssSlugsOf }); } catch (e) { r = { key: u.key, result: e.code === 'auth' ? 'auth' : 'error', error: e.message }; }
+      results.push({ ...r, place: r.result === 'unplaced' ? r.why : undefined, label: u.label || u.key, emu: u.emu, emuName: SS.labelOf(u.emu), romId: u.romId, romIds: u.card ? u.romIds || [] : undefined, card: u.card, states: !!u.states, remote: !!u.remote, why: u.why || null, likely: u.likely?.length ? u.likely : undefined });
       if (!['none', 'same', 'unmatched'].includes(r.result)) log('save sync:', u.key, r.result, r.error || '');
       ssProg = { done: i + 1, of: todo.length, why };
       broadcast('savesync', { state: 'run', done: i + 1, of: todo.length, why, romId });
       if (r.result === 'auth') break;
     }
     // 0.9.57 (owner: a game's sheet with its sync history): what moved, per save, the last 30 times
-    if (!dry) for (const r of results) if (['up', 'down', 'conflict', 'error', 'unplaced', 'damaged'].includes(r.result) && !(['unplaced', 'damaged'].includes(r.result) && ssData.history?.[r.key]?.[0]?.result === r.result)) ssNote(r.key, { result: r.result, why, error: r.error || undefined, place: r.place, choice: key ? choice : undefined }); // a repeat of the same problem isn't noted again
+    if (!dry) for (const r of results) if (['up', 'down', 'refiled', 'conflict', 'error', 'unplaced', 'damaged'].includes(r.result) && !(['unplaced', 'damaged'].includes(r.result) && ssData.history?.[r.key]?.[0]?.result === r.result)) ssNote(r.key, { result: r.result, why, error: r.error || undefined, place: r.place, choice: key ? choice : undefined }); // a repeat of the same problem isn't noted again
     const counts = {}; for (const r of results) counts[r.result] = (counts[r.result] || 0) + 1;
     // 0.9.56 (owner: each count opens the saves behind it): what each save did in the last whole sync, at most 600
     // 0.9.58 (owner: "a lot of discrepancies"): every save's result is kept, the ones that couldn't move too (not set up
     // here, emulator open, a download that failed its check, an error), each with its reason; nothing is silent
-    const items = results.filter((r) => r.result !== 'none').slice(0, 800).map((r) => ({ key: r.key, label: r.label, emu: r.emu, emuName: r.emuName, romId: r.romId, romIds: r.romIds, card: r.card, states: r.states, remote: r.remote, result: r.result, why: r.why, place: r.place, error: r.error }));
+    const items = results.filter((r) => r.result !== 'none').slice(0, 800).map((r) => ({ key: r.key, label: r.label, emu: r.emu, emuName: r.emuName, romId: r.romId, romIds: r.romIds, card: r.card, states: r.states, remote: r.remote, result: r.result, why: r.why, place: r.place, error: r.error, likely: r.likely }));
     if (romId == null && !dry) { ssData.last = { at: Date.now(), counts, items, conflicts: results.filter((r) => r.result === 'conflict').map((r) => ({ key: r.key, label: r.label, emuName: r.emuName, romId: r.romId })) }; saveJson(SAVESYNC_FILE, ssData, false); }
     broadcast('savesync', { state: 'done', counts, why, romId });
     return { results, counts };
@@ -2886,7 +2932,11 @@ async function installVitaGame(romId, zrif) {
   const send = (o) => broadcast('pkg-progress', { romId, ...o });
   try {
     send({ state: 'running', step: 0, of: 1, opens: false });
-    const got = await pkgInst.installVita({ cmd, prefs, item, zrif: key, signal: pkgRun.ac.signal, onStep: (s) => send({ state: 'running', ...s }) });
+    // 0.9.60: how far it is, from ux0/app/<title ID> growing towards what the package unpacks to
+    let pct = null;
+    const total = await pkgInst.unpackedSize([item.file]);
+    const stopGrowth = total && item.titleId ? pkgInst.growth({ dirs: [...new Set([...prefs, ...pkgInst.vita3kFsPaths(cmd.exe)])].map((d) => path.join(d, 'ux0/app', item.titleId)), total, onPct: (n) => { pct = n; send({ state: 'running', pct: n }); } }) : () => {};
+    const got = await pkgInst.installVita({ cmd, prefs, item, zrif: key, signal: pkgRun.ac.signal, onStep: (s) => send({ state: 'running', ...s, pct }) }).finally(stopGrowth);
     const g = got[0];
     if (!g) throw new Error('Vita3K didn’t install it. Its own message is in Cartridge’s log (Settings → About → Report a problem).');
     const prev = installs[romId];
@@ -3003,6 +3053,7 @@ function createWindow() {
   if (process.env.VITE_DEV) win.loadURL('http://localhost:5173');
   else win.loadFile(path.join(__dirname, '../dist/index.html'));
   win.webContents.on('render-process-gone', (_e, d) => log('renderer gone', d.reason, d.exitCode));
+  win.webContents.on('did-start-loading', () => { imgReady = false; }); // the image worker comes back with the page
   // CI launch check: exit 0 only if the UI actually rendered
   if (process.env.CARTRIDGE_SMOKE) {
     const fail = (why) => { console.error('SMOKE FAIL: ' + why); app.exit(1); };
@@ -3028,6 +3079,7 @@ function createWindow() {
     scheduler.add('steam-collections', { every: 600000, firstAfter: 30000, deferWhilePlaying: true, run: async () => colsAuto() });
     // 0.9.59: Search for Saves runs once by itself, later only when you ask (Where Your Saves Are)
     if (!fs.existsSync(SAVESEARCH_FILE)) scheduler.add('save-search', { once: true, firstAfter: 4 * 60000, deferWhilePlaying: true, run: () => handlers['saves:search']().catch(() => {}) });
+    scheduler.add('game-ids', { once: true, firstAfter: 15000, deferWhilePlaying: true, run: () => identity.ready() }); // 0.9.60: games' IDs, a game at a time
     scheduler.add('bios-check', { once: true, firstAfter: 45000, deferWhilePlaying: true, run: () => biosSetup({ install: true }).catch(() => {}) }); // 0.9.38: firmware too, when an emulator lacks it
   }
   win.webContents.once('did-finish-load', () => log('ui loaded', Date.now() - startedAt + 'ms', 'window=' + win.getContentSize().join('x'), 'zoom=' + currentZoom()));
@@ -3045,7 +3097,7 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 }
 
-const trophySvc = require('./trophyService')({ busy: () => !!(gameFocus.away || runOn),
+const trophySvc = require('./trophyService')({ busy: () => !!(gameFocus.away || runOn), idsReady: () => idsReady(), // 0.9.60: links by ID once the games' IDs are read
   USER_DATA, api, broadcast: (c, d) => broadcast(c, d), log, loadJson,
   getConfig: () => config, saveConfig: () => saveConfig(), getLibrary: () => library,
   codeName: (src, code) => require('./titleNames').nameFor(src, code),
@@ -3065,8 +3117,11 @@ function coverCrop(buf, W, H) {
   const r = im.resize({ width: rw, height: rh, quality: 'best' });
   return r.crop({ x: Math.max(0, Math.floor((rw - W) / 2)), y: Math.max(0, Math.floor((rh - H) / 3)), width: W, height: H }).toPNG();
 }
-function asPng(buf) {
+// any picture as PNG (Steam's files): in the image worker (0.9.60), here only when it can't answer
+async function asPng(buf) {
   if (!buf) return null;
+  const w = await imgWork('png', buf, { type: 'image/png' });
+  if (w?.buf) return Buffer.from(w.buf);
   const { nativeImage } = require('electron');
   const im = nativeImage.createFromBuffer(buf);
   return im.isEmpty() ? null : im.toPNG();
@@ -3095,8 +3150,12 @@ async function sgdbImage(name, kind, style, aspect = 0) {
   const fits = (w, h) => (kind === 'grid' ? h > w : kind === 'wide' ? w > h * 1.6 : w > h * 1.4);
   for (const i of list.filter((x) => !x.width || fits(x.width, x.height)).slice(0, 3)) {
     try {
+      // 0.9.60: its size from the image worker, and a hero kept as it came (decoding and re-encoding a 3840 px hero as PNG
+      // held the main thread half a second per game while Home was browsed); Steam's files are still PNG
+      const buf = await fetchImage(i.url), sz = await imgWork('probe', buf, { type: 'image/png' });
+      if (sz) { if (fits(sz.w, sz.h)) return kind === 'hero' ? buf : await asPng(buf); continue; }
       const { nativeImage } = require('electron');
-      const im = nativeImage.createFromBuffer(await fetchImage(i.url));
+      const im = nativeImage.createFromBuffer(buf);
       const { width: w, height: h } = im.getSize();
       if (!im.isEmpty() && fits(w, h)) return im.toPNG();
     } catch {}
@@ -3405,6 +3464,7 @@ const handlers08 = {
     const folder = typeof arg === 'string' ? arg : arg?.id, onServer = typeof arg === 'object' && !!arg?.server;
     const S = require('./syncthing'), b = await S.browse(folder, { server: onServer ? config.syncthing?.server || null : null });
     try {
+      await idsReady();
       const games = syncGameList(), names = new Map(games.map((g) => [g.id, g.name]));
       // each file matched on its own, so it carries its game's name; the folder's real path and name decide textures or saves
       for (const f of b.files) { const one = S.matchGames(games, [{ id: folder, label: b.label, path: b.path + '/' + b.label, files: [f] }], { nameOf: titles.nameOf }); const gid = Object.keys(one)[0]; if (gid) { f.game = names.get(Number(gid)) || ''; f.romId = Number(gid); f.kind = S.KIND_LABEL[Object.keys(one[gid]).find((k) => one[gid][k].length)] || 'Save'; } }
@@ -3455,7 +3515,10 @@ const handlers08 = {
         if (e.list.length < 60) e.list.push({ label: x.label || path.basename(x.path), sub: x.sub || '', path: x.path, at: x.at || 0, size: x.size || 0, keys: x.keys || {} });
       }
       const found = (last?.found || []).filter((h) => h.emu === emu).map((h) => ({ ...h, list: h.list.filter((x) => !known.has(realOr(x.path))) })).filter((h) => h.list.length).map((h) => ({ ...h, saves: h.list.length }));
-      const list = [...places.values()].filter((p) => p.loc === 'use' || p.saves).map((p) => ({ ...p, exists: fs.existsSync(p.place) }));
+      // 0.9.60: a folder Cartridge only looked in (shadPS4's version folders, Vita3K's storage guesses) shows when it holds
+      // saves; an emulator's own folder in use shows even when empty, so you see where saves will go
+      const looked = new Set(extra[emu] || []);
+      const list = [...places.values()].filter((p) => p.saves || (p.loc === 'use' && (p.why === 'added' || !looked.has(p.base)))).map((p) => ({ ...p, exists: fs.existsSync(p.place) }));
       if (!list.some((p) => p.exists || p.saves) && !found.length) continue;
       emus.push({ emu, name: S.NAMES[emu] || emu, synced: SS.SUPPORTED.includes(emu), places: list, found });
     }
@@ -3515,7 +3578,8 @@ const handlers08 = {
   'savesync:game': async ({ romId }) => {
     romId = Number(romId);
     const SS = require('./saveSync'), extra = saveExtras();
-    const all = SS.units({ extra, extraAt: saveAt(), games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf });
+    await idsReady();
+    const all = SS.units({ extra, extraAt: saveAt(), games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf, matches: config.saveMatches || {} });
     const mine = all.filter((u) => u.romId === romId || (u.romIds || []).includes(romId));
     const statOf = (u) => {
       try {
@@ -3540,17 +3604,19 @@ const handlers08 = {
   // 0.9.58: by key across every RomM entry (the game's saves here, and every key RomM keeps under this game)
   'savesync:versions': async ({ romId }) => {
     const SS = require('./saveSync'), extra = saveExtras(); romId = Number(romId);
-    const all = await ssRpcList(null);
-    const keys = new Set([...SS.units({ extra, extraAt: saveAt(), games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf }).filter((u) => u.romId === romId || (u.romIds || []).includes(romId)).map((u) => u.key), ...all.filter((r) => r.rom_id === romId).map((r) => SS.parseSlot(r.slot)?.key)]);
-    return all.map((x) => ({ x, p: SS.parseSlot(x.slot) })).filter(({ p }) => p && keys.has(p.key)).map(({ x, p }) => ({ id: x.id, key: p.key, emu: x.emulator || p.family, emuName: SS.labelOf(x.emulator || p.family), at: x.updated_at, size: x.file_size_bytes, device: x.device_syncs?.find((d) => d.device_id === x.origin_device_id)?.device_name || '' })).sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
+    const all = await ssRpcList(null); await idsReady();
+    const keys = new Set([...SS.units({ extra, extraAt: saveAt(), games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf, matches: config.saveMatches || {} }).filter((u) => u.romId === romId || (u.romIds || []).includes(romId)).map((u) => u.key), ...all.filter((r) => r.rom_id === romId).map((r) => SS.parseSlot(r.slot)?.key)]);
+    // 0.9.60: only saves of this game's console (a PSP save once filed under the PS2 game of the same name isn't shown there)
+    const slugs = ssSlugsOf(romId);
+    return all.map((x) => ({ x, p: SS.parseSlot(x.slot) })).filter(({ p }) => p && keys.has(p.key) && SS.fitsConsole(p.family, slugs)).map(({ x, p }) => ({ id: x.id, key: p.key, emu: x.emulator || p.family, emuName: SS.labelOf(x.emulator || p.family), at: x.updated_at, size: x.file_size_bytes, device: x.device_syncs?.find((d) => d.device_id === x.origin_device_id)?.device_name || '' })).sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
   },
   'savesync:restore': async ({ id, romId }) => {
     if (!saveSyncOn()) throw new Error('Cartridge Save Sync is off.');
     const SS = require('./saveSync'), extra = saveExtras();
-    const saves = await ssRpcList(null), save = saves.find((x) => x.id === Number(id));
+    const saves = await ssRpcList(null), save = saves.find((x) => x.id === Number(id)); await idsReady();
     if (!save) throw new Error('That version isn’t in RomM any more.');
-    const local = SS.units({ extra, extraAt: saveAt(), games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf }), p = SS.parseSlot(save.slot);
-    const u = local.find((x) => p && x.key === p.key && SS.familyOf(x.emu) === p.family) || SS.remoteOnly([save], new Set(), { extra, extraAt: saveAt() })[0];
+    const local = SS.units({ extra, extraAt: saveAt(), games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf, matches: config.saveMatches || {} }), p = SS.parseSlot(save.slot);
+    const u = local.find((x) => p && x.key === p.key && SS.familyOf(x.emu) === p.family) || SS.remoteOnly([save], new Set(), { extra, extraAt: saveAt(), slugsOf: ssSlugsOf })[0];
     const r = await SS.restore(u, save, ssRpc(await rommDevice()), ssLedger, { extra, extraAt: saveAt(), backupsRoot: SAVE_BACKUPS });
     if (r.result === 'busy') throw new Error(`Close ${SS.labelOf(u.emu)} first: Cartridge never changes saves while the emulator is open.`);
     if (r.result === 'unplaced') throw new Error(r.why === 'noemu' ? `No ${SS.labelOf(u.emu)} is set up on this device for this save.` : `${SS.labelOf(u.emu)} hasn’t made its save folders on this device yet. Open it once, then try again.`);
@@ -3558,6 +3624,14 @@ const handlers08 = {
     log('save sync: restored', u.key, 'version', id);
     ssNote(u.key, { result: 'restored', why: 'restore', version: save.updated_at || null });
     return r;
+  },
+  // "It's this game" for a save Cartridge couldn't match on its own (0.9.60): remembered per save, used while it fits the
+  // game's console; romId null forgets it
+  'savesync:match': ({ key, romId }) => {
+    const m = { ...(config.saveMatches || {}) };
+    if (romId == null) delete m[key]; else m[key] = Number(romId);
+    config.saveMatches = m; saveConfig(); savesCache = null;
+    return true;
   },
   'saves:forRom': async ({ romId }) => (await savesList()).filter((s) => (s.romIds || []).includes(Number(romId))),
   'sync:server': () => require('./syncthing').server(config.syncthing?.server || {}),
@@ -3600,7 +3674,7 @@ const handlers08 = {
     return { on: true };
   },
   'sync:serviceState': async () => ({ on: fs.existsSync(path.join(os.homedir(), '.config/systemd/user/cartridge-syncthing.service')) }),
-  'sync:games': async () => { await titlesReady(); return require('./syncthing').gamesSynced(syncGameList(), { server: config.syncthing?.server || null, nameOf: titles.nameOf }); },
+  'sync:games': async () => { await titlesReady(); await idsReady(); return require('./syncthing').gamesSynced(syncGameList(), { server: config.syncthing?.server || null, nameOf: titles.nameOf }); },
   // dates for a game's timeline (the game page adds trophies and achievements it already has)
   'rom:timeline': ({ romId }) => {
     const r = romIndexMain().get(romId);
@@ -5078,6 +5152,20 @@ const handlers = {
     const files = exts || o.files === '*' ? entries.filter((e) => !isD(e) && !e.name.startsWith('.') && (!exts || exts.includes(path.extname(e.name).toLowerCase()))).map((e) => e.name).sort((a, b) => a.localeCompare(b)) : undefined;
     return { path: path.resolve(d), parent: path.dirname(path.resolve(d)), dirs, files };
   },
+  // a folder's contents for Cartridge's own folder sheet (0.9.60, owner: Open Folder opened another app): names, sizes and
+  // dates, read only, at most 500 entries. A file shows its folder.
+  'fs:look': async ({ path: p } = {}) => {
+    let d = expandHome(p || os.homedir());
+    try { if (!(await fsp.stat(d)).isDirectory()) d = path.dirname(d); } catch { throw new Error('That folder isn’t there any more.'); }
+    const ents = await fsp.readdir(d, { withFileTypes: true }).catch(() => []);
+    const out = [];
+    for (const e of ents.slice(0, 500)) {
+      const f = path.join(d, e.name);
+      try { const st = await fsp.stat(f); out.push({ name: e.name, dir: st.isDirectory(), link: e.isSymbolicLink(), size: st.isDirectory() ? 0 : st.size, at: st.mtimeMs }); } catch { out.push({ name: e.name, dir: false, broken: true, size: 0, at: 0 }); }
+    }
+    out.sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1));
+    return { path: d, parent: path.dirname(d), entries: out, more: ents.length > 500 };
+  },
   'fs:mkdir': async (dir) => { await fsp.mkdir(dir, { recursive: true }); return true; },
   'storage:overview': () => storageOverview(),
   // the space where a console's next download would go (0.9.38: any drive with a games folder)
@@ -5364,6 +5452,9 @@ const JOB_EVENTS = {
 const sendRaw = broadcast;
 broadcast = (ch, data) => { sendRaw(ch, data); const f = JOB_EVENTS[ch]; if (f && data) { try { const [k, o] = f(data); if (k && bgJobs.has(k)) bgJob(k, Object.fromEntries(Object.entries(o).filter(([, v]) => v != null))); } catch {} } };
 handlers['jobs:list'] = () => [...bgJobs.values()];
+// the window's image worker (0.9.60, imgWork above): it says when it's up, and answers each picture
+handlers['img:ready'] = () => { imgReady = true; return true; };
+handlers['img:done'] = (m) => { imgWait.get(m?.id)?.(m?.error ? null : m); return true; };
 handlers['emu:profiles'] = () => require('./emuProfiles').all(); // 0.9.48: what Cartridge knows per emulator (diagnostics)
 handlers['cide:map'] = () => { const C = require('./cide'); return C.map(require('./cee').consoleKeys()); }; // 0.9.51: each console's ID kinds and readers, or why it has none (diagnostics)
 handlers['cee:emulators'] = () => require('./cee').emulators(); // 0.9.49 CEE: every emulator, its install kinds, launch lines, links
@@ -5373,12 +5464,18 @@ handlers['scheduler:status'] = () => scheduler.status(); // 0.9.48: the backgrou
 // the performance overlay (0.9.48, Settings → About): CPU since the last ask, as a share of one core, and memory, over all of
 // Cartridge's processes (Electron's own figures, nothing sent anywhere)
 let perfPrev = null;
+// How long the main thread is held up (0.9.60): it answers the controller's window, every call and gamescope, so a stall is
+// felt as a frozen app. The longest in the first minute is logged, then any over half a second; the Performance overlay
+// shows the longest of the last second. Measured with Node's event loop delay histogram (no cost worth counting).
+const loopDelay = require('perf_hooks').monitorEventLoopDelay({ resolution: 20 });
+loopDelay.enable();
+setTimeout(() => { log('main thread: longest stall in the first minute', Math.round(loopDelay.max / 1e6), 'ms'); loopDelay.reset(); setInterval(() => { const ms = Math.round(loopDelay.max / 1e6); if (ms > 500) log('main thread: stall of', ms, 'ms in the last minute'); loopDelay.reset(); }, 60000).unref?.(); }, 60000);
 handlers['perf:sample'] = () => {
   const m = app.getAppMetrics(), t = Date.now();
   const cpu = m.reduce((a, x) => a + (x.cpu?.cumulativeCPUUsage || 0), 0), mem = m.reduce((a, x) => a + (x.memory?.workingSetSize || 0), 0);
   const pct = perfPrev && t > perfPrev.t ? ((cpu - perfPrev.cpu) / ((t - perfPrev.t) / 1000)) * 100 : null;
   perfPrev = { cpu, t };
-  return { cpu: pct, memMB: Math.round(mem / 1024), procs: m.length, playing: !!(gameFocus.away || runOn) };
+  return { cpu: pct, memMB: Math.round(mem / 1024), procs: m.length, playing: !!(gameFocus.away || runOn), stallMs: Math.round(loopDelay.max / 1e6) };
 };
 
 for (const [ch, fn] of Object.entries(handlers)) {

@@ -823,7 +823,7 @@ onBeforeUnmount(() => { off?.(); clearTimeout(padT); window.removeEventListener(
 .w-bg span { position: relative; }
 /* chosen = a light outer ring; focus keeps the app's own white focus (owner: chosen and focused never look alike) */
 .w-swatch.on, .w-bg.on { box-shadow: 0 0 0 3px var(--s0), 0 0 0 5px rgba(255, 255, 255, 0.45); }
-.pad-mode .w-swatch:focus, .w-swatch:focus-visible, .pad-mode .w-bg:focus, .w-bg:focus-visible { box-shadow: 0 0 0 3px var(--s0), 0 0 0 6px var(--focus); }
+.pad-mode .w-swatch:focus, .w-swatch:focus-visible, .pad-mode .w-bg:focus, .w-bg:focus-visible { box-shadow: var(--ring); }
 :global(body.theme-light .w-bg) { color: #1d1e22; text-shadow: 0 0 6px rgba(255, 255, 255, 0.9); }
 :global(body.theme-light .w-swatch.on), :global(body.theme-light .w-bg.on) { box-shadow: 0 0 0 3px var(--s0), 0 0 0 5px rgba(0, 0, 0, 0.35); }
 .w-act { display: flex; justify-content: center; gap: var(--s-3); flex-wrap: wrap; margin-top: var(--s-3); }

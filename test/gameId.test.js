@@ -47,3 +47,29 @@ test('one normalisation for titles', () => {
   assert.strictEqual(norm('The Legend of Zelda™ (USA) [!]'), 'legend of zelda');
   assert.strictEqual(norm('Ratchet & Clank'), norm('Ratchet and Clank'));
 });
+
+test('lazy identity (0.9.60): a game not read yet answers its name IDs at once and is read in the background; ready() waits for all', async () => {
+  const fs2 = require('fs'), os2 = require('os'), path2 = require('path');
+  const { createIdentity } = require('../electron/gameId');
+  const dir = fs2.mkdtempSync(path2.join(os2.tmpdir(), 'cart-lazy-'));
+  const files = [1, 2, 3].map((i) => { const f = path2.join(dir, `g${i}.iso`); fs2.writeFileSync(f, 'x' + i); return f; });
+  const roms = files.map((f, i) => ({ id: i + 1, name: 'Game ' + (i + 1), fs_name: path2.basename(f) }));
+  let reads = 0;
+  const idn = createIdentity({ roms: () => roms, whereOf: (id) => files[id - 1], extract: (r) => { reads++; return ['SLUS2000' + r.id]; }, lazy: true, gap: 1 });
+  assert.deepStrictEqual(idn.fileIds(roms[0], files[0]), []); // not read on the spot
+  assert.strictEqual(reads, 0);
+  await idn.ready();
+  assert.strictEqual(reads, 3);
+  assert.deepStrictEqual(idn.fileIds(roms[0], files[0]), ['SLUS20001']);
+  assert.strictEqual(idn.findRom({ ids: ['SLUS20003'] }).id, 3);
+  // paused while a game runs
+  let busy = true, reads2 = 0;
+  const f4 = path2.join(dir, 'g4.iso'); fs2.writeFileSync(f4, 'x4');
+  const idn2 = createIdentity({ roms: () => [{ id: 4, name: 'Four' }], whereOf: () => f4, extract: () => { reads2++; return ['X']; }, lazy: true, gap: 1, busy: () => busy });
+  idn2.fileIds({ id: 4 }, f4);
+  await new Promise((r) => setTimeout(r, 30));
+  assert.strictEqual(reads2, 0);
+  busy = false; // the game ended: it carries on (within its 5 s wait)
+  await idn2.ready();
+  assert.strictEqual(reads2, 1);
+});

@@ -144,7 +144,7 @@ onMounted(async () => { await load(); focusFirst(el.value); });
 .tg-eyebrow { font-size: var(--t-md); letter-spacing: 0; }
 .tg-bar { height: 8px; max-width: 560px; }
 .tg-bar i { background: linear-gradient(90deg, #7fa8ff, #cfe0ff); }
-.tg-prog { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: var(--t-sm); color: #d4d8e2; }
+.tg-prog { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; font-size: var(--t-sm); color: var(--text-2, #d4d8e2); } /* 0.9.60: was a fixed light grey, white on white in Light */
 .tg-gc { display: inline-flex; gap: 5px; align-items: center; }
 .tg-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 12px; padding-bottom: 40px; }
 .tg-t { display: flex; gap: 14px; padding: 12px 14px; border-radius: var(--r-md); outline: none; transition: transform var(--spring-snappy-d) var(--spring-snappy); }
@@ -160,6 +160,8 @@ onMounted(async () => { await load(); focusFirst(el.value); });
 .tg-t-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; font-size: var(--t-xs); color: var(--muted); }
 .tg-t-meta .pts { color: var(--score, #9be38a); font-weight: 600; }
 .gr-P { color: #cfe0ff; } .gr-G { color: #ffd978; } .gr-S { color: #dfe4ea; } .gr-B { color: #e8a878; }
+/* Light (0.9.60, owner's photo: "Gold" was pale yellow on white): the same metals, dark enough to read */
+:global(body.theme-light .gr-P) { color: #2f4f8f; } :global(body.theme-light .gr-G) { color: #7a5600; } :global(body.theme-light .gr-S) { color: #4f5661; } :global(body.theme-light .gr-B) { color: #8a4a1c; }
 .dev { display: inline-flex; gap: 4px; align-items: center; color: #9cc3ff; }
 @media (max-width: 1100px) { .tg-icon { width: 180px; } }
 </style>

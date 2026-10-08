@@ -34,6 +34,15 @@ async function run(theme, style) {
   await p.click('[data-tab="library"]'); await p.waitForTimeout(800); await p.locator('.card').first().click(); await p.waitForTimeout(1200); await audit('game page', 'main.main');
   await p.keyboard.press('y'); await p.waitForTimeout(1200);
   for (let i = 0; i < 5; i++) { await audit('More tab ' + i, '.dialog'); await p.keyboard.press('e'); await p.waitForTimeout(500); }
+  // 0.9.60 (owner's photo: pale trophy counts in Light): a game's trophy page and the pop-ups the audits never opened
+  await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {}); await p.waitForTimeout(400);
+  await p.click('[data-tab="achievements"]').catch(() => {}); await p.waitForTimeout(800);
+  await p.locator('.aa-row, .aa-card').first().click().catch(() => {}); await p.waitForTimeout(1000); await audit('trophy game page', 'main.main');
+  for (const [type, props] of [['savelocations', {}], ['folderview', { path: '/home/u/.config/PCSX2/memcards' }]]) {
+    await p.evaluate(([t, pr]) => window.__cartStore?.openModal?.(t, pr), [type, props]).catch(() => {}); await p.waitForTimeout(900);
+    await audit('pop-up ' + type, '.dialog');
+    await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {}); await p.waitForTimeout(400);
+  }
   await browser.close();
   return { bad: [...bad], errors };
 }

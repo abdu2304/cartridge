@@ -13,7 +13,9 @@ const SCAN = () => {
   const scrolls = (s) => /auto|scroll/.test(s.overflowX) || /auto|scroll/.test(s.overflowY);
   const clipper = (el) => { for (let a = el; a && a !== document.body; a = a.parentElement) { const s = getComputedStyle(a); if (scrolls(s)) return null; if (hides(s)) return a; } return null; };
   const path = (el) => { const p = []; for (let a = el; a && a !== document.body && p.length < 4; a = a.parentElement) p.unshift(a.tagName.toLowerCase() + (a.classList[0] ? '.' + a.classList[0] : '')); return p.join(' > '); };
-  const tw = document.createTreeWalker(document.querySelector('main.main') || document.body, NodeFilter.SHOW_TEXT);
+  // 0.9.60: an open pop-up is scanned instead of the page under it (pop-ups were never looked at)
+  const root = document.querySelector('.scrim .dialog') || document.querySelector('main.main') || document.body;
+  const tw = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
   for (let n = tw.nextNode(); n; n = tw.nextNode()) {
     const text = n.textContent.trim();
     if (text.length < 2) continue;
@@ -39,6 +41,22 @@ const SCAN = () => {
     const cut = lines.some((r) => (r.top < box.b - 1 && r.bottom > box.b + tol) || (r.bottom > box.t + 1 && r.top < box.t - tol) || (r.left < box.r - 1 && r.right > box.r + 1.5) || (r.right > box.l + 1 && r.left < box.l - 1.5)) || shown.length < lines.length;
     if (cut) out.push(`${path(el)} | "${text.slice(0, 50)}"`);
   }
+  // 0.9.60 (owner's photo: two texts drawn over each other): lines of different texts that overlap, which no clipping box
+  // catches. Text over a picture or inside a scrolled-away part is skipped; a few px of touching is allowed.
+  const lines = [];
+  const tw2 = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = tw2.nextNode(); n; n = tw2.nextNode()) {
+    const el = n.parentElement;
+    if (!n.textContent.trim() || !el || !el.checkVisibility?.({ opacityProperty: true, visibilityProperty: true }) || el.closest('.st-ov, [aria-hidden="true"], .morph-fly, .sr-only')) continue;
+    const r = document.createRange(); r.selectNodeContents(n);
+    for (const b of r.getClientRects()) if (b.width > 2 && b.height > 2) lines.push({ el, b, t: n.textContent.trim().slice(0, 40) });
+  }
+  for (let i = 0; i < lines.length; i++) for (let j = i + 1; j < lines.length; j++) {
+    const A = lines[i], B = lines[j];
+    if (A.el === B.el || A.el.contains(B.el) || B.el.contains(A.el)) continue;
+    const w = Math.min(A.b.right, B.b.right) - Math.max(A.b.left, B.b.left), h = Math.min(A.b.bottom, B.b.bottom) - Math.max(A.b.top, B.b.top);
+    if (w > 4 && h > Math.min(A.b.height, B.b.height) * 0.4) out.push(`overlap: ${path(A.el)} "${A.t}" with ${path(B.el)} "${B.t}"`);
+  }
   return [...new Set(out)];
 };
 
@@ -51,6 +69,12 @@ async function pages(width, height) {
   await p.click('[data-tab="settings"]').catch(() => {}); await p.waitForTimeout(600);
   for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key))) { await p.click(`[data-key="${k}"]`).catch(() => {}); await scan('settings ' + k); }
   await p.click('[data-tab="library"]').catch(() => {}); await p.waitForTimeout(800); await p.locator('.card').first().click().catch(() => {}); await scan('game page');
+  // 0.9.60: the pages and pop-ups the audits never visited (owner's photos: a trophy page, the keyboard's suggestions)
+  await p.click('[data-tab="achievements"]').catch(() => {}); await p.waitForTimeout(700); await p.locator('.aa-row, .aa-card, [data-key^="ach-"]').first().click().catch(() => {}); await scan('trophy game page');
+  await p.click('[data-tab="consoles"]').catch(() => {}); await p.waitForTimeout(500);
+  await p.evaluate(() => window.__cartStore?.openModal?.('keyboard', { title: 'Search games', value: 'Ratchet & Clank: Size Matters', mode: 'game' })).catch(() => {}); await scan('keyboard with suggestions');
+  await p.keyboard.press('Escape').catch(() => {});
+  for (const [type, props] of [['savelocations', {}], ['folderview', { path: '/home/u/.config/PCSX2/memcards' }]]) { await p.evaluate(([t, pr]) => window.__cartStore?.openModal?.(t, pr), [type, props]).catch(() => {}); await scan('pop-up ' + type); await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {}); }
   await browser.close();
   return { bad: [...bad], errors };
 }

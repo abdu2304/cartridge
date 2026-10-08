@@ -1,5 +1,5 @@
 <template>
-  <div class="home" :style="{ '--hero-h': HERO_H[store.config.ui.mediaSize] || HERO_H.large }" ref="el">
+  <div class="home" :style="{ '--hero-row': HERO_H[store.config.ui.mediaSize] || HERO_H.large }" ref="el">
     <div v-if="!store.lib" class="center first-sync">
       <Logo :size="72" />
       <h2>{{ syncing ? 'Syncing your library' : 'No library yet' }}</h2>
@@ -251,7 +251,9 @@ call('steam:played').then((m) => { played.value = m || {}; }).catch(() => {});
 loadPlay();
 const minsOf = (r) => store.play[r.id]?.min || 0;
 // media bar size (0.9.15, Look & Feel): Large (the default) is about as tall as a game page's header
-const HERO_H = { compact: '50%', spacious: '58%', large: '68%' }; // 0.9.19 (owner): larger and more immersive, not much larger
+// the header's height per Media Bar size (0.9.60, owner: today's is Medium, a bigger Large). One fixed height each (0.9.42:
+// a height from the game's own text made the rows jump); the setting did nothing from 0.9.42 until this
+const HERO_H = { compact: 'max(250px, 27vh)', spacious: 'max(300px, 34vh)', large: 'max(300px, 34vh)', xl: 'max(380px, 46vh)' };
 const DONE = new Set(['finished', 'completed_100', 'retired', 'never_playing']);
 const shelves = computed(() => {
   const roms = allRoms().filter(visible);
@@ -365,7 +367,7 @@ onBeforeUnmount(() => rowRo?.disconnect());
 </script>
 
 <style scoped>
-.home { position: absolute; inset: 0; display: grid; grid-template-rows: max(300px, 34vh) 1fr; /* 0.9.42 (owner: the screen shook scrolling games fast): one fixed height. It was minmax(min-content, --hero-h), which in practice sized the row to each game's own text (the fr row took the rest): a long title or summary grew it for a few frames before fitHero shrank the logo, and every row below jumped. 300px / 34vh is the height it had for most games (300 at 1280x800, about 344 at 1080p), so the look stays. */ animation: viewIn var(--d-med) var(--ease); }
+.home { position: absolute; inset: 0; display: grid; grid-template-rows: var(--hero-row, max(300px, 34vh)) 1fr; /* 0.9.42 (owner: the screen shook scrolling games fast): one fixed height. It was minmax(min-content, --hero-h), which in practice sized the row to each game's own text (the fr row took the rest): a long title or summary grew it for a few frames before fitHero shrank the logo, and every row below jumped. 300px / 34vh is the height it had for most games (300 at 1280x800, about 344 at 1080p), so the look stays. */ animation: viewIn var(--d-med) var(--ease); }
 .first-sync { grid-row: 1 / -1; align-content: center; }
 .first-sync h2 { font-size: var(--t-xl); color: var(--text); }
 .hero { position: relative; padding: var(--s-5) var(--s-7) var(--s-4); display: flex; align-items: flex-end; min-height: 300px; }

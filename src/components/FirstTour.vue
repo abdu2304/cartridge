@@ -138,7 +138,7 @@ onBeforeUnmount(() => { layer?.pop(); clearInterval(tick); removeEventListener('
 /* never in the way of the app: only the card takes clicks, so the thing pointed at can be clicked or tapped */
 .tour-root { position: fixed; inset: 0; z-index: 44; /* under pop-ups (50) and the Quick Menu (45), which it teaches */ pointer-events: none; opacity: 0; transition: opacity var(--fade-slow); }
 .tour-root.ready { opacity: 1; }
-.spot { position: absolute; left: 0; top: 0; border-radius: var(--r-lg); box-shadow: 0 0 0 200vmax rgba(3, 4, 7, 0.72), 0 0 0 2px rgba(255, 255, 255, 0.9) inset;
+.spot { position: absolute; left: 0; top: 0; border-radius: var(--r-lg); box-shadow: 0 0 0 200vmax rgba(3, 4, 7, 0.72), 0 0 18px 2px rgba(255, 255, 255, 0.28); /* 0.9.60: a soft glow, no white line */
   transition: transform var(--spring-soft-d) var(--spring-soft), width var(--spring-soft-d) var(--spring-soft), height var(--spring-soft-d) var(--spring-soft), opacity var(--fade-in); }
 .spot.none { width: 0; height: 0; transform: translate(50vw, 50vh); box-shadow: 0 0 0 200vmax rgba(3, 4, 7, 0.72); }
 .bubble { position: absolute; left: 0; top: 0; pointer-events: auto; min-width: 0; gap: var(--s-3); animation: none;

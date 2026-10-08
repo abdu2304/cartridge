@@ -115,7 +115,7 @@ onBeforeUnmount(() => { layer.pop(); clearInterval(tick); });
 .qm-quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-2); }
 .qm-tog { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-width: 0; aspect-ratio: 1; padding: var(--s-2) 4px; border-radius: var(--r-md); background: var(--s2); font-size: var(--t-xs); font-weight: 600; color: var(--muted); transition: background var(--d-fast), color var(--d-fast); }
 .qm-tog span { overflow-wrap: anywhere; text-align: center; line-height: 1.2; }
-.qm-tog[aria-pressed='true'] { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
+.qm-tog[aria-pressed='true'] { background: var(--sel-bg); box-shadow: var(--sel-under); color: var(--on-sel); }
 
 .qm-list { display: flex; flex-direction: column; gap: 4px; }
 .qm-item { display: flex; align-items: center; gap: 14px; padding: 12px 14px; border-radius: var(--r-md); text-align: left; transition: background var(--d-fast), color var(--d-fast); }

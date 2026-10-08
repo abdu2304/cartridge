@@ -24,7 +24,8 @@
           <!-- Continue playing: the game you played last, its art, logo and when -->
           <template v-if="t.type === 'continue'">
             <template v-if="cur">
-              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(artOf(cur)) }" />
+              <!-- 0.9.60 (owner: switching games just cut): the next game's art is decoded first, then crossfades, panning in step -->
+              <Transition name="st-xf"><div :key="steadyArt('c' + t.id, cur).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(steadyArt('c' + t.id, cur).url), animationDelay: panDelay() }" /></Transition>
               <div class="st-scrim" />
               <div class="st-label on-art">Continue playing</div>
               <div class="st-cp">
@@ -200,7 +201,7 @@
           <!-- Console Spotlight (0.9.28): a console's games take turns, with their art -->
           <template v-else-if="t.type === 'spotlight'">
             <template v-if="spotOf(t)">
-              <Transition name="st-spot"><div :key="spotOf(t).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(spotOf(t), true) : artOf(spotOf(t)) || cover(spotOf(t), true)) }" /></Transition>
+              <Transition name="st-xf"><div :key="spotOf(t).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(spotOf(t), true) : artOf(spotOf(t)) || cover(spotOf(t), true)), animationDelay: panDelay() }" /></Transition>
               <div class="st-scrim" />
               <div class="st-label on-art">{{ platformById(t.platformId)?.display_name }} Spotlight</div>
               <div class="st-pin">
@@ -451,6 +452,10 @@ function steadyArt(key, r) {
   return cur;
 }
 const artOf = (r) => heroArt(r)?.src || ''; // SteamGridDB's hero only, no RomM picture first (0.9.21)
+// every pan runs on one clock (0.9.60): a picture that replaces another starts where the last one was, so the two line up
+// through the crossfade instead of jumping back to the start of the pan
+const PAN_S = 52; // st-pan: 26 s each way
+const panDelay = () => `-${((performance.now() / 1000) % PAN_S).toFixed(2)}s`;
 const platformById = (id) => store.lib?.platforms.find((p) => p.id === id) || null;
 
 // ---- the board: cell size from the screen (8 columns, 4 rows fill it), tiles placed in pixels
@@ -523,8 +528,10 @@ const troGamesOf = (t) => (t.console ? troGames.value.filter((g) => sameConsole(
 // the newest unlock's game art, behind its card (its cover from the library, else the trophy set's icon, else the badge)
 const troArt = (t) => { const a = achView(t)[0]; if (!a) return ''; const g = troGames.value.find((x) => x.title === a.game); return (g && g.art) || a.badge || ''; };
 // Console Spotlight (0.9.28): the console's games take turns, a new one every 12 seconds
-const spotTick = ref(0);
-const spotOf = (t) => { const l = conList(t.platformId); return l.length ? l[(spotTick.value + (t.id.length % 7)) % l.length] : null; };
+// 0.9.60 (owner): L1/R1 step through its games like the other rows; a tile you stepped waits ROLL_HOLD before moving on
+const spotTick = ref(0), spotIdx = reactive({});
+const spotPos = (t) => spotIdx[t.id] ?? spotTick.value + (t.id.length % 7);
+const spotOf = (t) => { const l = conList(t.platformId); return l.length ? l[((spotPos(t) % l.length) + l.length) % l.length] : null; };
 // An Emulator (0.9.28): its version and whether an update is out, from Settings → Emulators' list
 const emuInfo = ref({});
 call('emuup:list', {}).then((l) => { const m = {}; for (const u of l || []) m[u.path || u.fp] = u; emuInfo.value = m; }).catch(() => {});
@@ -618,6 +625,7 @@ function pickSpine(e, t, r) {
 function stepTile(t, d) {
   const n = COVER_ROWS[t.type] ? listOf(t).length : t.type === 'trophies' ? achOf(t).list.length : t.type === 'media' || t.type === 'shelf' ? conList(t.platformId).length : 0;
   if (t.type === 'surprise') { deal(); sfx.move?.(); focusTile(t); return true; }
+  if (t.type === 'spotlight') { if (conList(t.platformId).length < 2) return false; spotIdx[t.id] = spotPos(t) + d; stepped[t.id] = Date.now(); sfx.move?.(); focusTile(t); return true; }
   if (n < 2) return false;
   sel[t.id] = ((sel[t.id] || 0) + d + n) % n; stepped[t.id] = Date.now(); due[t.id] = Date.now() + ROLL_HOLD; sfx.move?.(); focusTile(t); return true;
 }
@@ -1254,7 +1262,7 @@ let clockT = 0, spaceT = 0, ro = null;
 let spotT = 0, rollT = 0;
 onMounted(async () => {
   clockT = setInterval(tick, 5000);
-  spotT = setInterval(() => { if (!store.away) spotTick.value++; }, 12000);
+  spotT = setInterval(() => { if (store.away) return; spotTick.value++; for (const id of Object.keys(spotIdx)) if (!(stepped[id] > Date.now() - ROLL_HOLD)) spotIdx[id]++; }, 12000);
   rollT = setInterval(roll, 1000);
   // 0.9.28 (owner: hints are hidden now, so first-timers get Start's tips once, in a short tour)
   if (store.config.ui.toured && !store.config.ui.startTips) setTimeout(async () => { if (store.modal || store.route.name !== 'start') return; saveConfig({ ui: { startTips: 1 } }); await openTour({ start: true, only: true }); }, 900);
@@ -1511,10 +1519,10 @@ watch(() => store.play, loadWeek);
 /* 0.9.57 (owner: switching games the picture went see-through, then more see-through): the new picture fades in over
    the old one, which stays as it is underneath until it's covered (two half see-through pictures fading against each
    other dipped to about a quarter mid-way) */
-:is(.st-row-art, .st-media-bg).st-xf-enter-active { transition: opacity var(--fade-cross); }
-:is(.st-row-art, .st-media-bg).st-xf-enter-from { opacity: 0; }
-:is(.st-row-art, .st-media-bg).st-xf-leave-active { transition: visibility var(--fade-cross); z-index: -3; }
-:is(.st-row-art, .st-media-bg).st-xf-leave-to { visibility: hidden; }
+:is(.st-row-art, .st-media-bg, .st-art).st-xf-enter-active { transition: opacity var(--fade-cross); }
+:is(.st-row-art, .st-media-bg, .st-art).st-xf-enter-from { opacity: 0; }
+:is(.st-row-art, .st-media-bg, .st-art).st-xf-leave-active { transition: visibility var(--fade-cross); z-index: -3; }
+:is(.st-row-art, .st-media-bg, .st-art).st-xf-leave-to { visibility: hidden; }
 /* the old name and the new one share the spot and cross over (no empty moment between them) */
 .st-lead-wrap { margin-top: auto; display: grid; min-width: 0; }
 .st-lead-wrap > .st-row-lead { grid-area: 1 / 1; margin-top: 0; justify-content: flex-end; }
@@ -1592,8 +1600,6 @@ watch(() => store.play, loadWeek);
 .st-emu-t b { font-family: var(--display); font-weight: 800; font-size: clamp(15px, 14cqh, 28px);  overflow-wrap: anywhere; }
 .st-emu-t > span:not(.status) { color: var(--muted); font-size: var(--t-xs); }
 .st-emu-t .status { align-self: flex-start; }
-.st-spot-enter-active, .st-spot-leave-active { transition: opacity var(--fade-cross); }
-.st-spot-enter-from, .st-spot-leave-to { opacity: 0; }
 .st-band { flex: 1; min-height: 0; display: flex; gap: 10px; align-items: center; margin: 10px 0 4px; overflow: hidden; mask-image: linear-gradient(90deg, #000 80%, transparent); }
 .st-band img { height: min(100%, 220px); aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--r-md); box-shadow: var(--weight-edge), var(--weight); animation: st-in var(--spring-soft-d) var(--spring-soft) both; }
 .st-band:empty { display: none; }

@@ -171,11 +171,11 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); laye
 .key.small { height: 38px; font-size: var(--t-sm); flex: none; padding: 0 12px; }
 .key.wide { flex: 1.6; font-size: var(--t-sm); }
 .key.space { flex: 4; font-size: var(--t-sm); }
-.key.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
+.key.on { background: var(--sel-bg); box-shadow: var(--sel-under); color: var(--on-sel); }
 .key.done { background: var(--btn, var(--grad)); border: 0; color: var(--on-btn, var(--on-primary)); font-weight: 700; }
-.key:focus { box-shadow: var(--ring); transform: scale(1.06); z-index: 1; }
+.key:focus { background: var(--focus); color: var(--on-focus); border-color: transparent; box-shadow: none; transform: scale(1.04); z-index: 1; } /* 0.9.60 (owner): a fill, never a white outline */
 .key:hover { background: rgba(255,255,255,.12); }
-.sugg { justify-content: flex-start; flex-wrap: nowrap; overflow: hidden; min-height: 38px; }
+.sugg { justify-content: flex-start; flex-wrap: nowrap; overflow: hidden; min-height: 38px; padding: 6px; margin: -6px; } /* 0.9.60: room for a focused key to grow inside the row (it was cut, owner's photo) */
 .key.sg { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; gap: 6px; }
 .sg-empty { color: var(--dim); font-size: var(--t-sm); align-self: center; padding-left: 4px; }
 .key.sg.title { background: rgba(var(--primary-rgb), 0.18); border-color: rgba(var(--primary-rgb), 0.45); }
