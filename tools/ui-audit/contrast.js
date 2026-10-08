@@ -39,7 +39,7 @@ async function run(theme, style) {
   await p.click('[data-tab="achievements"]').catch(() => {}); await p.waitForTimeout(800);
   await p.locator('.aa-row, .aa-card').first().click().catch(() => {}); await p.waitForTimeout(1000); await audit('trophy game page', 'main.main');
   for (const [type, props] of [['savelocations', {}], ['folderview', { path: '/home/u/.config/PCSX2/memcards' }]]) {
-    await p.evaluate(([t, pr]) => window.__cartStore?.openModal?.(t, pr), [type, props]).catch(() => {}); await p.waitForTimeout(900);
+    await p.evaluate(([t, pr]) => { window.__cartStore?.openModal?.(t, pr); }, [type, props]).catch(() => {}); await p.waitForTimeout(900);
     await audit('pop-up ' + type, '.dialog');
     await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {}); await p.waitForTimeout(400);
   }

@@ -72,9 +72,9 @@ async function pages(width, height) {
   // 0.9.60: the pages and pop-ups the audits never visited (owner's photos: a trophy page, the keyboard's suggestions)
   await p.click('[data-tab="achievements"]').catch(() => {}); await p.waitForTimeout(700); await p.locator('.aa-row, .aa-card, [data-key^="ach-"]').first().click().catch(() => {}); await scan('trophy game page');
   await p.click('[data-tab="consoles"]').catch(() => {}); await p.waitForTimeout(500);
-  await p.evaluate(() => window.__cartStore?.openModal?.('keyboard', { title: 'Search games', value: 'Ratchet & Clank: Size Matters', mode: 'game' })).catch(() => {}); await scan('keyboard with suggestions');
+  await p.evaluate(() => { window.__cartStore?.openModal?.('keyboard', { title: 'Search games', value: 'Ratchet & Clank: Size Matters', mode: 'game' }); }).catch(() => {}); await scan('keyboard with suggestions');
   await p.keyboard.press('Escape').catch(() => {});
-  for (const [type, props] of [['savelocations', {}], ['folderview', { path: '/home/u/.config/PCSX2/memcards' }]]) { await p.evaluate(([t, pr]) => window.__cartStore?.openModal?.(t, pr), [type, props]).catch(() => {}); await scan('pop-up ' + type); await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {}); }
+  for (const [type, props] of [['savelocations', {}], ['folderview', { path: '/home/u/.config/PCSX2/memcards' }]]) { await p.evaluate(([t, pr]) => { window.__cartStore?.openModal?.(t, pr); }, [type, props]).catch(() => {}); await scan('pop-up ' + type); await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {}); }
   await browser.close();
   return { bad: [...bad], errors };
 }
