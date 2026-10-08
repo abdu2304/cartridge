@@ -344,7 +344,9 @@ module.exports = function createSteamManager(ctx) {
     // folder builds (0.9.21): the program with its data folder beside it, as Vita3K's zip (EmuDeck's
     // ~/Applications/Vita3K/Vita3K) unpacks; found by the scan, or in its own folder under ~/Applications
     const U = require('./emuUpdates'), seen = new Set(out.map((x) => x.path));
-    const addFolder = (id, p, version = '') => { if (!seen.has(p) && exists(p) && U.installKind(p) === 'folder') { seen.add(p); out.push({ id, label: labelOf(id), kind: 'folder', path: p, version }); } };
+    // 0.9.58 (owner: Vita3K's sheet wouldn't open, only "already on this device"): EmuDeck keeps Vita3K's AppImage as
+    // ~/Applications/Vita3K/Vita3K (no extension, in its own folder); an AppImage there is listed as one, not skipped
+    const addFolder = (id, p, version = '') => { if (seen.has(p) || !exists(p)) return; const k = U.installKind(p); if (k === 'folder' || k === 'appimage') { seen.add(p); out.push({ id, label: labelOf(id), kind: k, path: p, version }); } };
     for (const x of found?.items || []) if (x.kind === 'program' && x.id && x.conf >= 2 && !/\/\.mount_|cartridge/i.test(x.path)) addFolder(x.id, x.path, x.version || '');
     for (const [id, e] of Object.entries(EMU)) for (const d of APP_DIRS()) for (const b of e.bin || []) addFolder(id, path.join(d, e.label || id, b));
     for (const [id, e] of Object.entries(EMU)) for (const n of e.dir || []) for (const d of APP_DIRS()) for (const b of e.bin || []) addFolder(id, path.join(d, n, b));

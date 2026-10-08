@@ -472,18 +472,26 @@ async function installVita({ cmd, prefs, item, zrif, onStep = () => {}, signal }
     }
   } finally { stage.done(); }
   // where Vita3K really put it: its "Extracting <ux0>/app/<ID>/..." and "Decrypt layer: <ux0>/app/<ID>" lines
-  const named = [...said.matchAll(/(?:Extracting|Decrypt layer:)\s+(.+?)[\/\\]ux0[\/\\](?:app|patch|addcont)[\/\\]/g)].map((m) => m[1].trim());
+  const named = [...said.matchAll(/(?:Extracting|Decrypt layer:)\s+"?(.+?)[\/\\]ux0[\/\\](?:app|patch|addcont)[\/\\]/g)].map((m) => m[1].trim());
   for (const r of named) if (!prefs.some((p) => real(p) === real(r))) prefs.push(r);
-  const dir = [...appsIn(prefs)].find(([d, n]) => n === item.titleId && vitaSfoId(d) === item.titleId)?.[0];
+  // 0.9.58 (owner: "Vita3K installed it, but not in a folder Cartridge knows"): judged only by what Vita3K said during
+  // this install (its log file's older lines are left out: a success line from an earlier run read as this one), the
+  // ID from its own "[PCSF00007] installed successfully" line, and the folders that are new in its ux0/app since
+  // before, so the game is found wherever Vita3K put it and whatever its archive said its ID was
+  const saidIds = [...said.matchAll(/\[(PCS[A-Z]\d{5}|[A-Z]{4}\d{5})\] installed successfully/g)].map((m) => m[1]);
+  const after = appsIn(prefs), fresh = [...after].filter(([d]) => !before.has(d));
+  const pick = (id) => [...after].find(([d, n]) => n === id && (vitaSfoId(d) === id || !vitaSfoId(d)))?.[0];
+  const dir = pick(item.titleId) || saidIds.map(pick).find(Boolean) || fresh.find(([d]) => vitaSfoId(d))?.[0] || fresh[0]?.[0];
   if (!dir) {
-    const said2 = said + '\n' + vita3kLogTail(cmd?.exe);
-    const why = vita3kWhy(said2);
-    const e = new Error(why ? `Vita3K: ${why.slice(0, 220)}` : new RegExp(`\\[${item.titleId}\\] installed successfully`).test(said2) ? `Vita3K installed it, but not in a folder Cartridge knows (looked in ${prefs.join(', ')}).` : 'Vita3K closed without installing it and didn’t say why.');
-    e.detail = said2.slice(-4000);
+    const why = vita3kWhy(said);
+    const last = said.trim().split('\n').filter((l) => /\|[EWC]\||error|fail|critical/i.test(l)).slice(-3).map((l) => l.replace(/^\s*\[[^\]]*\]\s*/, '').replace(/^\|\w\|\s*/, '')).join(' · ');
+    const e = new Error(why ? `Vita3K: ${why.slice(0, 220)}` : saidIds.length ? `Vita3K installed it, but the game’s folder wasn’t found (looked in ${prefs.join(', ')}).` : `Vita3K closed without installing it${last ? `: ${last.slice(0, 220)}` : ' and didn’t say why'}.`);
+    e.detail = said.slice(-4000);
     throw e;
   }
+  const serial = path.basename(dir);
   const pref = prefs.find((p) => dir.startsWith(path.join(p, 'ux0/app') + path.sep)) || prefs[0];
-  return [{ serial: item.titleId, dir, created: ![...before.values()].includes(item.titleId), licenced: vitaLicenced(pref, item.titleId, dir) }];
+  return [{ serial, dir, created: ![...before.values()].includes(serial), licenced: vitaLicenced(pref, serial, dir) }];
 }
 
 // Deleting a game from an emulator's storage: only one Cartridge installed, and only when all of

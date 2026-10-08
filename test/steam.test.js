@@ -282,3 +282,20 @@ test('shadPS4 launcher default version is set only when none is, keeping the res
     assert.match(ini, /theme=1/); assert.strictEqual(SV.settings(H).versionPath, '/vp'); assert.strictEqual(SV.settings(H).selected, '/vp/x/Shadps4-sdl.AppImage');
   } finally { if (save !== undefined) process.env.XDG_DATA_HOME = save; }
 });
+
+// 0.9.58 (owner: Vita3K's sheet wouldn't open in Emulators, only "already on this device"): EmuDeck keeps Vita3K's
+// AppImage as ~/Applications/Vita3K/Vita3K, no extension, in its own folder; it is listed as an installed AppImage
+test('EmuDeck\'s Vita3K (an AppImage named Vita3K in its own folder) is an installed emulator', () => {
+  const H = path.join(TMP, 'vita');
+  fs.mkdirSync(H + '/cfg', { recursive: true });
+  const f = path.join(H, 'Applications/Vita3K/Vita3K');
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  const h = Buffer.alloc(4096); h.writeUInt32BE(0x7f454c46, 0); h[4] = 2; h[5] = 1; h[6] = 1; h.write('AI', 8, 'latin1'); h[10] = 2;
+  fs.writeFileSync(f, h); fs.chmodSync(f, 0o755);
+  const code = `
+    const sm = require(${JSON.stringify(path.join(ROOT, 'electron/steamManager.js'))})({ USER_DATA: ${JSON.stringify(H + '/cfg')}, log() {}, PLATFORM_MAP: {}, getConfig: () => ({}), saveConfig() {}, broadcast() {},
+      emulationRoots: () => [], getLibrary: () => null, installed: () => ({}), romById: () => null, isGamescope: () => false, artFor: () => ({}), MARKED: 'm', markedPath: () => null });
+    console.log(JSON.stringify(sm.installedEmulators().filter((e) => e.id === 'vita3k').map((e) => [e.kind, e.path.replace(${JSON.stringify(H)}, '~')])));`;
+  const out = execFileSync(process.execPath, ['-e', code], { env: { ...process.env, HOME: H, XDG_DATA_HOME: '' }, encoding: 'utf8' }).trim().split('\n').pop();
+  assert.deepStrictEqual(JSON.parse(out), [['appimage', '~/Applications/Vita3K/Vita3K']]);
+});
