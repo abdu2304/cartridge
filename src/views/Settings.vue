@@ -1347,7 +1347,7 @@ onMounted(() => {
 .ga-cons { display: flex; gap: 8px; overflow-x: auto; padding: 8px 6px 10px; margin: 0 -6px; scrollbar-width: none; } /* room for a selected chip (0.9.28: it was cut off) */
 .ga-con { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--s1); box-shadow: var(--weight-edge); font-weight: 600; font-size: var(--t-sm); }
 .ga-con em { font-style: normal; color: var(--muted); font-weight: 500; }
-.ga-con.on { background: var(--sel-bg); box-shadow: var(--sel-under); color: var(--on-sel); }
+.ga-con.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .ga-con:focus-visible, .pad-mode .ga-con:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; outline: none; } /* the standard highlight: white fill, dark text, no ring */
 .pad-mode .ga-con:focus em { color: var(--on-focus-dim); }
 .rail-st { color: inherit !important; }
@@ -1372,9 +1372,9 @@ onMounted(() => {
 .swatches { display: flex; flex-wrap: wrap; gap: 10px; }
 .swatch { width: 74px; height: 50px; border-radius: var(--r-md); display: flex; align-items: flex-end; padding: 6px 8px; font-size: var(--t-xs); font-weight: 600; color: #fff; text-shadow: 0 1px 4px rgba(0,0,0,.6); box-shadow: inset 0 0 0 1px rgba(255,255,255,.15); }
 /* a colour can't take the grey fill: chosen is a soft ring, focus the full white one */
-.swatch.on { box-shadow: var(--sel-under); } /* chosen: the bar underneath (0.9.60, no ring) */
+.swatch.on { box-shadow: 0 0 0 3px var(--s0), 0 0 0 5px rgba(255, 255, 255, 0.45); }
 /* focus is the full focus colour, wider than the chosen ring, so a focused chosen colour still shows it moved (0.9.47: the audit found the two identical) */
-.pad-mode .swatch:focus, .swatch:focus-visible { box-shadow: var(--ring); transform: scale(1.12); } /* 0.9.60: lift and glow, no ring */
+.pad-mode .swatch:focus, .swatch:focus-visible { box-shadow: 0 0 0 3px var(--s0), 0 0 0 6px var(--focus); }
 .swatch { position: relative; }
 .swatch i { position: absolute; top: 6px; right: 6px; width: 12px; height: 12px; border-radius: 50%; box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.7); }
 .swatch.ink { color: #1d1e22; text-shadow: none; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.12); } /* Light's swatch (0.9.38) */
@@ -1401,7 +1401,7 @@ onMounted(() => {
 .bgnow-t small { font-size: var(--t-xs); color: var(--muted); }
 .bgnow-c { display: inline-flex; align-items: center; gap: 2px; font-size: var(--t-sm); font-weight: 600; color: var(--primary-t); }
 .bgtile { position: relative; display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: var(--r-md); background: var(--s2); text-align: left; }
-.bgtile.on { background: var(--sel-bg); box-shadow: var(--sel-under); color: var(--on-sel); }
+.bgtile.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .bgtile b { font-size: var(--t-sm); font-weight: 600; margin-top: 6px; }
 .bgtile small { font-size: var(--t-xs); color: var(--muted); }
 .bgp { position: relative; height: 54px; border-radius: var(--r-sm); overflow: hidden; background: var(--xmb); }
@@ -1423,7 +1423,7 @@ onMounted(() => {
 .fonttile { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 8px; border-radius: var(--r-md); background: var(--s2); }
 .fonttile b { font-size: var(--t-xl); font-weight: 600; line-height: 1.1; }
 .fonttile span { font-size: var(--t-xs); color: var(--muted); }
-.fonttile.on { background: var(--sel-bg); box-shadow: var(--sel-under); color: var(--on-sel); }
+.fonttile.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .steam-grid { width: 130px; border-radius: var(--r-sm); box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5); flex: none; }
 .fadeup-enter-active { transition: opacity var(--fade-in), transform var(--spring-d) var(--spring); }
 .fadeup-enter-from { opacity: 0; transform: translateX(10px); }
@@ -1438,7 +1438,7 @@ onMounted(() => {
    the pages scroll sideways when they don't fit */
 /* a setting found with Y: a moment of light on it */
 .pane :deep(.found) { animation: found var(--move-ambient); }
-@keyframes found { 0%, 40% { box-shadow: var(--ring-soft); } 100% { box-shadow: 0 0 0 0 transparent; } }
+@keyframes found { 0%, 40% { box-shadow: 0 0 0 3px var(--focus); } 100% { box-shadow: 0 0 0 3px transparent; } }
 .rail-find { color: var(--text-2, var(--muted)); margin-bottom: 6px; }
 .sec-head { display: flex; flex-direction: column; gap: 4px; margin: 0 0 var(--s-3); }
 .sec-head h1 { margin: 0; }

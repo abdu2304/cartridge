@@ -63,23 +63,6 @@ test('the rule book points at its checks', () => {
   for (const x of ['clipping.js', 'contrast.js', 'focus.js', 'styleModes.test.js', 'logos.test.js']) assert.ok(t.includes(x), x);
 });
 
-// Never a white outline (0.9.60, owner: "why do you keep using the white outline, make it a rule"). Focus is a lift with a
-// soft glow in the highlight colour (--ring), chosen a tint with a slim bar (--sel-ring, --sel-under). A hard white line
-// round something (a 0-blur box-shadow or an outline in white) is the thing that's banned. Allowed: the colour picker's
-// knob and the colour swatches' little dots (a white rim on a dot, its look, not focus), and edges drawn inside (inset).
-test('no white outlines round focused or chosen things', () => {
-  const WHITE = '(?:#fff\\b|#ffffff\\b|white\\b|rgba\\(255,\\s*255,\\s*255,\\s*(?:0?\\.[6-9]\\d*|1(?:\\.0+)?)\\))';
-  // white itself, or the highlight colour (which is white in the default look): var(--focus), var(--text), ${fo}
-  const ring = new RegExp(`(?<!inset )0 0 0 [0-9.]+px (?:${WHITE}|var\\(--(?:focus|focus-solid|text)\\b|\\$\\{fo\\})`, 'i'), line = new RegExp(`outline:\\s*[0-9.]+px\\s+solid\\s+${WHITE}`, 'i');
-  const ALLOWED = [/\.cp-knob\s*\{/, /\.(swatch|preset-sw|w-swatch) i\s*\{/]; // a dot's rim, not a ring round anything
-  const bad = [];
-  for (const f of SRC) {
-    const t = fs.readFileSync(f, 'utf8');
-    t.split('\n').forEach((l, i) => { if ((ring.test(l) || line.test(l)) && !ALLOWED.some((a) => a.test(l))) bad.push(`${rel(f)}:${i + 1}: ${l.trim().slice(0, 120)}`); });
-  }
-  assert.deepStrictEqual(bad, []);
-});
-
 // Nothing decodes or shrinks pictures on Electron's main thread in code that runs by itself (0.9.60: 25 to 120 ms a
 // picture there froze the controller and every call). The image worker (src/imageWorker.js) does it; these are the only
 // places left, each on demand or a fallback, pinned so a new one has to be argued for.

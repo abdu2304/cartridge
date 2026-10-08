@@ -142,7 +142,7 @@ function files(ctx) {
   return null;
 }
 // Dolphin's game sections live under other names in its main files
-const DOLPHIN_BASE = { Video_Settings: 'Settings', Video_Enhancements: 'Enhancements', Video_Hacks: 'Hacks', Core: 'Core' };
+const DOLPHIN_BASE = { Video_Settings: 'Settings', Video_Enhancements: 'Enhancements', Video_Hacks: 'Hacks', Video_Hardware: 'Hardware', Video_Stereoscopy: 'Stereoscopy', 'GFX.ColorCorrection': 'ColorCorrection', Core: 'Core', DSP: 'DSP' };
 function getIn(kind, text, sec, key) {
   if (text == null) return undefined;
   if (kind === 'yml') return ymlGet(text, sec, key);
@@ -156,8 +156,7 @@ const ALL = {
   rpcs3: /^(Core|Video|Audio|System|Savestate|Miscellaneous)$/, // custom_configs take the whole config.yml (two levels here)
   pcsx2: /^(EmuCore(\/.*)?|SPU2\/.*)$/,
   duckstation: /^(CPU|GPU|Display|Audio|Console|Hacks|PGXP|TextureReplacements)$/,
-  dolphin: /^(Video_Settings|Video_Enhancements|Video_Hacks|Core)$/,
-  ppsspp: /^(Graphics|CPU|Sound|SpeedHacks|SystemParam)$/,
+  // ppsspp and dolphin: emuSettingsDb.json (0.9.61)
   shadps4: /^(GPU|Vulkan|General)$/, // ApplyGroupOverrides
 };
 const DOLPHIN_GAME = Object.fromEntries(Object.entries(DOLPHIN_BASE).map(([g, b]) => [b, g]));
@@ -172,7 +171,38 @@ function entriesOf(kind, text) {
 }
 // "extra_dmem_in_mbytes" -> "Extra dmem in mbytes", "ResolutionScale" -> "Resolution scale"
 const human = (k) => { const w = String(k).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ').trim(); return w ? w[0].toUpperCase() + w.slice(1) : k; };
+// PPSSPP and Dolphin (0.9.61, owner: PPSSPP's list was wrong and stacked in one tab, Dolphin's missed most settings):
+// every setting each takes in a game's file, from its source (tools/game-settings/gen.js -> emuSettingsDb.json), one
+// tab per section, with the emulator's own default when its main file doesn't hold the key (Dolphin keeps only changes)
+let DB = null;
+const db = () => (DB ||= (() => { try { return require('./emuSettingsDb.json'); } catch { return {}; } })());
+const TABS = {
+  ppsspp: { Graphics: 'Graphics', CPU: 'CPU', Sound: 'Audio', Control: 'Controls', SystemParam: 'System', General: 'General' },
+  dolphin: { Video_Settings: 'Graphics', Video_Hardware: 'Graphics', Video_Enhancements: 'Enhancements', Video_Hacks: 'Hacks', Core: 'Core', DSP: 'Audio', Video_Stereoscopy: 'Stereo 3D', 'GFX.ColorCorrection': 'Colour' },
+};
+const ENUM_NAMES = { ForceWide: 'Force 16:9', ForceStandard: 'Force 4:3', CustomStretch: 'Custom (Stretch)', JIT64: 'JIT', SMPTE_NTSCM: 'NTSC-M', SYSTEMJ_NTSCJ: 'NTSC-J', EBU_PAL: 'PAL' };
+const nice = (k) => human(String(k).replace(/^[ibfsu](?=[A-Z])/, '').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2'));
+function dbItems(emu, known) {
+  const list = db()[emu]; if (!list) return null;
+  const seen = new Set(known), out = [], order = Object.keys(TABS[emu]);
+  const rank = (x) => { const i = order.indexOf(x.s); return i < 0 ? 99 : i; };
+  for (const x of [...list].sort((a, b) => rank(a) - rank(b))) {
+    const id = x.s + '.' + x.k;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    const it = { id, tab: TABS[emu][x.s] || x.s, label: x.l || nice(x.k), def: x.d, more: true };
+    if (x.t === 'bool') Object.assign(it, B('True', 'False'));
+    else if (x.t === 'enum' || x.t === 'choice') it.options = x.o.map(([v, l]) => [v, ENUM_NAMES[l] || (x.t === 'enum' && /^[A-Z][A-Za-z0-9]*$/.test(l) ? nice(l) : l)]);
+    else if (x.t === 'int') Object.assign(it, { options: [], num: { min: -2147483648, max: 2147483647 } });
+    else if (x.t === 'float') Object.assign(it, { options: [], num: { min: -1e9, max: 1e9, decimals: true } });
+    else Object.assign(it, { options: [], type: 'text' });
+    out.push(it);
+  }
+  return out;
+}
 function moreItems(ctx, F, known) {
+  const fromDb = dbItems(ctx.emu, known);
+  if (fromDb) return fromDb;
   const rx = ALL[ctx.emu]; if (!rx) return [];
   const seen = new Set(known), out = [];
   for (const f of F.base) {
@@ -190,7 +220,10 @@ function moreItems(ctx, F, known) {
   }
   return out;
 }
-const itemsOf = (ctx, F) => { const S = SCHEMA[ctx.emu]; return [...S.items, ...moreItems(ctx, F, S.items.map((x) => x.id))]; };
+const itemsOf = (ctx, F) => {
+  const S = SCHEMA[ctx.emu], defs = Object.fromEntries((db()[ctx.emu] || []).map((x) => [x.s + '.' + x.k, x.d]));
+  return [...S.items.map((it) => (defs[it.id] != null && it.def == null ? { ...it, def: defs[it.id] } : it)), ...moreItems(ctx, F, S.items.map((x) => x.id))];
+};
 // what the screen shows: each setting with the game's value (or none) and the emulator's own
 function describe(ctx) {
   const S = SCHEMA[ctx.emu], F = files(ctx);
@@ -202,9 +235,13 @@ function describe(ctx) {
     const game = own != null && !(F.copyBase && !ownMarked(ctx, F.file, it.id)) ? getIn(F.kind, own, sec, key) : undefined;
     let base;
     for (const t of bases) { base = getIn(F.kind, t, F.dolphin ? DOLPHIN_BASE[sec] || sec : sec, key); if (base !== undefined) break; }
+    if (base === undefined && it.def != null) base = it.def; // not in its file: the emulator's own default
     const opts = it.type === 'bool' ? [[it.on, 'On'], [it.off, 'Off']] : (it.options || []).map((o) => (Array.isArray(o) ? o : [o, o]));
-    return { id: it.id, tab: it.tab || (/^(Video|EmuCore\/GS|GPU|Graphics|Video_\w+)$/.test(sec) ? 'Graphics' : 'System'), label: it.label, sub: it.sub || '', options: opts.map(([v, l]) => ({ value: v, label: l })), game: game ?? null, base: base ?? null, type: it.type || 'choice', num: it.num || null, group: it.group || null };
+    return { id: it.id, tab: it.tab || TABS[ctx.emu]?.[sec] || (/^(Video|EmuCore\/GS|GPU|Graphics|Video_\w+)$/.test(sec) ? 'Graphics' : 'System'), label: it.label, sub: it.sub || '', options: opts.map(([v, l]) => ({ value: v, label: l })), game: game ?? null, base: base ?? null, type: it.type || 'choice', num: it.num || null, group: it.group || null };
   });
+  // tabs in the emulator's order (TABS), the picked settings first in each
+  const order = TABS[ctx.emu] ? [...new Set(Object.values(TABS[ctx.emu]))] : null;
+  if (order) { const r = (x) => { const i = order.indexOf(x.tab); return i < 0 ? 99 : i; }; items.sort((a, b) => r(a) - r(b)); }
   return { emu: ctx.emu, name: S.name, file: F.file, exists: own != null, items };
 }
 // PPSSPP's game file is a full copy, so only the keys Cartridge set count as "this game's" (the rest

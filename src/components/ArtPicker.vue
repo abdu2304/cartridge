@@ -77,7 +77,7 @@ onBeforeUnmount(() => layer.pop());
 .ap-head { display: flex; align-items: baseline; gap: 14px; }
 .ap-games { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .chipbtn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 999px; background: var(--s2); font-size: var(--t-sm); color: var(--text); }
-.chipbtn.on { background: var(--sel-bg); box-shadow: var(--sel-under); border-color: transparent; color: var(--on-sel); }
+.chipbtn.on { background: var(--sel-bg); box-shadow: var(--sel-ring); border-color: transparent; color: var(--on-sel); }
 .ap-grid { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: grid; gap: 16px; padding: 8px; align-content: start; grid-auto-rows: max-content; }
 .ap-grid.grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
 .ap-grid.grid .ap-item img { aspect-ratio: 2 / 3; }

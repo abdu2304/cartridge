@@ -437,7 +437,7 @@ defineExpose({ load });
 .eg-gh.open { grid-column: 1 / -1; gap: var(--s-3); }
 .eg-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 .eg-chip { padding: 8px 14px; border-radius: 999px; border: 0; background: var(--s2); color: inherit; font: inherit; font-size: var(--t-sm); }
-.eg-chip.on { background: var(--sel-bg); box-shadow: var(--sel-under); color: var(--on-sel); }
+.eg-chip.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .eg-chip:focus { background: var(--focus); color: var(--on-focus); outline: none; }
 .eg-ghbar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 .eg-ghbar i { display: block; height: 100%; background: currentColor; transition: width var(--progress); }

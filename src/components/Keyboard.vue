@@ -40,7 +40,8 @@
 // Built-in on-screen keyboard for controllers (Settings → Look & Feel → On-screen keyboard)
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { pushLayer, focusFirst } from '../nav.js';
-import { store, closeModal, call, allRoms } from '../store.js';
+import { store, closeModal, call } from '../store.js';
+import { suggest, applySuggestion } from '../gameSuggest.js';
 import Icon from './Icon.vue';
 import Btn from './Btn.vue';
 
@@ -79,31 +80,10 @@ const rows = computed(() => (sym.value ? symbols : base.map((r) => r.map((k) => 
 const quick = computed(() => (props.mode === 'url' ? ['http://', 'https://', '192.168.', ':8080', '.xyz', '.com', ':', 'localhost'] : []));
 const shown = computed(() => (props.password && !reveal.value ? '•'.repeat(text.value.length) : text.value));
 
-// Suggestions from your library's game names (mode 'game'). Words are ranked by how many titles use them.
-const norm = (t) => t.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
-let index = null;
-function buildIndex() {
-  const titles = [...new Set(allRoms().map((r) => r.name).filter(Boolean))].map((n) => ({ n, k: norm(n) }));
-  const words = new Map();
-  for (const t of titles) for (const w of new Set(t.k.split(' '))) if (w.length > 2) words.set(w, (words.get(w) || 0) + 1);
-  const wordList = [...words.entries()].sort((a, b) => b[1] - a[1]).map(([w]) => w);
-  return { titles, wordList };
-}
-const suggestions = computed(() => {
-  if (props.mode !== 'game') return [];
-  const q = norm(text.value);
-  if (!q) return [];
-  index ||= buildIndex();
-  const parts = q.split(' '), last = parts[parts.length - 1];
-  const done = parts.slice(0, -1);
-  const hit = (k) => { const ws = k.split(' '); return done.every((p) => ws.includes(p)) && ws.some((w) => w.startsWith(last)); };
-  const titles = index.titles.filter((t) => hit(t.k)).sort((a, b) => (b.k.startsWith(q) - a.k.startsWith(q)) || a.n.length - b.n.length).slice(0, 4);
-  const words = last.length >= 1 ? index.wordList.filter((w) => w.startsWith(last) && w !== last).slice(0, 4) : [];
-  return [...titles.map((t) => ({ kind: 'title', v: t.n })), ...words.map((w) => ({ kind: 'word', v: w }))];
-});
+// Suggestions from your library's game names (mode 'game'): src/gameSuggest.js, shared with the plain text box
+const suggestions = computed(() => (props.mode === 'game' ? suggest(text.value) : []));
 function pick(g) {
-  if (g.kind === 'title') text.value = g.v;
-  else text.value = text.value.replace(/\S*$/, '') + g.v + ' ';
+  text.value = applySuggestion(text.value, g);
   pos.value = text.value.length;
 }
 function insert(k) { text.value = text.value.slice(0, pos.value) + k + text.value.slice(pos.value); pos.value += k.length; }
@@ -171,9 +151,9 @@ onBeforeUnmount(() => { window.removeEventListener('keydown', onKey, true); laye
 .key.small { height: 38px; font-size: var(--t-sm); flex: none; padding: 0 12px; }
 .key.wide { flex: 1.6; font-size: var(--t-sm); }
 .key.space { flex: 4; font-size: var(--t-sm); }
-.key.on { background: var(--sel-bg); box-shadow: var(--sel-under); color: var(--on-sel); }
+.key.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .key.done { background: var(--btn, var(--grad)); border: 0; color: var(--on-btn, var(--on-primary)); font-weight: 700; }
-.key:focus { background: var(--focus); color: var(--on-focus); border-color: transparent; box-shadow: none; transform: scale(1.04); z-index: 1; } /* 0.9.60 (owner): a fill, never a white outline */
+.key:focus { box-shadow: var(--ring); transform: scale(1.06); z-index: 1; }
 .key:hover { background: rgba(255,255,255,.12); }
 .sugg { justify-content: flex-start; flex-wrap: nowrap; overflow: hidden; min-height: 38px; padding: 6px; margin: -6px; } /* 0.9.60: room for a focused key to grow inside the row (it was cut, owner's photo) */
 .key.sg { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: inline-flex; gap: 6px; }

@@ -208,6 +208,8 @@
                 <GameLogo :key="spotOf(t).id" :logo="store.config.ui.logos !== false ? logoOf(spotOf(t)) : null" :name="spotOf(t).name" cls="st-pin-name" :area="Math.min(22000, box(t).pw * box(t).ph * 0.12)" :max-w="box(t).pw * 0.7" :max-h="Math.min(110, box(t).ph * 0.32)" />
                 <span class="st-mark">{{ store.play[spotOf(t).id]?.min ? playtimeText(store.play[spotOf(t).id].min) + ' played' : '' }}<i v-if="store.installed[spotOf(t).id]" class="st-dev-tick" title="On this device"><Icon name="mdiCheckBold" :size="13" /></i></span>
               </div>
+              <!-- 0.9.61 (owner): the same dots as Continue playing, so it's clear L1/R1 step through the games -->
+              <div v-if="spotDots(t).n > 1 && box(t).pw >= 280" class="st-dots"><i v-for="i in spotDots(t).n" :key="i" :class="{ on: i - 1 === spotDots(t).on }" /></div>
             </template>
             <div v-else class="st-empty small"><span>No games for this console yet</span></div>
           </template>
@@ -531,6 +533,8 @@ const troArt = (t) => { const a = achView(t)[0]; if (!a) return ''; const g = tr
 // 0.9.60 (owner): L1/R1 step through its games like the other rows; a tile you stepped waits ROLL_HOLD before moving on
 const spotTick = ref(0), spotIdx = reactive({});
 const spotPos = (t) => spotIdx[t.id] ?? spotTick.value + (t.id.length % 7);
+// up to five dots; with more games the lit one walks round them as the spotlight steps
+const spotDots = (t) => { const n = Math.min(5, conList(t.platformId).length); return { n, on: n ? ((spotPos(t) % n) + n) % n : 0 }; };
 const spotOf = (t) => { const l = conList(t.platformId); return l.length ? l[((spotPos(t) % l.length) + l.length) % l.length] : null; };
 // An Emulator (0.9.28): its version and whether an update is out, from Settings → Emulators' list
 const emuInfo = ref({});
