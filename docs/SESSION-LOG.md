@@ -6,6 +6,14 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 8 Oct 2026 · 0.9.58 Saves You Can Trust
+- Owner's device photos after 0.9.57: Vita3K sheet wouldn't open and its install failed, Save Sync didn't move Zelda from the Bazzite PC to the ROG Ally (both Eden), PS2 games missing from saves, Sync Now and Update All stopping when leaving the page, chosen and focused looking alike, Recently Played cutting, no visible Start pan, Ready to Play in Light. Discussed first; owner: "do everything you recommend", Save Sync and Vita3K first.
+- Found: saves looked up only under the device's own RomM entry and in emulator-named slots; `running()` matched "eden" anywhere in any command line (found by the real-app test: my own shell's text made Eden "open"); unplaced/busy results were never shown; EmuDeck's Vita3K AppImage skipped by installedEmulators; stale Vita3K log lines read as this install.
+- Checked: npm test, vite build, launch check, audit:ui, real Vita3K 4111 installs (EmuDeck-style folder, wrong ID passed), real-app two-device Save Sync through a fake RomM.
+- Owner to test on devices: Zelda between the PC and the Ally (Sync Now on both), Needs Attention reasons, PS2 games under Your Games, a Vita zip install and Vita3K's sheet, Update All while leaving the page, Start's pan on the handheld and TV, chosen rings in Settings.
+
+---
+
 ## 7 Oct 2026 · 0.9.57 Seamless
 - Owner's list (photos from the TV) discussed first, then "start building". Picks: highlight B (your colour, solid), Start "whatever looks best" (a slow pan, no zoom), Syncthing flattened into the section's row, Vita3K zips/VPKs must install without its window ("we nailed this with PS3"). Added mid-build: redesign the Cloud Sync screen, and a game sheet in Cartridge Save Sync (poster, where the save is, history, Go to Game Page).
 - Vita3K root cause, found by running build 4111 in the container: CLI11 Windows-style options swallow "/..." arguments (the owner's "13.zip" was the half after the space), and killing the AppImage left the real Vita3K running. Both fixed and tested end to end (no window, ~0.6 s).
