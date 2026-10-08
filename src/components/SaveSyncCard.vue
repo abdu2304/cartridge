@@ -34,7 +34,7 @@
       <div class="subh">Last Sync</div>
       <div class="ssc-counts">
         <!-- 0.9.56 (owner): each count opens the saves behind it; Not Matched says why and what fixes it -->
-        <button v-for="k in SHOWN" :key="k.v" class="ssc-count" :class="{ dim: !st.last.counts?.[k.v], warn: k.v === 'unmatched' && st.last.counts?.[k.v] }" data-focus @click="openList(k)"><b>{{ st.last.counts?.[k.v] || 0 }}</b><span>{{ k.l }}</span><Icon name="mdiChevronRight" :size="16" class="ssc-go" /></button>
+        <button v-for="k in SHOWN" :key="k.v" class="ssc-count" :class="{ dim: !countOf(k), warn: (k.v === 'unmatched' || k.v === 'attention') && countOf(k) }" data-focus @click="openList(k)"><b>{{ countOf(k) }}</b><span>{{ k.l }}</span><Icon name="mdiChevronRight" :size="16" class="ssc-go" /></button>
       </div>
       <p class="muted small">{{ ago(st.last.at) }}</p>
       <!-- 0.9.57 (owner): every game with a synced save, each opening its own sheet (where its save is, its history) -->
@@ -67,7 +67,22 @@ import Icon from './Icon.vue';
 
 const emit = defineEmits(['advanced']);
 const st = ref(null), busy = ref(false), prog = ref({});
-const SHOWN = [{ v: 'up', l: 'Sent to RomM' }, { v: 'down', l: 'Brought Here' }, { v: 'same', l: 'Up to Date' }, { v: 'unmatched', l: 'Not Matched' }];
+const SHOWN = [{ v: 'up', l: 'Sent to RomM' }, { v: 'down', l: 'Brought Here' }, { v: 'same', l: 'Up to Date' }, { v: 'unmatched', l: 'Not Matched' }, { v: 'attention', l: 'Needs Attention' }];
+// 0.9.58 (owner: "a lot of discrepancies"): saves that couldn't move this time are counted and explained, never silent
+const ATTN = new Set(['unplaced', 'busy', 'damaged', 'error', 'conflict', 'auth']);
+const inList = (k, x) => (k.v === 'attention' ? ATTN.has(x.result) : x.result === k.v);
+const countOf = (k) => (st.value?.last?.items ? st.value.last.items.filter((x) => inList(k, x)).length : k.v === 'attention' ? [...ATTN].reduce((n, r) => n + (st.value?.last?.counts?.[r] || 0), 0) : st.value?.last?.counts?.[k.v] || 0);
+// why a save couldn't move, and what fixes it
+function issue(it) {
+  const emu = it.emuName || 'The emulator', game = gameOf(it) || 'this game';
+  if (it.result === 'unplaced' && it.place === 'noemu') return { short: `No ${emu} set up here`, why: `This save of ${game} is in RomM, from another device, and no ${emu} is set up on this device to put it in.`, fix: `Set up ${emu} here (Settings → Emulators) and open it once, then press Sync Now.` };
+  if (it.result === 'unplaced') return { short: `${emu} hasn’t made its save folder yet`, why: `${emu} is here, but it hasn’t made the folder this save goes in yet${/switch/.test(it.key) ? ' (Switch emulators make their user folder the first time a game saves)' : ''}.`, fix: `Open ${emu}, start any game and save once, then press Sync Now. Cartridge never makes an emulator’s folders for it.` };
+  if (it.result === 'busy') return { short: `${emu} was open`, why: `${emu} was running, and Cartridge never changes saves while their emulator is open.`, fix: `Close ${emu}, then press Sync Now.` };
+  if (it.result === 'damaged') return { short: 'The download didn’t match RomM’s check', why: 'What came from RomM didn’t match the check RomM gave for it, so nothing was written.', fix: 'Press Sync Now to try again. If it keeps happening, the copy in RomM may be damaged: put back an older version from the game’s page.' };
+  if (it.result === 'conflict') return { short: 'Changed on two devices', why: 'This save changed here and on another device since they last agreed. Cartridge never guesses which to keep.', fix: 'Choose which to keep in “Choose Which Save to Keep” above.' };
+  if (it.result === 'auth') return { short: 'RomM said no', why: it.error || 'RomM didn’t let Cartridge read or write saves.', fix: 'Sign in with your password, or pair again so Cartridge can ask for save access.' };
+  return { short: 'Couldn’t sync', why: it.error || 'Something went wrong talking to RomM.', fix: 'Press Sync Now to try again.' };
+}
 const conflicts = computed(() => st.value?.last?.conflicts || []);
 const short = (p) => String(p || '').replace(store.info?.home || '\0', '~');
 const sub = computed(() => {
@@ -109,11 +124,15 @@ const gameOf = (it) => romById(it.romId)?.name || it.why?.title || '';
 const games = computed(() => {
   const by = new Map();
   for (const it of st.value?.last?.items || []) {
-    if (it.result === 'unmatched' || it.card) continue;
-    const r = romById(it.romId); if (!r) continue;
-    const g = by.get(r.id) || { id: r.id, name: r.name, art: cover(r), emus: new Set(), result: it.result };
-    g.emus.add(it.emuName); if (it.result !== 'same') g.result = it.result;
-    by.set(r.id, g);
+    if (it.result === 'unmatched') continue;
+    // 0.9.58 (owner: "I can't find my PS2 games"): a memory card lists every game saved on it, each under its own name
+    const ids = it.card ? (it.romIds || []) : [it.romId];
+    for (const id of ids) {
+      const r = romById(id); if (!r) continue;
+      const g = by.get(r.id) || { id: r.id, name: r.name, art: cover(r), emus: new Set(), result: it.result };
+      g.emus.add(it.card ? `${it.emuName} memory card` : it.emuName); if (it.result !== 'same') g.result = it.result;
+      by.set(r.id, g);
+    }
   }
   return [...by.values()].map((g) => ({ ...g, sub: [consoleName({ romId: g.id, fallback: '' }), [...g.emus].join(', ')].filter(Boolean).join(' · ') })).sort((a, b) => a.name.localeCompare(b.name));
 });
@@ -128,14 +147,22 @@ function explain(it) {
   return { short: 'Nothing readable to match', why: `Cartridge couldn’t read a game ID or a name from this ${emu} save.`, fix: 'It stays on this device as it is; it just isn’t synced. Nothing to do unless you want it in RomM.' };
 }
 async function openList(k) {
-  const items = (st.value?.last?.items || []).filter((x) => x.result === k.v);
+  const items = (st.value?.last?.items || []).filter((x) => inList(k, x));
   if (!st.value?.last?.items) return toast('Press Sync Now once and the list shows here.', 'info', 3500);
   if (!items.length) return toast(`Nothing ${k.l.toLowerCase()} in the last sync`, 'info', 2500);
   for (;;) {
-    const v = await choose({ sheet: true, title: `${k.l} · ${items.length}`, message: k.v === 'unmatched' ? 'Saves on this device that Cartridge couldn’t match to a game in your library, so they stay here and aren’t synced. Press one to see why and what fixes it.' : '', options: items.map((it, i) => ({ label: gameOf(it) || it.label || it.key, sub: `${it.emuName}${it.card ? ' · memory card' : ''}${it.states ? ' · save states' : ''}${k.v === 'unmatched' ? ' · ' + explain(it).short : ''}`, value: String(i), icon: ICON[k.v], raw: true })) });
+    const v = await choose({ sheet: true, title: `${k.l} · ${items.length}`, message: k.v === 'unmatched' ? 'Saves on this device that Cartridge couldn’t match to a game in your library, so they stay here and aren’t synced. Press one to see why and what fixes it.' : '', options: items.map((it, i) => ({ label: gameOf(it) || it.label || it.key, sub: `${it.emuName}${it.card ? ' · memory card' : ''}${it.states ? ' · save states' : ''}${k.v === 'unmatched' ? ' · ' + explain(it).short : k.v === 'attention' ? ' · ' + issue(it).short : ''}`, value: String(i), icon: ICON[k.v] || 'mdiAlertCircleOutline', raw: true })) });
     if (v == null) return;
     const it = items[Number(v)];
     // a matched save: its game's sheet (0.9.57, owner): the game, where its save is, its history; Go to Game Page there
+    if (k.v === 'attention') {
+      const e = issue(it);
+      const a = await choose({ title: gameOf(it) || it.label || it.key, message: `Why: ${e.why}\n\nWhat fixes it: ${e.fix}`, options: [{ label: 'Sync Now', sub: 'After the fix', value: 'sync', icon: 'mdiSync' }, ...(romById(it.romId) ? [{ label: 'This Game’s Saves', value: 'sheet', icon: 'mdiContentSaveOutline' }] : []), { label: 'Back to the List', value: 'back', icon: 'mdiArrowLeft' }] });
+      if (a === 'sync') return run();
+      if (a === 'sheet') { const r = await openModal('savegame', { romId: it.romId }); if (r === 'game') return go('game', { romId: it.romId }); }
+      if (a == null) return;
+      continue;
+    }
     if (k.v !== 'unmatched') { if (!romById(it.romId)) continue; const r = await openModal('savegame', { romId: it.romId }); if (r === 'game') return go('game', { romId: it.romId }); continue; }
     const e = explain(it);
     const a = await choose({ title: gameOf(it) || it.label || it.key, message: `Why: ${e.why}\n\nWhat fixes it: ${e.fix}`, options: [
@@ -149,7 +176,8 @@ async function openList(k) {
   }
 }
 let off = null;
-onMounted(() => { load(); off = window.cart.on('savesync', (p) => { if (p.state === 'run') { busy.value = true; prog.value = p; } else { busy.value = false; prog.value = {}; load(); } }); });
+// 0.9.58: a sync already running (started before this page opened) shows as running, with how far it is
+onMounted(async () => { await load(); if (st.value?.busy) { busy.value = true; prog.value = st.value.prog || {}; } off = window.cart.on('savesync', (p) => { if (p.state === 'run') { busy.value = true; prog.value = p; } else { busy.value = false; prog.value = {}; load(); } }); });
 onBeforeUnmount(() => off?.());
 defineExpose({ load });
 
@@ -163,7 +191,7 @@ defineExpose({ load });
 .ssc-mid b { font-size: var(--t-md); }
 .small { font-size: var(--t-sm); margin: 0; line-height: 1.45; }
 .stack { display: flex; flex-direction: column; gap: var(--s-2); }
-.ssc-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-2); }
+.ssc-counts { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s-2); }
 .ssc-count { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: var(--s-3); border-radius: var(--r-md); background: var(--s1); text-align: left; }
 .ssc-count:focus-visible, .pad-mode .ssc-count:focus { background: var(--focus); color: var(--on-focus); }
 .ssc-count:is(:focus-visible, :focus) span, .ssc-count:is(:focus-visible, :focus) .ssc-go { color: var(--on-focus-dim); }
@@ -181,5 +209,5 @@ defineExpose({ load });
 .ssc-game { flex: none; }
 .ssc-cov { width: 36px; height: 48px; border-radius: var(--r-sm); object-fit: cover; flex: none; background: var(--s2); }
 .ssc-gi { color: var(--muted); flex: none; }
-@media (max-width: 900px) { .ssc-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .ssc-counts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 </style>

@@ -7,7 +7,7 @@
 //    save states per core. Three shapes: a folder per game (Switch, PS3, PSP, Vita, PS4, Wii, Wii U, 3DS, Xbox 360),
 //    a file per game (RetroArch, DuckStation per-game cards, Dolphin .gci), and a whole memory card (PCSX2, shared
 //    DuckStation and Dolphin cards), kept whole on the console's carrier game (owner: "do the whole card").
-//    Switch saves are Eden's only (owner: no Ryujinx, no other forks for now).
+//    Switch saves: Eden and the yuzu family (0.9.58; Ryujinx keeps saves by a per-device index, so not Ryujinx).
 // 2. Key and place: each unit has a key that is the same on every device (the user folder in the path left out:
 //    Eden's user ID differs per install) and a place: where it goes on this device when it isn't here yet.
 // 3. Hash: RomM's own content hash, worked out from the files without zipping (md5 of the sorted "name:md5" lines of
@@ -31,15 +31,30 @@ const exists = (p) => { try { fs.accessSync(p); return true; } catch { return fa
 
 // ---------------------------------------------------------------- 1. units
 // where the console's games live in RomM terms, for the carrier of a whole card
-const CONSOLE = { eden: 'switch', rpcs3: 'ps3', ppsspp: 'psp', vita3k: 'psvita', shadps4: 'ps4', pcsx2: 'ps2', duckstation: 'psx', dolphin: 'ngc', cemu: 'wiiu', azahar: '3ds', xenia: 'xbox360', retroarch: null };
+// 0.9.58: the Eden/yuzu family keep Switch saves the same way (nand/user/save/<user>/<title ID>), so all of them sync
+const SWITCH_FAMILY = ['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu'];
+const CONSOLE = { eden: 'switch', citron: 'switch', yuzu: 'switch', sudachi: 'switch', suyu: 'switch', torzu: 'switch', rpcs3: 'ps3', ppsspp: 'psp', vita3k: 'psvita', shadps4: 'ps4', pcsx2: 'ps2', duckstation: 'psx', dolphin: 'ngc', cemu: 'wiiu', azahar: '3ds', xenia: 'xbox360', retroarch: null };
 const SUPPORTED = Object.keys(CONSOLE);
-const LABEL = { eden: 'Eden', rpcs3: 'RPCS3', ppsspp: 'PPSSPP', vita3k: 'Vita3K', shadps4: 'shadPS4', pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', cemu: 'Cemu', azahar: 'Azahar', xenia: 'Xenia', retroarch: 'RetroArch' };
+const LABEL = { eden: 'Eden', citron: 'Citron', yuzu: 'yuzu', sudachi: 'Sudachi', suyu: 'suyu', torzu: 'torzu', rpcs3: 'RPCS3', ppsspp: 'PPSSPP', vita3k: 'Vita3K', shadps4: 'shadPS4', pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', cemu: 'Cemu', azahar: 'Azahar', xenia: 'Xenia', retroarch: 'RetroArch' };
+// One slot per game per console (0.9.58, owner: "fix this as a top priority, I don't want mistakes"): a save's slot in
+// RomM was named after the emulator ("cartridge:eden:…"), so Eden on one device and Citron (or any renamed build) on
+// another never met. The slot now names the console family; slots written the old way are still read (FAMILY maps
+// both an emulator and a family to the family), so nothing already in RomM is lost.
+const FAMILY = { eden: 'switch', citron: 'switch', yuzu: 'switch', sudachi: 'switch', suyu: 'switch', torzu: 'switch', switch: 'switch', rpcs3: 'ps3', ps3: 'ps3', ppsspp: 'psp', psp: 'psp', vita3k: 'vita', vita: 'vita', shadps4: 'ps4', ps4: 'ps4', pcsx2: 'ps2', ps2: 'ps2', duckstation: 'ps1', ps1: 'ps1', dolphin: 'gc', gc: 'gc', cemu: 'wiiu', wiiu: 'wiiu', azahar: '3ds', '3ds': '3ds', xenia: 'x360', x360: 'x360', retroarch: 'retroarch' };
+const familyOf = (x) => FAMILY[x] || x;
+const MEMBERS = (fam) => SUPPORTED.filter((e) => familyOf(e) === fam);
+const FAMILY_LABEL = { switch: 'Switch', ps3: 'RPCS3', psp: 'PPSSPP', vita: 'Vita3K', ps4: 'shadPS4', ps2: 'PCSX2', ps1: 'DuckStation', gc: 'Dolphin', wiiu: 'Cemu', '3ds': 'Azahar', x360: 'Xenia', retroarch: 'RetroArch' };
+const labelOf = (x) => LABEL[x] || FAMILY_LABEL[x] || x;
+// "cartridge:<family or emulator>:<kind>:<key>" -> { family, kind, key } (null: not one of Cartridge's)
+function parseSlot(slot) { const m = /^cartridge:([^:]+):(dir|file|files):(.+)$/.exec(slot || ''); return m ? { family: familyOf(m[1]), kind: m[2], key: m[3] } : null; }
+// RomM's saves for this unit: the same key in the same console family, under any game and any slot spelling
+const remotesFor = (all, u) => (all || []).filter((r) => { const p = parseSlot(r.slot); return p && p.key === u.key && p.family === familyOf(u.emu); });
 
 // one scanned save -> { key, kind: dir|file, layout, keyPart } or null (not synced)
 function shape(s) {
   const p = s.path, b = path.basename(p);
   switch (s.emu) {
-    case 'eden': { const m = /nand\/user\/save\/(0000000000000000\/[^/]+|account\/[^/]+)\/([0-9A-Fa-f]{16})$/.exec(p); return m ? { key: 'switch:' + m[2].toUpperCase(), kind: 'dir' } : null; }
+    case 'eden': case 'citron': case 'yuzu': case 'sudachi': case 'suyu': case 'torzu': { const m = /nand\/user\/save\/(0000000000000000\/[^/]+|account\/[^/]+)\/([0-9A-Fa-f]{16})$/.exec(p); return m ? { key: 'switch:' + m[2].toUpperCase(), kind: 'dir' } : null; }
     case 'rpcs3': return { key: 'ps3:' + b, kind: 'dir' };
     case 'ppsspp': return { key: 'psp:' + b, kind: 'dir' };
     case 'vita3k': return { key: 'vita:' + b, kind: 'dir' };
@@ -121,7 +136,7 @@ function whyUnmatched(s, sh = {}) {
   return { code: 'none', console: con };
 }
 // RomM's slot for a unit: names the save so every device finds the same one (255 characters at most)
-const slotOf = (emu, key, kind) => `cartridge:${emu}:${kind}:${key}`.slice(0, 255);
+const slotOf = (emu, key, kind) => `cartridge:${familyOf(emu)}:${kind}:${key}`.slice(0, 255);
 
 // ---------------------------------------------------------------- 2. place on this device
 // where a unit goes here when this device doesn't have it yet; null when it can't be placed safely (the emulator
@@ -262,7 +277,8 @@ function writeUnit(u, files, target, backupsRoot) {
 }
 
 // is the emulator running? (never write its saves under it). procs: lines of /proc/*/cmdline
-const RUN_MARK = { eden: /\beden\b/i, rpcs3: /rpcs3/i, ppsspp: /ppsspp/i, vita3k: /vita3k/i, shadps4: /shadps4/i, pcsx2: /pcsx2/i, duckstation: /duckstation/i, dolphin: /dolphin-emu|DolphinEmu/i, cemu: /\bcemu\b/i, azahar: /azahar|citra/i, xenia: /xenia/i, retroarch: /retroarch/i };
+const SW_RUN = /\b(eden|citron|yuzu|sudachi|suyu|torzu)\b/i; // any of the family: Linked Folders can give them one save folder
+const RUN_MARK = { eden: SW_RUN, citron: SW_RUN, yuzu: SW_RUN, sudachi: SW_RUN, suyu: SW_RUN, torzu: SW_RUN, rpcs3: /rpcs3/i, ppsspp: /ppsspp/i, vita3k: /vita3k/i, shadps4: /shadps4/i, pcsx2: /pcsx2/i, duckstation: /duckstation/i, dolphin: /dolphin-emu|DolphinEmu/i, cemu: /\bcemu\b/i, azahar: /azahar|citra/i, xenia: /xenia/i, retroarch: /retroarch/i };
 function running(emu, procs = null) {
   const re = RUN_MARK[emu]; if (!re) return false;
   const list = procs || (() => { const o = []; for (const d of ls('/proc')) if (/^\d+$/.test(d.name)) { try { o.push(fs.readFileSync(`/proc/${d.name}/cmdline`, 'utf8').replace(/\0/g, ' ')); } catch {} } return o; })();
@@ -274,11 +290,21 @@ function running(emu, procs = null) {
 //        download(id) -> Buffer, confirm(id, hash) } (RomM, through main.js)
 // ledger: { get(key), set(key, v) }; opts: { home, extra, backupsRoot, procs, choice: 'mine'|'theirs' for a conflict,
 //        dry: only say what would happen }
+// opts.remotes: every one of Cartridge's saves in RomM, read once per sync (0.9.58). A save is found by its key and
+// console family under any game: the two devices may have matched the game to different RomM entries (a game and its
+// update file), and looking only under this device's entry made each device keep its own copy, never meeting.
+const ts = (v) => (typeof v === 'number' ? v : Date.parse(v) || 0);
+async function remotesOf(u, rpc, opts) {
+  if (opts.remotes) return remotesFor(opts.remotes, u);
+  return remotesFor(rpc.listAll ? await rpc.listAll() : await rpc.list(u.romId, u.slot), u);
+}
+// is an emulator of this unit's family set up here? (why a save from another device can't be put in place)
+const hasEmu = (emu, { home = os.homedir(), extra = {} } = {}) => [...(extra[emu] || []), ...(S.DATA[emu] || []).map((d) => path.join(home, d))].some(isDir);
 async function syncUnit(u, rpc, ledger, opts = {}) {
-  if (u.romId == null) return { key: u.key, result: 'unmatched' };
-  const remotes = (await rpc.list(u.romId, u.slot)) || [];
-  const newest = remotes.slice().sort((a, b) => String(b.updated_at).localeCompare(String(a.updated_at)))[0] || null;
-  const remote = newest ? { id: newest.id, hash: newest.content_hash } : null;
+  if (u.romId == null && !u.remote) return { key: u.key, result: 'unmatched' };
+  const remotes = await remotesOf(u, rpc, opts);
+  const newest = remotes.slice().sort((a, b) => ts(b.updated_at) - ts(a.updated_at) || (b.id || 0) - (a.id || 0))[0] || null;
+  const remote = newest ? { id: newest.id, hash: newest.content_hash, romId: newest.rom_id ?? null, emulator: newest.emulator || null } : null;
   const target = u.path || placeFor(u.emu, u.key, opts);
   const local = u.path ? hashUnit(u) : null;
   const base = ledger.get(u.key) || null;
@@ -291,13 +317,14 @@ async function syncUnit(u, rpc, ledger, opts = {}) {
   if (what === 'up') {
     const ents = entriesOf(u), buf = zip(ents);
     const name = (u.key.replace(/^[^:]+:/, '').replace(/[^\w.-]+/g, '_') || 'save') + '.zip';
-    const r = await rpc.upload(u, buf, name, { overwrite: !!opts.choice, hash: local });
+    // into the RomM entry that already holds this save, so every device's copies stay together (0.9.58)
+    const r = await rpc.upload({ ...u, romId: remote?.romId ?? u.romId }, buf, name, { overwrite: !!opts.choice, hash: local });
     if (r?.conflict) return { key: u.key, result: 'conflict', local, remote };
     ledger.set(u.key, { hash: local, remoteId: r?.id ?? null, remoteHash: r?.content_hash || local, at: Date.now() });
     return { key: u.key, result: 'up' };
   }
   // down
-  if (!target) return { key: u.key, result: 'unplaced' };
+  if (!target) return { key: u.key, result: 'unplaced', why: hasEmu(u.emu, opts) ? 'nofolder' : 'noemu' };
   const buf = await rpc.download(remote.id);
   const files = unzip(buf);
   const got = hashArchive(files);
@@ -314,12 +341,12 @@ async function syncUnit(u, rpc, ledger, opts = {}) {
 async function restore(u, save, rpc, ledger, opts = {}) {
   if (running(u.emu, opts.procs)) return { key: u.key, result: 'busy' };
   const target = u.path || placeFor(u.emu, u.key, opts);
-  if (!target) return { key: u.key, result: 'unplaced' };
+  if (!target) return { key: u.key, result: 'unplaced', why: hasEmu(u.emu, opts) ? 'nofolder' : 'noemu' };
   const files = unzip(await rpc.download(save.id));
   if (save.content_hash && hashArchive(files) !== save.content_hash) return { key: u.key, result: 'damaged' };
   writeUnit({ ...u, path: target }, files, target, opts.backupsRoot);
   const now = { ...u, path: target, files: u.kind === 'files' ? files.filter(([, b]) => b).map(([n]) => n) : u.files };
-  const local = hashUnit(now), r = await rpc.upload({ ...u, path: target }, zip(entriesOf(now)), path.basename(save.file_name || 'save.zip').replace(/ \[[\d_-]+\]/, ''), { overwrite: true, hash: local });
+  const local = hashUnit(now), r = await rpc.upload({ ...u, path: target, romId: save.rom_id ?? u.romId }, zip(entriesOf(now)), path.basename(save.file_name || 'save.zip').replace(/ \[[\d_-]+\]/, ''), { overwrite: true, hash: local });
   ledger.set(u.key, { hash: local, remoteId: r?.id ?? null, remoteHash: r?.content_hash || local, at: Date.now() });
   return { key: u.key, result: 'restored' };
 }
@@ -336,7 +363,9 @@ function rommRpc({ base, headers, devId = null, fetchImpl = fetch }) {
     return r;
   };
   return {
-    list: async (romId, slot) => { const r = await go('/api/saves', { rom_id: romId, slot, ...dq }); if (!r.ok) throw new Error(`RomM error ${r.status} listing saves`); return r.json(); },
+    list: async (romId, slot) => { const r = await go('/api/saves', { rom_id: romId, slot, ...dq }); if (!r.ok) throw new Error(`RomM error ${r.status} listing saves`); const j = await r.json(); return Array.isArray(j) ? j : j?.items || []; },
+    // every save of Cartridge's under every game (0.9.58: saves are found by key, not by this device's RomM entry)
+    listAll: async () => { const r = await go('/api/saves', { ...dq }); if (!r.ok) throw new Error(`RomM error ${r.status} listing saves`); const j = await r.json(); return (Array.isArray(j) ? j : j?.items || []).filter((x) => parseSlot(x.slot)); },
     upload: async (u, buf, name, { overwrite, hash } = {}) => {
       const fd = new FormData(); fd.append('saveFile', new Blob([buf], { type: 'application/zip' }), name);
       const r = await go('/api/saves', { rom_id: u.romId, emulator: u.emu, slot: u.slot, autocleanup: 'true', autocleanup_limit: 10, content_hash: hash, overwrite: overwrite ? 'true' : null, ...dq }, { method: 'POST', body: fd });
@@ -351,15 +380,20 @@ function rommRpc({ base, headers, devId = null, fetchImpl = fetch }) {
 
 // units RomM has that this device doesn't (from another device), so they can be brought here: remote saves whose
 // slot is ours and whose key isn't among the local units
-function remoteOnly(remotes, localKeys) {
+function remoteOnly(remotes, localKeys, opts = {}) {
   const out = new Map();
   for (const r of remotes || []) {
-    const m = /^cartridge:([^:]+):(dir|file|files):(.+)$/.exec(r.slot || '');
-    if (!m || localKeys.has(m[3]) || !SUPPORTED.includes(m[1])) continue;
-    const cur = out.get(m[3]);
-    if (!cur || String(r.updated_at) > String(cur.updated_at)) out.set(m[3], { key: m[3], emu: m[1], kind: m[2], romId: r.rom_id, slot: r.slot, path: null, files: [], remote: true, updated_at: r.updated_at });
+    const p = parseSlot(r.slot);
+    if (!p || localKeys.has(p.key)) continue;
+    // 0.9.58: the slot names a console family; the save goes to this device's emulator of that family (the one set up
+    // here, Eden first for Switch), else the family's first, which then says it isn't set up
+    const members = MEMBERS(p.family);
+    if (!members.length) continue;
+    const emu = members.find((e) => hasEmu(e, opts)) || members[0];
+    const cur = out.get(p.key);
+    if (!cur || ts(r.updated_at) > ts(cur.updated_at)) out.set(p.key, { key: p.key, emu, kind: p.kind, romId: r.rom_id, slot: slotOf(emu, p.key, p.kind), path: null, files: [], remote: true, updated_at: r.updated_at });
   }
   return [...out.values()];
 }
 
-module.exports = { rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };
+module.exports = { FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };

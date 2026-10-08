@@ -2544,7 +2544,7 @@ function ssGames() {
 const ssRpc = (devId) => require('./saveSync').rommRpc({ base: resolveBase, headers: authHeaders, devId });
 // a game's saves: its own, plus the whole memory card of its console
 const ssFor = (u, romId) => { if (romId == null) return true; if (u.romId === romId) return true; const r = romIndexMain().get(romId); return u.card && require('./saveSync').CONSOLE[u.emu] === ssConsoleOf(r); };
-let ssBusy = null;
+let ssBusy = null, ssProg = null; // ssProg: how far the running sync is, for a page that opens while it runs
 async function saveSyncRun({ romId = null, key = null, choice = null, dry = false, why = 'run' } = {}) {
   if (!saveSyncOn()) return { off: true, syncthing: syncthingSaves() };
   if (ssBusy) return ssBusy; // one sync at a time; a second ask shares the running one
@@ -2553,29 +2553,38 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
     if (why !== 'before') await titlesReady(4000); // names for codes of games not on this device (never holds up a game)
     romId = romId == null ? null : Number(romId);
     const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf });
+    // 0.9.58: every save of Cartridge's in RomM, read once: a save is found by its key and console under any game
+    // (the other device may have matched the game to another RomM entry), never only under this device's entry
     let remotes = [];
-    try { remotes = await (await ssRpcList(romId)); } catch (e) { log('save sync: RomM unreachable', e.message); if (why !== 'before' && !dry) ssHold(romId); return { offline: true, error: e.message, held: ssData.held || null }; }
+    try { remotes = await ssRpcList(null); } catch (e) { log('save sync: RomM unreachable', e.message); if (why !== 'before' && !dry) ssHold(romId); return { offline: true, error: e.message, held: ssData.held || null }; }
     const devId = await rommDevice(), rpc = ssRpc(devId);
-    const todo = [...local, ...SS.remoteOnly(remotes, new Set(local.map((u) => u.key)))].filter((u) => ssFor(u, romId) && (!key || u.key === key));
+    const all = [...local, ...SS.remoteOnly(remotes, new Set(local.map((u) => u.key)), { extra })];
+    // one game (before or after playing it): its saves here, and every save RomM keeps under that game, by key
+    const want = romId == null ? null : new Set([...local.filter((u) => u.romId === romId || (u.romIds || []).includes(romId)).map((u) => u.key), ...remotes.filter((r) => r.rom_id === romId).map((r) => SS.parseSlot(r.slot)?.key).filter(Boolean)]);
+    const todo = all.filter((u) => (romId == null || want.has(u.key) || ssFor(u, romId)) && (!key || u.key === key));
     const results = [];
+    ssProg = { done: 0, of: todo.length, why };
     broadcast('savesync', { state: 'run', done: 0, of: todo.length, why, romId });
     for (const [i, u] of todo.entries()) {
       let r;
-      try { r = await SS.syncUnit(u, rpc, ssLedger, { extra, backupsRoot: SAVE_BACKUPS, choice: key ? choice : null, dry }); } catch (e) { r = { key: u.key, result: e.code === 'auth' ? 'auth' : 'error', error: e.message }; }
-      results.push({ ...r, label: u.label || u.key, emu: u.emu, emuName: SS.LABEL[u.emu] || u.emu, romId: u.romId, card: u.card, states: !!u.states, why: u.why || null });
+      try { r = await SS.syncUnit(u, rpc, ssLedger, { extra, backupsRoot: SAVE_BACKUPS, choice: key ? choice : null, dry, remotes }); } catch (e) { r = { key: u.key, result: e.code === 'auth' ? 'auth' : 'error', error: e.message }; }
+      results.push({ ...r, place: r.result === 'unplaced' ? r.why : undefined, label: u.label || u.key, emu: u.emu, emuName: SS.labelOf(u.emu), romId: u.romId, romIds: u.card ? u.romIds || [] : undefined, card: u.card, states: !!u.states, remote: !!u.remote, why: u.why || null });
       if (!['none', 'same', 'unmatched'].includes(r.result)) log('save sync:', u.key, r.result, r.error || '');
+      ssProg = { done: i + 1, of: todo.length, why };
       broadcast('savesync', { state: 'run', done: i + 1, of: todo.length, why, romId });
       if (r.result === 'auth') break;
     }
     // 0.9.57 (owner: a game's sheet with its sync history): what moved, per save, the last 30 times
-    if (!dry) for (const r of results) if (['up', 'down', 'conflict', 'error'].includes(r.result)) ssNote(r.key, { result: r.result, why, error: r.error || undefined, choice: key ? choice : undefined });
+    if (!dry) for (const r of results) if (['up', 'down', 'conflict', 'error', 'unplaced', 'damaged'].includes(r.result) && !(['unplaced', 'damaged'].includes(r.result) && ssData.history?.[r.key]?.[0]?.result === r.result)) ssNote(r.key, { result: r.result, why, error: r.error || undefined, place: r.place, choice: key ? choice : undefined }); // a repeat of the same problem isn't noted again
     const counts = {}; for (const r of results) counts[r.result] = (counts[r.result] || 0) + 1;
     // 0.9.56 (owner: each count opens the saves behind it): what each save did in the last whole sync, at most 600
-    const items = results.filter((r) => ['up', 'down', 'same', 'unmatched'].includes(r.result)).slice(0, 600).map((r) => ({ key: r.key, label: r.label, emu: r.emu, emuName: r.emuName, romId: r.romId, card: r.card, states: r.states, result: r.result, why: r.why }));
+    // 0.9.58 (owner: "a lot of discrepancies"): every save's result is kept, the ones that couldn't move too (not set up
+    // here, emulator open, a download that failed its check, an error), each with its reason; nothing is silent
+    const items = results.filter((r) => r.result !== 'none').slice(0, 800).map((r) => ({ key: r.key, label: r.label, emu: r.emu, emuName: r.emuName, romId: r.romId, romIds: r.romIds, card: r.card, states: r.states, remote: r.remote, result: r.result, why: r.why, place: r.place, error: r.error }));
     if (romId == null && !dry) { ssData.last = { at: Date.now(), counts, items, conflicts: results.filter((r) => r.result === 'conflict').map((r) => ({ key: r.key, label: r.label, emuName: r.emuName, romId: r.romId })) }; saveJson(SAVESYNC_FILE, ssData, false); }
     broadcast('savesync', { state: 'done', counts, why, romId });
     return { results, counts };
-  })().finally(() => { ssBusy = null; });
+  })().finally(() => { ssBusy = null; ssProg = null; });
   return ssBusy;
 }
 // a save's sync history (save-sync.json history[key]: newest first, 30 at most)
@@ -2620,8 +2629,8 @@ async function ssRpcList(romId) {
   // one game: its saves and its console's carrier game (where the whole memory card is)
   const ids = romId == null ? [null] : [...new Set([romId, ssCarriers()[ssConsoleOf(romIndexMain().get(romId))]].filter((x) => x != null))];
   const all = [];
-  for (const id of ids) all.push(...((await api('/api/saves', { query: id == null ? {} : { rom_id: id } })) || []));
-  return all.filter((s) => String(s.slot || '').startsWith('cartridge:'));
+  for (const id of ids) { const j = await api('/api/saves', { query: id == null ? {} : { rom_id: id } }); all.push(...(Array.isArray(j) ? j : j?.items || [])); }
+  return all.filter((s) => require('./saveSync').parseSlot(s.slot));
 }
 // after a game: its saves go up a few seconds after it closes (emulators write on exit)
 function saveSyncAfter(romId) { if (saveSyncOn()) setTimeout(() => saveSyncRun({ romId, why: 'after' }).catch(() => {}), 4000); }
@@ -3409,7 +3418,7 @@ const handlers08 = {
   // every save on this device with the game it belongs to (0.9.29); read only
   'saves:list': ({ fresh } = {}) => savesList(fresh),
   // Cartridge Save Sync (0.9.51)
-  'savesync:status': () => ({ mode: config.saveSync || null, on: saveSyncOn(), syncthing: syncthingSaves(), busy: !!ssBusy, last: ssData.last, saved: Object.keys(ssData.ledger).length, backups: SAVE_BACKUPS, held: ssData.held ? { ...ssData.held, games: ssData.held.romIds.map((id) => romIndexMain().get(id)?.name).filter(Boolean) } : null }),
+  'savesync:status': () => ({ mode: config.saveSync || null, on: saveSyncOn(), syncthing: syncthingSaves(), busy: !!ssBusy, prog: ssProg, last: ssData.last, saved: Object.keys(ssData.ledger).length, backups: SAVE_BACKUPS, held: ssData.held ? { ...ssData.held, games: ssData.held.romIds.map((id) => romIndexMain().get(id)?.name).filter(Boolean) } : null }),
   'savesync:set': ({ on } = {}) => {
     if (on && syncthingSaves()) throw new Error('This device syncs saves with Syncthing. Stop using Syncthing for saves first: a device uses one or the other.');
     config.saveSync = on ? 'cartridge' : null; saveConfig();
@@ -3451,20 +3460,23 @@ const handlers08 = {
     return { romId, on: saveSyncOn(), saves, versions, conflicts, held: !!ssData.held?.romIds?.includes(romId), last: ssData.last?.at || null };
   },
   // older versions of a game's saves in RomM, and putting one back
+  // 0.9.58: by key across every RomM entry (the game's saves here, and every key RomM keeps under this game)
   'savesync:versions': async ({ romId }) => {
-    const SS = require('./saveSync');
-    return (await ssRpcList(Number(romId))).map((x) => { const m = /^cartridge:([^:]+):(dir|file|files):(.+)$/.exec(x.slot) || []; return { id: x.id, key: m[3], emu: m[1], emuName: SS.LABEL[m[1]] || m[1], at: x.updated_at, size: x.file_size_bytes, device: x.device_syncs?.find((d) => d.device_id === x.origin_device_id)?.device_name || '' }; }).sort((a, b) => String(b.at).localeCompare(String(a.at)));
+    const SS = require('./saveSync'), extra = saveExtras(); romId = Number(romId);
+    const all = await ssRpcList(null);
+    const keys = new Set([...SS.units({ extra, games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf }).filter((u) => u.romId === romId || (u.romIds || []).includes(romId)).map((u) => u.key), ...all.filter((r) => r.rom_id === romId).map((r) => SS.parseSlot(r.slot)?.key)]);
+    return all.map((x) => ({ x, p: SS.parseSlot(x.slot) })).filter(({ p }) => p && keys.has(p.key)).map(({ x, p }) => ({ id: x.id, key: p.key, emu: x.emulator || p.family, emuName: SS.labelOf(x.emulator || p.family), at: x.updated_at, size: x.file_size_bytes, device: x.device_syncs?.find((d) => d.device_id === x.origin_device_id)?.device_name || '' })).sort((a, b) => (Date.parse(b.at) || 0) - (Date.parse(a.at) || 0));
   },
   'savesync:restore': async ({ id, romId }) => {
     if (!saveSyncOn()) throw new Error('Cartridge Save Sync is off.');
     const SS = require('./saveSync'), extra = saveExtras();
-    const saves = await ssRpcList(Number(romId)), save = saves.find((x) => x.id === Number(id));
+    const saves = await ssRpcList(null), save = saves.find((x) => x.id === Number(id));
     if (!save) throw new Error('That version isn’t in RomM any more.');
-    const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf });
-    const u = local.find((x) => x.slot === save.slot) || SS.remoteOnly([save], new Set())[0];
+    const local = SS.units({ extra, games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf }), p = SS.parseSlot(save.slot);
+    const u = local.find((x) => p && x.key === p.key && SS.familyOf(x.emu) === p.family) || SS.remoteOnly([save], new Set(), { extra })[0];
     const r = await SS.restore(u, save, ssRpc(await rommDevice()), ssLedger, { extra, backupsRoot: SAVE_BACKUPS });
-    if (r.result === 'busy') throw new Error(`Close ${SS.LABEL[u.emu] || u.emu} first: Cartridge never changes saves while the emulator is open.`);
-    if (r.result === 'unplaced') throw new Error(`${SS.LABEL[u.emu] || u.emu} hasn’t made its save folders on this device yet. Open it once, then try again.`);
+    if (r.result === 'busy') throw new Error(`Close ${SS.labelOf(u.emu)} first: Cartridge never changes saves while the emulator is open.`);
+    if (r.result === 'unplaced') throw new Error(r.why === 'noemu' ? `No ${SS.labelOf(u.emu)} is set up on this device for this save.` : `${SS.labelOf(u.emu)} hasn’t made its save folders on this device yet. Open it once, then try again.`);
     if (r.result === 'damaged') throw new Error('That version didn’t match RomM’s check, so nothing was changed.');
     log('save sync: restored', u.key, 'version', id);
     ssNote(u.key, { result: 'restored', why: 'restore', version: save.updated_at || null });
@@ -5228,6 +5240,8 @@ const JOBS = {
   'pkg:install': (a) => ({ key: 'pkg:' + a.romId, kind: 'Install', title: romName(a.romId), romId: Number(a.romId), icon: 'mdiPackageDown' }),
   'bios:download': (a) => ({ key: 'bios:' + (a.slug || a.platformId), kind: 'BIOS and Firmware', title: String(a.slug || '').toUpperCase(), icon: 'mdiChip' }),
   'sync:install': () => ({ key: 'sync:install', kind: 'Install', title: 'Syncthing', icon: 'mdiSync' }),
+  // 0.9.58 (owner: Sync Now stopped when leaving the page): it never stopped, but nothing showed it; now it's a job
+  'savesync:run': () => ({ key: 'savesync', kind: 'Save Sync', title: 'Cartridge Save Sync', icon: 'mdiCloudSyncOutline' }),
 };
 for (const [ch, info] of Object.entries(JOBS)) {
   const fn = handlers[ch];
@@ -5242,6 +5256,7 @@ const JOB_EVENTS = {
   'ps3-update': (m) => ['ps3:' + m.romId, { pct: m.pct, text: m.state === 'installing' ? `Installing ${m.version || ''}`.trim() : m.version ? `Update ${m.version}` : '' }],
   'pkg-progress': (m) => ['pkg:' + m.romId, { pct: m.pct, text: m.text || m.step || '' }],
   'sync-install': (m) => ['sync:install', { pct: m.pct }],
+  savesync: (m) => ['savesync', m.state === 'run' ? { pct: m.of ? Math.round((m.done / m.of) * 100) : null, text: m.of ? `${m.done} of ${m.of} saves` : 'Reading RomM' } : {}],
 };
 const sendRaw = broadcast;
 broadcast = (ch, data) => { sendRaw(ch, data); const f = JOB_EVENTS[ch]; if (f && data) { try { const [k, o] = f(data); if (k && bgJobs.has(k)) bgJob(k, Object.fromEntries(Object.entries(o).filter(([, v]) => v != null))); } catch {} } };
