@@ -1813,7 +1813,8 @@ async function runJob(it) {
   let lastT = Date.now(), lastB = 0;
   try {
     const rom = await api(`/api/roms/${it.romId}`);
-    const target = downloadDir({ slug: rom.platform_slug, fs_slug: rom.platform_fs_slug }, rom.fs_size_bytes || 0, it.root || null); // 0.9.38: any drive; 0.9.49: the one asked for
+    // 0.9.65 Download More Files: more of a game's files go into the folder it already has, wherever that is
+    const target = it.into ? path.dirname(it.into) : downloadDir({ slug: rom.platform_slug, fs_slug: rom.platform_fs_slug }, rom.fs_size_bytes || 0, it.root || null); // 0.9.38: any drive; 0.9.49: the one asked for
     if (!target) throw new Error('No folder set for this platform. Set it in Settings.');
     await fsp.mkdir(target, { recursive: true });
     // 0.9.63 (owner: a game with several files asks which to download): only the files picked, when some were
@@ -1832,7 +1833,7 @@ async function runJob(it) {
     };
 
     let finalPath;
-    const single = files.length <= 1 && !(Array.isArray(it.only) && it.only.length) && (rom.has_simple_single_file || (config.downloads.flattenSingleFile && rom.has_nested_single_file) || files.length === 0);
+    const single = !it.into && files.length <= 1 && !(Array.isArray(it.only) && it.only.length) && (rom.has_simple_single_file || (config.downloads.flattenSingleFile && rom.has_nested_single_file) || files.length === 0);
     if (single) {
       const fname = files[0]?.file_name || rom.fs_name;
       finalPath = path.join(target, fname);
@@ -1854,7 +1855,7 @@ async function runJob(it) {
       if (isFolderSystem(rom) && /\.zip$/i.test(finalPath)) finalPath = await unzipGame(finalPath, target, it);
     } else {
       // Multi-file: mirror the server folder, one file at a time (resumable)
-      const folder = path.join(target, rom.fs_name);
+      const folder = it.into || path.join(target, rom.fs_name);
       for (const f of files) {
         if (it.abort.signal.aborted) throw new Error('aborted');
         const rel = f.full_path.startsWith(romPrefix) ? f.full_path.slice(romPrefix.length) : f.file_name;
@@ -1878,14 +1879,16 @@ async function runJob(it) {
         return hasDescriptor ? DESCRIPTOR.has(e) || e === 'chd' : DISC_EXT.has(e);
       });
       let m3uName = null;
-      if (hasM3u) m3uName = files.find((f) => f.file_name.toLowerCase().endsWith('.m3u')).file_name;
+      // files added to a folder already here (Download More Files): its layout stays exactly as it is
+      if (it.into) {}
+      else if (hasM3u) m3uName = files.find((f) => f.file_name.toLowerCase().endsWith('.m3u')).file_name;
       else if (discs.length >= 2) {
         m3uName = `${rom.fs_name}.m3u`;
         const lines = discs.map((f) => (f.full_path.startsWith(romPrefix) ? f.full_path.slice(romPrefix.length) : f.file_name));
         await fsp.writeFile(path.join(folder, m3uName), lines.join('\n') + '\n');
       }
       // ES-DE "directory as file": Game.m3u/ containing Game.m3u
-      if (m3uName && config.downloads.esdeM3uFolders && !rom.fs_name.toLowerCase().endsWith('.m3u')) {
+      if (!it.into && m3uName && config.downloads.esdeM3uFolders && !rom.fs_name.toLowerCase().endsWith('.m3u')) {
         const dirName = `${rom.fs_name}.m3u`;
         if (m3uName !== dirName) await fsp.rename(path.join(folder, m3uName), path.join(folder, dirName));
         const newFolder = path.join(target, dirName);
@@ -1906,8 +1909,8 @@ async function runJob(it) {
     // a re-download (library check): the new copy is in, so the old one kept aside goes
     if (it.backup) { await fsp.rm(it.backup, { recursive: true, force: true }).catch(() => {}); it.backup = null; }
     // a re-download is the same game as before: Steam already has it, so no automatic add
-    if (!it.redo && it.notice !== 'pkg') rpcs3Settings(rom.id);
-    if (!it.redo && it.notice !== 'pkg') try { if (steamMgr.onDownloaded(rom.id)) broadcast('steam-auto', { romId: rom.id, name: rom.name, action: 'add' }); } catch (e) { log('steam auto add', e.message); }
+    if (!it.redo && !it.into && it.notice !== 'pkg') rpcs3Settings(rom.id);
+    if (!it.redo && !it.into && it.notice !== 'pkg') try { if (steamMgr.onDownloaded(rom.id)) broadcast('steam-auto', { romId: rom.id, name: rom.name, action: 'add' }); } catch (e) { log('steam auto add', e.message); }
     autoBios(rom.platform_id, rom.platform_slug); // in the background, never holds the download up
   } catch (e) {
     // stopped on purpose: keep a status set since (paused, or queued again by Resume)
@@ -4819,15 +4822,12 @@ const handlers = {
     return true;
   },
   // Pick your own emulators (0.9.17): by console, what's here, and a download for what isn't
-  'emuget:list': () => {
-    const G = require('./emuGet'), have = steamMgr.installedEmulators();
-    const isHere = (e, key) => {
-      if (e.id === 'retroarch') return ['snes', 'psx', 'genesis'].some((k) => (steamMgr.candidatesFor(k) || []).some((c) => /^ra:/.test(c.id)));
-      if (have.some((x) => x.id === e.id)) return true;
-      const ck = { retro: 'snes', gc: 'gc' }[key] || key;
-      return (steamMgr.candidatesFor(ck) || []).some((c) => c.id.split('@')[0] === e.id);
-    };
-    return G.CATALOG.map((c) => ({ key: c.key, name: c.name, emus: c.emus.map((e) => ({ id: e.id, label: require('./emulators').EMU[e.id]?.label || { retroarch: 'RetroArch', supermodel: 'Supermodel' }[e.id] || e.id, how: e.how, from: e.how === 'flatpak' ? 'Flatpak from Flathub' : `${e.binary || e.dirBuild ? 'Linux build' : 'AppImage'} from ${e.repo.split('/')[0]}${e.fp ? ', else its Flatpak' : ''}`, installed: isHere(e, c.key) })) }));
+  'emuget:list': async () => {
+    // 0.9.65 (owner: KytyPS5's newest builds have no Linux file): an emulator marked gate is offered only while its
+    // newest release carries a Linux build; it comes back by itself when one does. Copies already here stay listed.
+    const G = require('./emuGet'), gated = new Set(), rows = emugetRows();
+    for (const c of G.CATALOG) for (const e of c.emus) if (e.gate && !rows.find((r) => r.key === c.key)?.emus.find((x) => x.id === e.id)?.installed && !(await linuxNow(e))) gated.add(e.id);
+    return rows.map((c) => ({ ...c, emus: c.emus.filter((e) => !gated.has(e.id)) }));
   },
   // where emulators live (0.9.17): this device and every mounted drive, with free space
   'emuget:drives': async () => {
@@ -4858,7 +4858,7 @@ const handlers = {
     const emudeck = ex('.config/EmuDeck/settings.sh') || ex('emudeck'), retrodeck = ex('.var/app/net.retrodeck.retrodeck') || ex('retrodeck');
     // anything installed counts: programs found by the scan, and the installer's own list (launcher scripts, Flatpaks)
     let emulators = 0; try { emulators = steamMgr.installedEmulators().length; } catch {}
-    try { emulators += handlers['emuget:list']().reduce((n, c) => n + c.emus.filter((e) => e.installed).length, 0); } catch {}
+    try { emulators += emugetRows().reduce((n, c) => n + c.emus.filter((e) => e.installed).length, 0); } catch {}
     // the Emulation folder the installer made earlier is Cartridge's own setup: later installs carry on with it
     const own = !!(config.emulationFresh && config.emulationRoot && isDir(config.emulationRoot));
     return { fresh: own || (!emudeck && !retrodeck && !emulators), own, emudeck, retrodeck, emulators };
@@ -5434,7 +5434,29 @@ const handlers = {
     log(st.emu + ' patches', st.serial, todo.map((c) => (c.on ? '+' : '-') + c.description).join(', '));
     return { count: todo.length };
   },
-  'dl:add': (job) => enqueue(job),
+  'dl:add': (job) => {
+    // Download More Files (0.9.65): only into the game's own folder, and only files not already in it
+    if (job.more) {
+      const dir = installedMap[job.romId];
+      if (!dir || !fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory()) throw new Error('This game isn’t in a folder of its own on this device, so there’s nowhere to add files.');
+      job = { ...job, into: dir, redo: false };
+    }
+    return enqueue(job);
+  },
+  // which of a game's files are already in its folder (0.9.65, Download More Files): by name and size
+  'dl:filesHere': async ({ romId, files }) => {
+    const dir = installedMap[romId];
+    const st = dir ? await fsp.stat(dir).catch(() => null) : null;
+    if (!st?.isDirectory()) return { folder: null, here: [] };
+    const here = [];
+    for (const f of files || []) {
+      const p = path.join(dir, String(f.file_name || ''));
+      if (!p.startsWith(dir + path.sep)) continue;
+      const s2 = await fsp.stat(p).catch(() => null);
+      if (s2?.isFile() && (!f.size || s2.size === f.size)) here.push(f.file_name);
+    }
+    return { folder: dir, here };
+  },
   'dl:list': () => queue.map(publicItem),
   'dl:cancel': (id) => {
     const it = queue.find((q) => q.id === id);
@@ -5960,3 +5982,32 @@ app.on('before-quit', () => {
 });
 // Steam's Exit game (and a shutdown) ask politely first: treat it like Quit
 for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { if (ignoreSignal(sig)) return; log('got', sig); app.quit(); setTimeout(() => app.exit(0), 3000).unref?.(); });
+
+// does an emulator's newest release carry a Linux build (0.9.65, KytyPS5)? Its newest release only, never an older
+// one: a Linux build from three days ago isn't what its project ships now. Remembered 6 hours; an unanswered check
+// keeps the last answer (shown when never known).
+const linuxSeen = {};
+async function linuxNow(e) {
+  const k = linuxSeen[e.id];
+  if (k && Date.now() - k.at < 6 * 3600e3) return k.ok;
+  try {
+    const U = require('./emuUpdates');
+    const rel = await require('./github').release(e.repo, { pre: e.pre });
+    const ok = !!U.pickAsset(rel?.assets, e.asset);
+    linuxSeen[e.id] = { ok, at: Date.now() };
+    if (!ok) log(`${e.id}: its newest release (${rel?.tag || 'none'}) has no Linux build, so it isn't offered`);
+    return ok;
+  } catch { return k ? k.ok : true; }
+}
+
+// Get Emulators' list, as rows per console (sync: the installer's fresh check uses it)
+function emugetRows() {
+  const G = require('./emuGet'), have = steamMgr.installedEmulators();
+  const isHere = (e, key) => {
+    if (e.id === 'retroarch') return ['snes', 'psx', 'genesis'].some((k) => (steamMgr.candidatesFor(k) || []).some((c) => /^ra:/.test(c.id)));
+    if (have.some((x) => x.id === e.id)) return true;
+    const ck = { retro: 'snes', gc: 'gc' }[key] || key;
+    return (steamMgr.candidatesFor(ck) || []).some((c) => c.id.split('@')[0] === e.id);
+  };
+  return G.CATALOG.map((c) => ({ key: c.key, name: c.name, emus: c.emus.map((e) => ({ id: e.id, label: require('./emulators').EMU[e.id]?.label || { retroarch: 'RetroArch', supermodel: 'Supermodel' }[e.id] || e.id, how: e.how, from: e.how === 'flatpak' ? 'Flatpak from Flathub' : `${e.binary || e.dirBuild ? 'Linux build' : 'AppImage'} from ${e.repo.split('/')[0]}${e.fp ? ', else its Flatpak' : ''}`, installed: isHere(e, c.key) })) }));
+}

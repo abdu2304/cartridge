@@ -157,7 +157,7 @@
 import { similarTo } from '../recs.js';
 import { addGame, removeGame, applyChanges, pickEmulator, pickCollections, pickFrameGen } from '../steam.js';
 import { computed, onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue';
-import { store, heroArt, call, img, go, cover, bytes, year, rating, toast, confirm, download, downloadFor, romById, platformById, isNew, setBg, logoOf, resetLogos, artFor, choose, openModal, allRoms, visible, isFavourite, addToCollection, playOf, playtimeText, ago, loadPlay, askText, saveConfig, backdropOf, wantSharp, bgJob, playGame, saveSyncOn } from '../store.js';
+import { store, heroArt, call, img, go, cover, bytes, year, rating, toast, confirm, download, downloadMore, downloadFor, romById, platformById, isNew, setBg, logoOf, resetLogos, artFor, choose, openModal, allRoms, visible, isFavourite, addToCollection, playOf, playtimeText, ago, loadPlay, askText, saveConfig, backdropOf, wantSharp, bgJob, playGame, saveSyncOn } from '../store.js';
 import { pinToStart } from '../startTiles.js';
 import { useView } from '../useView.js';
 import { ensureFocus, focusFirst } from '../nav.js';
@@ -655,9 +655,17 @@ async function more() {
     { label: 'About', sub: 'Console, ID, version, and what’s installed for it', value: 'about', icon: 'mdiInformationOutline' },
   ];
   if (detail.value?.path_manual) details.unshift({ label: 'Manual', sub: 'The game’s manual from RomM', value: 'manual', icon: 'mdiBookOpenPageVariantOutline' });
+  // Download More Files (0.9.65, owner): a game RomM keeps as several files side by side, some of them not here yet
+  let moreFiles = null;
+  const parts = base.value.files || [];
+  if (installedPath.value && !marked.value && parts.length > 1 && parts.length <= 60 && !parts.some((f) => f.nested)) {
+    const r = await call('dl:filesHere', { romId: props.romId, files: parts.map((f) => ({ file_name: f.file_name, size: f.size })) }).catch(() => null);
+    if (r?.folder && r.here.length < parts.length) moreFiles = { have: r.here, missing: parts.length - r.here.length, total: parts.length };
+  }
   // Options (0.9.16): hide, re-download and delete, out of the header
   const options = [
     { label: u?.hidden ? 'Unhide game' : 'Hide game', sub: u?.hidden ? 'Show it in lists again' : 'Keep it out of Home, Library and Search', value: 'hide', icon: u?.hidden ? 'mdiEyeOutline' : 'mdiEyeOffOutline' },
+    ...(moreFiles ? [{ label: 'Download More Files', sub: `${moreFiles.missing} of ${moreFiles.total} files aren’t on this device yet`, value: 'morefiles', icon: 'mdiFilePlusOutline' }] : []),
     ...(installedPath.value && !marked.value ? [
       { label: 'Re-download', sub: 'The copy on this device is replaced', value: 'redownload', icon: 'mdiRefresh' },
       { label: 'Delete from this device', sub: 'Stays on your RomM server', value: 'delete', icon: 'mdiDeleteOutline', danger: true },
@@ -722,6 +730,7 @@ async function more() {
   if (v === 'pkg') { await installPkg(); return; }
   if (v === 'patches') { await openModal('gameaddons', { romId: Number(props.romId), name: base.value.name, tab: 'patches' }); return; }
   if (v === 'redownload') { await redownload(); return; }
+  if (v === 'morefiles') { await downloadMore(base.value, moreFiles.have); return; }
   if (v === 'ps3check') {
     toast('Checking Sony’s update list…', 'info', 2500, 'mdiPackageUp');
     const up = await call('ps3up:game', { romId: Number(props.romId), fresh: true }).catch((e) => ({ error: e.message }));

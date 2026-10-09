@@ -368,6 +368,21 @@ export async function download(rom, { checkSpace = true, pick = true } = {}) {
   return true;
 }
 
+// Download More Files (0.9.65): the files of a game not on this device yet, into the folder it already has.
+// Files already here are shown ticked and greyed, nothing else starts ticked.
+export async function downloadMore(rom, have) {
+  const parts = rom.files || [];
+  const only = await openModal('filepick', { name: rom.name, files: parts, have });
+  if (!only || !only.length) return false;
+  const size = parts.filter((f) => only.includes(f.file_name)).reduce((a, f) => a + (f.size || 0), 0);
+  const p = platformById(rom.platform_id);
+  if (p?.target?.path && size && !(await roomFor({ ...rom, fs_size_bytes: size }, p, null))) return false;
+  try { await call('dl:add', { romId: rom.id, name: rom.name, platformSlug: rom.platform_slug, platformName: rom.platform_display_name, size, cover: rom.path_cover_small || rom.url_cover, only, more: true }); }
+  catch (e) { toast(e.message, 'error'); return false; }
+  toast(`Downloading ${only.length === 1 ? only[0] : only.length + ' more files'}`, 'info', 2000, 'mdiDownload');
+  return true;
+}
+
 // Before a download: will it fit? Counts what is still downloading to the same folder too.
 async function roomFor(rom, p, root = null) {
   // 0.9.38: the drive the download would really go to (games folders on more than one drive)
