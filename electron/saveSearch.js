@@ -49,22 +49,29 @@ function savesAt(hit) {
 // roots: where to walk (home first); known: real paths of saves already found (skipped); skip: more folders never
 // walked; budget: { ms, dirs }; onProgress({ dirs, found }). -> { found: [{ emu, emuName, base, at, place, saves,
 // newest, list }], dirs, ms, done (false: the budget ran out first) }
-async function search({ roots = [os.homedir()], known = new Set(), skip = [], budget = {}, onProgress = () => {}, maxDepth = 10 } = {}) {
+async function search({ roots = [os.homedir()], known = new Set(), skip = [], budget = {}, onProgress = () => {}, maxDepth = 10, stop = () => false } = {}) {
   const t0 = Date.now(), ms = budget.ms ?? 45000, maxDirs = budget.dirs ?? 250000;
   const skipReal = new Set(skip.map(real)), seen = new Set(), found = [], hitSeen = new Set();
   let dirs = 0, done = true;
+  // 0.9.63 (owner's log: saves found twice): the same folder can be mounted at two paths (Bazzite mounts the system
+  // drive again under /run/media/system/...), so folders and saves are told apart by the disk's own file number
+  const idOf = async (p) => { try { const st = await fs.promises.stat(p); return st.dev + ':' + st.ino; } catch { return null; } };
+  const seenIds = new Set(), knownIds = new Set((await Promise.all([...known].map(idOf))).filter(Boolean));
   const stack = [...new Set(roots.filter(isDir).map(real))].reverse().map((d) => [d, 0]);
   while (stack.length) {
-    if (Date.now() - t0 > ms || dirs >= maxDirs) { done = false; break; }
+    if (Date.now() - t0 > ms || dirs >= maxDirs || (dirs % 50 === 0 && stop())) { done = false; break; } // 0.9.63: a game starting stops it (the disk is the game's)
     const [dir, depth] = stack.pop();
     if (seen.has(dir) || skipReal.has(dir)) continue;
-    seen.add(dir); dirs++;
+    const id = await idOf(dir);
+    if (id && seenIds.has(id)) continue;
+    seen.add(dir); if (id) seenIds.add(id); dirs++;
     let ents; try { ents = await fs.promises.readdir(dir, { withFileTypes: true }); } catch { continue; }
     const names = new Set(ents.map((e) => e.name));
     for (const hit of shapeOf(dir, names)) {
       const key = hit.emu + '\0' + JSON.stringify(hit.at);
       if (hitSeen.has(key)) continue; hitSeen.add(key);
-      const list = savesAt(hit).filter((s) => !known.has(real(s.path)));
+      const list = [];
+      for (const s of savesAt(hit)) if (!known.has(real(s.path)) && !knownIds.has(await idOf(s.path))) list.push(s);
       if (!list.length) continue;
       let newest = 0; for (const s of list) { try { newest = Math.max(newest, fs.statSync(s.path).mtimeMs); } catch {} }
       found.push({ emu: hit.emu, emuName: S.NAMES[hit.emu] || hit.emu, base: hit.base, at: hit.at, place: S.placeDir(hit.at, hit.base), saves: list.length, newest, list: list.slice(0, 40).map((s) => ({ label: s.label || path.basename(s.path), path: s.path, keys: s.keys || {} })) });

@@ -10,7 +10,7 @@
         <div class="muted small">{{ emuName === 'PPSSPP' ? 'Cheats' : 'Patches' }} you turn on here stay on in {{ emuName }}, as if you ticked them there.<template v-if="emuName === 'PPSSPP' || emuName === 'Dolphin'"> Cheats also turn on {{ emuName }}’s Enable cheats setting.</template></div>
       </div>
       <!-- Dolphin (0.9.21, owner): one page per kind, LB/RB between them; each says how many are on -->
-      <div v-if="tabs.length > 1 && !embedded" class="pt-tabs"><Btn b="LB" /><div class="seg"><button v-for="t in tabs" :key="t.k" data-focus :class="{ on: tab === t.k }" @click="tab = t.k">{{ t.l }}<span v-if="t.on" class="pt-count">{{ t.on }}</span></button></div><Btn b="RB" /></div>
+      <div v-if="tabs.length > 1 && !embedded" class="pt-tabs"><Btn b="LB" /><div class="seg strip"><button v-for="t in tabs" :key="t.k" data-focus :class="{ on: tab === t.k }" @click="tab = t.k">{{ t.l }}<span v-if="t.on" class="pt-count">{{ t.on }}</span></button></div><Btn b="RB" /></div>
       <div v-if="!list.length" class="muted" style="padding: 12px 2px">{{ why || `${emuName} has no patches for this game.` }}</div>
       <div v-else-if="!shown.length" class="muted" style="padding: 12px 2px">{{ EMPTY[tab] || 'Nothing here for this game.' }}</div>
       <div v-else class="pt-list" data-scroll>
@@ -92,6 +92,7 @@ const DL = {
   Cemu: { label: 'Download Latest Community Graphic Packs', busy: 'Downloading Graphic Packs…' },
   RPCS3: { label: 'Download Latest Patches', busy: 'Downloading RPCS3’s Patches…' },
   shadPS4: { label: 'Download Latest Patches', busy: 'Downloading shadPS4 and GoldHEN Patches…' },
+  Xenia: { label: 'Download Latest Patches', busy: 'Downloading Xenia’s Patches…' },
 };
 async function packsDownload() {
   packsBusy.value = true;
@@ -99,6 +100,7 @@ async function packsDownload() {
     const r = await call('patches:download', { romId: props.romId });
     toast(r.emu === 'Cemu' ? (r.updated ? `Cemu's graphic packs are now ${r.version}` : `Cemu's graphic packs are up to date${r?.version ? ' (' + r.version + ')' : ''}`)
       : r.emu === 'RPCS3' ? (r.updated ? 'RPCS3’s patch list is the newest now' : 'RPCS3’s patch list is up to date')
+      : r.emu === 'Xenia' ? (r.added || r.updated ? `Xenia’s patches: ${r.added} new, ${r.updated} updated` : 'Xenia’s patches are up to date')
       : `shadPS4 and GoldHEN patches downloaded${r.partly ? '. ' + r.partly : ''}`, r.partly ? 'info' : 'ok', 4000, 'mdiDownload');
     emit('reload');
   }
@@ -135,8 +137,6 @@ onBeforeUnmount(() => layer?.pop());
 .pt-host { display: flex; flex-direction: column; min-height: 0; flex: 1; }
 .pt-host > .pt { width: auto; max-height: none; min-height: 0; flex: 1; }
 .pt-tabs { display: flex; align-items: center; gap: var(--s-2); }
-.pt-tabs .seg { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-.pt-tabs .seg button { flex: none; white-space: nowrap; }
 .pt-count { margin-left: 6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-grid; place-items: center; font-size: 11px; font-weight: 800; background: var(--sel, rgba(255,255,255,.18)); }
 .pt h2 { margin: 2px 0 6px; font-size: var(--t-xl); line-height: 1.15; }
 .small { font-size: var(--t-sm); }

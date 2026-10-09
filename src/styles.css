@@ -552,6 +552,14 @@ input, textarea, select { transition: box-shadow var(--spring-snappy-d) var(--sp
 /* segmented rows: one pill glides to the choice (motion.js slidingPills) */
 .seg { position: relative; }
 .seg > button { position: relative; z-index: 1; }
+/* one scrolling row of tabs (0.9.63, owner): never two rows, never cut; motion.js keeps the chosen one in view */
+.seg.strip { display: flex; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; max-width: 100%; min-width: 0; }
+.seg.strip::-webkit-scrollbar { display: none; }
+.seg.strip > button { flex: none; white-space: nowrap; }
+:has(> .seg.strip) > :not(.seg) { flex: none; } /* the L1/R1 glyphs beside it keep their size */
+.seg.strip.fade-r { mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+.seg.strip.fade-l { mask-image: linear-gradient(to left, #000 calc(100% - 36px), transparent); }
+.seg.strip.fade-l.fade-r { mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
 .seg-ink { position: absolute; left: 0; top: 0; z-index: 0; border-radius: var(--r-sm); background: var(--sel-bg); box-shadow: var(--sel-ring); pointer-events: none; }
 .seg-ink.live { transition: transform var(--spring-pop-d) var(--spring-pop), width var(--spring-pop-d) var(--spring-pop), height var(--spring-d) var(--spring), opacity var(--d-fast); }
 .seg.inked > button.on { background: transparent; }

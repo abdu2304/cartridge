@@ -78,7 +78,7 @@ const st = ref(null), busy = ref(false), prog = ref({});
 // library, and saves of games that are (or probably are) but didn't sync, each with why and what fixes it
 const SHOWN = [{ v: 'up', l: 'Sent to RomM' }, { v: 'down', l: 'Brought Here' }, { v: 'same', l: 'Up to Date' }, { v: 'notsynced', l: 'Not Synced' }];
 // 0.9.58 (owner: "a lot of discrepancies"): saves that couldn't move this time are counted and explained, never silent
-const ATTN = new Set(['unplaced', 'busy', 'damaged', 'error', 'conflict', 'auth']);
+const ATTN = new Set(['unplaced', 'busy', 'damaged', 'error', 'conflict', 'auth', 'toolarge']);
 const NOT = new Set([...ATTN, 'unmatched']);
 const inList = (k, x) => (k.v === 'notsynced' ? NOT.has(x.result) : k.v === 'up' ? x.result === 'up' || x.result === 'refiled' : x.result === k.v);
 const countOf = (k) => (st.value?.last?.items ? st.value.last.items.filter((x) => inList(k, x)).length : k.v === 'notsynced' ? [...NOT].reduce((n, r) => n + (st.value?.last?.counts?.[r] || 0), 0) : st.value?.last?.counts?.[k.v] || 0);
@@ -92,6 +92,7 @@ function issue(it) {
   if (it.result === 'busy') return { short: `${emu} was open`, why: `${emu} was running, and Cartridge never changes saves while their emulator is open.`, fix: `Close ${emu}, then press Sync Now.` };
   if (it.result === 'damaged') return { short: 'The download didn’t match RomM’s check', why: 'What came from RomM didn’t match the check RomM gave for it, so nothing was written.', fix: 'Press Sync Now to try again. If it keeps happening, the copy in RomM may be damaged: put back an older version from the game’s page.' };
   if (it.result === 'conflict') return { short: 'Changed on two devices', why: 'This save changed here and on another device since they last agreed. Cartridge never guesses which to keep.', fix: 'Choose which to keep in “Choose Which Save to Keep” above.' };
+  if (it.result === 'toolarge') return { short: 'Too big for your server', why: it.error || 'Your RomM server refused this save for its size.', fix: 'Raise the upload size limit on the web server or tunnel in front of RomM, then press Sync Now. Cartridge already tried your server’s other address. Until then it doesn’t try this save again unless it changes.' };
   if (it.result === 'auth') return { short: 'RomM said no', why: it.error || 'RomM didn’t let Cartridge read or write saves.', fix: 'Sign in with your password, or pair again so Cartridge can ask for save access.' };
   return { short: 'Couldn’t sync', why: it.error || 'Something went wrong talking to RomM.', fix: 'Press Sync Now to try again.' };
 }

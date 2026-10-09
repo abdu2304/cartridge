@@ -183,4 +183,4 @@ function finish(x) {
   return o;
 }
 
-module.exports = { id: 'duckstation', files: FILES.map((f) => ({ url: RAW + f, as: f })), read };
+module.exports = { id: 'duckstation', versions: { git: 'https://github.com/stenzek/duckstation', tags: /^v0\.1-\d+$/ }, /* 0.9.63: its last releases too (gen.js) */ files: FILES.map((f) => ({ url: RAW + f, as: f })), read };

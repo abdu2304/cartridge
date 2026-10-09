@@ -61,9 +61,11 @@ const USER_CFG = `PPU-bbbb2222:
 
 function setup(name) {
   const root = path.join(TMP, name, '.config/rpcs3');
-  fs.mkdirSync(path.join(root, 'patches'), { recursive: true }); fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+  // RPCS3 on Linux: config.yml and patch_config.yml in the root (config/ is Windows only, 0.9.63)
+  fs.mkdirSync(path.join(root, 'patches'), { recursive: true });
   fs.writeFileSync(path.join(root, 'patches/patch.yml'), PATCH_YML);
-  fs.writeFileSync(path.join(root, 'config/patch_config.yml'), USER_CFG);
+  fs.writeFileSync(path.join(root, 'config.yml'), 'Video:\n  Renderer: Vulkan\n');
+  fs.writeFileSync(path.join(root, 'patch_config.yml'), USER_CFG);
   const old = process.env.XDG_CONFIG_HOME; delete process.env.XDG_CONFIG_HOME;
   try { return P.rpcs3Dirs(path.join(TMP, name))[0]; } finally { if (old !== undefined) process.env.XDG_CONFIG_HOME = old; }
 }
@@ -233,12 +235,12 @@ test('PCSX2: a game without settings gets a new file with just the patch', async
 // ---------------------------------------------------------------- RPCS3 database settings (0.9.3 L)
 test('RPCS3 database: writes the game\'s settings once, never over its own', () => {
   const root = path.join(TMP, 'rpcs3db');
-  fs.mkdirSync(path.join(root, 'config'), { recursive: true });
+  fs.mkdirSync(root, { recursive: true });
   const dir = { root };
   const DB = JSON.stringify({ return_code: 0, games: { BLUS30443: { config: 'Core:\n  SPU Block Size: Mega\n' } } });
   const a = P.rpcs3ApplyDb(dir, 'BLUS30443', DB, {});
   assert.strictEqual(a.result, 'written');
-  assert.strictEqual(fs.readFileSync(path.join(root, 'config/custom_configs/config_BLUS30443.yml'), 'utf8'), 'Core:\n  SPU Block Size: Mega\n');
+  assert.strictEqual(fs.readFileSync(path.join(root, 'custom_configs/config_BLUS30443.yml'), 'utf8'), 'Core:\n  SPU Block Size: Mega\n');
   assert.ok(a.mine.BLUS30443);
   assert.strictEqual(P.rpcs3ApplyDb(dir, 'BLUS30443', DB, a.mine).result, 'exists');
   assert.strictEqual(P.rpcs3ApplyDb(dir, 'BCUS98137', DB, {}).result, 'none');

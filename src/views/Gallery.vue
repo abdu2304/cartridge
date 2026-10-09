@@ -305,7 +305,7 @@ async function bulk(what) {
     if (!todo.length) { toast('Those are all on this device already', 'info', 2200); return; }
     const size = todo.reduce((s, r) => s + (r.fs_size_bytes || 0), 0);
     if (!(await confirm(`Download ${todo.length} game${todo.length === 1 ? '' : 's'}?`, `${bytes(size)} total`, 'Download'))) return;
-    for (const r of todo) await download(r, { checkSpace: todo.length === 1 });
+    for (const r of todo) await download(r, { checkSpace: todo.length === 1, pick: todo.length === 1 }); // 0.9.63: many at once never ask per game
   }
   if (what === 'collection' && !(await addToCollection(roms.map((r) => r.id)))) return;
   if (what === 'uncollect') {

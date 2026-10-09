@@ -50,7 +50,7 @@ const ADV = /Log|Debug|Jit|Dump|Flags|HLE|Breakpoint|Validation|Shader(Chain|Cac
 const nice = (k) => String(k).replace(/^[ibfsu](?=[A-Z])/, '').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
 const sortTabs = (order, list) => list.sort((a, b) => order.indexOf(a.tab) - order.indexOf(b.tab));
 module.exports = {
-  id: 'ppsspp',
+  id: 'ppsspp', versions: { git: 'https://github.com/hrydgard/ppsspp', tags: /^v\d+\.\d+(\.\d+)?$/ }, /* 0.9.63: its last releases too (gen.js) */
   files: [{ url: RAW + 'Core/Config.cpp', as: 'Config.cpp' }, { url: RAW + 'UI/GameSettingsScreen.cpp', as: 'GameSettingsScreen.cpp' }],
   // in the order the tabs show (Array sort is stable, so each tab keeps the source's order)
   read: (dir) => sortTabs(['Graphics', 'CPU', 'Audio', 'Controls', 'System', 'General', 'Advanced'], read(dir).map((x) => ({ ...x, l: x.l || nice(x.k), o: x.t === 'bool' ? [['True', 'On'], ['False', 'Off']] : x.o, tab: ADV.test(x.k) ? 'Advanced' : TAB[x.s] || x.s, adv: ADV.test(x.k) || undefined }))),

@@ -338,7 +338,7 @@ export function downloadFor(romId) {
   for (let i = store.downloads.length - 1; i >= 0; i--) if (store.downloads[i].romId === romId) return store.downloads[i];
   return null;
 }
-export async function download(rom, { checkSpace = true } = {}) {
+export async function download(rom, { checkSpace = true, pick = true } = {}) {
   const p = platformById(rom.platform_id);
   if (p && !p.target?.path) { toast(`Set a folder for ${p.display_name} first`, 'error'); return false; }
   // 0.9.49 (owner): Storage → Always Ask Where: with games folders on more than one drive, each download asks which
@@ -351,8 +351,19 @@ export async function download(rom, { checkSpace = true } = {}) {
       if (!root) return false;
     }
   }
-  if (checkSpace && p?.target?.path && rom.fs_size_bytes && !(await roomFor(rom, p, root))) return false;
-  await call('dl:add', { romId: rom.id, name: rom.name, platformSlug: rom.platform_slug, platformName: rom.platform_display_name, size: rom.fs_size_bytes, cover: rom.path_cover_small || rom.url_cover, root });
+  // 0.9.63 (owner: "if a ROM has multiple files ask before download which one they want, and an option to select all"):
+  // a game made of separate files side by side (a .pkg and a .zip, discs, updates) asks which; nothing starts ticked.
+  // Folder games (files in folders: a PS3 game) always come whole.
+  let only = null, size = rom.fs_size_bytes;
+  const parts = rom.files || [];
+  if (pick && parts.length > 1 && parts.length <= 60 && !parts.some((f) => f.nested)) {
+    only = await openModal('filepick', { name: rom.name, files: parts });
+    if (!only || !only.length) return false;
+    if (only.length === parts.length) only = null; // all of them: the usual whole download
+    else size = parts.filter((f) => only.includes(f.file_name)).reduce((a, f) => a + (f.size || 0), 0) || size;
+  }
+  if (checkSpace && p?.target?.path && size && !(await roomFor({ ...rom, fs_size_bytes: size }, p, root))) return false;
+  await call('dl:add', { romId: rom.id, name: rom.name, platformSlug: rom.platform_slug, platformName: rom.platform_display_name, size, cover: rom.path_cover_small || rom.url_cover, root, only });
   toast(`Downloading ${rom.name}`, 'info', 2000, 'mdiDownload');
   return true;
 }

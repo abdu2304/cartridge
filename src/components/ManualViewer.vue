@@ -65,6 +65,7 @@ onMounted(async () => {
     doc = await pdfjs.getDocument({ data: new Uint8Array(data) }).promise;
     pages.value = doc.numPages;
     await nextTick();
+    if (!scroller.value) return; // closed while the manual loaded
     io = new IntersectionObserver((es) => es.forEach((e) => e.isIntersecting && draw(Number(e.target.dataset.page))), { root: scroller.value, rootMargin: '100% 0px' });
     for (const n of Object.keys(canvases)) if (canvases[n]) io.observe(canvases[n]);
     scroller.value.focus();

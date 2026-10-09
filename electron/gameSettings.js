@@ -2,7 +2,7 @@
 // way the emulator's own per-game settings work). Each emulator keeps a per-game file layered over its
 // normal settings; Cartridge writes only that file, only the keys you change, and "Emulator's own" takes
 // a key out again. Formats and keys read from each emulator's source:
-// - RPCS3: config/custom_configs/config_<SERIAL>.yml, applied over its config.yml (Emu/System.cpp);
+// - RPCS3: custom_configs/config_<SERIAL>.yml beside its config.yml (config/ only on Windows), applied over it (Emu/System.cpp);
 //   keys from Emu/system_config.h, values as system_config_types.cpp names them
 // - PCSX2: gamesettings/<SERIAL>_<CRC>.ini (VMManager::GetGameSettingsPath), layered over PCSX2.ini;
 //   keys from Pcsx2Config.cpp ([EmuCore/GS] Renderer, upscale_multiplier; [EmuCore] ...)
@@ -250,7 +250,7 @@ const schemaOf = (ctx) => SCHEMA[ctx.emu] || { name: ctx.name || NAMES[ctx.emu] 
 // ctx: { emu, serial, crc, rpcs3Root, pcsx2: { gamesettings, root }, duckRoot, dolphin: { user, config }, ppsspp: { root, ini }, shadUser }
 function files(ctx) {
   const e = ctx.emu;
-  if (e === 'rpcs3') return { file: path.join(ctx.rpcs3Root, 'config', 'custom_configs', `config_${ctx.serial}.yml`), base: [path.join(ctx.rpcs3Root, 'config', 'config.yml'), path.join(ctx.rpcs3Root, 'config.yml')], kind: 'yml' };
+  if (e === 'rpcs3') { const c = require('./patches').rpcs3CfgDir(ctx.rpcs3Root); return { file: path.join(c, 'custom_configs', `config_${ctx.serial}.yml`), base: [path.join(c, 'config.yml')], kind: 'yml' }; } // 0.9.63: config/ only on Windows
   if (e === 'pcsx2') return { file: path.join(ctx.pcsx2.gamesettings, ctx.serial ? `${ctx.serial}_${ctx.crc}.ini` : `${ctx.crc}.ini`), base: [path.join(ctx.pcsx2.root, 'inis', 'PCSX2.ini')], kind: 'ini' };
   if (e === 'duckstation') return { file: path.join(ctx.duckRoot, 'gamesettings', `${ctx.serial}.ini`), base: [path.join(ctx.duckRoot, 'settings.ini')], kind: 'ini' };
   if (e === 'dolphin') return { file: path.join(ctx.dolphin.user, 'GameSettings', `${ctx.serial}.ini`), base: [path.join(ctx.dolphin.config, 'GFX.ini'), path.join(ctx.dolphin.config, 'Dolphin.ini')], kind: 'ini', dolphin: true };
@@ -361,12 +361,44 @@ function moreItems(ctx, F, known) {
   }
   return out;
 }
+// 0.9.63 (owner: Eden 0.2.0 has Fast, Balanced and Accurate where the newest Eden has Fast and Accurate, so 1 meant
+// Balanced): the settings of the release you have. db.versions[emu] holds, per release tag, what differs from the
+// newest source (gen.js). A version newer than every release reads as the newest; one within them takes the latest
+// release not newer than it; an unknown version (or one older than every release read) leaves each setting that
+// differs between releases locked: shown, but changed only in the emulator itself, never guessed.
+const vnum = (v) => { const s = String(v || '').replace(/^mame0(\d+)$/i, '0.$1'); return /^build /i.test(s) ? null : (s.match(/\d+/g) || []).map(Number); };
+const vcmp = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] || 0) - (b[i] || 0); if (d) return d; } return 0; };
+function pickRelease(tags, version) {
+  const v = vnum(version); if (!v || !v.length) return null;
+  const sorted = tags.map((t) => [t, vnum(t)]).filter(([, n]) => n && n.length).sort((a, b) => vcmp(a[1], b[1]));
+  if (!sorted.length) return null;
+  if (vcmp(v, sorted[sorted.length - 1][1]) > 0) return 'newest';
+  let got = null; for (const [t, n] of sorted) if (vcmp(n, v) <= 0) got = t;
+  return got; // null: older than every release read
+}
+function listFor(emu, version) {
+  const base = db()[emu], V = db().versions?.[emu];
+  if (!Array.isArray(base) || !V || !V.tags?.length) return { list: base, locked: null, release: null };
+  const rel = pickRelease(V.tags, version);
+  if (rel === 'newest') return { list: base, locked: null, release: 'newest' };
+  if (rel) {
+    const d = V.diff[rel] || {}, out = [];
+    for (const x of base) { const c = d[x.s + '|' + x.k]; if (c === 0) continue; out.push(c ? { ...x, ...c } : x); }
+    for (const c of Object.values(d)) if (c && c.gone) { const { gone, ...x } = c; out.push(x); }
+    return { list: out, locked: null, release: rel };
+  }
+  const locked = new Set(); for (const t of V.tags) for (const k of Object.keys(V.diff[t] || {})) locked.add(k.replace('|', '.'));
+  return { list: base, locked, release: null };
+}
 const itemsOf = (ctx, F) => {
-  const S = schemaOf(ctx), list = (F.list || db()[ctx.emu] || []).filter((x) => !x.os || x.os === (ctx.os || 'linux')); // Xenia: Windows-only settings only for its Windows build
+  const LF = !F.list && db()[ctx.emu] ? listFor(ctx.emu, ctx.emuVersion) : null;
+  const S = schemaOf(ctx), list = (F.list || LF?.list || db()[ctx.emu] || []).filter((x) => !x.os || x.os === (ctx.os || 'linux')); // Xenia: Windows-only settings only for its Windows build
   const byId = Object.fromEntries(list.map((x) => [x.s + '.' + x.k, x]));
   // a hand-picked setting keeps its own name and choices, and takes the rest (tab, default, range, description) from the source
   const picked = S.items.map((it) => { const x = byId[it.id]; if (!x) return it; const f = itemOf(x); return { ...f, ...it, tab: it.tab || f.tab, def: it.def ?? f.def, desc: it.desc || f.desc, num: it.num || (it.options?.length ? null : f.num) }; });
-  return [...picked, ...(list.length ? dbItems(ctx.emu, S.items.map((x) => x.id), list) : moreItems(ctx, F, S.items.map((x) => x.id)))];
+  const all = [...picked, ...(list.length ? dbItems(ctx.emu, S.items.map((x) => x.id), list) : moreItems(ctx, F, S.items.map((x) => x.id)))];
+  if (LF?.locked) for (const it of all) if (LF.locked.has(it.id)) it.locked = true;
+  return all;
 };
 // what the screen shows: each setting with the game's value (or none) and the emulator's own
 function describeOne(ctx) {
@@ -382,12 +414,13 @@ function describeOne(ctx) {
     for (const t of bases) { base = F.kind === 'cemu' && !it.base ? undefined : getIn(F.kind, t, bSec, bKey, true, F); if (base !== undefined) break; }
     if (base === undefined && it.def != null) base = it.def; // not in its file: the emulator's own default
     const opts = it.type === 'bool' ? [[it.on, 'On'], [it.off, 'Off']] : (it.options || []).map((o) => (Array.isArray(o) ? o : [o, o]));
-    return { id: it.id, tab: it.tab || (/^(Video|EmuCore\/GS|GPU|Graphics|Video_\w+)$/.test(sec) ? 'Graphics' : 'System'), label: it.label, sub: it.sub || '', desc: it.desc || '', options: opts.map(([v, l]) => ({ value: v, label: l })), game: game ?? null, base: base ?? null, type: it.type || 'choice', num: it.num || null, group: it.group || null };
+    return { id: it.id, tab: it.tab || (/^(Video|EmuCore\/GS|GPU|Graphics|Video_\w+)$/.test(sec) ? 'Graphics' : 'System'), label: it.label, sub: it.sub || '', desc: it.desc || '', options: opts.map(([v, l]) => ({ value: v, label: l })), game: game ?? null, base: base ?? null, type: it.type || 'choice', num: it.num || null, group: it.group || null, locked: it.locked || undefined };
   });
   // tabs in the emulator's own order with Advanced last (0.9.62), the hand-picked settings first in each
   const order = F.list ? ordered(F.list.map(tabOf)) : db()[ctx.emu] ? tabOrder(ctx.emu) : null;
   if (order) { const r = (x) => { const i = order.indexOf(x.tab); return i < 0 ? 98 : i; }; items.sort((a, b) => r(a) - r(b)); }
-  return { emu: ctx.emu, name: S.name, file: F.file, exists: own != null, items };
+  const LF = !F.list && db()[ctx.emu] ? listFor(ctx.emu, ctx.emuVersion) : null;
+  return { emu: ctx.emu, name: S.name, file: F.file, exists: own != null, items, version: ctx.emuVersion || null, release: LF?.release || null, versionUnknown: !!LF?.locked };
 }
 // PPSSPP's game file is a full copy, so only the keys Cartridge set count as "this game's" (the rest
 // came from your normal settings when the file was made); records in game-settings.json
@@ -410,6 +443,7 @@ function applyOne(ctx, changes) {
   for (const c of changes) {
     const it = all.find((x) => x.id === c.id);
     if (!it) continue;
+    if (it.locked && c.value != null) throw new Error(`${it.label}: its choices differ between ${S.name} versions and Cartridge couldn’t tell which you have, so change it in ${S.name} itself.`);
     const [sec, key] = it.sec != null ? [it.sec, it.key] : split(it.id);
     let value = c.value == null ? undefined : String(c.value);
     // a typed number (0.9.29): any value in the emulator's own range
@@ -458,4 +492,4 @@ function apply(ctx, changes) {
   if (theirs.length) applyOne({ ...ctx, emu: 'racore' }, theirs);
   return describe(ctx);
 }
-module.exports = { SCHEMA, describe, apply, files, iniGet, iniPut, ymlPut, ymlGet, setRecsFile: (f) => { recsFile = f; } };
+module.exports = { pickRelease, listFor, SCHEMA, describe, apply, files, iniGet, iniPut, ymlPut, ymlGet, setRecsFile: (f) => { recsFile = f; } };

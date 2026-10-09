@@ -8,7 +8,7 @@
       </div>
     </div>
 
-    <div v-if="!props.page" class="st-tabs-row"><Btn b="LB" /><div class="seg st-tabs">
+    <div v-if="!props.page" class="st-tabs-row"><Btn b="LB" /><div class="seg strip st-tabs">
       <button v-for="t in TABS_ALL" :key="t.v" data-focus :data-key="'st-' + t.v" :class="{ on: view === t.v }" @click="setView(t.v)">{{ t.l }}</button>
     </div><Btn b="RB" /></div>
 
@@ -320,7 +320,7 @@ async function toggleService() {
 .st-hero h1 { margin: 0 0 4px; }
 .st-hero-txt { flex: 1; min-width: 0; }
 .st-hero p { margin: 0; max-width: 120ch; line-height: 1.45; } /* 0.9.32 (owner): uses the width, not three squeezed lines */
-.st-tabs-row { display: flex; align-items: center; gap: 10px; align-self: flex-start; }
+.st-tabs-row { display: flex; align-items: center; gap: 10px; align-self: flex-start; max-width: 100%; min-width: 0; }
 .st-card { display: flex; flex-direction: column; gap: var(--s-2); padding: var(--s-4); border-radius: var(--r-lg); background: var(--s1); }
 .st-card > b { font-family: var(--display); font-size: var(--t-lg); }
 .st-card p { margin: 0; line-height: 1.45; }

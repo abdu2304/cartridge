@@ -193,4 +193,4 @@ function tabOf(x) {
   return o;
 }
 
-module.exports = { id: 'rpcs3', files: FILES.map((f) => ({ url: RAW + f, as: f })), read };
+module.exports = { id: 'rpcs3', versions: { git: 'https://github.com/RPCS3/rpcs3', tags: /^v0\.0\.\d{2,}$/ }, /* 0.9.63: its last releases too (gen.js) */ files: FILES.map((f) => ({ url: RAW + f, as: f })), read };

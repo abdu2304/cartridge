@@ -137,6 +137,7 @@ const fromKey = (k) => k.replace(/_index$/, '').replace(/_/g, ' ').replace(/^./,
 const HIDDEN_ADV = /^(bg_(red|green|blue)|post_shader_(chain|preset)|frame_gen_dump_flow|debug_knobs|disable_buffer_reorder)$/;
 module.exports = {
   id: 'eden',
+  versions: { git: 'https://git.eden-emu.dev/eden-emu/eden', tags: /^v\d+\.\d+\.\d+$/ }, // 0.9.63: its last releases too (gen.js)
   files: [
     { url: RAW + 'common/settings.h', as: 'settings.h' },
     { url: RAW + 'common/settings_enums.h', as: 'settings_enums.h' },

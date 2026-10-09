@@ -77,11 +77,42 @@ const sfoAt = (f) => { try { return parseSfo(fs.readFileSync(f)); } catch { retu
 // fs::get_config_dir(): ~/.config/rpcs3 (or the Flatpak's). patches/ holds patch.yml (RPCS3's
 // download), imported_patch.yml and <serial>_patch.yml; the switches are config/patch_config.yml
 // (older RPCS3: patch_config.yml next to patches/). bin_patch.cpp, patch_engine.
+// 0.9.63 (owner: Infamous's settings did nothing): where RPCS3 keeps its settings. fs::get_config_dir(true) adds a
+// "config/" folder only on Windows (Utilities/File.cpp); on Linux config.yml, custom_configs/ and patch_config.yml sit
+// in the root itself (~/.config/rpcs3, the Flatpak's, or portable/). Cartridge wrote custom_configs and patch_config.yml
+// under config/ when they didn't exist yet, where Linux RPCS3 never reads them. A root laid out the Windows way
+// (config/config.yml and no config.yml beside it: RPCS3 for Windows) keeps config/.
+function rpcs3CfgDir(root) { return !exists(path.join(root, 'config.yml')) && exists(path.join(root, 'config', 'config.yml')) ? path.join(root, 'config') : root; }
 function rpcs3Dirs(home = os.homedir()) {
   const xdg = process.env.XDG_CONFIG_HOME || path.join(home, '.config');
   return [path.join(xdg, 'rpcs3'), path.join(home, '.var/app/net.rpcs3.RPCS3/config/rpcs3')]
-    .filter((d) => exists(path.join(d, 'patches')) || exists(path.join(d, 'config')))
-    .map((root) => ({ root, patches: path.join(root, 'patches'), config: exists(path.join(root, 'patch_config.yml')) && !exists(path.join(root, 'config', 'patch_config.yml')) ? path.join(root, 'patch_config.yml') : path.join(root, 'config', 'patch_config.yml') }));
+    .filter((d) => exists(path.join(d, 'patches')) || exists(path.join(d, 'config')) || exists(path.join(d, 'config.yml')))
+    .map((root) => ({ root, cfg: rpcs3CfgDir(root), patches: path.join(root, 'patches'), config: path.join(rpcs3CfgDir(root), 'patch_config.yml') }));
+}
+// Files an earlier Cartridge put under config/ on Linux, moved to where RPCS3 reads them: per-game settings
+// (custom_configs/config_<SERIAL>.yml) only when RPCS3 has none for that game (yours are never replaced), and the
+// patch switches merged into patch_config.yml (RPCS3's own switches win where both set one). Returns what moved,
+// as [from, to], so the records that name the old paths can follow.
+function rpcs3Relocate(dir) {
+  const moved = [];
+  if (dir.cfg !== dir.root) return moved;
+  const oldDir = path.join(dir.root, 'config', 'custom_configs'), newDir = path.join(dir.cfg, 'custom_configs');
+  for (const n of (() => { try { return fs.readdirSync(oldDir); } catch { return []; } })()) {
+    if (!/^config_.+\.yml$/.test(n)) continue;
+    const from = path.join(oldDir, n), to = path.join(newDir, n);
+    if (exists(to)) continue; // RPCS3's own settings for the game: left as they are, ours stay where they were
+    try { load(fs.readFileSync(from, 'utf8')); } catch { continue; } // only a file RPCS3 can read
+    fs.mkdirSync(newDir, { recursive: true }); fs.copyFileSync(from, to); fs.rmSync(from); moved.push([from, to]);
+  }
+  const oldPc = path.join(dir.root, 'config', 'patch_config.yml'), newPc = path.join(dir.cfg, 'patch_config.yml');
+  if (exists(oldPc)) {
+    const merge = (a, b) => { for (const [k, v] of Object.entries(b)) { if (v && typeof v === 'object' && a[k] && typeof a[k] === 'object') merge(a[k], v); else if (!(k in a)) a[k] = v; } return a; };
+    const mineCfg = readYaml(oldPc), theirs = exists(newPc) ? readYaml(newPc) : {};
+    if (exists(newPc) && !exists(newPc + '.cartridge-backup')) fs.copyFileSync(newPc, newPc + '.cartridge-backup');
+    fs.writeFileSync(newPc + '.tmp', dump(merge(theirs, mineCfg))); fs.renameSync(newPc + '.tmp', newPc);
+    fs.renameSync(oldPc, oldPc + '.cartridge-moved'); moved.push([oldPc, newPc]);
+  }
+  return moved;
 }
 // The game's serial and app version (APP_VER): an installed update in dev_hdd0 wins over the disc
 function ps3Version(gameDir, hdds, serial) {
@@ -341,8 +372,10 @@ function pcsx2GameList(cacheDir) {
 function pcsx2Game(dir, file) {
   const list = pcsx2GameList(dir.cache);
   const real = (f) => { try { return fs.realpathSync(f); } catch { return f; } };
-  const want = real(file);
-  const hit = list.find((g) => real(g.path) === want) || list.find((g) => path.basename(g.path) === path.basename(file));
+  // 0.9.63 (owner: PCSX2's game settings took long to open): the path as written first, then only same-named entries
+  // are resolved (every entry of a big game list was looked up on disk, each time)
+  const want = real(file), base = path.basename(file), named = list.filter((g) => path.basename(g.path) === base);
+  const hit = list.find((g) => g.path === file || g.path === want) || named.find((g) => real(g.path) === want) || named[0];
   return hit && hit.crc ? { serial: hit.serial, crc: hit.crc } : null;
 }
 // One file from a plain ISO9660 image (a PS3 disc's PS3_GAME/PARAM.SFO), or null
@@ -502,7 +535,7 @@ function rpcs3DbFromText(text, serial) {
   const c = j && j.games && j.games[serial] && j.games[serial].config;
   return typeof c === 'string' && c.trim() ? c : null;
 }
-function rpcs3CustomPath(dir, serial) { return path.join(dir.root, 'config', 'custom_configs', `config_${serial}.yml`); }
+function rpcs3CustomPath(dir, serial) { return path.join(dir.cfg || rpcs3CfgDir(dir.root), 'custom_configs', `config_${serial}.yml`); }
 function rpcs3DbCached(dir) { try { return fs.readFileSync(path.join(dir.root, 'GuiConfigs', 'config_database.dat'), 'utf8'); } catch { return null; } }
 // returns 'written', 'exists' (the game has its own settings already) or 'none' (not in the database)
 function rpcs3ApplyDb(dir, serial, dbText, mine = {}) {
@@ -517,4 +550,32 @@ function rpcs3ApplyDb(dir, serial, dbText, mine = {}) {
   return { result: 'written', mine: { ...mine, [serial]: { at: Date.now(), file: f } } };
 }
 
-module.exports = { loosePatchYaml, readPatchFile, rpcs3DownloadPatches, isoFile, rpcs3DbFromText, rpcs3CustomPath, rpcs3DbCached, rpcs3ApplyDb, parseSfo, sfoAt, rpcs3Dirs, ps3Version, rpcs3List, rpcs3Set, shadDirs, ps4Version, shadList, shadSet, shadDownloadPatches, SHAD_REPOS, load, dump, pcsx2Dirs, pcsx2GameList, pcsx2Game, ps2IsoInfo, pcsx2ZipSources, pcsx2ZipBuffer, pnachList, pcsx2List, pcsx2Set, crcHex };
+// RPCS3's own config.yml checked (0.9.63, owner: "Failed to load global config ... illegal map value" at line 277).
+// Older EmuDeck scripts set the resolution with a line edit that could join two lines: "Write Depth Buffer:
+// falseResolution Scale: = 150". Today's EmuDeck removes that text with sed 's|Resolution Scale: = [0-9]*$||'; the
+// Repair does the same, and only that. -> null (reads fine) or { file, line, text, known }
+function rpcs3ConfigCheck(dir) {
+  const f = path.join(dir.cfg || rpcs3CfgDir(dir.root), 'config.yml');
+  let text; try { text = fs.readFileSync(f, 'utf8'); } catch { return null; }
+  try { yaml.load(text, { schema: yaml.FAILSAFE_SCHEMA }); return null; } catch (e) {
+    const lines = text.split('\n'), bad = lines.findIndex((l) => /Resolution Scale: = \d*\s*$/.test(l));
+    const at = bad >= 0 ? bad : Math.max(0, (e.mark?.line ?? 0));
+    return { file: f, line: at + 1, text: (lines[at] || '').trim().slice(0, 120), known: bad >= 0 };
+  }
+}
+// the known damage only: a backup first, the text EmuDeck itself removes, then the file must read cleanly, else the
+// backup goes back and nothing changed. -> { ok, backup } or throws with why
+function rpcs3ConfigRepair(dir) {
+  const c = rpcs3ConfigCheck(dir);
+  if (!c) return { ok: true, already: true };
+  if (!c.known) throw new Error(`RPCS3's settings file has a problem Cartridge doesn't know how to repair safely (line ${c.line}: ${c.text}). Open it in a text editor, or let RPCS3 make a new one by renaming it.`);
+  const before = fs.readFileSync(c.file, 'utf8');
+  const backup = c.file + '.cartridge-backup-' + new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+  fs.copyFileSync(c.file, backup);
+  const after = before.split('\n').map((l) => l.replace(/Resolution Scale: = [0-9]*\s*$/, '')).join('\n');
+  try { yaml.load(after, { schema: yaml.FAILSAFE_SCHEMA }); } catch (e) { throw new Error(`The repair didn't make the file readable (${String(e.reason || e.message).slice(0, 80)}), so nothing was changed.`); }
+  fs.writeFileSync(c.file + '.tmp', after); fs.renameSync(c.file + '.tmp', c.file);
+  if (rpcs3ConfigCheck(dir)) { fs.copyFileSync(backup, c.file); throw new Error('The repaired file still didn’t read cleanly, so the original was put back.'); }
+  return { ok: true, backup };
+}
+module.exports = { rpcs3ConfigCheck, rpcs3ConfigRepair, rpcs3CfgDir, rpcs3Relocate, loosePatchYaml, readPatchFile, rpcs3DownloadPatches, isoFile, rpcs3DbFromText, rpcs3CustomPath, rpcs3DbCached, rpcs3ApplyDb, parseSfo, sfoAt, rpcs3Dirs, ps3Version, rpcs3List, rpcs3Set, shadDirs, ps4Version, shadList, shadSet, shadDownloadPatches, SHAD_REPOS, load, dump, pcsx2Dirs, pcsx2GameList, pcsx2Game, ps2IsoInfo, pcsx2ZipSources, pcsx2ZipBuffer, pnachList, pcsx2List, pcsx2Set, crcHex };

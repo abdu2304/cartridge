@@ -195,31 +195,34 @@ module.exports = function createTrophyService(ctx) {
     }
     const changed = known && [...now].some((k) => !known.has(k));
     known = now;
-    lastPoll = pollSig();
+    lastPoll = await pollSigAsync().catch(() => '');
     broadcast('trophies', { changed: true });
     if (changed || !syncState.at) queueSync(changed ? 3000 : 8000);
   }
   // Polling is a handful of stat calls: each unlock file plus each root folder
-  function pollSig() {
-    const parts = [];
-    for (const id of ORDER) {
-      if (srcCfg(id).enabled === false) continue;
-      for (const { dir } of dirsOf(id)) {
-        try { parts.push(fs.statSync(dir).mtimeMs); } catch {}
-        for (const n of safeLs(dir)) { try { parts.push(fs.statSync(path.join(dir, n)).mtimeMs); } catch {} }
-      }
-    }
-    for (const g of games.values()) for (const f of g.files) { try { const s = fs.statSync(f); parts.push(s.mtimeMs, s.size); } catch {} }
+  const safeLs = (d) => { try { return fs.readdirSync(d).slice(0, 400); } catch { return []; } };
+  // 0.9.63 (owner's log: a ~600 ms stall every minute): the same signature, read without holding the main thread
+  // (hundreds of stat calls every 8 s, on an external drive). Folders found once a minute, files stat'd in parallel.
+  let dirsAt = 0, dirsMemo = [];
+  async function pollSigAsync() {
+    const P = fs.promises, st = (f) => P.stat(f).catch(() => null);
+    if (Date.now() - dirsAt > 60000) { dirsAt = Date.now(); dirsMemo = ORDER.filter((id) => srcCfg(id).enabled !== false).flatMap((id) => dirsOf(id)); }
+    const files = [];
+    for (const { dir } of dirsMemo) { files.push(dir); for (const n of await P.readdir(dir).then((x) => x.slice(0, 400), () => [])) files.push(path.join(dir, n)); }
+    const parts = (await Promise.all(files.map(st))).map((s) => (s ? s.mtimeMs : null)).filter((x) => x != null);
+    for (const s of await Promise.all([...games.values()].flatMap((g) => g.files).map(st))) if (s) parts.push(s.mtimeMs, s.size);
     return parts.join(',');
   }
-  const safeLs = (d) => { try { return fs.readdirSync(d).slice(0, 400); } catch { return []; } };
+  let polling = false;
   function startPolling() {
     clearInterval(pollT);
     let n = 0;
     pollT = setInterval(() => {
       // CAE governor (0.9.47): while a game is in front, every 32 s instead of 8 (it stats every trophy file)
       if (ctx.busy?.() && n++ % 4) return;
-      try { const s = pollSig(); if (s !== lastPoll) refresh().catch(() => {}); } catch {}
+      if (polling) return;
+      polling = true;
+      pollSigAsync().then((s) => { if (s !== lastPoll) refresh().catch(() => {}); }).catch(() => {}).finally(() => { polling = false; });
     }, 8000);
   }
 

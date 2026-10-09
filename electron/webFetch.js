@@ -50,7 +50,7 @@ async function webFetch(url, opts = {}) {
   if (r && !BLOCKED.has(r.status)) return r;
   if (err && opts.signal?.aborted) throw err;
   // only plain GETs can be handed to a window
-  if ((opts.method || 'GET').toUpperCase() !== 'GET') { if (r) return r; throw err; }
+  if ((opts.method || 'GET').toUpperCase() !== 'GET') { if (r) return r; throw named(err, url); }
   const headers = opts.headers instanceof Headers ? Object.fromEntries(opts.headers) : (opts.headers || {});
   if (!r || looksChecked(r)) { // a rate limit (GitHub's API) is not a check: its own fallbacks handle it
     const text = await viaWindow(url, headers);
@@ -59,7 +59,14 @@ async function webFetch(url, opts = {}) {
     if (text != null && text !== '') return new Response(text, { status: 200, headers: { 'content-type': /^\s*[[{]/.test(text) ? 'application/json' : 'text/plain' } });
   }
   if (r) return r;
-  throw err;
+  throw named(err, url);
+}
+// 0.9.63: a network failure names the site ("objects.githubusercontent.com couldn't be reached (ERR_ADDRESS_UNREACHABLE)")
+function named(err, url) {
+  let host = ''; try { host = new URL(url).host; } catch {}
+  const m = String(err?.message || err);
+  if (!host || m.includes(host) || !/ERR_|ENOTFOUND|EAI_AGAIN|ECONN|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|fetch failed/.test(m)) return err;
+  return Object.assign(new Error(`${host} couldn’t be reached (${m.replace(/^net::/, '')})`), { cause: err, code: err?.code });
 }
 module.exports = webFetch;
 module.exports.viaWindow = (u, h) => (electron ? viaWindow(u, h) : Promise.resolve(null));

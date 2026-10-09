@@ -355,3 +355,39 @@ test('Dolphin saves match a GameCube or Wii game by the ID read from the game or
   S.match(saves, games);
   assert.deepStrictEqual(saves.map((s) => s.romIds[0]), [1, 2]);
 });
+
+test('a save is hashed without blocking, the same as before, and an unchanged file is never read again (0.9.63)', async () => {
+  const d = tmp();
+  put(d, 'a/SAVE.BIN', 'one'); put(d, 'a/sub/B.DAT', 'two');
+  const u = { kind: 'dir', path: path.join(d, 'a') };
+  const cache = {};
+  assert.strictEqual(await SS.hashUnitAsync(u, cache), SS.hashUnit(u));
+  assert.strictEqual(Object.keys(cache).length, 2);
+  // nothing changed: nothing is read again
+  const real = fs.promises.readFile; let reads = 0;
+  fs.promises.readFile = (...a) => { reads++; return real(...a); };
+  try { await SS.hashUnitAsync(u, cache); } finally { fs.promises.readFile = real; }
+  assert.strictEqual(reads, 0);
+  const f = path.join(d, 'a/SAVE.BIN');
+  // a real change (new date) is read and replaces its old entry
+  fs.writeFileSync(f, 'three');
+  assert.strictEqual(await SS.hashUnitAsync(u, cache), SS.hashUnit(u));
+  assert.strictEqual(Object.keys(cache).length, 2);
+});
+
+test('a save refused for its size (413) goes through the server’s other address, which is remembered (0.9.63)', async () => {
+  const seen = [];
+  const fetchImpl = async (url, init) => { seen.push(String(url).split('/api')[0]); return String(url).startsWith('http://away') ? new Response(JSON.stringify({ id: 7, content_hash: 'h' }), { status: 200 }) : new Response('too large', { status: 413 }); };
+  let kept = null;
+  const rpc = SS.rommRpc({ base: async () => 'http://home', headers: () => ({}), fetchImpl, altBases: async () => ['http://home', 'http://away'], largeBase: () => kept, onLarge: (b) => { kept = b; } });
+  const r = await rpc.upload({ romId: 1, emu: 'ppsspp', slot: 's' }, Buffer.alloc(2e6), 'x.zip', { hash: 'h' });
+  assert.strictEqual(r.id, 7);
+  assert.deepStrictEqual(seen, ['http://home', 'http://away']);
+  assert.strictEqual(kept, 'http://away');
+  // next time a big save goes straight there
+  seen.length = 0; await rpc.upload({ romId: 1, emu: 'ppsspp', slot: 's' }, Buffer.alloc(2e6), 'x.zip', { hash: 'h' });
+  assert.deepStrictEqual(seen, ['http://away']);
+  // refused everywhere: a plain error with the size
+  const none = SS.rommRpc({ base: async () => 'http://home', headers: () => ({}), fetchImpl: async () => new Response('', { status: 413 }), altBases: async () => ['http://home', 'http://away2'] });
+  await assert.rejects(none.upload({ romId: 1, emu: 'ppsspp', slot: 's' }, Buffer.alloc(3 * 1048576), 'x.zip', {}), (e) => e.code === 'toolarge' && /3\.0 MB/.test(e.message));
+});

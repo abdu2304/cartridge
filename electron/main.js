@@ -182,7 +182,7 @@ function watchGameRun(romId) {
     }
     return false;
   };
-  let seen = false, started = Date.now(), seenAt = 0, asked = false;
+  let seen = false, started = Date.now(), seenAt = 0, asked = false, copiedAt = 0;
   const vita = /psvita|vita/i.test(`${r.platform_slug} ${r.platform_fs_slug}`);
   broadcast('game-run', { state: 'starting', romId });
   runT = setInterval(() => {
@@ -192,6 +192,9 @@ function watchGameRun(romId) {
     // gets Vita3K's own reason (its log, or the title not being in its storage) instead of silence
     if (vita && !asked && ((!on && !seen && Date.now() - started > 20000) || (!on && seen && Date.now() - seenAt < 15000))) { asked = true; vitaQuickExit(romId, serial); }
     if (!on && !seen && Date.now() - started > 180000) { clearInterval(runT); return; } // never seen: give up after 3 min
+    // 0.9.63 (owner: the system froze in a Vita game and had to be forced off): Vita3K's log is copied every 30 s
+    // while its game runs, so a freeze that takes everything down still leaves the last of it (emulator-runs/)
+    if (vita && on && Date.now() - (copiedAt || 0) > 30000) { copiedAt = Date.now(); keepEmuLog('vita3k', require('./pkgInstall').vita3kLogFile(steamMgr.vita3kCommand?.()?.exe)); }
     if (!on && seen) {
       clearInterval(runT); runOn = false; gameFocus.endedAt = Date.now(); log('game ended', romId);
       broadcast('game-run', { state: 'ended', romId });
@@ -1632,6 +1635,12 @@ async function rateWait(n) {
 // (owner: 70 MB/s fell to 7). The speed limit is shared between the downloads running at once.
 let dlWorkersOk = true;
 // opts.plain: a download that isn't from RomM (PS3 updates from Sony): RomM's sign-in never goes along
+// 0.9.63 (owner's log: "net::ERR_ADDRESS_UNREACHABLE" with no site named): a network failure says which site it was
+const NET_RE = /ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|EHOSTUNREACH|ENETUNREACH|ETIMEDOUT|fetch failed|ERR_(NAME_NOT_RESOLVED|INTERNET_DISCONNECTED|CONNECTION_\w+|ADDRESS_UNREACHABLE|TIMED_OUT|NETWORK_CHANGED)|socket hang up/;
+function siteWhy(msg, url) {
+  let host = ''; try { host = new URL(url).host; } catch {}
+  return host && NET_RE.test(String(msg)) && !String(msg).includes(host) ? `${host} couldn’t be reached (${String(msg).replace(/^net::/, '')})` : String(msg);
+}
 async function downloadTo(url, dest, it, onBytes, opts = {}) {
   if (!dlWorkersOk) return downloadHere(url, dest, it, onBytes, opts);
   const part = dest + '.part';
@@ -1663,7 +1672,7 @@ async function downloadTo(url, dest, it, onBytes, opts = {}) {
       else if (m.type === 'bytes') onBytes(m.n);
       else if (m.type === 'restart') end(resolve, 'restart');
       else if (m.type === 'done') { if (m.bytes > 64 << 20) log('downloaded', path.basename(dest), Math.round(m.bytes / 1048576) + ' MB at', (m.bytes / 1048576 / Math.max(0.001, m.ms / 1000)).toFixed(1) + ' MB/s'); end(resolve, 'done'); }
-      else if (m.type === 'error') end(reject, Object.assign(new Error(m.message), m.message === 'aborted' ? { name: 'AbortError' } : {}));
+      else if (m.type === 'error') end(reject, Object.assign(new Error(opts.plain ? siteWhy(m.message, url) : m.message), m.message === 'aborted' ? { name: 'AbortError' } : {}));
     };
     const onErr = (e) => end(reject, e);
     const onExit = () => end(reject, Object.assign(new Error(it.abort.signal.aborted ? 'aborted' : 'Download stopped'), it.abort.signal.aborted ? { name: 'AbortError' } : {}));
@@ -1807,7 +1816,9 @@ async function runJob(it) {
     const target = downloadDir({ slug: rom.platform_slug, fs_slug: rom.platform_fs_slug }, rom.fs_size_bytes || 0, it.root || null); // 0.9.38: any drive; 0.9.49: the one asked for
     if (!target) throw new Error('No folder set for this platform. Set it in Settings.');
     await fsp.mkdir(target, { recursive: true });
-    const files = (rom.files || []).slice().sort((a, b) => a.full_path.localeCompare(b.full_path));
+    // 0.9.63 (owner: a game with several files asks which to download): only the files picked, when some were
+    let files = (rom.files || []).slice().sort((a, b) => a.full_path.localeCompare(b.full_path));
+    if (Array.isArray(it.only) && it.only.length && files.length > 1) { const want = new Set(it.only); const picked = files.filter((f) => want.has(f.file_name)); if (picked.length) files = picked; }
     const romPrefix = rom.full_path + '/';
     it.total = files.reduce((s, f) => s + (f.file_size_bytes || 0), 0) || rom.fs_size_bytes || 0;
     it.received = 0;
@@ -1821,7 +1832,7 @@ async function runJob(it) {
     };
 
     let finalPath;
-    const single = files.length <= 1 && (rom.has_simple_single_file || (config.downloads.flattenSingleFile && rom.has_nested_single_file) || files.length === 0);
+    const single = files.length <= 1 && !(Array.isArray(it.only) && it.only.length) && (rom.has_simple_single_file || (config.downloads.flattenSingleFile && rom.has_nested_single_file) || files.length === 0);
     if (single) {
       const fname = files[0]?.file_name || rom.fs_name;
       finalPath = path.join(target, fname);
@@ -2376,7 +2387,7 @@ async function pumpEmuGet() {
   const off = (m) => { if (m.key === q.key && m.id === q.id && m.pct != null) { q.pct = m.pct; broadcast('emuget-state', emuGetQ); } };
   emuGetListeners.add(off);
   try { const r = await handlers['emuget:install']({ key: q.key, id: q.id }); q.state = 'done'; q.where = r?.path || r?.fp || ''; q.relinked = r?.relinked || 0; q.links = r?.links || 0; q.note = r?.note || (r?.shadVersion ? `With shadPS4 ${r.shadVersion} as its default` : ''); }
-  catch (e) { q.state = 'error'; q.error = e.message; }
+  catch (e) { q.state = 'error'; q.error = e.message; log('emulator install failed', q.key, q.id, '|', e.message); }
   emuGetListeners.delete(off);
   broadcast('emuget-state', emuGetQ);
   pumpEmuGet();
@@ -2589,22 +2600,40 @@ function ssGames() {
   return list;
 }
 // RomM's saves API (electron/saveSync.js rommRpc, tested against a fake RomM server)
-const ssRpc = (devId) => require('./saveSync').rommRpc({ base: resolveBase, headers: authHeaders, devId });
+const ssRpc = (devId) => require('./saveSync').rommRpc({ base: resolveBase, headers: authHeaders, devId,
+  // 0.9.63: a save refused for its size (413) is tried on the server's other address; the one that takes it is kept
+  altBases: async () => [config.server.localUrl, config.server.remoteUrl].map(trimUrl).filter(Boolean),
+  largeBase: () => { const b = ssData.largeBase; return b && [config.server.localUrl, config.server.remoteUrl].map(trimUrl).includes(b) ? b : null; },
+  onLarge: (b) => { if (ssData.largeBase !== b) { ssData.largeBase = b; saveJson(SAVESYNC_FILE, ssData, false); log('save sync: big saves go through', b); } } });
 // a game's saves: its own, plus the whole memory card of its console
 // a game's RomM console slugs, so a save is only filed under or shown for a game of its own console (0.9.60)
 const ssSlugsOf = (id) => { const r = romIndexMain().get(Number(id)); return r ? [r.platform_slug, r.platform_fs_slug] : null; };
 const ssFor = (u, romId) => { if (romId == null) return true; if (u.romId === romId) return true; const r = romIndexMain().get(romId); return u.card && require('./saveSync').CONSOLE[u.emu] === ssConsoleOf(r); };
 let upAll = null; // Update All while it runs (0.9.58)
 let ssBusy = null, ssProg = null; // ssProg: how far the running sync is, for a page that opens while it runs
+// 0.9.63: each save file's md5 by path, size and date (saveSync.hashUnitAsync), so a sync only reads what changed
+const SAVE_HASHES_FILE = path.join(USER_DATA, 'save-hashes.json');
+let ssHashes = null;
+const breathe = () => new Promise((ok) => setImmediate(ok)); // lets the window draw and take input between pieces of work
+// how long each step of a slow job took, logged only when one held things up (owner's log: find stalls by name)
+function slowSteps(name, t) { const parts = Object.entries(t).filter(([, ms]) => ms >= 250); if (parts.length) log(name + ': slow steps', parts.map(([k, ms]) => `${k} ${Math.round(ms)} ms`).join(', ')); }
 async function saveSyncRun({ romId = null, key = null, choice = null, dry = false, why = 'run' } = {}) {
+  const manual = why === 'run' || why === 'resolve'; // Sync Now (and settling a conflict) tries everything again
   if (!saveSyncOn()) return { off: true, syncthing: syncthingSaves() };
   if (ssBusy) return ssBusy; // one sync at a time; a second ask shares the running one
   ssBusy = (async () => {
+    const T = {}, tick = (k, t0) => { T[k] = (T[k] || 0) + (performance.now() - t0); };
+    let t0 = performance.now();
     const SS = require('./saveSync'), extra = saveExtras();
+    tick('emulator folders', t0);
     if (why !== 'before') await titlesReady(4000); // names for codes of games not on this device (never holds up a game)
     romId = romId == null ? null : Number(romId);
     await idsReady(why === 'before' ? 8000 : 120000); // a game about to start never waits long for this
-    const local = SS.units({ extra, extraAt: saveAt(), games: ssGames(), carriers: ssCarriers(), nameOf: titles.nameOf, matches: config.saveMatches || {} });
+    t0 = performance.now(); const games = ssGames(), carriers = ssCarriers(); tick('library', t0); await breathe();
+    t0 = performance.now();
+    const local = SS.units({ extra, extraAt: saveAt(), games, carriers, nameOf: titles.nameOf, matches: config.saveMatches || {} });
+    tick('finding saves', t0); await breathe();
+    if (!ssHashes) ssHashes = loadJson(SAVE_HASHES_FILE, {});
     // 0.9.58: every save of Cartridge's in RomM, read once: a save is found by its key and console under any game
     // (the other device may have matched the game to another RomM entry), never only under this device's entry
     let remotes = [];
@@ -2619,21 +2648,29 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
     broadcast('savesync', { state: 'run', done: 0, of: todo.length, why, romId });
     for (const [i, u] of todo.entries()) {
       let r;
-      try { r = await SS.syncUnit(u, rpc, ssLedger, { extra, extraAt: saveAt(), backupsRoot: SAVE_BACKUPS, choice: key ? choice : null, dry, remotes, slugsOf: ssSlugsOf }); } catch (e) { r = { key: u.key, result: e.code === 'auth' ? 'auth' : 'error', error: e.message }; }
+      t0 = performance.now();
+      try { r = await SS.syncUnit(u, rpc, ssLedger, { extra, extraAt: saveAt(), backupsRoot: SAVE_BACKUPS, choice: key ? choice : null, dry, remotes, slugsOf: ssSlugsOf, hashCache: ssHashes, refused: manual ? null : (k, h) => (ssData.tooLarge?.[k]?.hash === h ? ssData.tooLarge[k].error : null) }); } catch (e) { r = { key: u.key, result: e.code === 'auth' ? 'auth' : e.code === 'toolarge' ? 'toolarge' : 'error', error: e.message }; }
+      // a save refused for its size is remembered with its hash, and only tried again when it changes or on Sync Now
+      if (r.result === 'toolarge' && !dry) { const h = ssHashes && u.path ? await SS.hashUnitAsync(u, ssHashes).catch(() => null) : null; if (h) { (ssData.tooLarge ||= {})[u.key] = { hash: h, error: r.error }; } }
+      else if (ssData.tooLarge?.[u.key] && ['up', 'same', 'down'].includes(r.result)) delete ssData.tooLarge[u.key];
+      { const ms = performance.now() - t0; if (ms > (T.slowest || 0)) { T.slowest = ms; T.slowestKey = u.key; } } await breathe();
       results.push({ ...r, place: r.result === 'unplaced' ? r.why : undefined, label: u.label || u.key, emu: u.emu, emuName: SS.labelOf(u.emu), romId: u.romId, romIds: u.card ? u.romIds || [] : undefined, card: u.card, states: !!u.states, remote: !!u.remote, why: u.why || null, likely: u.likely?.length ? u.likely : undefined });
-      if (!['none', 'same', 'unmatched'].includes(r.result)) log('save sync:', u.key, r.result, r.error || '');
+      if (!['none', 'same', 'unmatched'].includes(r.result) && !r.skipped) log('save sync:', u.key, r.result, r.error || '');
       ssProg = { done: i + 1, of: todo.length, why };
       broadcast('savesync', { state: 'run', done: i + 1, of: todo.length, why, romId });
       if (r.result === 'auth') break;
     }
     // 0.9.57 (owner: a game's sheet with its sync history): what moved, per save, the last 30 times
-    if (!dry) for (const r of results) if (['up', 'down', 'refiled', 'conflict', 'error', 'unplaced', 'damaged'].includes(r.result) && !(['unplaced', 'damaged'].includes(r.result) && ssData.history?.[r.key]?.[0]?.result === r.result)) ssNote(r.key, { result: r.result, why, error: r.error || undefined, place: r.place, choice: key ? choice : undefined }); // a repeat of the same problem isn't noted again
+    if (!dry) for (const r of results) if (['up', 'down', 'refiled', 'conflict', 'error', 'unplaced', 'damaged', 'toolarge'].includes(r.result) && !(['unplaced', 'damaged', 'toolarge'].includes(r.result) && ssData.history?.[r.key]?.[0]?.result === r.result)) ssNote(r.key, { result: r.result, why, error: r.error || undefined, place: r.place, choice: key ? choice : undefined }); // a repeat of the same problem isn't noted again
     const counts = {}; for (const r of results) counts[r.result] = (counts[r.result] || 0) + 1;
     // 0.9.56 (owner: each count opens the saves behind it): what each save did in the last whole sync, at most 600
     // 0.9.58 (owner: "a lot of discrepancies"): every save's result is kept, the ones that couldn't move too (not set up
     // here, emulator open, a download that failed its check, an error), each with its reason; nothing is silent
     const items = results.filter((r) => r.result !== 'none').slice(0, 800).map((r) => ({ key: r.key, label: r.label, emu: r.emu, emuName: r.emuName, romId: r.romId, romIds: r.romIds, card: r.card, states: r.states, remote: r.remote, result: r.result, why: r.why, place: r.place, error: r.error, likely: r.likely }));
     if (romId == null && !dry) { ssData.last = { at: Date.now(), counts, items, conflicts: results.filter((r) => r.result === 'conflict').map((r) => ({ key: r.key, label: r.label, emuName: r.emuName, romId: r.romId })) }; saveJson(SAVESYNC_FILE, ssData, false); }
+    saveJson(SAVE_HASHES_FILE, ssHashes, false);
+    const { slowestKey } = T; delete T.slowestKey; if (T.slowest) { T['slowest save (' + slowestKey + ')'] = T.slowest; delete T.slowest; }
+    slowSteps('save sync', T);
     broadcast('savesync', { state: 'done', counts, why, romId });
     return { results, counts };
   })().finally(() => { ssBusy = null; ssProg = null; });
@@ -2646,7 +2683,7 @@ async function saveSearchRun() {
   const SR = require('./saveSearch');
   const roots = [os.homedir(), ...SR.driveRoots(extraRoots())];
   broadcast('save-search', { state: 'run', dirs: 0, found: 0 });
-  const r = await SR.search({ roots, known, skip: [USER_DATA, SAVE_BACKUPS], onProgress: (p) => broadcast('save-search', { state: 'run', ...p }) });
+  const r = await SR.search({ roots, known, skip: [USER_DATA, SAVE_BACKUPS], onProgress: (p) => broadcast('save-search', { state: 'run', ...p }), stop: () => !!(gameFocus.away || runOn) });
   const rec = { at: Date.now(), done: r.done, dirs: r.dirs, ms: r.ms, found: r.found };
   saveJson(SAVESEARCH_FILE, rec, false);
   log('save search:', r.dirs, 'folders in', Math.round(r.ms / 1000), 's,', r.found.length, 'places with saves', r.done ? '' : '(stopped at the time limit)', r.found.map((h) => `${h.emu}:${h.place}`).join(' '));
@@ -2718,6 +2755,7 @@ function patchState(romId) {
     return { emu: 'cemu', serial: ids[0] || r?.name, dir: { root: e.root, settings: e.settings }, ids, title: r?.name };
   }
   if (/^ps2$/i.test(r?.platform_slug || '') || /^ps2$/i.test(r?.platform_fs_slug || '')) return ps2PatchState(romId);
+  if (/\bxbox360\b/i.test(slugs)) return xeniaPatchState(Number(romId), r); // 0.9.63
   if (!/ps3/i.test(`${r?.platform_slug} ${r?.platform_fs_slug}`)) return { emu: null };
   const where = installedMap[romId];
   if (!where) return { emu: 'rpcs3', why: 'Download the game first.' };
@@ -2831,6 +2869,33 @@ function raContent(where) {
   return first ? path.join(where, first) : mainFile(where);
 }
 const GS_NAME = { eden: 'Eden', citron: 'Citron', yuzu: 'yuzu', azahar: 'Azahar', citra: 'Citra', cemu: 'Cemu', vita3k: 'Vita3K', xenia: 'Xenia', flycast: 'Flycast', supermodel: 'Supermodel', mame: 'MAME', retroarch: 'RetroArch', ryujinx: 'Ryujinx' };
+// the version of the emulator a game uses (0.9.63, owner: Eden 0.2.0's choices aren't the newest source's): the copy
+// its Steam shortcut starts, else the first installed; read from what that copy says it is (RPCS3's log, the version an
+// update put in, its file name, a Flatpak's metadata, shadPS4's chosen version). null when it can't be told.
+function flatpakVersion(fp) {
+  if (!fp) return null;
+  for (const b of [path.join(os.homedir(), '.local/share/flatpak'), '/var/lib/flatpak']) {
+    for (const f of [`${fp}.metainfo.xml`, `${fp}.appdata.xml`]) {
+      try { const x = fs.readFileSync(path.join(b, 'app', fp, 'current/active/files/share/metainfo', f), 'utf8'); const m = /<release[^>]*\bversion="([^"]+)"/.exec(x); if (m) return m[1]; } catch {}
+    }
+  }
+  return null;
+}
+function emuVersionFor(id, romId) {
+  try {
+    const U = require('./emuUpdates');
+    if (id === 'shadps4') { const own = (config.steam?.shadVersions || {})[romId]; const sel = own || require('./shadVersions').settings()?.selected; if (sel) return U.verOf(sel) || null; }
+    let exe = '', args = '';
+    try { const key = steamMgr.forRom(Number(romId)).console; const t = key ? steamMgr._templateForGame(Number(romId), key) : null; if (t?.exe) { exe = t.exe; args = Array.isArray(t.args) ? t.args.join(' ') : String(t.args || ''); } } catch {}
+    const list = steamMgr.installedEmulators().filter((e) => e.id === id);
+    const e = list.find((x) => exe && (x.path === exe || (x.fp && (args.includes(x.fp) || exe.includes(x.fp))))) || list[0];
+    if (!e) return null;
+    if (e.kind === 'flatpak') return flatpakVersion(e.fp);
+    const rec = (loadJson(path.join(USER_DATA, 'emulator-releases.json'), {}).installed || {})[e.path];
+    const size = (() => { try { return fs.statSync(e.path).size; } catch { return -1; } })();
+    return U.ranVersion(id, e.path) || (rec && rec.size === size ? rec.version : null) || U.verOf(path.basename(e.path)) || (e.version ? U.verOf(e.version) : null) || null;
+  } catch { return null; }
+}
 function newEmuCtx(romId, r, where, slugs) {
   const g = gameEmuOf(romId, slugs);
   if (!g) return null;
@@ -2889,6 +2954,23 @@ function newEmuCtx(romId, r, where, slugs) {
   if (id === 'eden' || id === 'ryujinx') serial = (BigInt('0x' + serial) & ~0x1fffn).toString(16).toUpperCase().padStart(16, '0'); // the base game's ID, as Eden names the file
   const dataDir = id === 'cemu' ? [path.join(os.homedir(), '.local/share/Cemu'), '/usr/share/Cemu'].find((d) => fs.existsSync(path.join(d, 'gameProfiles', 'default'))) || '' : '';
   return { emu: id, serial, cfgDir, dataDir, os: id === 'xenia' && /\.exe$/i.test(g.exe) ? 'windows' : 'linux' };
+}
+// 0.9.63: RPCS3 files an earlier Cartridge saved under config/ on Linux, moved where RPCS3 reads them (patches.js
+// rpcs3Relocate), never while RPCS3 runs; the records naming them follow, so Back to RPCS3's Own still finds them
+async function rpcs3Relocate() {
+  if (require('./raLogin').running().has('rpcs3')) return; // RPCS3 open: next start
+  const P = require('./patches'), gsFile = path.join(USER_DATA, 'game-settings.json');
+  for (const d of P.rpcs3Dirs()) {
+    let moved = []; try { moved = P.rpcs3Relocate(d); } catch (e) { log('rpcs3 relocate failed', d.root, e.message); continue; }
+    if (!moved.length) continue;
+    const gs = loadJson(gsFile, {});
+    for (const [from, to] of moved) {
+      if (gs[from]) { gs[to] = gs[from]; delete gs[from]; }
+      for (const v of Object.values(rpcs3Cfgs)) if (v && v.file === from) v.file = to;
+    }
+    saveJson(gsFile, gs, false); saveJson(RPCS3_CFG_FILE, rpcs3Cfgs);
+    log('rpcs3 settings moved where RPCS3 reads them:', moved.map(([, t]) => path.basename(t)).join(', '));
+  }
 }
 function gameSettingsCtx(romId) {
   require('./gameSettings').setRecsFile(path.join(USER_DATA, 'game-settings.json'));
@@ -2979,6 +3061,50 @@ async function unzipTo(zip, dir) {
     }
   } finally { try { close?.(); } catch {} }
 }
+// Xenia Canary's patches (0.9.63, electron/xeniaPatches.js): the game-patches repository's "latest" release zip (else
+// the repository's own zip), only its patch files laid into Xenia's patches folder, when missing or a week old
+const XENIA_PATCHES_FILE = path.join(USER_DATA, 'xenia-patches.json');
+async function freshXeniaPatches(romId, force = false) {
+  const r = romIndexMain().get(Number(romId));
+  if (!/\bxbox360\b/i.test(`${r?.platform_slug} ${r?.platform_fs_slug}`)) return;
+  const st = xeniaPatchState(Number(romId), r);
+  if (!st.dir) return;
+  const rec = loadJson(XENIA_PATCHES_FILE, {}), mine = rec[st.dir] || { at: 0, written: {} };
+  if (!force && Date.now() - mine.at < 7 * 864e5 && fs.existsSync(path.join(st.dir, 'patches'))) return;
+  const z = path.join(os.tmpdir(), `cartridge-xenia-patches-${Date.now()}.zip`);
+  try {
+    let url = 'https://github.com/xenia-canary/game-patches/archive/refs/heads/main.zip';
+    try { const rel = await require('./github').release('xenia-canary/game-patches', { tag: 'latest' }); const a = (rel?.assets || []).find((x) => /\.zip$/i.test(x.name)); if (a) url = a.url; } catch {}
+    await downloadTo(url, z, { abort: new AbortController() }, () => {}, { plain: true });
+    const { list, close } = await require('./addonInstall').openArchive(z, path.join(os.tmpdir(), 'cartridge-unz-' + Date.now()));
+    const entries = [];
+    try { for (const e of list) if (require('./xeniaPatches').NAME_RE.test(path.basename(e.rel)) && e.size < 4 << 20) { const rs = await e.read(), parts = []; for await (const c of rs) parts.push(c); entries.push([e.rel, Buffer.concat(parts)]); } } finally { try { close?.(); } catch {} }
+    if (!entries.length) throw new Error('the download had no patch files in it');
+    const res = require('./xeniaPatches').install(st.dir, entries, mine.written);
+    rec[st.dir] = { at: Date.now(), written: res.written }; saveJson(XENIA_PATCHES_FILE, rec, false);
+    log('xenia patches', entries.length, 'files,', res.added, 'added,', res.updated, 'updated');
+    return force ? { files: entries.length, added: res.added, updated: res.updated } : undefined;
+  } catch (e) {
+    log('xenia patches download failed', e.message);
+    if (force) throw new Error(`Xenia’s patch list couldn’t be downloaded (${e.message}).`);
+    return `Xenia’s patch list couldn’t be downloaded (${e.message}).`;
+  } finally { fs.rmSync(z, { force: true }); }
+}
+// Xbox 360 games: the title ID read from the game (x360Id.js) and Xenia's storage root (where its patches folder is)
+const x360Ids = new Map();
+function xeniaPatchState(romId, r = romIndexMain().get(Number(romId))) {
+  const where = installedMap[romId];
+  if (!where || where === MARKED) return { emu: 'xenia', why: 'Download the game first.' };
+  let st = null; try { st = fs.statSync(where); } catch {}
+  const k = `${where}|${st?.size}|${st?.mtimeMs}`;
+  if (!x360Ids.has(k)) x360Ids.set(k, require('./x360Id').titleId(where));
+  const serial = x360Ids.get(k);
+  if (!serial) return { emu: 'xenia', why: 'Cartridge couldn’t read this game’s title ID from its files.' };
+  const g = gameEmuOf(romId, `${r?.platform_slug} ${r?.platform_fs_slug}`) || { id: 'xenia', exe: '', args: '', start: '' };
+  const dir = emuCfgDir('xenia', g);
+  if (!dir) return { emu: 'xenia', serial, why: 'Xenia’s folder wasn’t found on this device. Start Xenia once, then come back.' };
+  return { emu: 'xenia', serial, dir, cfg: path.join(dir, 'xenia-canary.config.toml') };
+}
 // shadPS4's two patch lists, fetched like its launcher's Download Patches when missing or a week old (0.9.23)
 async function freshShadPatches(romId, force = false) {
   const r = romIndexMain().get(Number(romId));
@@ -3011,6 +3137,8 @@ function ps4PatchState(romId, r) {
   return { emu: 'shadps4', serial, version: patchesMod.ps4Version(where), dir };
 }
 // PS2 games: PCSX2 must have the game in its game list (that is where the serial and CRC come from)
+const PS2_IDS_FILE = path.join(USER_DATA, 'ps2-ids.json');
+let ps2Ids = null;
 function ps2PatchState(romId) {
   const where = installedMap[romId];
   if (!where || where === MARKED) return { emu: 'pcsx2', why: 'Download the game first.' };
@@ -3022,7 +3150,11 @@ function ps2PatchState(romId) {
   try { if (fs.statSync(where).isDirectory()) file = fs.readdirSync(where).map((n) => path.join(where, n)).filter((f) => /\.(iso|chd|cso|zso|gz|bin|cue|elf)$/i.test(f)).sort((a, b) => fs.statSync(b).size - fs.statSync(a).size)[0] || where; } catch {}
   // PCSX2's game list first; else Cartridge reads the disc itself (ISO since 0.9.3 L, CHD/CSO/ZSO since 0.9.17)
   const readable = /\.(iso|chd|cso|zso)$/i.test(file);
-  const game = patchesMod.pcsx2Game(dir, file) || (readable ? patchesMod.ps2IsoInfo(file) : null);
+  // 0.9.63: a disc's serial and CRC are read once per file (by size and date): a CHD was decompressed on every open
+  let st = null; try { st = fs.statSync(file); } catch {}
+  const ck = st ? `${file}|${st.size}|${st.mtimeMs}` : '', ps2c = (ps2Ids ||= loadJson(PS2_IDS_FILE, {}));
+  let game = ck && ps2c[ck];
+  if (!game) { game = patchesMod.pcsx2Game(dir, file) || (readable ? patchesMod.ps2IsoInfo(file) : null); if (game?.crc && ck) { for (const k of Object.keys(ps2c)) if (k.startsWith(file + '|')) delete ps2c[k]; ps2c[ck] = { serial: game.serial || '', crc: game.crc }; saveJson(PS2_IDS_FILE, ps2c, false); } }
   if (!game || !game.crc) return { emu: 'pcsx2', why: readable ? 'Cartridge couldn’t read this disc image.' : 'Cartridge can’t read this kind of file, so its details come from PCSX2: add your PS2 folder in PCSX2 (Settings → Game List) once, let it scan, then come back.' };
   return { emu: 'pcsx2', serial: game.serial || '', version: patchesMod.crcHex(game.crc), dir, game };
 }
@@ -3035,6 +3167,8 @@ const EMU_PATCH = {
   ppsspp: { name: 'PPSSPP', list: (st, mine) => cheatsMod.ppssppList(st.dir, st.serial, mine), set: (st, todo, mine) => { notRunning('ppsspp', 'PPSSPP'); return cheatsMod.ppssppSet(st.dir, st.serial, todo, mine, st.title); } },
   // Wii U: Cemu's graphic packs; turned on with each category's default preset, as Cemu does
   cemu: { name: 'Cemu', list: (st, mine) => require('./cemuPacks').list({ root: st.dir.root, settings: st.dir.settings, titleIds: st.ids, name: st.title }, mine), set: (st, todo, mine) => { notRunning('cemu', 'Cemu'); const C = require('./cemuPacks'); const all = C.list({ root: st.dir.root, settings: st.dir.settings, titleIds: st.ids, name: st.title }, mine); C.set({ settings: st.dir.settings }, todo.map((t) => { const p = all.find((x) => x.key === t.key); return { ...t, presets: Object.fromEntries(Object.entries(p?.presets || {}).map(([k, v]) => [k, (t.want && v.includes(t.want[k]) ? t.want[k] : null) || p.chosen[k] || v[0]])) }; }), mine); return mine; } },
+  // Xbox 360 (0.9.63): Xenia Canary's patch files; Xenia reads them when a game starts, and turning one on turns apply_patches on if it was off
+  xenia: { name: 'Xenia', list: (st, mine) => require('./xeniaPatches').list(st.dir, st.serial, mine), set: (st, todo, mine) => { notRunning('xenia', 'Xenia'); const X = require('./xeniaPatches'); if (todo.some((t) => t.on) && X.ensureOn(st.cfg)) log('xenia apply_patches turned on'); return X.set(st.dir, todo, mine); } },
   pcsx2: { name: 'PCSX2', list: (st, mine) => patchesMod.pcsx2List(st.dir, st.game, patchesMod.pcsx2ZipBuffer(patchesMod.pcsx2ZipSources(os.homedir(), steamMgr.appImagesFor('ps2', /pcsx2/i)), require('./detect').readAppImageFile), mine), set: (st, todo, mine) => patchesMod.pcsx2Set(st.dir, st.game, todo, mine) },
 };
 // D2: a Vita game through Vita3K (.pkg with its zRIF installs with no window; a .vpk or .zip
@@ -3202,6 +3336,7 @@ function createWindow() {
     // 0.9.59: Search for Saves runs once by itself, later only when you ask (Where Your Saves Are)
     if (!fs.existsSync(SAVESEARCH_FILE)) scheduler.add('save-search', { once: true, firstAfter: 4 * 60000, deferWhilePlaying: true, run: () => handlers['saves:search']().catch(() => {}) });
     scheduler.add('game-ids', { once: true, firstAfter: 15000, deferWhilePlaying: true, run: () => identity.ready() }); // 0.9.60: games' IDs, a game at a time
+    scheduler.add('rpcs3-relocate', { once: true, firstAfter: 20000, deferWhilePlaying: true, run: async () => rpcs3Relocate() }); // 0.9.63
     scheduler.add('bios-check', { once: true, firstAfter: 45000, deferWhilePlaying: true, run: () => biosSetup({ install: true }).catch(() => {}) }); // 0.9.38: firmware too, when an emulator lacks it
   }
   win.webContents.once('did-finish-load', () => log('ui loaded', Date.now() - startedAt + 'ms', 'window=' + win.getContentSize().join('x'), 'zoom=' + currentZoom()));
@@ -3936,6 +4071,14 @@ const handlers09 = {
     return conf;
   },
   // 0.9.3: everything waiting for you, in one list (Settings → Emulators) instead of start-up pop-ups
+  'rpcs3:repairConfig': ({ root } = {}) => {
+    if (require('./raLogin').running().has('rpcs3')) throw new Error('Close RPCS3 first: it writes this file when it quits.');
+    const P = require('./patches'), d = P.rpcs3Dirs().find((x) => x.root === root) || P.rpcs3Dirs()[0];
+    if (!d) throw new Error('RPCS3’s settings weren’t found.');
+    const r = P.rpcs3ConfigRepair(d);
+    log('rpcs3 config repaired', d.root, r.backup || '');
+    return r;
+  },
   'issues:list': async () => {
     const out = [];
     const add = (kind, text, sub, fix) => out.push({ kind, text, sub: sub || '', fix });
@@ -3955,6 +4098,9 @@ const handlers09 = {
       if (n.game) add('game', `${n.game} Steam shortcut${n.game === 1 ? ' is' : 's are'} for a game that's gone from this device`, '', 'health');
       if (n.core + n.flatpak) add('core', `${n.core + n.flatpak} Steam shortcut${n.core + n.flatpak === 1 ? ' needs' : 's need'} a missing RetroArch core or Flatpak`, '', 'health');
     } catch (e) { log('issues: health', e.message); }
+    // 0.9.63: RPCS3's own settings file damaged (an older EmuDeck's resolution edit): RPCS3 then fails to load its
+    // settings and per-game ones; the known damage gets a Repair (backup first), anything else says where it is
+    try { for (const d of require('./patches').rpcs3Dirs()) { const c = require('./patches').rpcs3ConfigCheck(d); if (c) { add('rpcs3cfg', 'RPCS3’s settings file is damaged', c.known ? `Line ${c.line} has text an older EmuDeck left behind (“${c.text}”), so RPCS3 can’t load its settings or any game’s. Repair removes only that text, after a backup.` : `RPCS3 can’t read line ${c.line} (“${c.text}”) of ${c.file}. Open it in a text editor to fix it, or rename it so RPCS3 makes a new one.`, c.known ? 'rpcs3cfg' : null); out[out.length - 1].root = d.root; } } } catch (e) { log('issues: rpcs3 config', e.message); }
     try { if (steamMgr.flatpakSteamAccess() === 'needed') add('fpsteam', 'Flatpak Steam needs permission to start your emulators', 'Its games run in a sandbox. Allow it to start programs on your system (flatpak override). Restart Steam afterwards.', 'fpsteam'); } catch {}
     try {
       for (const m of steamMgr.movedEmulators().filter((x) => !x.shortcuts)) add('setup', `Your launch setup points at ${m.exe}, which isn't there any more`, '', 'setup');
@@ -4998,7 +5144,7 @@ const handlers = {
   // Find and Link Saves (0.9.37, owner: detect the saves and link them by itself, keep the manual way): every fork
   // ready to link gets its games the original lacks copied across (copies only), then the link
   'links:auto': ({ dry } = {}) => {
-    const L = require('./folderLinks'), list = handlers['links:list']().suggestions.filter((s) => s.from && s.to && ['folder', 'empty', 'missing'].includes(s.state));
+    const L = require('./folderLinks'), seenPair = new Set(), list = handlers['links:list']().suggestions.filter((s) => s.from && s.to && ['folder', 'empty', 'missing'].includes(s.state) && !seenPair.has(s.from + '\0' + s.to) && seenPair.add(s.from + '\0' + s.to)); // 0.9.63: a pair suggested twice is done once
     if (dry) return list.map((s) => ({ fork: s.fork, ofName: s.ofName, label: s.label, from: s.from, to: s.to, state: s.state }));
     const out = [];
     for (const s of list) {
@@ -5034,10 +5180,11 @@ const handlers = {
     log('folder unlinked', rec.from);
     return true;
   },
-  'gamesettings:get': ({ romId }) => { const c = gameSettingsCtx(Number(romId)); return c.why ? { why: c.why, emu: c.emu } : require('./gameSettings').describe(c); },
+  'gamesettings:get': ({ romId }) => { const c = gameSettingsCtx(Number(romId)); if (c.why) return { why: c.why, emu: c.emu }; c.emuVersion = emuVersionFor(c.emu, Number(romId)); return require('./gameSettings').describe(c); },
   'gamesettings:set': ({ romId, changes }) => {
     const c = gameSettingsCtx(Number(romId));
     if (c.why) throw new Error(c.why);
+    c.emuVersion = emuVersionFor(c.emu, Number(romId));
     const names = { rpcs3: 'RPCS3', pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', ppsspp: 'PPSSPP', shadps4: 'shadPS4', ...GS_NAME };
     notRunning(c.emu, names[c.emu]);
     const d = require('./gameSettings').apply(c, changes || []);
@@ -5152,10 +5299,11 @@ const handlers = {
     if (/ps3/i.test(slugs)) { const x = await freshRpcs3Patches(Number(romId), true); if (!x) throw new Error('RPCS3’s folder wasn’t found on this device. Start RPCS3 once, then try again.'); return { emu: 'RPCS3', ...x }; }
     if (/ps4/i.test(slugs)) { const x = await freshShadPatches(Number(romId), true); if (!x) throw new Error('shadPS4’s folder wasn’t found on this device. Start shadPS4 once, then try again.'); return { emu: 'shadPS4', ...x }; }
     if (/\bwiiu\b/i.test(slugs)) return { emu: 'Cemu', ...(await freshCemuPacks(Number(romId), true)) };
+    if (/\bxbox360\b/i.test(slugs)) return { emu: 'Xenia', ...(await freshXeniaPatches(Number(romId), true)) };
     throw new Error('No patch download for this console.');
   },
   'patches:list': async ({ romId }) => {
-    const dlErr = (await freshRpcs3Patches(romId)) || (await freshShadPatches(romId)) || (await freshCemuPacks(romId));
+    const dlErr = (await freshRpcs3Patches(romId)) || (await freshShadPatches(romId)) || (await freshCemuPacks(romId)) || (await freshXeniaPatches(romId));
     const st = patchState(romId), E = EMU_PATCH[st.emu];
     if (!st.dir || !E) return { emu: st.emu, emuName: E?.name || '', serial: st.serial, why: [st.why, dlErr].filter(Boolean).join(' '), list: [] };
     if (st.emu === 'ppsspp') { try { const r = await cheatsMod.ppssppDownloadDb(st.dir); if (r.updated) log('ppsspp cheat.db downloaded', r.url); } catch (e) { log('ppsspp cheat.db download failed:', e.message); } }
@@ -5535,7 +5683,7 @@ function bgJob(key, o) {
 async function asJob(info, fn) {
   bgJob(info.key, { ...info, state: 'run', pct: null, text: '', error: '' });
   try { const r = await fn(); bgJob(info.key, { state: 'done', pct: 100, text: '' }); return r; }
-  catch (e) { bgJob(info.key, { state: 'error', error: e.message || String(e) }); throw e; }
+  catch (e) { bgJob(info.key, { state: 'error', error: e.message || String(e) }); log('job failed', info.key, '|', e.message || String(e)); throw e; } // 0.9.63: every failure in the log with its reason
 }
 const emuLabel = (id) => require('./emulators').EMU[String(id || '').split('@')[0]]?.label || String(id || 'Emulator');
 const romName = (id) => romIndexMain().get(Number(id))?.name || 'Game';
@@ -5589,9 +5737,29 @@ let perfPrev = null;
 // How long the main thread is held up (0.9.60): it answers the controller's window, every call and gamescope, so a stall is
 // felt as a frozen app. The longest in the first minute is logged, then any over half a second; the Performance overlay
 // shows the longest of the last second. Measured with Node's event loop delay histogram (no cost worth counting).
+// an emulator's own log, copied beside Cartridge's (emulator-runs/<id>-last.log), without blocking
+function keepEmuLog(id, file) {
+  if (!file) return;
+  const to = path.join(USER_DATA, 'emulator-runs', id + '-last.log');
+  fs.promises.mkdir(path.dirname(to), { recursive: true }).then(() => fs.promises.copyFile(file, to)).catch(() => {});
+}
+// 0.9.63 (owner's log: a forced restart left no trace): how Cartridge and the system are doing, in the log every 5
+// minutes, and every minute while a game runs, so the last lines before a freeze show memory running out or not
+let healthPrev = null, healthN = 0;
+function healthLine() {
+  const playing = !!(gameFocus.away || runOn);
+  if (!playing && healthN++ % 5) return;
+  try {
+    const m = app.getAppMetrics(), t = Date.now(), cpu = m.reduce((a, x) => a + (x.cpu?.cumulativeCPUUsage || 0), 0);
+    const pct = healthPrev && t > healthPrev.t ? Math.round(((cpu - healthPrev.cpu) / ((t - healthPrev.t) / 1000)) * 100) : null;
+    healthPrev = { cpu, t };
+    const mine = Math.round(m.reduce((a, x) => a + (x.memory?.workingSetSize || 0), 0) / 1024);
+    log('health:', `cartridge ${mine} MB, cpu ${pct ?? '?'}%`, `| system free ${Math.round(os.freemem() / 1048576)} of ${Math.round(os.totalmem() / 1048576)} MB`, `| load ${os.loadavg()[0].toFixed(1)}`, playing ? '| game running' : '');
+  } catch {}
+}
 const loopDelay = require('perf_hooks').monitorEventLoopDelay({ resolution: 20 });
 loopDelay.enable();
-setTimeout(() => { log('main thread: longest stall in the first minute', Math.round(loopDelay.max / 1e6), 'ms'); loopDelay.reset(); setInterval(() => { const ms = Math.round(loopDelay.max / 1e6); if (ms > 500) log('main thread: stall of', ms, 'ms in the last minute'); loopDelay.reset(); }, 60000).unref?.(); }, 60000);
+setTimeout(() => { log('main thread: longest stall in the first minute', Math.round(loopDelay.max / 1e6), 'ms'); loopDelay.reset(); setInterval(() => { const ms = Math.round(loopDelay.max / 1e6); if (ms > 500) log('main thread: stall of', ms, 'ms in the last minute'); loopDelay.reset(); healthLine(); }, 60000).unref?.(); }, 60000);
 handlers['perf:sample'] = () => {
   const m = app.getAppMetrics(), t = Date.now();
   const cpu = m.reduce((a, x) => a + (x.cpu?.cumulativeCPUUsage || 0), 0), mem = m.reduce((a, x) => a + (x.memory?.workingSetSize || 0), 0);
@@ -5600,6 +5768,11 @@ handlers['perf:sample'] = () => {
   return { cpu: pct, memMB: Math.round(mem / 1024), procs: m.length, playing: !!(gameFocus.away || runOn), stallMs: Math.round(loopDelay.max / 1e6) };
 };
 
+// 0.9.63 (owner's log: the emulator update check ran twice at the same moment): the same question asked again while
+// the first is still being answered shares that answer instead of doing the work twice
+const SHARED = new Set(['emuup:list', 'saves:locations', 'issues:list', 'steam:overview', 'cee:emulators']);
+const inflight = new Map();
+for (const ch of SHARED) if (handlers[ch]) { const fn = handlers[ch]; handlers[ch] = (arg) => { const k = ch + JSON.stringify(arg ?? null); if (!inflight.has(k)) inflight.set(k, Promise.resolve().then(() => fn(arg)).finally(() => inflight.delete(k))); return inflight.get(k); }; }
 for (const [ch, fn] of Object.entries(handlers)) {
   ipcMain.handle(ch, async (_e, arg) => {
     try { return { ok: true, data: await fn(arg) }; }

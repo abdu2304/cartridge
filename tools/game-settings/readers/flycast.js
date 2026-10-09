@@ -142,6 +142,7 @@ function HAND() {
 }
 module.exports = {
   id: 'flycast',
+  versions: { git: 'https://github.com/flyinghead/flycast', tags: /^v\d+\.\d+(\.\d+)?$/ }, // 0.9.63: its last releases too (gen.js)
   files: [{ url: RAW + 'cfg/option.cpp', as: 'option.cpp' }, { url: RAW + 'cfg/option.h', as: 'option.h' }, { url: RAW + 'types.h', as: 'types.h' },
     ...UI.map((f) => ({ url: RAW + 'ui/' + f, as: f }))],
   read,
