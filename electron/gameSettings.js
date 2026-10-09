@@ -129,6 +129,9 @@ function ymlPut(text, sec, key, value) {
   return Y.dump(y, { lineWidth: -1 }).replace(/'(true|false|\d+)'/g, '$1');
 }
 
+// emulators with no hand-picked list show everything from their source (0.9.62)
+const NAMES = { eden: 'Eden', citron: 'Citron', yuzu: 'yuzu', sudachi: 'Sudachi', azahar: 'Azahar', citra: 'Citra', lime3ds: 'Lime3DS', cemu: 'Cemu', vita3k: 'Vita3K', xenia: 'Xenia', flycast: 'Flycast', mame: 'MAME', supermodel: 'Supermodel', retroarch: 'RetroArch', ryujinx: 'Ryujinx' };
+const schemaOf = (ctx) => SCHEMA[ctx.emu] || { name: ctx.name || NAMES[ctx.emu] || ctx.emu, items: [] };
 // where a game's file is, and the emulator's own settings to show beside it
 // ctx: { emu, serial, crc, rpcs3Root, pcsx2: { gamesettings, root }, duckRoot, dolphin: { user, config }, ppsspp: { root, ini }, shadUser }
 function files(ctx) {
@@ -176,28 +179,27 @@ const human = (k) => { const w = String(k).replace(/([a-z0-9])([A-Z])/g, '$1 $2'
 // tab per section, with the emulator's own default when its main file doesn't hold the key (Dolphin keeps only changes)
 let DB = null;
 const db = () => (DB ||= (() => { try { return require('./emuSettingsDb.json'); } catch { return {}; } })());
-const TABS = {
-  ppsspp: { Graphics: 'Graphics', CPU: 'CPU', Sound: 'Audio', Control: 'Controls', SystemParam: 'System', General: 'General' },
-  dolphin: { Video_Settings: 'Graphics', Video_Hardware: 'Graphics', Video_Enhancements: 'Enhancements', Video_Hacks: 'Hacks', Core: 'Core', DSP: 'Audio', Video_Stereoscopy: 'Stereo 3D', 'GFX.ColorCorrection': 'Colour' },
-};
 const ENUM_NAMES = { ForceWide: 'Force 16:9', ForceStandard: 'Force 4:3', CustomStretch: 'Custom (Stretch)', JIT64: 'JIT', SMPTE_NTSCM: 'NTSC-M', SYSTEMJ_NTSCJ: 'NTSC-J', EBU_PAL: 'PAL' };
 const nice = (k) => human(String(k).replace(/^[ibfsu](?=[A-Z])/, '').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2'));
-function dbItems(emu, known) {
-  const list = db()[emu]; if (!list) return null;
-  const seen = new Set(known), out = [], order = Object.keys(TABS[emu]);
-  const rank = (x) => { const i = order.indexOf(x.s); return i < 0 ? 99 : i; };
-  for (const x of [...list].sort((a, b) => rank(a) - rank(b))) {
-    const id = x.s + '.' + x.k;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    const it = { id, tab: TABS[emu][x.s] || x.s, label: x.l || nice(x.k), def: x.d, more: true };
-    if (x.t === 'bool') Object.assign(it, B('True', 'False'));
-    else if (x.t === 'enum' || x.t === 'choice') it.options = x.o.map(([v, l]) => [v, ENUM_NAMES[l] || (x.t === 'enum' && /^[A-Z][A-Za-z0-9]*$/.test(l) ? nice(l) : l)]);
-    else if (x.t === 'int') Object.assign(it, { options: [], num: { min: -2147483648, max: 2147483647 } });
-    else if (x.t === 'float') Object.assign(it, { options: [], num: { min: -1e9, max: 1e9, decimals: true } });
-    else Object.assign(it, { options: [], type: 'text' });
-    out.push(it);
-  }
+// 0.9.62 (owner: "across the board"): every emulator's entries carry their tab (adv: the emulator's advanced, debug
+// and logging settings, all in one Advanced tab at the end), a range when its source gives one, and its description
+const tabOf = (x) => (x.adv ? 'Advanced' : x.tab || x.s || 'Settings');
+function tabOrder(emu) { const t = [...new Set((db()[emu] || []).map(tabOf))].filter((x) => x !== 'Advanced'); return [...t, 'Advanced']; }
+const INT = { min: -2147483648, max: 2147483647 };
+function itemOf(x) {
+  const it = { id: x.s + '.' + x.k, tab: tabOf(x), label: x.l || nice(x.k), def: x.d, desc: x.desc || '', more: true };
+  const range = (dec) => ({ min: Number.isFinite(x.min) ? x.min : dec ? -1e9 : INT.min, max: Number.isFinite(x.max) ? x.max : dec ? 1e9 : INT.max, ...(dec ? { decimals: true } : {}), ...(x.unit ? { unit: x.unit } : {}) });
+  if (x.t === 'bool') { const o = x.o && x.o.length === 2 ? x.o : [['True', 'On'], ['False', 'Off']]; Object.assign(it, B(o[0][0], o[1][0])); }
+  else if (x.t === 'enum' || x.t === 'choice') { it.options = (x.o || []).map(([v, l]) => [v, ENUM_NAMES[l] || (x.t === 'enum' && /^[A-Z][A-Za-z0-9]*$/.test(l) ? nice(l) : l)]); if (/^-?\d+$/.test(String(x.o?.[0]?.[0] ?? 'x')) && x.typeable) it.num = range(false); }
+  else if (x.t === 'int') Object.assign(it, { options: [], num: range(false) });
+  else if (x.t === 'float') Object.assign(it, { options: [], num: range(true) });
+  else Object.assign(it, { options: [], type: 'text' });
+  return it;
+}
+function dbItems(emu, known, list = db()[emu]) {
+  if (!list) return null;
+  const seen = new Set(known), out = [];
+  for (const x of list) { const id = x.s + '.' + x.k; if (seen.has(id)) continue; seen.add(id); out.push(itemOf(x)); }
   return out;
 }
 function moreItems(ctx, F, known) {
@@ -221,12 +223,15 @@ function moreItems(ctx, F, known) {
   return out;
 }
 const itemsOf = (ctx, F) => {
-  const S = SCHEMA[ctx.emu], defs = Object.fromEntries((db()[ctx.emu] || []).map((x) => [x.s + '.' + x.k, x.d]));
-  return [...S.items.map((it) => (defs[it.id] != null && it.def == null ? { ...it, def: defs[it.id] } : it)), ...moreItems(ctx, F, S.items.map((x) => x.id))];
+  const S = schemaOf(ctx), list = F.list || db()[ctx.emu] || [];
+  const byId = Object.fromEntries(list.map((x) => [x.s + '.' + x.k, x]));
+  // a hand-picked setting keeps its own name and choices, and takes the rest (tab, default, range, description) from the source
+  const picked = S.items.map((it) => { const x = byId[it.id]; if (!x) return it; const f = itemOf(x); return { ...f, ...it, tab: it.tab || f.tab, def: it.def ?? f.def, desc: it.desc || f.desc, num: it.num || (it.options?.length ? null : f.num) }; });
+  return [...picked, ...(F.list ? dbItems(ctx.emu, S.items.map((x) => x.id), F.list) : moreItems(ctx, F, S.items.map((x) => x.id)))];
 };
 // what the screen shows: each setting with the game's value (or none) and the emulator's own
 function describe(ctx) {
-  const S = SCHEMA[ctx.emu], F = files(ctx);
+  const S = schemaOf(ctx), F = files(ctx);
   if (!S || !F) return null;
   const own = read(F.file);
   const bases = F.base.map(read);
@@ -237,11 +242,11 @@ function describe(ctx) {
     for (const t of bases) { base = getIn(F.kind, t, F.dolphin ? DOLPHIN_BASE[sec] || sec : sec, key); if (base !== undefined) break; }
     if (base === undefined && it.def != null) base = it.def; // not in its file: the emulator's own default
     const opts = it.type === 'bool' ? [[it.on, 'On'], [it.off, 'Off']] : (it.options || []).map((o) => (Array.isArray(o) ? o : [o, o]));
-    return { id: it.id, tab: it.tab || TABS[ctx.emu]?.[sec] || (/^(Video|EmuCore\/GS|GPU|Graphics|Video_\w+)$/.test(sec) ? 'Graphics' : 'System'), label: it.label, sub: it.sub || '', options: opts.map(([v, l]) => ({ value: v, label: l })), game: game ?? null, base: base ?? null, type: it.type || 'choice', num: it.num || null, group: it.group || null };
+    return { id: it.id, tab: it.tab || (/^(Video|EmuCore\/GS|GPU|Graphics|Video_\w+)$/.test(sec) ? 'Graphics' : 'System'), label: it.label, sub: it.sub || '', desc: it.desc || '', options: opts.map(([v, l]) => ({ value: v, label: l })), game: game ?? null, base: base ?? null, type: it.type || 'choice', num: it.num || null, group: it.group || null };
   });
-  // tabs in the emulator's order (TABS), the picked settings first in each
-  const order = TABS[ctx.emu] ? [...new Set(Object.values(TABS[ctx.emu]))] : null;
-  if (order) { const r = (x) => { const i = order.indexOf(x.tab); return i < 0 ? 99 : i; }; items.sort((a, b) => r(a) - r(b)); }
+  // tabs in the emulator's own order with Advanced last (0.9.62), the hand-picked settings first in each
+  const order = F.list ? [...new Set(F.list.map(tabOf).filter((t) => t !== 'Advanced')), 'Advanced'] : db()[ctx.emu] ? tabOrder(ctx.emu) : null;
+  if (order) { const r = (x) => { const i = order.indexOf(x.tab); return i < 0 ? 98 : i; }; items.sort((a, b) => r(a) - r(b)); }
   return { emu: ctx.emu, name: S.name, file: F.file, exists: own != null, items };
 }
 // PPSSPP's game file is a full copy, so only the keys Cartridge set count as "this game's" (the rest
@@ -252,7 +257,7 @@ const saveRecs = (r) => { if (recsFile) { fs.mkdirSync(path.dirname(recsFile), {
 function ownMarked(ctx, file, id) { const r = recs()[file]; return !r || !r.copied || (r.keys || []).includes(id); }
 // changes: [{ id, value }] (value null = back to the emulator's own)
 function apply(ctx, changes) {
-  const S = SCHEMA[ctx.emu], F = files(ctx);
+  const S = schemaOf(ctx), F = files(ctx);
   if (!S || !F) throw new Error('Cartridge can’t change this emulator’s per-game settings.');
   let text = read(F.file);
   const r = recs(), rec = r[F.file] || { created: text == null, keys: [] };
@@ -269,7 +274,7 @@ function apply(ctx, changes) {
     // a typed number (0.9.29): any value in the emulator's own range
     const typed = it.num && value !== undefined && /^-?\d+(\.\d+)?$/.test(value) && (it.num.decimals || !value.includes('.')) && Number(value) >= it.num.min && Number(value) <= it.num.max;
     if (it.type === 'text' && value !== undefined) value = value.replace(/[\r\n]+/g, ' ').trim();
-    if (value !== undefined && it.type !== 'bool' && it.type !== 'text' && !typed && !(it.options || []).some((o) => String(Array.isArray(o) ? o[0] : o) === value)) throw new Error(it.num ? `${it.label}: a number from ${it.num.min} to ${it.num.max}.` : `${it.label}: that value isn’t one Cartridge offers.`);
+    if (value !== undefined && it.type !== 'bool' && it.type !== 'text' && !typed && !(it.options || []).some((o) => String(Array.isArray(o) ? o[0] : o) === value)) throw new Error(it.num ? `${it.label}: ${Math.abs(it.num.min) >= 1e6 && Math.abs(it.num.max) >= 1e6 ? (it.num.decimals ? 'a number' : 'a whole number') : Math.abs(it.num.max) >= 1e6 ? `a ${it.num.decimals ? '' : 'whole '}number from ${it.num.min} up` : `a ${it.num.decimals ? '' : 'whole '}number from ${it.num.min} to ${it.num.max}`}.` : `${it.label}: that value isn’t one Cartridge offers.`);
     if (value !== undefined && it.type === 'bool' && value !== it.on && value !== it.off) throw new Error(`${it.label}: on or off only.`);
     if (F.copyBase && value === undefined && rec.copied) { // PPSSPP: back to your normal setting's value
       const b = F.base[0] && getIn('ini', read(F.base[0]), sec, key);
