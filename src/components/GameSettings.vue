@@ -21,10 +21,12 @@
           <span class="l-end"><span class="status" :class="{ ok: fg.own }">{{ fg.own ? FGL[fg.own] : 'Default' }}</span></span>
         </button>
         <div v-if="tab === 'Steam' && !fg" class="lrow" data-focus tabindex="0"><span class="l-mid"><b>Frame Generation</b><span class="l-sub">{{ fgWhy || 'Looking…' }}</span></span></div>
+        <!-- 0.9.62 (owner: advanced settings too): the emulator's own debug and expert settings, kept apart -->
+        <div v-if="tab === 'Advanced'" class="gs-warn muted small"><Icon name="mdiAlertOutline" :size="16" />For testing and fixing problems. Some of these can stop the game starting; “{{ d.name }}’s own” puts any of them back.</div>
         <template v-for="(it, i) in shown" :key="it.id">
         <div v-if="it.group && it.group !== shown[i - 1]?.group" class="gs-group">{{ it.group }}</div>
         <button class="lrow" data-focus data-expand :data-key="'gs-' + it.id" :disabled="busy" @click="pick(it)">
-          <span class="l-mid"><b>{{ it.label }}</b><span class="l-sub">{{ it.sub || (it.game != null ? 'This game’s own' : `${d.name}’s own${it.base != null ? ': ' + labelOf(it, it.base) : ''}`) }}</span></span>
+          <span class="l-mid"><b>{{ it.label }}</b><span class="l-sub">{{ it.sub || (it.game != null ? 'This game’s own' : `${d.name}’s own${it.base != null ? ': ' + labelOf(it, it.base) : ''}`) }}</span><span v-if="it.desc" class="l-sub gs-desc">{{ it.desc }}</span></span>
           <span class="l-end"><span class="status" :class="{ ok: it.game != null }">{{ it.game != null ? labelOf(it, it.game) : 'Default' }}</span></span>
         </button>
         </template>
@@ -53,7 +55,7 @@ const el = ref(null), d = ref(null), busy = ref(false);
 const rom = computed(() => romById(props.romId));
 const art = computed(() => (rom.value ? cover(rom.value) : ''));
 const tab = ref(props.tab || ''); // back from a picker: the tab you were on (0.9.46: it fell to Steam, the only tab before the list loaded)
-const tabs = computed(() => { const t = [...new Set((d.value?.items || []).map((x) => x.tab || 'General'))]; t.push('Steam'); return t; }); // Steam always: frame generation says why when it can't apply (0.9.28)
+const tabs = computed(() => { const t = [...new Set((d.value?.items || []).map((x) => x.tab || 'General'))]; const a = t.indexOf('Advanced'); if (a >= 0) t.splice(a, 0, 'Steam'); else t.push('Steam'); return t; }); // Advanced stays last (0.9.62) // Steam always: frame generation says why when it can't apply (0.9.28)
 const shown = computed(() => (d.value?.items || []).filter((x) => (x.tab || 'General') === tab.value));
 watch(tabs, (t) => { if (d.value && !t.includes(tab.value)) tab.value = t[0] || ''; }, { immediate: true }); // only once the list is in: before it, Steam is the only tab
 function stepTab(n) { const t = tabs.value; if (t.length < 2) return; tab.value = t[(t.indexOf(tab.value) + n + t.length) % t.length]; nextTick(() => focusFirst(el.value.querySelector('.gs-list') || el.value)); }
@@ -85,16 +87,18 @@ let saved = null, layer;
 function reopen(at) { if (store.modal?.type !== 'gamesettings') store.modal = { type: 'gamesettings', props: { romId: props.romId, name: props.name, tab: tab.value, at: at || '' }, resolve: saved || (() => {}) }; }
 async function pick(it) {
   const cur = it.game;
-  const v = await choose({ title: it.label, message: it.sub || '', sheet: true, options: [
+  // the emulator's own first, then Type a Number or a Value (0.9.62, owner: type any number in its range), then the choices
+  const range = it.num ? `${Math.abs(it.num.min) >= 1e6 && Math.abs(it.num.max) >= 1e6 ? 'Any number' : Math.abs(it.num.max) >= 1e6 ? `${it.num.min} or more` : `${it.num.min} to ${it.num.max}`}${it.num.unit ? ' ' + it.num.unit : ''}` : '';
+  const v = await choose({ title: it.label, message: it.desc || it.sub || '', sheet: true, options: [
     { label: `${d.value.name}’s own`, sub: it.base != null ? `Now ${labelOf(it, it.base)}` : 'Follows your normal settings', value: '__base', icon: 'mdiArrowULeftTop', selected: cur == null, raw: true },
-    ...it.options.map((o) => ({ label: o.label, value: o.value, selected: cur != null && String(cur) === String(o.value), raw: true })),
+    ...(it.num ? [{ label: 'Type a Number', sub: `${range}${cur != null && !it.options.some((o) => String(o.value) === String(cur)) ? ' · now ' + cur : ''}`, value: '__num', icon: 'mdiNumeric', raw: true }] : []),
     ...(it.type === 'text' ? [{ label: 'Type a Value', sub: cur != null ? 'Now ' + cur : it.base != null ? `${d.value.name}’s own is ${it.base}` : '', value: '__text', icon: 'mdiFormTextbox', raw: true }] : []),
-    ...(it.num ? [{ label: 'Type a Number', sub: `${Math.abs(it.num.min) >= 1e6 ? 'Any number' : `${it.num.min} to ${it.num.max}`}${it.num.unit ? ' ' + it.num.unit : ''}${cur != null && !it.options.some((o) => String(o.value) === String(cur)) ? ' · now ' + cur : ''}`, value: '__num', icon: 'mdiNumeric', raw: true }] : []),
+    ...it.options.map((o) => ({ label: o.label, value: o.value, selected: cur != null && String(cur) === String(o.value), raw: true })),
   ] });
   // a number of your own (0.9.29): the keyboard first, then this window again
   let value = v;
   if (v === '__num' || v === '__text') {
-    const t = await askText({ title: it.label, value: cur != null ? String(cur) : it.base != null ? String(it.base) : '', placeholder: v === '__num' ? (Math.abs(it.num.min) >= 1e6 ? 'A number' : `${it.num.min} to ${it.num.max}`) : it.sub || '' });
+    const t = await askText({ title: it.label, value: cur != null ? String(cur) : it.base != null ? String(it.base) : '', placeholder: v === '__num' ? range : it.sub || '' });
     value = t != null && String(t).trim() ? String(t).trim() : null;
   }
   reopen('gs-' + it.id);
@@ -131,5 +135,7 @@ onBeforeUnmount(() => layer?.pop());
 .gs-list > * { flex: none; }
 .gs-group { flex: none; padding: 10px 4px 2px; font-size: var(--t-xs); font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
 .gs-tabs { display: flex; align-items: center; gap: 10px; align-self: flex-start; max-width: 100%; }
-.gs-tabs .seg { flex-wrap: wrap; } /* 0.9.61: Dolphin has eight tabs; on a narrow window they wrap rather than run off */
+.gs-tabs .seg { flex-wrap: wrap; }
+.gs-warn { flex: none; display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px 8px; line-height: 1.4; }
+.gs-list .lrow:not(.expanded) .gs-desc { display: none; } /* hold A on a row for what the setting does */ /* 0.9.61: Dolphin has eight tabs; on a narrow window they wrap rather than run off */
 </style>

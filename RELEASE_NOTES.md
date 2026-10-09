@@ -1,12 +1,19 @@
-## Cartridge 0.9.61 · The Old Highlight
-
-### Changed
-- **Focus and chosen look as they did in 0.9.59.** The glow round focused cards and the tinted chosen states with a bar from 0.9.60 are gone: focused cards and tiles have their ring again, buttons and rows their fill, and chosen things their thin ring in your highlight colour.
+## Cartridge 0.9.62 · Every Game's Settings
 
 ### New
-- **Dots on Console Spotlight,** the same as on Continue Playing, so you can see L1/R1 step through the console's games. With more than five games the lit dot walks round them.
+- **Game Settings for every emulator that has settings of a game's own.** As with PPSSPP and Dolphin in 0.9.61, each list is read from the emulator's own source code: only the settings the emulator really takes for one game, with its own names, choices, descriptions and defaults, in tabs.
+  - **Now covered:** Eden (Switch), Ryujinx (Switch), Azahar (3DS), Cemu (Wii U), Vita3K (PS Vita), Xenia Canary (Xbox 360), Flycast (Dreamcast and Naomi), MAME, Supermodel (Model 3) and RetroArch.
+  - **RetroArch:** the game's own RetroArch settings and its core's own options together, for 62 cores (Snes9x, Genesis Plus GX, Beetle PSX, SwanStation, Mupen64Plus-Next, Flycast, mGBA and more).
+  - **Fuller lists:** RPCS3, PCSX2, DuckStation and shadPS4 now show every setting they take per game, not just a few.
+- **Advanced tab.** Each emulator's debug, logging and expert settings are kept in one Advanced tab at the end, with a note that some of them can stop a game starting.
+- **Type any number.** A setting that takes a number lets you type it, within the emulator's own range ("100 to 300"); a number outside it is refused with the range.
+- **What a setting does.** Each setting's description shows when you pick it, and when you hold A on its row.
+- **Game Settings on every installed game.** The game page offers it for every installed game. It uses the emulator the game launches with (a PS1 game in a RetroArch core gets the core's settings), and says plainly when that emulator has no settings of a game's own.
+- **Xbox 360 title IDs** are read from the game itself (its disc image, default.xex or Games on Demand package), and Dreamcast product numbers from the disc.
+
+### Changed
+- **One tab order for every emulator:** Graphics first, Advanced last, Cartridge's own Steam tab just before it.
+- **Every emulator Cartridge writes to is checked first.** Nothing is written while the game's emulator is open (it would save over the change when it closes).
 
 ### Fixed
-- **Game names suggested as you type, everywhere.** When Cartridge's own keyboard isn't the one you type with (Steam's keyboard or a real one), the search box showed no suggestions. It now lists your game names as you type, the same way Cartridge's keyboard does; A on one fills it in.
-- **PPSSPP game settings were wrong and in one long list.** Cartridge listed every key in PPSSPP's settings file, including ones PPSSPP ignores in a game's own file (like the graphics backend), all in one tab. It now lists only the settings PPSSPP really takes per game, with PPSSPP's own names and choices, in tabs: Graphics, CPU, Audio, Controls, System and General.
-- **Dolphin game settings were missing most settings.** Dolphin's files only keep what you've changed, so Cartridge saw few of them. Every setting Dolphin takes per game is now listed, with Dolphin's own default beside each, in tabs: Graphics, Enhancements, Hacks, Core, Audio, Stereo 3D and Colour.
+- **Cemu's graphic packs and settings could be changed while Cemu was open.** It's now refused like the others.

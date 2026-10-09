@@ -146,7 +146,10 @@ function writeOne(t, { user, token, now = Math.floor(Date.now() / 1000), machine
 }
 
 // Emulators running now would write their settings back over ours when they close
-const PROC = { pcsx2: /pcsx2/i, duckstation: /duckstation/i, dolphin: /dolphin-emu/i, ppsspp: /ppsspp/i, retroarch: /retroarch/i, azahar: /azahar/i, citra: /citra/i };
+// 0.9.62: every emulator whose files Cartridge writes (game settings, patches) is refused while it runs: it saves its
+// settings when it quits, over the change (Eden and Azahar rewrite a game's file when the game starts, Flycast and
+// Supermodel their whole main file)
+const PROC = { pcsx2: /pcsx2/i, duckstation: /duckstation/i, dolphin: /dolphin-emu/i, ppsspp: /ppsspp/i, retroarch: /retroarch/i, azahar: /azahar/i, citra: /citra/i, rpcs3: /rpcs3/i, shadps4: /shadps4/i, eden: /^eden/i, cemu: /^cemu/i, vita3k: /vita3k/i, xenia: /xenia/i, flycast: /flycast/i, mame: /^mame/i, supermodel: /^supermodel/i, ryujinx: /ryujinx/i };
 function running(procDir = '/proc') {
   const out = new Set();
   let ids = []; try { ids = fs.readdirSync(procDir).filter((d) => /^\d+$/.test(d)); } catch { return out; }
