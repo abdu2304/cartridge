@@ -2866,6 +2866,33 @@ function raContent(where) {
   return first ? path.join(where, first) : mainFile(where);
 }
 const GS_NAME = { eden: 'Eden', citron: 'Citron', yuzu: 'yuzu', azahar: 'Azahar', citra: 'Citra', cemu: 'Cemu', vita3k: 'Vita3K', xenia: 'Xenia', flycast: 'Flycast', supermodel: 'Supermodel', mame: 'MAME', retroarch: 'RetroArch', ryujinx: 'Ryujinx' };
+// the version of the emulator a game uses (0.9.63, owner: Eden 0.2.0's choices aren't the newest source's): the copy
+// its Steam shortcut starts, else the first installed; read from what that copy says it is (RPCS3's log, the version an
+// update put in, its file name, a Flatpak's metadata, shadPS4's chosen version). null when it can't be told.
+function flatpakVersion(fp) {
+  if (!fp) return null;
+  for (const b of [path.join(os.homedir(), '.local/share/flatpak'), '/var/lib/flatpak']) {
+    for (const f of [`${fp}.metainfo.xml`, `${fp}.appdata.xml`]) {
+      try { const x = fs.readFileSync(path.join(b, 'app', fp, 'current/active/files/share/metainfo', f), 'utf8'); const m = /<release[^>]*\bversion="([^"]+)"/.exec(x); if (m) return m[1]; } catch {}
+    }
+  }
+  return null;
+}
+function emuVersionFor(id, romId) {
+  try {
+    const U = require('./emuUpdates');
+    if (id === 'shadps4') { const own = (config.steam?.shadVersions || {})[romId]; const sel = own || require('./shadVersions').settings()?.selected; if (sel) return U.verOf(sel) || null; }
+    let exe = '', args = '';
+    try { const key = steamMgr.forRom(Number(romId)).console; const t = key ? steamMgr._templateForGame(Number(romId), key) : null; if (t?.exe) { exe = t.exe; args = Array.isArray(t.args) ? t.args.join(' ') : String(t.args || ''); } } catch {}
+    const list = steamMgr.installedEmulators().filter((e) => e.id === id);
+    const e = list.find((x) => exe && (x.path === exe || (x.fp && (args.includes(x.fp) || exe.includes(x.fp))))) || list[0];
+    if (!e) return null;
+    if (e.kind === 'flatpak') return flatpakVersion(e.fp);
+    const rec = (loadJson(path.join(USER_DATA, 'emulator-releases.json'), {}).installed || {})[e.path];
+    const size = (() => { try { return fs.statSync(e.path).size; } catch { return -1; } })();
+    return U.ranVersion(id, e.path) || (rec && rec.size === size ? rec.version : null) || U.verOf(path.basename(e.path)) || (e.version ? U.verOf(e.version) : null) || null;
+  } catch { return null; }
+}
 function newEmuCtx(romId, r, where, slugs) {
   const g = gameEmuOf(romId, slugs);
   if (!g) return null;
@@ -5098,10 +5125,11 @@ const handlers = {
     log('folder unlinked', rec.from);
     return true;
   },
-  'gamesettings:get': ({ romId }) => { const c = gameSettingsCtx(Number(romId)); return c.why ? { why: c.why, emu: c.emu } : require('./gameSettings').describe(c); },
+  'gamesettings:get': ({ romId }) => { const c = gameSettingsCtx(Number(romId)); if (c.why) return { why: c.why, emu: c.emu }; c.emuVersion = emuVersionFor(c.emu, Number(romId)); return require('./gameSettings').describe(c); },
   'gamesettings:set': ({ romId, changes }) => {
     const c = gameSettingsCtx(Number(romId));
     if (c.why) throw new Error(c.why);
+    c.emuVersion = emuVersionFor(c.emu, Number(romId));
     const names = { rpcs3: 'RPCS3', pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', ppsspp: 'PPSSPP', shadps4: 'shadPS4', ...GS_NAME };
     notRunning(c.emu, names[c.emu]);
     const d = require('./gameSettings').apply(c, changes || []);

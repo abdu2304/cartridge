@@ -80,11 +80,12 @@ function read(dir) {
 
 module.exports = {
   id: 'cemu',
+  versions: { git: 'https://github.com/cemu-project/Cemu', tags: /^v\d+\.\d+(\.\d+)?$/ }, // 0.9.63: its last releases too (gen.js)
   files: [
     { url: RAW + 'Cafe/GameProfile/GameProfile.cpp', as: 'GameProfile.cpp' },
     { url: RAW + 'Cafe/GameProfile/GameProfile.h', as: 'GameProfile.h' },
     { url: RAW + 'config/CemuConfig.h', as: 'CemuConfig.h' },
-    { url: RAW + 'gui/wxgui/GameProfileWindow.cpp', as: 'GameProfileWindow.cpp' },
+    { url: RAW + 'gui/wxgui/GameProfileWindow.cpp', alt: [RAW + 'gui/GameProfileWindow.cpp'], as: 'GameProfileWindow.cpp' }, // gui/ before the wx folder
   ],
   read,
 };

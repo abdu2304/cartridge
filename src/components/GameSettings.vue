@@ -4,12 +4,14 @@
       <div class="gs-head">
         <img v-if="art" class="gs-cover" :src="art" />
         <div style="min-width: 0">
-          <div class="eyebrow">{{ d?.name ? d.name + ' · ' : '' }}Game Settings</div>
+          <div class="eyebrow">{{ d?.name ? d.name + (d.version ? ' ' + d.version : '') + ' · ' : '' }}Game Settings</div>
           <h2>{{ name }}</h2>
           <p class="muted small">Only for this game, saved in {{ d?.name || 'the emulator' }}’s own per-game settings. Anything left on “{{ d?.name || 'Emulator' }}’s own” follows your normal settings.</p>
         </div>
       </div>
       <div v-if="!d" class="muted"><Icon name="mdiSync" :size="16" class="spin" /> Reading its settings…</div>
+      <!-- 0.9.63: the version wasn't known, so settings whose choices changed between versions are shown but not changed -->
+      <div v-else-if="d.versionUnknown && d.items?.some((x) => x.locked)" class="gs-warn muted small"><Icon name="mdiInformationOutline" :size="16" />Cartridge couldn’t tell which version of {{ d.name }} you have, so settings whose choices changed between its versions are locked. Change those in {{ d.name }} itself.</div>
       <div v-else-if="d.why" class="muted small">{{ d.why }}</div>
       <div v-else-if="!(d.items || []).length" class="muted small">{{ d.name || 'This emulator' }} has no per-game settings Cartridge can change for this game yet.</div>
       <!-- sections as tabs on L1/R1 (0.9.24, owner: the menu style across the board) -->
@@ -25,8 +27,8 @@
         <div v-if="tab === 'Advanced'" class="gs-warn muted small"><Icon name="mdiAlertOutline" :size="16" />For testing and fixing problems. Some of these can stop the game starting; “{{ d.name }}’s own” puts any of them back.</div>
         <template v-for="(it, i) in shown" :key="it.id">
         <div v-if="it.group && it.group !== shown[i - 1]?.group" class="gs-group">{{ it.group }}</div>
-        <button class="lrow" data-focus data-expand :data-key="'gs-' + it.id" :disabled="busy" @click="pick(it)">
-          <span class="l-mid"><b>{{ it.label }}</b><span class="l-sub">{{ it.sub || (it.game != null ? 'This game’s own' : `${d.name}’s own${it.base != null ? ': ' + labelOf(it, it.base) : ''}`) }}</span><span v-if="it.desc" class="l-sub gs-desc">{{ it.desc }}</span></span>
+        <button class="lrow" :class="{ 'gs-locked': it.locked }" data-focus data-expand :data-key="'gs-' + it.id" :disabled="busy" @click="pick(it)">
+          <span class="l-mid"><b>{{ it.label }}</b><span class="l-sub">{{ it.locked ? `Its choices differ between ${d.name} versions: change it in ${d.name}` : it.sub || (it.game != null ? 'This game’s own' : `${d.name}’s own${it.base != null ? ': ' + labelOf(it, it.base) : ''}`) }}</span><span v-if="it.desc" class="l-sub gs-desc">{{ it.desc }}</span></span>
           <span class="l-end"><span class="status" :class="{ ok: it.game != null }">{{ it.game != null ? labelOf(it, it.game) : 'Default' }}</span></span>
         </button>
         </template>
@@ -86,6 +88,8 @@ let saved = null, layer;
 // the picker takes the one modal slot: this sheet comes back after it
 function reopen(at) { if (store.modal?.type !== 'gamesettings') store.modal = { type: 'gamesettings', props: { romId: props.romId, name: props.name, tab: tab.value, at: at || '' }, resolve: saved || (() => {}) }; }
 async function pick(it) {
+  // a locked setting (its version unknown): its own value can still go back to the emulator's, nothing else
+  if (it.locked) { if (it.game == null) return toast(`${it.label} is changed in ${d.value.name} itself: its choices differ between versions.`, 'info', 4500, 'mdiInformationOutline'); const v = await choose({ title: it.label, message: `${d.value.name} versions number this setting differently, so Cartridge only puts it back.`, options: [{ label: `Back to ${d.value.name}’s Own`, value: 'base', icon: 'mdiRestore' }] }); reopen('gs-' + it.id); if (v === 'base') await save([{ id: it.id, value: null }]); return; }
   const cur = it.game;
   // the emulator's own first, then Type a Number or a Value (0.9.62, owner: type any number in its range), then the choices
   const range = it.num ? `${Math.abs(it.num.min) >= 1e6 && Math.abs(it.num.max) >= 1e6 ? 'Any number' : Math.abs(it.num.max) >= 1e6 ? `${it.num.min} or more` : `${it.num.min} to ${it.num.max}`}${it.num.unit ? ' ' + it.num.unit : ''}` : '';
@@ -128,6 +132,7 @@ onBeforeUnmount(() => layer?.pop());
 
 <style scoped>
 .gs { width: min(960px, 94vw); max-height: 88vh; display: flex; flex-direction: column; gap: var(--s-3); }
+.gs-locked .l-mid b { opacity: 0.6; }
 .gs-head { display: flex; gap: var(--s-4); align-items: flex-start; }
 .gs-head h2 { margin: 2px 0 6px; font-size: var(--t-xl); line-height: 1.15; }
 .gs-head p { margin: 0; line-height: 1.45; }

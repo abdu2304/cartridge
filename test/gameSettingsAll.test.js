@@ -16,7 +16,7 @@ const by = (d, k) => d.items.find((x) => x.id === k || x.id.endsWith('.' + k));
 
 test('every emulator’s list is usable: keys, types, choices, defaults among the choices, Advanced last', () => {
   for (const [emu, list] of Object.entries(DB)) {
-    if (emu === 'note') continue;
+    if (emu === 'note' || emu === 'versions') continue;
     const entries = emu === 'retroarchCores' ? Object.values(list).flatMap((c) => c.entries) : list;
     assert.ok(entries.length > 0, emu);
     for (const x of entries) {
@@ -171,4 +171,23 @@ test('Xbox 360 title IDs from a disc image, a default.xex and an STFS package', 
   const con = Buffer.alloc(0x400); con.write('CON ', 0, 'latin1'); con.writeUInt32BE(0x58410a6d, 0x360);
   const conFile = path.join(TMP, 'package'); fs.writeFileSync(conFile, con);
   assert.strictEqual(X.titleId(conFile), '58410A6D');
+});
+
+test('each emulator release gets its own choices; an unknown version locks only what differs (0.9.63)', () => {
+  const G = require('../electron/gameSettings');
+  const db = require('../electron/emuSettingsDb.json');
+  const T = db.versions.eden.tags;
+  assert.strictEqual(G.pickRelease(T, '0.2.0'), 'v0.2.0');
+  assert.strictEqual(G.pickRelease(T, '0.2.1.500'), 'newest');
+  assert.strictEqual(G.pickRelease(T, '0.0.1'), null);
+  assert.strictEqual(G.pickRelease(T, 'build 2026-10-07'), null);
+  // the owner's Eden 0.2.0: three GPU Modes, 1 = Balanced, and nothing that release doesn't have
+  const L = G.listFor('eden', '0.2.0');
+  assert.deepStrictEqual(L.list.find((x) => x.k === 'gpu_accuracy').o, [['0', 'Fast'], ['1', 'Balanced'], ['2', 'Accurate']]);
+  assert.ok(!L.list.some((x) => x.k === 'frame_gen'));
+  // unknown: what differs is locked, the rest isn't
+  const U = G.listFor('eden', null);
+  assert.ok(U.locked.has('Renderer.gpu_accuracy') && !U.locked.has('Renderer.resolution_setup'));
+  // every release read has a sane diff: no more than half the settings changed
+  for (const [emu, V] of Object.entries(db.versions)) for (const t of V.tags) assert.ok(Object.keys(V.diff[t]).length < db[emu].length / 2, `${emu} ${t}`);
 });

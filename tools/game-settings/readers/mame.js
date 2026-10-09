@@ -79,7 +79,7 @@ function read(dir) {
   return out;
 }
 module.exports = {
-  id: 'mame',
+  id: 'mame', versions: { git: 'https://github.com/mamedev/mame', tags: /^mame0\d{3}$/ }, /* 0.9.63: its last releases too (gen.js) */
   files: [
     { url: RAW + 'emu/emuopts.cpp', as: 'emuopts.cpp' }, { url: RAW + 'emu/emuopts.h', as: 'emuopts.h' },
     { url: RAW + 'osd/modules/lib/osdobj_common.cpp', as: 'osdobj_common.cpp' }, { url: RAW + 'osd/modules/lib/osdobj_common.h', as: 'osdobj_common.h' },

@@ -49,6 +49,7 @@ const nice = (k) => String(k).replace(/^[ibfsu](?=[A-Z])/, '').replace(/([A-Z]+)
 const sortTabs = (order, list) => list.sort((a, b) => order.indexOf(a.tab) - order.indexOf(b.tab));
 module.exports = {
   id: 'dolphin',
+  versions: { git: 'https://github.com/dolphin-emu/dolphin', tags: /^\d{4}a?$/ }, // 0.9.63: its last releases too (gen.js)
   files: [['Core/Config/GraphicsSettings.cpp', 'GraphicsSettings.cpp'], ['Core/Config/MainSettings.cpp', 'MainSettings.cpp'], ['VideoCommon/VideoConfig.h', 'VideoConfig.h'], ['Core/PowerPC/PowerPC.h', 'PowerPC.h']].map(([p, as]) => ({ url: RAW + p, as })),
   // in the order the tabs show (Array sort is stable, so each tab keeps the source's order)
   read: (dir) => sortTabs(['Graphics', 'Enhancements', 'Hacks', 'Core', 'Audio', 'Stereo 3D', 'Colour', 'Advanced'], read(dir).map((x) => ({ ...x, l: x.l || nice(x.k), o: x.t === 'bool' ? [['True', 'On'], ['False', 'Off']] : x.o, tab: ADV.test(x.k) ? 'Advanced' : TAB[x.s] || x.s, adv: ADV.test(x.k) || undefined }))),

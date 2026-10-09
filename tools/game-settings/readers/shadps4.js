@@ -108,4 +108,4 @@ function finish(x) {
   return o;
 }
 
-module.exports = { id: 'shadps4', files: FILES, read };
+module.exports = { id: 'shadps4', versions: { git: 'https://github.com/shadps4-emu/shadPS4', tags: /^v\.\d+\.\d+\.\d+$/ }, /* 0.9.63: its last releases too (gen.js) */ files: FILES, read };

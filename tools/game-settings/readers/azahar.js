@@ -163,6 +163,7 @@ function read(dir) {
 const SRC = ['common/settings.h', 'citra_qt/configuration/config.cpp', ...TABS.flatMap((t) => [`citra_qt/configuration/configure_${t}.cpp`, `citra_qt/configuration/configure_${t}.ui`])];
 module.exports = {
   id: 'azahar',
+  versions: { git: 'https://github.com/azahar-emu/azahar', tags: /^\d{4}(\.\d+)*$/ }, // 0.9.63: its last releases too (gen.js)
   files: SRC.map((f) => ({ url: RAW + f, as: path.basename(f) })),
   read: (dir) => read(dir).map(({ member, ...x }) => x),
   _ui: uiWidgets,

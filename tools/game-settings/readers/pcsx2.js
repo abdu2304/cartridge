@@ -196,4 +196,4 @@ function finish(x) {
   return o;
 }
 
-module.exports = { id: 'pcsx2', files: FILES.map((f) => ({ url: RAW + f, as: f })), read };
+module.exports = { id: 'pcsx2', versions: { git: 'https://github.com/PCSX2/pcsx2', tags: /^v\d+\.\d+\.\d+$/ }, /* 0.9.63: its last releases too (gen.js) */ files: FILES.map((f) => ({ url: RAW + f, as: f })), read };
