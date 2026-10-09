@@ -18,6 +18,8 @@ const SOURCES = {
   xenia: { id: 'xenia', name: 'Xenia', platform: 'Xbox 360', short: 'X360', slugs: ['xbox360'], kind: 'gamerscore' },
   vita3k: { id: 'vita3k', name: 'Vita3K', platform: 'PlayStation Vita', short: 'Vita', slugs: ['psvita'], kind: 'trophy' },
   kytyps5: { id: 'kytyps5', name: 'KytyPS5', platform: 'PlayStation 5', short: 'PS5', slugs: ['ps5'], kind: 'trophy' },
+  // 0.9.65: achievements recomps record themselves (recompAchievements.js), one game per installed recomp
+  recomp: { id: 'recomp', name: 'Recomps', platform: 'Recomps', short: 'Recomp', slugs: [], kind: 'gamerscore' },
 };
 
 const HOME = os.homedir();
@@ -626,9 +628,19 @@ function parseKyty(root) {
   return games;
 }
 
+// ---------------------------------------------------------------- recomps (0.9.65)
+// main.js hands the installed recomps over (setRecomps); each one's install folder stands for it as a "folder" here
+let recompItems = [];
+const setRecomps = (list) => { recompItems = Array.isArray(list) ? list : []; };
+const recompRoots = () => recompItems.filter((it) => isDir(it.dir)).map((it) => ({ dir: it.dir, how: 'config' }));
+function parseRecomp(dir) {
+  const RA = require('./recompAchievements');
+  return recompItems.filter((it) => it.dir === dir).map((it) => RA.gameOf(it, RA.locate(it))).filter(Boolean);
+}
+
 // ---------------------------------------------------------------- detection + scanning
-const DETECT = { rpcs3: rpcs3Roots, shadps4: shadps4Roots, xenia: xeniaRoots, vita3k: vita3kRoots, kytyps5: kytyRoots };
-const PARSE = { rpcs3: parseRpcs3, shadps4: parseShadps4, xenia: parseXenia, vita3k: parseVita3k, kytyps5: parseKyty };
+const DETECT = { rpcs3: rpcs3Roots, shadps4: shadps4Roots, xenia: xeniaRoots, vita3k: vita3kRoots, kytyps5: kytyRoots, recomp: recompRoots };
+const PARSE = { rpcs3: parseRpcs3, shadps4: parseShadps4, xenia: parseXenia, vita3k: parseVita3k, kytyps5: parseKyty, recomp: parseRecomp };
 
 // Does this folder hold data for the given source? Returns the root to use (it may be a parent
 // or child of what the user picked), or null.
@@ -667,6 +679,7 @@ function validateAt(src, dir) {
     for (const d of [dir, path.join(dir, 'content'), ...tryDirs]) if (xeniaProfiles(d).length) return d;
     return null;
   }
+  if (src === 'recomp') return recompItems.some((it) => it.dir === dir) ? dir : null;
   if (src === 'kytyps5') {
     for (const d of [dir, ...tryDirs]) if (ls(path.join(d, '_SaveData')).some((t) => ls(path.join(d, '_SaveData', t)).some((f) => /^trophies_\d+_\d+\.json$/.test(f)))) return d;
     return null;
@@ -754,4 +767,4 @@ function signature(dirs) {
   return s;
 }
 
-module.exports = { readUcp, setPs5Games, rememberTitle, readTrp, shadTrophyKey, setTrpCacheDir, APP_DIRS, emulationRoots, registerIcon: iconToken, shadKeyState, watchPaths, SOURCES, DETECT, validate, scan, readSource, signature, iconPath, setIconCacheDir, readTropusrPS3, readTropusrVita, parseTrophyXml, parseGpd, readXdbf };
+module.exports = { setRecomps, readUcp, setPs5Games, rememberTitle, readTrp, shadTrophyKey, setTrpCacheDir, APP_DIRS, emulationRoots, registerIcon: iconToken, shadKeyState, watchPaths, SOURCES, DETECT, validate, scan, readSource, signature, iconPath, setIconCacheDir, readTropusrPS3, readTropusrVita, parseTrophyXml, parseGpd, readXdbf };

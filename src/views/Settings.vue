@@ -248,6 +248,8 @@
               </div>
             </template>
             <LinkedFolders v-else-if="emuPage === 'links'" />
+            <!-- 0.9.65 (owner): recomps have their own tab, kept out of Update All -->
+            <Recomps v-else-if="emuPage === 'recomps'" embedded />
             <template v-else-if="emuPage === 'folders'">
             <div class="row" style="justify-content: space-between">
               <p class="muted small" style="margin: 0; max-width: 520px">Matched inside your ROMs folder using ES-DE folder names. Pick any system to point it somewhere else.</p>
@@ -620,6 +622,7 @@ import RommUpload from '../components/RommUpload.vue';
 import EmuIcon from '../components/EmuIcon.vue';
 import EmuGet from '../components/EmuGet.vue';
 import LinkedFolders from '../components/LinkedFolders.vue';
+import Recomps from '../components/Recomps.vue';
 import ChangelogCard from '../components/ChangelogCard.vue';
 import ServerStatus from '../components/ServerStatus.vue';
 import ControllerTest from '../components/ControllerTest.vue';
@@ -690,6 +693,7 @@ const SEARCH = [
   ['Games folders and drives', 'Library · Games and Storage', 'library', 'folders'], ['Add a drive', 'Library · Games and Storage', 'library', 'folders'],
   ['New games go to', 'Library · Games and Storage', 'library', 'folders'], ['Always ask where downloads go', 'Library · Games and Storage', 'library', 'folders'],
   ['BIOS folder', 'Library · Games and Storage', 'library', 'folders'], ['Free up space, storage manager', 'Library · Games and Storage', 'library', 'folders'], ['Check downloaded games', 'Library · Games and Storage', 'library', 'folders'],
+  ['Recomps, native ports of console games', 'Emulators · Recomps', 'emu', 'recomps'], ['Zelda 64 Recompiled, Ship of Harkinian, Unleashed...', 'Emulators · Recomps', 'emu', 'recomps'],
   ['Get and update emulators', 'Emulators', 'emu', 'emus'], ['Vita3K, RPCS3, shadPS4, Dolphin, PCSX2...', 'Emulators', 'emu', 'emus'],
   ['Game add-ons, mods, texture packs, patches', 'Emulators · Game Add-ons', 'emu', 'addons'], ['Nexus Mods API key', 'Emulators · Game Add-ons', 'emu', 'addons'], ['BIOS and firmware', 'Emulators · Setup and Health', 'emu', 'overview'],
   ['Shortcut health, issues', 'Emulators · Setup and Health', 'emu', 'overview'], ['Console folders', 'Emulators · Console Folders', 'emu', 'folders'], ['Linked folders, share saves with a fork', 'Emulators · Linked Folders', 'emu', 'links'],
@@ -1191,7 +1195,7 @@ async function loadAll() {
 const mediaSizes = [{ v: 'compact', l: 'Compact' }, { v: 'large', l: 'Medium' }, { v: 'xl', l: 'Large' }];
 // Emulators pages (0.9.16)
 // 0.9.28 (owner: the flow felt confusing): what you have first, then add-ons, then setup and health checks, then folders
-const EMU_PAGES = [{ v: 'emus', l: 'Emulators' }, { v: 'addons', l: 'Game Add-ons' }, { v: 'overview', l: 'Setup and Health' }, { v: 'folders', l: 'Console Folders' }, { v: 'links', l: 'Linked Folders' }];
+const EMU_PAGES = [{ v: 'emus', l: 'Emulators' }, { v: 'recomps', l: 'Recomps' }, { v: 'addons', l: 'Game Add-ons' }, { v: 'overview', l: 'Setup and Health' }, { v: 'folders', l: 'Console Folders' }, { v: 'links', l: 'Linked Folders' }];
 // a fork's Manage sheet asks for Linked Folders (0.9.33)
 watch(() => store.emuPageWant, (v) => { if (!v) return; store.emuPageWant = null; setEmuPage(v); nextTick(() => focusFirst(paneEl.value, `[data-key="emup-${v}"]`)); });
 // 0.9.44 (owner: Emulators opened on Setup and Health): every section opens on its first page; coming back from a

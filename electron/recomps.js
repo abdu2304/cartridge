@@ -186,7 +186,7 @@ function createRecomps(ctx) {
   const F = (n) => path.join(dataDir, n);
   const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
   const writeJson = (f, v) => { try { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f + '.tmp', JSON.stringify(v, null, 1)); fs.renameSync(f + '.tmp', f); } catch (e) { log('recomps: write', path.basename(f), e.message); } };
-  const SHIPPED = path.join(__dirname, 'recomps.json');
+  const SHIPPED = ctx.shipped || path.join(__dirname, 'recomps.json'); // ctx.shipped: tests
   let installs = readJson(F('recomp-installs.json'), {});
   let latest = readJson(F('recomp-latest.json'), {});
   const saveInstalls = () => writeJson(F('recomp-installs.json'), installs);
@@ -238,7 +238,7 @@ function createRecomps(ctx) {
       const rec = installs[e.id] || null;
       const lt = latest[e.id] || null;
       out.push({
-        id: e.id, name: e.name, games: e.games, origin: e.origin, from: e.from, description: e.description || '', url: projectUrl(e), site: e.site || null,
+        id: e.id, name: e.name, games: e.games, origin: e.origin, from: e.from, repo: e.repo || null, description: e.description || '', url: projectUrl(e), site: e.site || null,
         builds: e.builds, needs: e.needs || null, setup: e.setup || { how: 'none' }, saves: e.saves || [], achievements: e.achievements || null, license: e.license || null,
         roms: matchRoms(e, roms),
         installed: rec ? { tag: rec.tag, kind: rec.kind, dir: rec.dir, program: rec.program, channel: rec.channel || 'stable', at: rec.at, game: rec.game || null, ready: readyOf(e, rec), here: exists(rec.program), appid: rec.appid || null } : null,
@@ -314,7 +314,9 @@ function createRecomps(ctx) {
     if (!prev && fs.existsSync(dest) && fs.readdirSync(dest).length) throw new Error(`${dest.replace(os.homedir(), '~')} already has something in it. Cartridge leaves it as it is.`);
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     const meta = prev ? backupSaves(id, 'update') : null;
-    const tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.cartridge-dl`);
+    // the download keeps the release file's own ending: how it's unpacked goes by it (.tar.gz through tar, .zip, .7z)
+    const ext = (/\.(tar\.(gz|xz|zst|bz2)|[a-z0-9]{1,8})$/i.exec(b.asset.name) || ['.bin'])[0];
+    const tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.cartridge-dl${ext}`);
     const out = dest + '.cartridge-new';
     const FV = require('./forkVersions'), store = FV.storeOf(path.dirname(dest), path.basename(dest));
     let program, files, kind = b.kind;

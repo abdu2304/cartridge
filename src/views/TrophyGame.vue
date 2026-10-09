@@ -70,7 +70,7 @@ const filters = [{ v: 'all', l: 'All' }, { v: 'unlocked', l: 'Unlocked' }, { v: 
 const l = computed(() => g.value?.light || {});
 const pct = computed(() => (l.value.total ? Math.round((l.value.earned / l.value.total) * 100) : 0));
 const rom = computed(() => romById(g.value?.romId));
-const SLUG = { rpcs3: 'ps3', shadps4: 'ps4', xenia: 'xbox360', vita3k: 'psvita', kytyps5: 'ps5' };
+const SLUG = { rpcs3: 'ps3', shadps4: 'ps4', xenia: 'xbox360', vita3k: 'psvita', kytyps5: 'ps5', recomp: null };
 const hash = (t) => { let h = 5381; for (const c of String(t)) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36); };
 const gameLogo = computed(() => (!g.value ? null : rom.value ? logoOf(rom.value) : logoOf({ id: 'tro' + hash(g.value.title), name: g.value.title.replace(/[™®©]/g, '') })));
 const totals = computed(() => { const o = { P: 0, G: 0, S: 0, B: 0 }; for (const t of g.value?.trophies || []) if (o[t.grade] !== undefined) o[t.grade]++; return o; });

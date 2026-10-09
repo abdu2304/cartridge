@@ -79,6 +79,7 @@
     <GameTimeline v-else-if="store.modal?.type === 'timeline'" v-bind="store.modal.props" />
     <GameAbout v-else-if="store.modal?.type === 'gameabout'" v-bind="store.modal.props" />
     <FilePick v-else-if="store.modal?.type === 'filepick'" v-bind="store.modal.props" />
+    <RecompSheet v-else-if="store.modal?.type === 'recomp'" v-bind="store.modal.props" />
     <ConsoleCollection v-else-if="store.modal?.type === 'consolecol'" v-bind="store.modal.props" />
     <LinkSetup v-else-if="store.modal?.type === 'linksetup'" v-bind="store.modal.props" />
     <SaveGame v-else-if="store.modal?.type === 'savegame'" :key="'sg' + store.modal.props.romId" v-bind="store.modal.props" />
@@ -143,6 +144,7 @@ import ArtPicker from './components/ArtPicker.vue';
 import GameTimeline from './components/GameTimeline.vue';
 import GameAbout from './components/GameAbout.vue';
 import FilePick from './components/FilePick.vue';
+import RecompSheet from './components/RecompSheet.vue';
 import ConsoleCollection from './components/ConsoleCollection.vue';
 import LinkSetup from './components/LinkSetup.vue';
 import SaveGame from './components/SaveGame.vue';
@@ -189,8 +191,9 @@ import Collections from './views/Collections.vue';
 import EmuSetup from './views/EmuSetup.vue';
 import ShortcutHealth from './views/ShortcutHealth.vue';
 import FrameGen from './views/FrameGen.vue';
+import RecompsView from './views/RecompsView.vue';
 
-const views = { start: Start, achievements: Achievements, 'ra-game': RaGame, 'trophy-game': TrophyGame, home: Home, library: Gallery, consoles: Consoles, platform: Gallery, collection: Gallery, genre: Gallery, genres: Genres, collections: Collections, game: Game, downloads: Downloads, settings: Settings, search: Search, 'steam-console': SteamConsole, 'steam-missing': SteamMissing, 'emu-setup': EmuSetup, 'steam-health': ShortcutHealth, 'frame-gen': FrameGen };
+const views = { start: Start, achievements: Achievements, 'ra-game': RaGame, 'trophy-game': TrophyGame, home: Home, library: Gallery, consoles: Consoles, platform: Gallery, collection: Gallery, genre: Gallery, genres: Genres, collections: Collections, game: Game, downloads: Downloads, settings: Settings, search: Search, 'steam-console': SteamConsole, 'steam-missing': SteamMissing, 'emu-setup': EmuSetup, 'steam-health': ShortcutHealth, 'frame-gen': FrameGen, recomps: RecompsView };
 // the tabs you picked in Look & Feel → Top bar, in your order
 const tabs = computed(() => activeTabs().map((name) => ({ name, ...TAB_DEFS[name] })));
 const steamPct = computed(() => { const p = steam.progress; return p?.total ? Math.max(4, Math.min(100, ((p.done + 1) / p.total) * 100)) : null; });

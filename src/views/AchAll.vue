@@ -113,7 +113,7 @@ const ra = ref(null), tro = ref(null), loading = ref(true);
 const raOn = computed(() => !!store.config.ra?.user && !!store.config.ra?.key);
 const fmt = (n) => (n || 0).toLocaleString();
 const raDate = (d) => { const t = new Date(String(d || '').replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(d || '') ? '' : 'Z')).getTime(); return isNaN(t) ? 0 : t; };
-const CONSOLE = { rpcs3: 'PlayStation 3', shadps4: 'PlayStation 4', xenia: 'Xbox 360', vita3k: 'PlayStation Vita', kytyps5: 'PlayStation 5' };
+const CONSOLE = { rpcs3: 'PlayStation 3', shadps4: 'PlayStation 4', xenia: 'Xbox 360', vita3k: 'PlayStation Vita', kytyps5: 'PlayStation 5', recomp: 'Recomps' };
 const romOfTro = (key) => tro.value?.games?.find((g) => g.key === key)?.romId || null;
 const pctOf = (e, t) => (t ? Math.round((e / t) * 100) : 0);
 const trophyCount = computed(() => (tro.value?.anySource ? ['P', 'G', 'S', 'B'].reduce((s, g) => s + (tro.value.summary?.[g] || 0), 0) : 0));

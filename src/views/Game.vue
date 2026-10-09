@@ -645,12 +645,15 @@ async function more() {
   if (saveSyncOn()) play.push({ label: 'Saves in RomM', sub: 'Cartridge Save Sync: sync now, or put an older version back', value: 'cloudsaves', icon: 'mdiCloudSyncOutline' }); // 0.9.51
   if (sv?.length) play.push({ label: 'Saves on This Device', sub: `${sv.length} ${sv.length === 1 ? 'save' : 'saves'} · ${sv.some((x) => x.synced) ? 'synced with Syncthing' : 'not synced'} · changed ${ago(Math.max(...sv.map((x) => x.at || 0)))}`, value: 'saves', icon: 'mdiContentSaveOutline' });
   if (installedPath.value) play.push({ label: 'Show file location', value: 'path', icon: 'mdiFolderOutline' });
+  const rcs = await Promise.race([call('recomps:forRom', { romId: Number(props.romId) }).catch(() => []), new Promise((r) => setTimeout(() => r([]), 1200))]);
   const top = [
     { label: fav.value ? 'Remove from favourites' : 'Add to favourites', sub: 'Saved in RomM', value: 'fav', icon: fav.value ? 'mdiHeartOff' : 'mdiHeartOutline' },
     { label: 'Play status', sub: statusText.value || 'None', value: 'status', icon: 'mdiProgressCheck' },
     { label: 'Add to a collection', sub: 'Yours in RomM, or a new one', value: 'col', icon: 'mdiBookmarkPlusOutline' },
     { label: 'Timeline', sub: 'Added, downloaded, played, trophies', value: 'timeline', icon: 'mdiTimelineClockOutline' },
     { label: 'Pin to Start', sub: 'A tile of its own on Start', value: 'pin', icon: 'mdiPinOutline' },
+    // 0.9.65: a native PC port of this game (a recomp), each its own sheet
+    ...rcs.map((r) => ({ label: `Recomp: ${r.name}`, sub: r.installed ? (r.installed.ready ? `Installed ${r.installed.tag}` : 'Installed, needs your game') : 'A native PC port of this game', value: 'recomp:' + r.id, icon: 'mdiRocketLaunchOutline', raw: true })),
     // 0.9.38 (owner): About belongs with the game, last, under Pin to Start (it was in Options)
     { label: 'About', sub: 'Console, ID, version, and what’s installed for it', value: 'about', icon: 'mdiInformationOutline' },
   ];
@@ -729,6 +732,7 @@ async function more() {
   }
   if (v === 'pkg') { await installPkg(); return; }
   if (v === 'patches') { await openModal('gameaddons', { romId: Number(props.romId), name: base.value.name, tab: 'patches' }); return; }
+  if (typeof v === 'string' && v.startsWith('recomp:')) { await openModal('recomp', { id: v.slice(7) }); return; }
   if (v === 'redownload') { await redownload(); return; }
   if (v === 'morefiles') { await downloadMore(base.value, moreFiles.have); return; }
   if (v === 'ps3check') {
