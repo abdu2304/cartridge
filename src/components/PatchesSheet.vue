@@ -92,6 +92,7 @@ const DL = {
   Cemu: { label: 'Download Latest Community Graphic Packs', busy: 'Downloading Graphic Packs…' },
   RPCS3: { label: 'Download Latest Patches', busy: 'Downloading RPCS3’s Patches…' },
   shadPS4: { label: 'Download Latest Patches', busy: 'Downloading shadPS4 and GoldHEN Patches…' },
+  Xenia: { label: 'Download Latest Patches', busy: 'Downloading Xenia’s Patches…' },
 };
 async function packsDownload() {
   packsBusy.value = true;
@@ -99,6 +100,7 @@ async function packsDownload() {
     const r = await call('patches:download', { romId: props.romId });
     toast(r.emu === 'Cemu' ? (r.updated ? `Cemu's graphic packs are now ${r.version}` : `Cemu's graphic packs are up to date${r?.version ? ' (' + r.version + ')' : ''}`)
       : r.emu === 'RPCS3' ? (r.updated ? 'RPCS3’s patch list is the newest now' : 'RPCS3’s patch list is up to date')
+      : r.emu === 'Xenia' ? (r.added || r.updated ? `Xenia’s patches: ${r.added} new, ${r.updated} updated` : 'Xenia’s patches are up to date')
       : `shadPS4 and GoldHEN patches downloaded${r.partly ? '. ' + r.partly : ''}`, r.partly ? 'info' : 'ok', 4000, 'mdiDownload');
     emit('reload');
   }

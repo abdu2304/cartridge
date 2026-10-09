@@ -1816,7 +1816,9 @@ async function runJob(it) {
     const target = downloadDir({ slug: rom.platform_slug, fs_slug: rom.platform_fs_slug }, rom.fs_size_bytes || 0, it.root || null); // 0.9.38: any drive; 0.9.49: the one asked for
     if (!target) throw new Error('No folder set for this platform. Set it in Settings.');
     await fsp.mkdir(target, { recursive: true });
-    const files = (rom.files || []).slice().sort((a, b) => a.full_path.localeCompare(b.full_path));
+    // 0.9.63 (owner: a game with several files asks which to download): only the files picked, when some were
+    let files = (rom.files || []).slice().sort((a, b) => a.full_path.localeCompare(b.full_path));
+    if (Array.isArray(it.only) && it.only.length && files.length > 1) { const want = new Set(it.only); const picked = files.filter((f) => want.has(f.file_name)); if (picked.length) files = picked; }
     const romPrefix = rom.full_path + '/';
     it.total = files.reduce((s, f) => s + (f.file_size_bytes || 0), 0) || rom.fs_size_bytes || 0;
     it.received = 0;
@@ -1830,7 +1832,7 @@ async function runJob(it) {
     };
 
     let finalPath;
-    const single = files.length <= 1 && (rom.has_simple_single_file || (config.downloads.flattenSingleFile && rom.has_nested_single_file) || files.length === 0);
+    const single = files.length <= 1 && !(Array.isArray(it.only) && it.only.length) && (rom.has_simple_single_file || (config.downloads.flattenSingleFile && rom.has_nested_single_file) || files.length === 0);
     if (single) {
       const fname = files[0]?.file_name || rom.fs_name;
       finalPath = path.join(target, fname);
@@ -2753,6 +2755,7 @@ function patchState(romId) {
     return { emu: 'cemu', serial: ids[0] || r?.name, dir: { root: e.root, settings: e.settings }, ids, title: r?.name };
   }
   if (/^ps2$/i.test(r?.platform_slug || '') || /^ps2$/i.test(r?.platform_fs_slug || '')) return ps2PatchState(romId);
+  if (/\bxbox360\b/i.test(slugs)) return xeniaPatchState(Number(romId), r); // 0.9.63
   if (!/ps3/i.test(`${r?.platform_slug} ${r?.platform_fs_slug}`)) return { emu: null };
   const where = installedMap[romId];
   if (!where) return { emu: 'rpcs3', why: 'Download the game first.' };
@@ -3058,6 +3061,50 @@ async function unzipTo(zip, dir) {
     }
   } finally { try { close?.(); } catch {} }
 }
+// Xenia Canary's patches (0.9.63, electron/xeniaPatches.js): the game-patches repository's "latest" release zip (else
+// the repository's own zip), only its patch files laid into Xenia's patches folder, when missing or a week old
+const XENIA_PATCHES_FILE = path.join(USER_DATA, 'xenia-patches.json');
+async function freshXeniaPatches(romId, force = false) {
+  const r = romIndexMain().get(Number(romId));
+  if (!/\bxbox360\b/i.test(`${r?.platform_slug} ${r?.platform_fs_slug}`)) return;
+  const st = xeniaPatchState(Number(romId), r);
+  if (!st.dir) return;
+  const rec = loadJson(XENIA_PATCHES_FILE, {}), mine = rec[st.dir] || { at: 0, written: {} };
+  if (!force && Date.now() - mine.at < 7 * 864e5 && fs.existsSync(path.join(st.dir, 'patches'))) return;
+  const z = path.join(os.tmpdir(), `cartridge-xenia-patches-${Date.now()}.zip`);
+  try {
+    let url = 'https://github.com/xenia-canary/game-patches/archive/refs/heads/main.zip';
+    try { const rel = await require('./github').release('xenia-canary/game-patches', { tag: 'latest' }); const a = (rel?.assets || []).find((x) => /\.zip$/i.test(x.name)); if (a) url = a.url; } catch {}
+    await downloadTo(url, z, { abort: new AbortController() }, () => {}, { plain: true });
+    const { list, close } = await require('./addonInstall').openArchive(z, path.join(os.tmpdir(), 'cartridge-unz-' + Date.now()));
+    const entries = [];
+    try { for (const e of list) if (require('./xeniaPatches').NAME_RE.test(path.basename(e.rel)) && e.size < 4 << 20) { const rs = await e.read(), parts = []; for await (const c of rs) parts.push(c); entries.push([e.rel, Buffer.concat(parts)]); } } finally { try { close?.(); } catch {} }
+    if (!entries.length) throw new Error('the download had no patch files in it');
+    const res = require('./xeniaPatches').install(st.dir, entries, mine.written);
+    rec[st.dir] = { at: Date.now(), written: res.written }; saveJson(XENIA_PATCHES_FILE, rec, false);
+    log('xenia patches', entries.length, 'files,', res.added, 'added,', res.updated, 'updated');
+    return force ? { files: entries.length, added: res.added, updated: res.updated } : undefined;
+  } catch (e) {
+    log('xenia patches download failed', e.message);
+    if (force) throw new Error(`Xenia’s patch list couldn’t be downloaded (${e.message}).`);
+    return `Xenia’s patch list couldn’t be downloaded (${e.message}).`;
+  } finally { fs.rmSync(z, { force: true }); }
+}
+// Xbox 360 games: the title ID read from the game (x360Id.js) and Xenia's storage root (where its patches folder is)
+const x360Ids = new Map();
+function xeniaPatchState(romId, r = romIndexMain().get(Number(romId))) {
+  const where = installedMap[romId];
+  if (!where || where === MARKED) return { emu: 'xenia', why: 'Download the game first.' };
+  let st = null; try { st = fs.statSync(where); } catch {}
+  const k = `${where}|${st?.size}|${st?.mtimeMs}`;
+  if (!x360Ids.has(k)) x360Ids.set(k, require('./x360Id').titleId(where));
+  const serial = x360Ids.get(k);
+  if (!serial) return { emu: 'xenia', why: 'Cartridge couldn’t read this game’s title ID from its files.' };
+  const g = gameEmuOf(romId, `${r?.platform_slug} ${r?.platform_fs_slug}`) || { id: 'xenia', exe: '', args: '', start: '' };
+  const dir = emuCfgDir('xenia', g);
+  if (!dir) return { emu: 'xenia', serial, why: 'Xenia’s folder wasn’t found on this device. Start Xenia once, then come back.' };
+  return { emu: 'xenia', serial, dir, cfg: path.join(dir, 'xenia-canary.config.toml') };
+}
 // shadPS4's two patch lists, fetched like its launcher's Download Patches when missing or a week old (0.9.23)
 async function freshShadPatches(romId, force = false) {
   const r = romIndexMain().get(Number(romId));
@@ -3120,6 +3167,8 @@ const EMU_PATCH = {
   ppsspp: { name: 'PPSSPP', list: (st, mine) => cheatsMod.ppssppList(st.dir, st.serial, mine), set: (st, todo, mine) => { notRunning('ppsspp', 'PPSSPP'); return cheatsMod.ppssppSet(st.dir, st.serial, todo, mine, st.title); } },
   // Wii U: Cemu's graphic packs; turned on with each category's default preset, as Cemu does
   cemu: { name: 'Cemu', list: (st, mine) => require('./cemuPacks').list({ root: st.dir.root, settings: st.dir.settings, titleIds: st.ids, name: st.title }, mine), set: (st, todo, mine) => { notRunning('cemu', 'Cemu'); const C = require('./cemuPacks'); const all = C.list({ root: st.dir.root, settings: st.dir.settings, titleIds: st.ids, name: st.title }, mine); C.set({ settings: st.dir.settings }, todo.map((t) => { const p = all.find((x) => x.key === t.key); return { ...t, presets: Object.fromEntries(Object.entries(p?.presets || {}).map(([k, v]) => [k, (t.want && v.includes(t.want[k]) ? t.want[k] : null) || p.chosen[k] || v[0]])) }; }), mine); return mine; } },
+  // Xbox 360 (0.9.63): Xenia Canary's patch files; Xenia reads them when a game starts, and turning one on turns apply_patches on if it was off
+  xenia: { name: 'Xenia', list: (st, mine) => require('./xeniaPatches').list(st.dir, st.serial, mine), set: (st, todo, mine) => { notRunning('xenia', 'Xenia'); const X = require('./xeniaPatches'); if (todo.some((t) => t.on) && X.ensureOn(st.cfg)) log('xenia apply_patches turned on'); return X.set(st.dir, todo, mine); } },
   pcsx2: { name: 'PCSX2', list: (st, mine) => patchesMod.pcsx2List(st.dir, st.game, patchesMod.pcsx2ZipBuffer(patchesMod.pcsx2ZipSources(os.homedir(), steamMgr.appImagesFor('ps2', /pcsx2/i)), require('./detect').readAppImageFile), mine), set: (st, todo, mine) => patchesMod.pcsx2Set(st.dir, st.game, todo, mine) },
 };
 // D2: a Vita game through Vita3K (.pkg with its zRIF installs with no window; a .vpk or .zip
@@ -5250,10 +5299,11 @@ const handlers = {
     if (/ps3/i.test(slugs)) { const x = await freshRpcs3Patches(Number(romId), true); if (!x) throw new Error('RPCS3’s folder wasn’t found on this device. Start RPCS3 once, then try again.'); return { emu: 'RPCS3', ...x }; }
     if (/ps4/i.test(slugs)) { const x = await freshShadPatches(Number(romId), true); if (!x) throw new Error('shadPS4’s folder wasn’t found on this device. Start shadPS4 once, then try again.'); return { emu: 'shadPS4', ...x }; }
     if (/\bwiiu\b/i.test(slugs)) return { emu: 'Cemu', ...(await freshCemuPacks(Number(romId), true)) };
+    if (/\bxbox360\b/i.test(slugs)) return { emu: 'Xenia', ...(await freshXeniaPatches(Number(romId), true)) };
     throw new Error('No patch download for this console.');
   },
   'patches:list': async ({ romId }) => {
-    const dlErr = (await freshRpcs3Patches(romId)) || (await freshShadPatches(romId)) || (await freshCemuPacks(romId));
+    const dlErr = (await freshRpcs3Patches(romId)) || (await freshShadPatches(romId)) || (await freshCemuPacks(romId)) || (await freshXeniaPatches(romId));
     const st = patchState(romId), E = EMU_PATCH[st.emu];
     if (!st.dir || !E) return { emu: st.emu, emuName: E?.name || '', serial: st.serial, why: [st.why, dlErr].filter(Boolean).join(' '), list: [] };
     if (st.emu === 'ppsspp') { try { const r = await cheatsMod.ppssppDownloadDb(st.dir); if (r.updated) log('ppsspp cheat.db downloaded', r.url); } catch (e) { log('ppsspp cheat.db download failed:', e.message); } }

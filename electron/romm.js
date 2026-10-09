@@ -45,7 +45,7 @@ function slimRom(r) {
     ra_id: r.ra_id || null,
     has_notes: !!(r.has_notes || arr(r.all_user_notes).length || obj(r.rom_user).note_raw_markdown),
     summary: str(r.summary).slice(0, 400),
-    regions: arr(r.regions).map(str), files: arr(r.files).filter(Boolean).map((f) => ({ file_name: f.file_name })),
+    regions: arr(r.regions).map(str), files: arr(r.files).filter(Boolean).map((f) => (f.file_size_bytes != null || (f.full_path && r.full_path) ? { file_name: f.file_name, size: Number(f.file_size_bytes) || 0, nested: !!(f.full_path && r.full_path && f.full_path.slice(String(r.full_path).length + 1).includes('/')) } : { file_name: f.file_name })), // 0.9.63: sizes and nesting for the file picker
     year: md.first_release_date || null, genres: arr(md.genres).slice(0, 3),
     developer: developerOf(r), rating: md.average_rating || null,
     created_at: r.created_at, has_file_on_disk: r.has_file_on_disk !== false,
