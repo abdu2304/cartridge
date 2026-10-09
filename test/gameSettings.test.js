@@ -88,7 +88,7 @@ test('PPSSPP lists only its per-game settings, in tabs, with its own names and c
   const d = G.describe({ emu: 'ppsspp', serial: 'ULUS10001', ppsspp: { root, ini: path.join(root, 'PSP/SYSTEM/ppsspp.ini') } });
   const by = (id) => d.items.find((x) => x.id === id);
   assert.ok(!by('Graphics.GraphicsBackend')); // not a per-game setting in PPSSPP (CfgFlag::DEFAULT)
-  assert.deepStrictEqual([...new Set(d.items.map((x) => x.tab))], ['Graphics', 'CPU', 'Audio', 'Controls', 'System', 'General', 'Advanced']); // Advanced last (0.9.62)
+  assert.deepStrictEqual([...new Set(d.items.map((x) => x.tab))], ['Graphics', 'CPU', 'System', 'Audio', 'Controls', 'General', 'Advanced']); // one tab order for every emulator, Advanced last (0.9.62)
   assert.ok(!d.items.some((x) => x.tab === 'All Settings'));
   const sb = by('Graphics.SplineBezierQuality');
   assert.strictEqual(sb.label, 'Spline/Bezier curves quality');

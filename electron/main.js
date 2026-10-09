@@ -2771,6 +2771,67 @@ function switchVersionOf(where, keyDirs = []) {
   return { number: n, update: n != null ? Math.floor(n / 65536) : null, display: disp || null };
 }
 // Which emulator file a game's settings live in (0.9.23): the same copy its patches use
+// ---- per-game settings for every emulator (0.9.62, owner: "across the board"). Which emulator a game launches with:
+// its Steam template (yours, picked for the game, or the console's), else the console's usual one
+const GS_FAMILY = [['eden', /\beden\b|eden_emu/i], ['citron', /citron/i], ['yuzu', /\byuzu\b|sudachi|suyu|torzu/i], ['azahar', /azahar/i], ['citra', /citra|lime3ds/i], ['cemu', /\bcemu\b/i], ['vita3k', /vita3k/i], ['xenia', /xenia/i], ['flycast', /flycast/i], ['supermodel', /supermodel/i], ['mame', /\bmame\b/i], ['retroarch', /retroarch/i], ['ryujinx', /ryujinx|ryubing/i]];
+const GS_DEFAULT = [[/\bswitch\b/, 'eden'], [/\b(3ds|n3ds)\b/, 'azahar'], [/\bwiiu\b/, 'cemu'], [/\b(psvita|vita)\b/, 'vita3k'], [/\bxbox360\b/, 'xenia'], [/\b(dc|dreamcast|naomi|naomi2|atomiswave)\b/, 'flycast'], [/\bmodel3\b/, 'supermodel'], [/\b(arcade|mame)\b/, 'mame']];
+function gameEmuOf(romId, slugs) {
+  let t = null;
+  try { const key = steamMgr.forRom(Number(romId)).console; t = key ? steamMgr._templateForGame(Number(romId), key) : null; } catch {}
+  if (t?.exe) {
+    const args = Array.isArray(t.args) ? t.args.join(' ') : String(t.args || ''), hay = `${t.emu || ''} ${t.exe} ${args}`;
+    const id = String(t.emu || '').replace(/@.*$/, '');
+    const fam = (GS_FAMILY.find(([f]) => f === id) || GS_FAMILY.find(([, re]) => re.test(hay)) || [null])[0];
+    if (fam) return { id: fam, exe: t.exe, args, start: t.start || '', core: (/-L\s+"?([^"\s]+?)(?:_libretro)?(?:\.so)?"?(?:\s|$)/.exec(args) || [])[1] || '' };
+  }
+  const d = GS_DEFAULT.find(([re]) => re.test(slugs));
+  return d ? { id: d[1], exe: '', args: '', start: '', core: '' } : null;
+}
+// where that copy keeps its settings: portable beside it (or in its Start in folder), a Flatpak's own, else the usual
+function emuCfgDir(id, g) {
+  const home = os.homedir(), xc = process.env.XDG_CONFIG_HOME || path.join(home, '.config'), xd = process.env.XDG_DATA_HOME || path.join(home, '.local/share');
+  const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+  const near = [g.start, g.exe && path.dirname(g.exe)].filter(Boolean), fp = (app, sub) => path.join(home, '.var/app', app, sub);
+  const pick = (portable, flat, normal) => near.map(portable).find(isDir) || (flat && (g.args.includes(flat[0]) || /flatpak/.test(g.exe)) && isDir(fp(...flat)) ? fp(...flat) : normal);
+  if (id === 'eden') return pick((d) => path.join(d, 'user', 'config'), ['dev.eden_emu.eden', 'config/eden'], path.join(xc, 'eden'));
+  if (id === 'azahar') return pick((d) => path.join(d, 'user', 'config'), ['org.azahar_emu.Azahar', 'config/azahar-emu'], path.join(xc, 'azahar-emu'));
+  if (id === 'cemu') return pick((d) => path.join(d, 'portable'), ['info.cemu.Cemu', 'config/Cemu'], path.join(xc, 'Cemu'));
+  if (id === 'vita3k') return pick((d) => path.join(d, 'portable'), null, path.join(xc, 'Vita3K'));
+  if (id === 'xenia') { // the Windows build is portable by default; the Linux one with portable.txt beside it
+    const dir = g.exe && path.dirname(g.exe);
+    if (dir && (/\.exe$/i.test(g.exe) || fs.existsSync(path.join(dir, 'portable.txt')))) return dir;
+    return path.join(xd, 'Xenia');
+  }
+  return '';
+}
+const GS_MAIN = { eden: 'qt-config.ini', azahar: 'qt-config.ini', cemu: 'settings.xml', vita3k: 'config.yml', xenia: 'xenia-canary.config.toml' };
+const GS_NAME = { eden: 'Eden', citron: 'Citron', yuzu: 'yuzu', azahar: 'Azahar', citra: 'Citra', cemu: 'Cemu', vita3k: 'Vita3K', xenia: 'Xenia', flycast: 'Flycast', supermodel: 'Supermodel', mame: 'MAME', retroarch: 'RetroArch', ryujinx: 'Ryujinx' };
+function newEmuCtx(romId, r, where, slugs) {
+  const g = gameEmuOf(romId, slugs);
+  if (!g) return null;
+  const id = g.id, name = GS_NAME[id] || id;
+  if (id === 'ryujinx') return { emu: id, why: 'Ryujinx has no settings of a game’s own: everything is in its main settings.' };
+  if (id === 'citron' || id === 'yuzu' || id === 'citra') return { emu: id, why: `${name} numbers its settings differently from Eden${id === 'citra' ? ' and Azahar' : ''}, so Cartridge doesn’t change its per-game settings yet.` };
+  if (!GS_MAIN[id]) return { emu: id, g };
+  const cfgDir = emuCfgDir(id, g);
+  if (!fs.existsSync(path.join(cfgDir, GS_MAIN[id])) && !(id === 'xenia' && fs.existsSync(path.join(cfgDir, 'xenia.config.toml')))) return { emu: id, why: `${name}’s settings weren’t found on this device. Open ${name} once, then come back.` };
+  const file = mainFile(where), ids = require("./cide").parse(`${r.fs_name || ''} ${r.name || ''} ${path.basename(where)}`) || {};
+  let serial = '';
+  try {
+    if (id === 'eden') serial = require('./addons').switchTitleId(file, require('./addons').keyDirs()) || '';
+    if (id === 'azahar') serial = (/\.cia$/i.test(file) ? require('./addons').ciaTitleId(file) : require('./addons').n3dsTitleId(file)) || '';
+    if (id === 'cemu') serial = patchState(romId).serial || '';
+    if (id === 'vita3k') serial = installs[romId]?.serial || steamMgr._vitaTitleId(r, where) || '';
+    if (id === 'xenia') serial = require('./x360Id').titleId(where) || require('./x360Id').titleId(file) || '';
+  } catch {}
+  serial = String(serial || '').toUpperCase();
+  const want = { eden: /^[0-9A-F]{16}$/, azahar: /^[0-9A-F]{16}$/, cemu: /^[0-9A-F]{16}$/, vita3k: /^[A-Z]{4}\d{5}$/, xenia: /^[0-9A-F]{8}$/ }[id];
+  if (!want.test(serial)) { const k = Object.values(ids).flat().find((x) => want.test(String(x).toUpperCase())); serial = k ? String(k).toUpperCase() : ''; }
+  if (!serial) return { emu: id, why: `Cartridge couldn’t read this game’s ${id === 'vita3k' ? 'title ID (PCSE00000 and so on)' : 'title ID'} from its files${id === 'eden' ? ' (prod.keys is needed for Switch games)' : ''}.` };
+  if (id === 'eden') serial = (BigInt('0x' + serial) & ~0x1fffn).toString(16).toUpperCase().padStart(16, '0'); // the base game's ID, as Eden names the file
+  const dataDir = id === 'cemu' ? [path.join(os.homedir(), '.local/share/Cemu'), '/usr/share/Cemu'].find((d) => fs.existsSync(path.join(d, 'gameProfiles', 'default'))) || '' : '';
+  return { emu: id, serial, cfgDir, dataDir, os: id === 'xenia' && /\.exe$/i.test(g.exe) ? 'windows' : 'linux' };
+}
 function gameSettingsCtx(romId) {
   require('./gameSettings').setRecsFile(path.join(USER_DATA, 'game-settings.json'));
   const r = romIndexMain().get(romId), slugs = `${r?.platform_slug} ${r?.platform_fs_slug}`;
@@ -2790,6 +2851,8 @@ function gameSettingsCtx(romId) {
     const serial = require('./addons').psxSerial(mainFile(where));
     return serial ? { emu: 'duckstation', serial, duckRoot: e.root } : { emu: 'duckstation', why: 'Cartridge couldn’t read this game’s serial.' };
   }
+  // Switch, 3DS, Wii U, Vita, Xbox 360, Dreamcast, arcade and RetroArch games (0.9.62): by the emulator they launch with
+  if (!/\b(ps2|ngc|gamecube|gc|wii|psp|ps4)\b/i.test(slugs)) { const n = newEmuCtx(romId, r, where, slugs); if (n && !n.g) return n; }
   const st = patchState(romId);
   if (!st.emu || st.why && !st.dir) return { emu: st.emu, why: st.why || 'Cartridge can’t change this emulator’s per-game settings.' };
   if (st.emu === 'pcsx2') return { emu: 'pcsx2', serial: st.serial, crc: st.version, pcsx2: st.dir };

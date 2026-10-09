@@ -68,7 +68,10 @@ const TAB = { Audio: 'Audio', UiAudio: 'Audio', SystemAudio: 'Audio', Core: 'Sys
   RendererExtensions: 'Advanced Graphics', LibraryApplet: 'Applets', CpuDebug: 'Advanced', RendererDebug: 'Advanced', Debugging: 'Advanced' };
 const ADV = new Set(['CpuDebug', 'RendererDebug', 'Debugging']);
 // not for a game's file: paths, devices picked at run time, program arguments
-const SKIP = /^(output_device|input_device|program_args|vulkan_device|selected_gpu|network_interface)$/;
+// cpu_backend and nce_*: NCE is arm64 only, so an x86-64 build has Dynarmic alone
+const SKIP = /^(output_device|input_device|program_args|vulkan_device|selected_gpu|network_interface|cpu_backend|nce_\w+)$/;
+// VSync isn't in shared_translation (the graphics page names the present modes: TranslateVSyncMode, Vulkan wording)
+const VSYNC = [['0', 'Immediate (VSync Off)'], ['1', 'Mailbox (Recommended)'], ['2', 'FIFO (VSync On)'], ['3', 'FIFO Relaxed']];
 
 function read(dir, opts = {}) {
   const src = (f) => fs.readFileSync(path.join(dir, f), 'utf8');
@@ -119,16 +122,19 @@ function read(dir, opts = {}) {
       if (li === 4 && /^-?\d+$/.test(a[2]) && /^-?\d+$/.test(a[3])) { e.min = Number(a[2]); e.max = Number(a[3]); }
     }
     if (e.t === 'bool') e.o = [['true', 'On'], ['false', 'Off']];
+    if (type === 'VSyncMode') e.o = VSYNC;
     const n = names[member];
-    if (n && n.l) e.l = n.l.replace(/:$/, '').replace(/&/g, ''); else e.l = null;
-    if (n && n.desc) e.desc = n.desc;
+    if (n && n.l.trim()) e.l = n.l.replace(/:$/, '').replace(/&/g, ''); else e.l = null;
+    if (n && n.desc) e.desc = n.desc.split('\n')[0]; // the first line: a short tooltip
     out.push(e);
   }
   return out;
 }
 // a setting with no name in the UI is shown as part of another (use_speed_limit beside speed_limit) or not at all;
 // keep the paired ones, named from their key
-const fromKey = (k) => k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+const fromKey = (k) => k.replace(/_index$/, '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+// shown nowhere in the desktop UI or debug only: Advanced
+const HIDDEN_ADV = /^(bg_(red|green|blue)|post_shader_(chain|preset)|frame_gen_dump_flow|debug_knobs|disable_buffer_reorder)$/;
 module.exports = {
   id: 'eden',
   files: [
@@ -136,6 +142,6 @@ module.exports = {
     { url: RAW + 'common/settings_enums.h', as: 'settings_enums.h' },
     { url: RAW + 'qt_common/config/shared_translation.cpp', as: 'shared_translation.cpp' },
   ],
-  read: (dir) => read(dir).map(({ cat, member, ...x }) => ({ ...x, l: x.l || fromKey(x.k), tab: TAB[cat] || 'System', adv: ADV.has(cat) || undefined })),
+  read: (dir) => read(dir).map(({ cat, member, ...x }) => ({ ...x, l: x.l || fromKey(x.k), tab: ADV.has(cat) || HIDDEN_ADV.test(x.k) ? 'Advanced' : TAB[cat] || 'System', adv: ADV.has(cat) || HIDDEN_ADV.test(x.k) || undefined })),
   _cpp: cpp, _args: args, _lit: lit, _block: block, _raw: read,
 };

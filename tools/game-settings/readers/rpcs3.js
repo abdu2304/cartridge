@@ -13,7 +13,8 @@ const FILES = ['Emu/system_config.h', 'Emu/system_config_types.h', 'Emu/system_c
 // enum class X { a, b = 3, ... } (blocks for Windows and macOS left out), and CELL_* style enums with values
 function enumsOf(text) {
   const out = {};
-  for (const m of text.matchAll(/enum(?:\s+class)?\s+(\w+)\s*(?::\s*[\w ]+)?\{([^}]*)\}/g)) {
+  text = text.replace(/\/\/.*$/gm, '');
+  for (const m of text.matchAll(/enum(?:\s+class)?\s+(\w+)\s*(?::\s*[\w ]+)?\s*\{([^}]*)\}/g)) {
     let n = -1, skip = 0; const vals = [];
     for (const raw of m[2].split('\n')) {
       const l = raw.replace(/\/\/.*$/, '').trim();
@@ -72,7 +73,10 @@ function read(dir) {
     const range = /<\s*(-?[^,>]+),\s*([^>]+)>/.exec(kind);
     const num = (x) => { try { return Number(Function(`return (${x.replace(/'/g, '').replace(/LL/g, '')})`)()); } catch { return null; } };
     if (/^cfg::_bool/.test(kind)) { e.t = 'bool'; e.d = def0 === 'true' ? 'true' : 'false'; e.o = [['true', 'On'], ['false', 'Off']]; }
-    else if (/^cfg::(_int|uint)</.test(kind) || /^cfg::uint64$/.test(kind)) { e.t = 'int'; e.d = def0 == null ? '0' : String(num(def0) ?? def0); if (range) { e.min = num(range[1]); e.max = num(range[2]); } if (kind === 'cfg::uint64' && def0 === '0xffffffffffffffff') e.d = '18446744073709551615'; }
+    else if (/^cfg::(_int|uint)</.test(kind) || /^cfg::uint64$/.test(kind)) {
+      // static_cast<u32>(audio_format_flag::lpcm_2_48khz): the enum member's value
+      const ev = /(\w+)::(\w+)\)$/.exec(def0 || ''); const em = ev && (enums[ev[1]] || []).find((v) => v.name === ev[2]);
+      e.t = 'int'; e.d = def0 == null ? '0' : em ? String(em.n) : num(def0) != null && !Number.isNaN(num(def0)) ? String(num(def0)) : null; if (range) { e.min = num(range[1]); e.max = num(range[2]); } if (kind === 'cfg::uint64' && def0 === '0xffffffffffffffff') e.d = '18446744073709551615'; }
     else if (/^cfg::_float</.test(kind)) { e.t = 'float'; e.d = def0 == null ? '0' : String(num(def0)); if (range) { e.min = num(range[1]); e.max = num(range[2]); } }
     else if (/^cfg::_enum</.test(kind)) {
       const type = /<(\w+)>/.exec(kind)[1]; const vals = enums[type] || []; const sp = spell[type] || {};
@@ -138,12 +142,15 @@ function read(dir) {
     if (l) l = l.replace(/:\s*$/, '').replace(/&(?=\w)/, '').trim();
     if (!l || l.length < 3) l = e.k;
     if (e.t === 'enum') e.o = e.o.map(([v, lab, x]) => [v, (type && local[type] && local[type][x.name]) || lab]);
-    const tip = w && w.tip && tips[w.tip];
-    const desc = tip ? tip.split(/\\n/)[0].replace(/\s+$/, '') : undefined;
+    const tip = w && !w.radio && w.tip && tips[w.tip]; // a radio group's tooltip is its first button's
+    const desc = tip ? tip.split(/\\n/)[0].split(/(?<=\.)\s/)[0].trim() : undefined;
     const uiTab = line >= 0 ? tabAt(line) : null;
     const x = { s: e.s, k: e.k, t: e.t, d: e.d, o: e.o, min: e.min, max: e.max, l, desc, uiTab };
     if (keep(x)) res.push(x);
   }
+  const seen = {};
+  for (const x of res) { const id = x.s + '|' + x.l; seen[id] = (seen[id] || 0) + 1; }
+  for (const x of res) if (seen[x.s + '|' + x.l] > 1) x.l = x.k;
   return res.map(tabOf);
 }
 // splits "a, b{c, d}, e(f, g)" at top-level commas
