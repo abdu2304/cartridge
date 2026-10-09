@@ -2797,6 +2797,8 @@ function emuCfgDir(id, g) {
   if (id === 'azahar') return pick((d) => path.join(d, 'user', 'config'), ['org.azahar_emu.Azahar', 'config/azahar-emu'], path.join(xc, 'azahar-emu'));
   if (id === 'cemu') return pick((d) => path.join(d, 'portable'), ['info.cemu.Cemu', 'config/Cemu'], path.join(xc, 'Cemu'));
   if (id === 'vita3k') return pick((d) => path.join(d, 'portable'), null, path.join(xc, 'Vita3K'));
+  if (id === 'ryujinx') return pick((d) => path.join(d, 'portable'), ['io.github.ryubing.Ryujinx', 'config/Ryujinx'], path.join(xc, 'Ryujinx'));
+  if (id === 'retroarch') return near.find((d) => fs.existsSync(path.join(d, 'retroarch.cfg'))) || pick(() => '', ['org.libretro.RetroArch', 'config/retroarch'], path.join(xc, 'retroarch'));
   if (id === 'xenia') { // the Windows build is portable by default; the Linux one with portable.txt beside it
     const dir = g.exe && path.dirname(g.exe);
     if (dir && (/\.exe$/i.test(g.exe) || fs.existsSync(path.join(dir, 'portable.txt')))) return dir;
@@ -2804,31 +2806,87 @@ function emuCfgDir(id, g) {
   }
   return '';
 }
-const GS_MAIN = { eden: 'qt-config.ini', azahar: 'qt-config.ini', cemu: 'settings.xml', vita3k: 'config.yml', xenia: 'xenia-canary.config.toml' };
+const GS_MAIN = { eden: 'qt-config.ini', azahar: 'qt-config.ini', cemu: 'settings.xml', vita3k: 'config.yml', xenia: 'xenia-canary.config.toml', ryujinx: 'Config.json', retroarch: 'retroarch.cfg' };
+// Dreamcast: the product number Flycast names a game's section after (IP.BIN "SEGA SEGAKATANA", product at 0x40), read
+// from the first sector of each track in turn until found (GDI's track 3, CHD, CDI, raw images); cached per file
+const dcIdCache = new Map();
+function dreamcastId(file) {
+  let st; try { st = fs.statSync(file); } catch { return ''; }
+  const k = `${file}:${st.size}:${st.mtimeMs}`; if (dcIdCache.has(k)) return dcIdCache.get(k);
+  let id = '';
+  const look = (img, max) => { try { for (let lba = 0; lba < max && !id; lba++) { const b = img.read(lba * 2048, 0x50); if (b.toString('latin1', 0, 15) === 'SEGA SEGAKATANA') id = b.toString('latin1', 0x40, 0x4a).trim(); } } finally { img.close?.(); } };
+  try {
+    if (/\.gdi$/i.test(file)) { // the high-density data track (the third), as its own file
+      const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/).map((l) => l.trim().split(/\s+/)).filter((x) => x.length >= 5);
+      const t3 = lines.find((x) => x[0] === '3'); if (t3) { const img = require('./discImage').open(path.join(path.dirname(file), t3[4].replace(/^"|"$/g, ''))); if (img) look(img, 16); }
+    } else { const img = require('./discImage').open(file); if (img) look(img, 20000); }
+  } catch {}
+  dcIdCache.set(k, id);
+  return id;
+}
+// the file RetroArch is handed (its base name names the game's files): a disc list or descriptor first, else the biggest
+function raContent(where) {
+  try { if (!fs.statSync(where).isDirectory()) return where; } catch { return where; }
+  const names = fs.readdirSync(where), first = ['m3u', 'cue', 'gdi', 'cdi', 'ccd', 'mds', 'chd'].map((e) => names.find((n) => n.toLowerCase().endsWith('.' + e))).find(Boolean);
+  return first ? path.join(where, first) : mainFile(where);
+}
 const GS_NAME = { eden: 'Eden', citron: 'Citron', yuzu: 'yuzu', azahar: 'Azahar', citra: 'Citra', cemu: 'Cemu', vita3k: 'Vita3K', xenia: 'Xenia', flycast: 'Flycast', supermodel: 'Supermodel', mame: 'MAME', retroarch: 'RetroArch', ryujinx: 'Ryujinx' };
 function newEmuCtx(romId, r, where, slugs) {
   const g = gameEmuOf(romId, slugs);
   if (!g) return null;
   const id = g.id, name = GS_NAME[id] || id;
-  if (id === 'ryujinx') return { emu: id, why: 'Ryujinx has no settings of a game’s own: everything is in its main settings.' };
   if (id === 'citron' || id === 'yuzu' || id === 'citra') return { emu: id, why: `${name} numbers its settings differently from Eden${id === 'citra' ? ' and Azahar' : ''}, so Cartridge doesn’t change its per-game settings yet.` };
+  const romset = path.basename(where).replace(/\.(zip|7z|chd)$/i, '');
+  const home = os.homedir(), xc = process.env.XDG_CONFIG_HOME || path.join(home, '.config'), near = [g.start, g.exe && path.dirname(g.exe)].filter(Boolean);
+  const found = (list) => list.filter(Boolean).find((f) => fs.existsSync(f));
+  if (id === 'flycast') {
+    const cfgFile = found([/org\.flycast\.Flycast/.test(g.args) && path.join(home, '.var/app/org.flycast.Flycast/config/flycast/emu.cfg'), path.join(xc, 'flycast', 'emu.cfg'), path.join(home, '.var/app/org.flycast.Flycast/config/flycast/emu.cfg')]);
+    if (!cfgFile) return { emu: id, why: 'Flycast’s settings weren’t found on this device. Open Flycast once, then come back.' };
+    const arcade = /\b(naomi|naomi2|atomiswave|arcade)\b/.test(slugs);
+    let serial = arcade ? romset : dreamcastId(raContent(where));
+    if (arcade) { // Naomi games are named by their boot title; a section Flycast already made for this game wins
+      const norm = (x) => String(x).toLowerCase().replace(/[^a-z0-9]/g, ''), secs = [...String(fs.readFileSync(cfgFile, 'utf8')).matchAll(/^\[([^\]]+)\]/gm)].map((m) => m[1]);
+      serial = secs.find((x) => norm(x) === norm(r.name) || norm(x) === norm(romset)) || serial;
+    }
+    if (!serial) return { emu: id, why: 'Cartridge couldn’t read this game’s product number from its disc.' };
+    return { emu: id, serial, cfgFile };
+  }
+  if (id === 'supermodel') {
+    const cfgFile = found([...near.map((d) => path.join(d, 'Config', 'Supermodel.ini')), path.join(home, '.supermodel', 'Config', 'Supermodel.ini'), path.join(xc, 'supermodel', 'Config', 'Supermodel.ini'), path.join(home, '.var/app/com.supermodel3.Supermodel/config/supermodel/Config/Supermodel.ini')]);
+    return cfgFile ? { emu: id, serial: romset, cfgFile } : { emu: id, why: 'Supermodel’s settings (Supermodel.ini) weren’t found on this device.' };
+  }
+  if (id === 'mame') {
+    const mameIni = found([...near.map((d) => path.join(d, 'mame.ini')), /org\.mamedev\.MAME/.test(g.args) && path.join(home, '.var/app/org.mamedev.MAME/.mame/mame.ini'), path.join(home, '.mame', 'mame.ini'), path.join(home, '.var/app/org.mamedev.MAME/.mame/mame.ini')]);
+    if (!mameIni) return { emu: id, why: 'MAME’s settings (mame.ini) weren’t found on this device. Run MAME once with -createconfig, then come back.' };
+    const base = path.dirname(mameIni), ip = (/^\s*inipath\s+(.+)$/m.exec(fs.readFileSync(mameIni, 'utf8')) || [])[1] || '.;ini';
+    const dirs = ip.replace(/^"|"$/g, '').split(';').map((d) => d.trim().replace(/^~(?=\/|$)/, home).replace(/\$HOME/g, home)).map((d) => (path.isAbsolute(d) ? d : path.join(base, d)));
+    const iniDir = dirs.find((d) => d !== base && fs.existsSync(d)) || path.join(base, 'ini');
+    return { emu: id, serial: romset, iniDir, mameIni };
+  }
   if (!GS_MAIN[id]) return { emu: id, g };
   const cfgDir = emuCfgDir(id, g);
   if (!fs.existsSync(path.join(cfgDir, GS_MAIN[id])) && !(id === 'xenia' && fs.existsSync(path.join(cfgDir, 'xenia.config.toml')))) return { emu: id, why: `${name}’s settings weren’t found on this device. Open ${name} once, then come back.` };
   const file = mainFile(where), ids = require("./cide").parse(`${r.fs_name || ''} ${r.name || ''} ${path.basename(where)}`) || {};
   let serial = '';
   try {
-    if (id === 'eden') serial = require('./addons').switchTitleId(file, require('./addons').keyDirs()) || '';
+    if (id === 'eden' || id === 'ryujinx') serial = require('./addons').switchTitleId(file, require('./addons').keyDirs()) || '';
     if (id === 'azahar') serial = (/\.cia$/i.test(file) ? require('./addons').ciaTitleId(file) : require('./addons').n3dsTitleId(file)) || '';
     if (id === 'cemu') serial = patchState(romId).serial || '';
     if (id === 'vita3k') serial = installs[romId]?.serial || steamMgr._vitaTitleId(r, where) || '';
     if (id === 'xenia') serial = require('./x360Id').titleId(where) || require('./x360Id').titleId(file) || '';
   } catch {}
   serial = String(serial || '').toUpperCase();
-  const want = { eden: /^[0-9A-F]{16}$/, azahar: /^[0-9A-F]{16}$/, cemu: /^[0-9A-F]{16}$/, vita3k: /^[A-Z]{4}\d{5}$/, xenia: /^[0-9A-F]{8}$/ }[id];
+  if (id === 'retroarch') { // the core's folder (its library_name) and the content's base name
+    const db = require('./emuSettingsDb.json').retroarchCores || {}, core = String(g.core || '').replace(/_libretro$/, '');
+    const coreName = db[core]?.name || require('./emulators').coreName(core);
+    if (!core || !coreName) return { emu: id, why: 'Cartridge couldn’t tell which RetroArch core this game uses.' };
+    const cfg = fs.readFileSync(path.join(cfgDir, 'retroarch.cfg'), 'utf8'), op = (/^\s*core_options_path\s*=\s*"([^"]*)"/m.exec(cfg) || [])[1];
+    return { emu: id, core, coreName, serial: path.basename(raContent(where)).replace(/\.[^.]+$/, ''), cfgDir, coreOptions: op && op !== 'default' ? op.replace(/^~(?=\/|$)/, os.homedir()) : '' };
+  }
+  const want = { ryujinx: /^[0-9A-F]{16}$/, eden: /^[0-9A-F]{16}$/, azahar: /^[0-9A-F]{16}$/, cemu: /^[0-9A-F]{16}$/, vita3k: /^[A-Z]{4}\d{5}$/, xenia: /^[0-9A-F]{8}$/ }[id];
   if (!want.test(serial)) { const k = Object.values(ids).flat().find((x) => want.test(String(x).toUpperCase())); serial = k ? String(k).toUpperCase() : ''; }
   if (!serial) return { emu: id, why: `Cartridge couldn’t read this game’s ${id === 'vita3k' ? 'title ID (PCSE00000 and so on)' : 'title ID'} from its files${id === 'eden' ? ' (prod.keys is needed for Switch games)' : ''}.` };
-  if (id === 'eden') serial = (BigInt('0x' + serial) & ~0x1fffn).toString(16).toUpperCase().padStart(16, '0'); // the base game's ID, as Eden names the file
+  if (id === 'eden' || id === 'ryujinx') serial = (BigInt('0x' + serial) & ~0x1fffn).toString(16).toUpperCase().padStart(16, '0'); // the base game's ID, as Eden names the file
   const dataDir = id === 'cemu' ? [path.join(os.homedir(), '.local/share/Cemu'), '/usr/share/Cemu'].find((d) => fs.existsSync(path.join(d, 'gameProfiles', 'default'))) || '' : '';
   return { emu: id, serial, cfgDir, dataDir, os: id === 'xenia' && /\.exe$/i.test(g.exe) ? 'windows' : 'linux' };
 }
@@ -2838,6 +2896,9 @@ function gameSettingsCtx(romId) {
   const where = installedMap[romId];
   if (!r) return { why: 'That game isn’t in the library.' };
   if (!where || where === MARKED) return { why: 'Download the game first.' };
+  // 0.9.62: the emulator the game launches with decides (a PS1 game in a RetroArch core gets the core's settings); the
+  // others (RPCS3, DuckStation, PCSX2, Dolphin, PPSSPP, shadPS4) are found by console below as before
+  { const n = newEmuCtx(romId, r, where, slugs); if (n && !n.g) return n; }
   if (/ps3/i.test(slugs)) {
     const serial = ps3Serial(romId, where), ph = patchHome(romId, 'rpcs3'), dirs = patchesMod.rpcs3Dirs();
     const dir = (ph.rpcs3Home && dirs.find((d) => d.root === ph.rpcs3Home)) || dirs[0];
@@ -2851,8 +2912,6 @@ function gameSettingsCtx(romId) {
     const serial = require('./addons').psxSerial(mainFile(where));
     return serial ? { emu: 'duckstation', serial, duckRoot: e.root } : { emu: 'duckstation', why: 'Cartridge couldn’t read this game’s serial.' };
   }
-  // Switch, 3DS, Wii U, Vita, Xbox 360, Dreamcast, arcade and RetroArch games (0.9.62): by the emulator they launch with
-  if (!/\b(ps2|ngc|gamecube|gc|wii|psp|ps4)\b/i.test(slugs)) { const n = newEmuCtx(romId, r, where, slugs); if (n && !n.g) return n; }
   const st = patchState(romId);
   if (!st.emu || st.why && !st.dir) return { emu: st.emu, why: st.why || 'Cartridge can’t change this emulator’s per-game settings.' };
   if (st.emu === 'pcsx2') return { emu: 'pcsx2', serial: st.serial, crc: st.version, pcsx2: st.dir };

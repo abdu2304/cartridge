@@ -44,10 +44,12 @@ function read(dir) {
 
 const TAB = { Video_Settings: 'Graphics', Video_Hardware: 'Graphics', Video_Enhancements: 'Enhancements', Video_Hacks: 'Hacks', Core: 'Core', DSP: 'Audio', Video_Stereoscopy: 'Stereo 3D', 'GFX.ColorCorrection': 'Colour' };
 const ADV = /Log|Debug|Dump|Validation|Wireframe|Overlay|Show|Statistic|Profile|Fifo|Graphics?Mods|EnableMods|Texture(Dump|Load)|Cache(Hires)?Textures|BackendMultithreading|CommandBuffer|PerfQueries|ShaderCompilerThreads|Precompiler|MMU|PauseOnPanic|FloatExceptions|DivByZero|DisableICache|AccurateNaNs|AccurateFmadds|FPRF|LowDCBZ|TimingVariance|MaxFallback|JIT|Fastmem|PageTable|LargeEntryPoints|AccurateCPUCache|SyncGpu(Max|Min)|SyncOnSkipIdle|MEM[12]Size|ARAMExpansion|EnableSaveStates|SuggestedAspect|WidescreenHeuristic|MaxInternalResolution|ArbitraryMipmap|ManuallyUpload|VertexLoader|PreferVS|CPUCull|CustomAspect/;
+// a readable name when the source has none: "iShowStatusFlags" -> "Show Status Flags", "EFBAccessEnable" -> "EFB Access Enable"
+const nice = (k) => String(k).replace(/^[ibfsu](?=[A-Z])/, '').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
 const sortTabs = (order, list) => list.sort((a, b) => order.indexOf(a.tab) - order.indexOf(b.tab));
 module.exports = {
   id: 'dolphin',
   files: [['Core/Config/GraphicsSettings.cpp', 'GraphicsSettings.cpp'], ['Core/Config/MainSettings.cpp', 'MainSettings.cpp'], ['VideoCommon/VideoConfig.h', 'VideoConfig.h'], ['Core/PowerPC/PowerPC.h', 'PowerPC.h']].map(([p, as]) => ({ url: RAW + p, as })),
   // in the order the tabs show (Array sort is stable, so each tab keeps the source's order)
-  read: (dir) => sortTabs(['Graphics', 'Enhancements', 'Hacks', 'Core', 'Audio', 'Stereo 3D', 'Colour', 'Advanced'], read(dir).map((x) => ({ ...x, o: x.t === 'bool' ? [['True', 'On'], ['False', 'Off']] : x.o, tab: ADV.test(x.k) ? 'Advanced' : TAB[x.s] || x.s, adv: ADV.test(x.k) || undefined }))),
+  read: (dir) => sortTabs(['Graphics', 'Enhancements', 'Hacks', 'Core', 'Audio', 'Stereo 3D', 'Colour', 'Advanced'], read(dir).map((x) => ({ ...x, l: x.l || nice(x.k), o: x.t === 'bool' ? [['True', 'On'], ['False', 'Off']] : x.o, tab: ADV.test(x.k) ? 'Advanced' : TAB[x.s] || x.s, adv: ADV.test(x.k) || undefined }))),
 };

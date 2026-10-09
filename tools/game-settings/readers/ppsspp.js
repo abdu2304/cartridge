@@ -46,10 +46,12 @@ function read(dir) {
 // tabs: PPSSPP's sections, with logging, debugging and developer settings in Advanced
 const TAB = { Graphics: 'Graphics', CPU: 'CPU', Sound: 'Audio', Control: 'Controls', SystemParam: 'System', General: 'General' };
 const ADV = /Log|Debug|Jit|Dump|Flags|HLE|Breakpoint|Validation|Shader(Chain|Cache)|StatusFlags|CwCheat|ScrollPosition|Snapshot|Fps|Frame(Rate2?|Profiler)|IOTiming|SoftwareRenderer(Jit)?$|DisableDithering|ReplacementTextureLoadSpeed|SaveNewTextures|IgnoreTextureFilenames/;
+// a readable name when the source has none: "iShowStatusFlags" -> "Show Status Flags", "EFBAccessEnable" -> "EFB Access Enable"
+const nice = (k) => String(k).replace(/^[ibfsu](?=[A-Z])/, '').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/^./, (c) => c.toUpperCase());
 const sortTabs = (order, list) => list.sort((a, b) => order.indexOf(a.tab) - order.indexOf(b.tab));
 module.exports = {
   id: 'ppsspp',
   files: [{ url: RAW + 'Core/Config.cpp', as: 'Config.cpp' }, { url: RAW + 'UI/GameSettingsScreen.cpp', as: 'GameSettingsScreen.cpp' }],
   // in the order the tabs show (Array sort is stable, so each tab keeps the source's order)
-  read: (dir) => sortTabs(['Graphics', 'CPU', 'Audio', 'Controls', 'System', 'General', 'Advanced'], read(dir).map((x) => ({ ...x, o: x.t === 'bool' ? [['True', 'On'], ['False', 'Off']] : x.o, tab: ADV.test(x.k) ? 'Advanced' : TAB[x.s] || x.s, adv: ADV.test(x.k) || undefined }))),
+  read: (dir) => sortTabs(['Graphics', 'CPU', 'Audio', 'Controls', 'System', 'General', 'Advanced'], read(dir).map((x) => ({ ...x, l: x.l || nice(x.k), o: x.t === 'bool' ? [['True', 'On'], ['False', 'Off']] : x.o, tab: ADV.test(x.k) ? 'Advanced' : TAB[x.s] || x.s, adv: ADV.test(x.k) || undefined }))),
 };

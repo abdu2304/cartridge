@@ -632,7 +632,8 @@ async function more() {
   const pe = /ps3/i.test(slugs) ? 'RPCS3' : /ps4/i.test(slugs) ? 'shadPS4' : /\bps2\b/i.test(slugs) ? 'PCSX2' : /\b(ngc|gamecube|gc|wii)\b/i.test(slugs) ? 'Dolphin' : /\bpsp\b/i.test(slugs) ? 'PPSSPP' : null;
   // PS3 game updates are a tab in Add-ons (0.9.29, owner: no second place for them)
   // 0.9.23 (owner: edit a game's emulator settings from Cartridge)
-  if (installedPath.value && !marked.value && (pe || /\bpsx\b/i.test(slugs))) play.push({ label: 'Game settings', sub: `${pe || 'DuckStation'}’s settings for this game only`, value: 'gamesettings', icon: 'mdiTune' });
+  // 0.9.62 (owner: across the board): every installed game; the window says when its emulator has none of a game's own
+  if (installedPath.value && !marked.value) play.push({ label: 'Game settings', sub: `${pe || (/\bpsx\b/i.test(slugs) ? 'DuckStation' : 'The emulator')}’s settings for this game only`, value: 'gamesettings', icon: 'mdiTune' });
   // patches and cheats are in Game Add-ons (0.9.24, owner: no separate row for them here)
   // 0.9.28 (owner: PS4 patches had gone from here): PS3 and PS4 too; Game Add-ons shows only the tabs the console has
   // 0.9.52: cartridge consoles too, for ROM hacks (and Nexus Mods on the mods engine's other sources)

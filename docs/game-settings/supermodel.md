@@ -11,6 +11,7 @@ One file, `Supermodel.ini`, holds the global settings and every game's settings.
 | Portable (a `Config` folder in the folder Supermodel runs from) | `Config/Supermodel.ini` |
 | `~/.supermodel` exists | `~/.supermodel/Config/Supermodel.ini` |
 | Otherwise (newer builds) | `~/.config/supermodel/Config/Supermodel.ini` (or `$XDG_CONFIG_HOME/supermodel/Config/Supermodel.ini` when `~/.config/supermodel` doesn't exist) |
+| Flatpak (`com.supermodel3.Supermodel`) | the same rules inside the sandbox; with no `~/.config/supermodel` it ends at `$XDG_CONFIG_HOME`, so `~/.var/app/com.supermodel3.Supermodel/config/supermodel/Config/Supermodel.ini` (not checked on a device) |
 
 The checks are in that order (`FileSystemPath::GetPath`). EmuDeck runs Supermodel from its own folder, so look for a `Config` folder next to the program first.
 
