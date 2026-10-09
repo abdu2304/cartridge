@@ -8,7 +8,7 @@
           <h2>{{ name }}</h2>
         </div>
       </div>
-      <div v-if="tabs.length > 1" class="ga-tabs"><Btn b="LB" /><div class="seg"><button v-for="t in tabs" :key="t.k" data-focus :data-key="'ga-' + t.k" :class="{ on: tab === t.k }" @click="pick(t.k)">{{ t.l }}</button></div><Btn b="RB" /></div>
+      <div v-if="tabs.length > 1" class="ga-tabs"><Btn b="LB" /><div class="seg strip"><button v-for="t in tabs" :key="t.k" data-focus :data-key="'ga-' + t.k" :class="{ on: tab === t.k }" @click="pick(t.k)">{{ t.l }}</button></div><Btn b="RB" /></div>
 
       <!-- each part stays alive once opened, so ticks and lists survive moving between tabs -->
       <div ref="body" class="ga-body">
@@ -75,8 +75,10 @@ const tabs = computed(() => {
   // not there"): once the packs are read, only the groups this game has, each with its count (Graphics always)
   else if (pe === 'Cemu') {
     const all = [['Graphics', 'Graphics'], ['Enhancements', 'Enhancements'], ['Mods', 'Graphic Pack Mods'], ['Workarounds', 'Workarounds'], ['Cheats', 'Cheats']];
+    // 0.9.63 (owner: R1 to Graphics "hides everything else"): every group showed until the packs were read, then the
+    // empty ones went. Now the packs are read as the window opens and the tabs appear once, already counted
     const l = patches.value?.list;
-    for (const [k, label] of all) { const n = l ? l.filter((p) => p.section === k).length : null; if (n === null || n || k === 'Graphics') out.push({ k: 'p:' + k, l: n ? `${label} · ${n}` : label }); }
+    if (l) for (const [k, label] of all) { const n = l.filter((p) => p.section === k).length; if (n || k === 'Graphics') out.push({ k: 'p:' + k, l: n ? `${label} · ${n}` : label }); }
   }
   else if (pe === 'shadPS4') out.push({ k: 'p:shadPS4', l: 'shadPS4 Patches' }, { k: 'p:GoldHEN', l: 'GoldHEN' }); // 0.9.23: its two lists, LB/RB between them
   else if (pe) out.push({ k: 'p', l: pe === 'PPSSPP' ? 'Cheats' : 'Patches' });
@@ -136,6 +138,7 @@ onMounted(() => {
     // the right stick moves between mod sites on the Mods tab (0.9.52)
     rsleft: () => { if (tab.value === 'mods') ads.value?.stepSource(-1); }, rsright: () => { if (tab.value === 'mods') ads.value?.stepSource(1); } });
   show(tab.value);
+  if (PATCH_EMU_OF(slug.value) === 'Cemu' && !seen.patches) { seen.patches = true; loadPatches().then(() => { if (props.tab === 'patches' && !patchTab.value) { const t = tabs.value.find((x) => x.k.startsWith('p:')); if (t) { show(t.k); nextTick(() => focusFirst(el.value, `[data-key="ga-${t.k}"]`)); } } }); }
   nextTick(() => focusFirst(el.value, `[data-key="ga-${tab.value}"]`));
 });
 onBeforeUnmount(() => { layer?.pop(); off?.(); });
@@ -147,9 +150,10 @@ onBeforeUnmount(() => { layer?.pop(); off?.(); });
 .ga-cover { width: 56px; height: 56px; object-fit: cover; border-radius: var(--r-sm); flex: none; }
 .ga-title { min-width: 0; }
 .ga h2 { margin: 2px 0 0; font-size: var(--t-xl); line-height: 1.15;  overflow-wrap: anywhere; }
-.ga-tabs { display: flex; align-items: center; gap: var(--s-2); }
-.ga-tabs .seg { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-.ga-tabs .seg button { flex: none; white-space: nowrap; }
+.ga-tabs { display: flex; align-items: center; gap: var(--s-2); min-width: 0; }
+.ga-tabs > :not(.seg) { flex: none; }
+
+
 .ga-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .ga-up { display: flex; flex-direction: column; gap: var(--s-3); min-height: 0; flex: 1; }
 .ga-ver { display: flex; flex-wrap: wrap; gap: var(--s-4); font-size: var(--t-sm); opacity: 0.85; }

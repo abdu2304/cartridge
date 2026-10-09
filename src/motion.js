@@ -166,6 +166,18 @@ export function slidingPills(root = document.body) {
     Object.assign(ink.style, { opacity: '1', width: on.offsetWidth + 'px', height: on.offsetHeight + 'px', transform: `translate(${on.offsetLeft}px, ${on.offsetTop}px)` });
     seg.classList.add('inked');
     if (still) requestAnimationFrame(() => ink.classList.add('live')); // first placing never slides in from the corner
+    if (seg.classList.contains('strip')) strip(seg, on, still);
+  };
+  // 0.9.63 (owner: Game Settings' tabs took two rows, "find a way to make them fit in a row"): a .seg.strip is one
+  // scrolling row; the chosen tab is kept fully in view (with room for the faded edge) and each edge fades only where
+  // more tabs continue past it
+  const edges = (seg) => { const max = seg.scrollWidth - seg.clientWidth; seg.classList.toggle('fade-l', seg.scrollLeft > 2); seg.classList.toggle('fade-r', max > 2 && seg.scrollLeft < max - 2); };
+  const strip = (seg, on, still) => {
+    if (!seg._edges) { seg._edges = () => edges(seg); seg.addEventListener('scroll', seg._edges, { passive: true }); }
+    const pad = 40, l = on.offsetLeft - pad, r = on.offsetLeft + on.offsetWidth + pad - seg.clientWidth;
+    const to = seg.scrollLeft > l ? Math.max(0, l) : seg.scrollLeft < r ? r : null;
+    if (to != null) seg.scrollTo({ left: to, behavior: still || matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    edges(seg);
   };
   const all = (still) => root.querySelectorAll('.seg').forEach((seg) => place(seg, still));
   let queued = new Set(), raf = 0;

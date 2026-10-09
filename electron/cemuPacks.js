@@ -107,6 +107,8 @@ function titleIds(gamePath, cemuConfigDir, name = '') {
   const out = new Set();
   const tryMeta = (f) => { const m = /<title_id[^>]*>([0-9A-Fa-f]{16})<\/title_id>/.exec(read(f) || ''); if (m) out.add(m[1].toUpperCase()); };
   if (gamePath) { tryMeta(path.join(gamePath, 'meta', 'meta.xml')); try { for (const n of fs.readdirSync(gamePath)) tryMeta(path.join(gamePath, n, 'meta', 'meta.xml')); } catch {} }
+  // a .wua (or a folder holding one): the title folders' names inside it (0.9.63, electron/wua.js)
+  if (gamePath) { const W = require('./wua'); const wuas = /\.wua$/i.test(gamePath) ? [gamePath] : (() => { try { return fs.readdirSync(gamePath).filter((n) => /\.wua$/i.test(n)).map((n) => path.join(gamePath, n)); } catch { return []; } })(); for (const w of wuas) for (const t of W.titles(w)) out.add(t.id); }
   const cache = read(path.join(cemuConfigDir || '', 'title_list_cache.xml')) || '';
   const gp = gamePath ? realp(gamePath) : '', want = norm(String(name || '').replace(/\s*[([].*$/, '')), byName = [];
   for (const m of cache.matchAll(/<title\b[^>]*titleId="([0-9A-Fa-f]{16})"[^>]*>([\s\S]*?)<\/title>/g)) {

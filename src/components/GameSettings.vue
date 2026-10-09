@@ -15,7 +15,7 @@
       <div v-else-if="d.why" class="muted small">{{ d.why }}</div>
       <div v-else-if="!(d.items || []).length" class="muted small">{{ d.name || 'This emulator' }} has no per-game settings Cartridge can change for this game yet.</div>
       <!-- sections as tabs on L1/R1 (0.9.24, owner: the menu style across the board) -->
-      <div v-if="d && tabs.length > 1" class="gs-tabs"><Btn b="LB" /><div class="seg"><button v-for="t in tabs" :key="t" tabindex="-1" :class="{ on: t === tab }" @click="tab = t">{{ t }}</button></div><Btn b="RB" /></div>
+      <div v-if="d && tabs.length > 1" class="gs-tabs"><Btn b="LB" /><div class="seg strip"><button v-for="t in tabs" :key="t" tabindex="-1" :class="{ on: t === tab }" @click="tab = t">{{ t }}</button></div><Btn b="RB" /></div>
       <div v-else-if="!d" />
       <div v-if="d" class="gs-list" data-scroll :key="tab">
         <button v-if="tab === 'Steam' && fg" class="lrow" data-focus :disabled="busy" @click="pickFg">
@@ -141,7 +141,8 @@ onBeforeUnmount(() => layer?.pop());
 .gs-list > * { flex: none; }
 .gs-group { flex: none; padding: 10px 4px 2px; font-size: var(--t-xs); font-weight: 700; color: var(--muted); letter-spacing: 0.02em; }
 .gs-tabs { display: flex; align-items: center; gap: 10px; align-self: flex-start; max-width: 100%; }
-.gs-tabs .seg { flex-wrap: wrap; }
+.gs-tabs { min-width: 0; }
+.gs-tabs > :not(.seg) { flex: none; }
 .gs-warn { flex: none; display: flex; gap: 8px; align-items: flex-start; padding: 6px 4px 8px; line-height: 1.4; }
 .gs-list .lrow:not(.expanded) .gs-desc { display: none; } /* hold A on a row for what the setting does */ /* 0.9.61: Dolphin has eight tabs; on a narrow window they wrap rather than run off */
 </style>

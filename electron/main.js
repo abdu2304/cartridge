@@ -3090,6 +3090,8 @@ function ps4PatchState(romId, r) {
   return { emu: 'shadps4', serial, version: patchesMod.ps4Version(where), dir };
 }
 // PS2 games: PCSX2 must have the game in its game list (that is where the serial and CRC come from)
+const PS2_IDS_FILE = path.join(USER_DATA, 'ps2-ids.json');
+let ps2Ids = null;
 function ps2PatchState(romId) {
   const where = installedMap[romId];
   if (!where || where === MARKED) return { emu: 'pcsx2', why: 'Download the game first.' };
@@ -3101,7 +3103,11 @@ function ps2PatchState(romId) {
   try { if (fs.statSync(where).isDirectory()) file = fs.readdirSync(where).map((n) => path.join(where, n)).filter((f) => /\.(iso|chd|cso|zso|gz|bin|cue|elf)$/i.test(f)).sort((a, b) => fs.statSync(b).size - fs.statSync(a).size)[0] || where; } catch {}
   // PCSX2's game list first; else Cartridge reads the disc itself (ISO since 0.9.3 L, CHD/CSO/ZSO since 0.9.17)
   const readable = /\.(iso|chd|cso|zso)$/i.test(file);
-  const game = patchesMod.pcsx2Game(dir, file) || (readable ? patchesMod.ps2IsoInfo(file) : null);
+  // 0.9.63: a disc's serial and CRC are read once per file (by size and date): a CHD was decompressed on every open
+  let st = null; try { st = fs.statSync(file); } catch {}
+  const ck = st ? `${file}|${st.size}|${st.mtimeMs}` : '', ps2c = (ps2Ids ||= loadJson(PS2_IDS_FILE, {}));
+  let game = ck && ps2c[ck];
+  if (!game) { game = patchesMod.pcsx2Game(dir, file) || (readable ? patchesMod.ps2IsoInfo(file) : null); if (game?.crc && ck) { for (const k of Object.keys(ps2c)) if (k.startsWith(file + '|')) delete ps2c[k]; ps2c[ck] = { serial: game.serial || '', crc: game.crc }; saveJson(PS2_IDS_FILE, ps2c, false); } }
   if (!game || !game.crc) return { emu: 'pcsx2', why: readable ? 'Cartridge couldn’t read this disc image.' : 'Cartridge can’t read this kind of file, so its details come from PCSX2: add your PS2 folder in PCSX2 (Settings → Game List) once, let it scan, then come back.' };
   return { emu: 'pcsx2', serial: game.serial || '', version: patchesMod.crcHex(game.crc), dir, game };
 }

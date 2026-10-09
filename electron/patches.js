@@ -372,8 +372,10 @@ function pcsx2GameList(cacheDir) {
 function pcsx2Game(dir, file) {
   const list = pcsx2GameList(dir.cache);
   const real = (f) => { try { return fs.realpathSync(f); } catch { return f; } };
-  const want = real(file);
-  const hit = list.find((g) => real(g.path) === want) || list.find((g) => path.basename(g.path) === path.basename(file));
+  // 0.9.63 (owner: PCSX2's game settings took long to open): the path as written first, then only same-named entries
+  // are resolved (every entry of a big game list was looked up on disk, each time)
+  const want = real(file), base = path.basename(file), named = list.filter((g) => path.basename(g.path) === base);
+  const hit = list.find((g) => g.path === file || g.path === want) || named.find((g) => real(g.path) === want) || named[0];
   return hit && hit.crc ? { serial: hit.serial, crc: hit.crc } : null;
 }
 // One file from a plain ISO9660 image (a PS3 disc's PS3_GAME/PARAM.SFO), or null

@@ -6,7 +6,7 @@
         <h2>Licences and Acknowledgements</h2>
         <p class="muted small">Cartridge stands on the work of many people. Thank you to everyone below.</p>
       </div>
-      <div class="lic-tabs"><Btn b="LB" /><div class="seg"><button v-for="(g, i) in GROUPS" :key="g.t" tabindex="-1" :class="{ on: i === cur }" @click="cur = i">{{ g.t }}</button></div><Btn b="RB" /></div>
+      <div class="lic-tabs"><Btn b="LB" /><div class="seg strip"><button v-for="(g, i) in GROUPS" :key="g.t" tabindex="-1" :class="{ on: i === cur }" @click="cur = i">{{ g.t }}</button></div><Btn b="RB" /></div>
       <div class="lic-list" data-scroll :key="cur">
         <p class="muted small">{{ GROUPS[cur].note }}</p>
         <div v-for="x in GROUPS[cur].items" :key="x[0]" class="lrow" data-focus tabindex="0">
@@ -63,7 +63,7 @@ onBeforeUnmount(() => layer?.pop());
 .lic { width: min(820px, 94vw); max-height: 88vh; display: flex; flex-direction: column; gap: var(--s-3); }
 .lic h2 { margin: 2px 0 6px; font-size: var(--t-xl); }
 .lic p { margin: 0; }
-.lic-tabs { display: flex; align-items: center; gap: 10px; align-self: flex-start; }
+.lic-tabs { display: flex; align-items: center; gap: 10px; align-self: flex-start; max-width: 100%; min-width: 0; }
 .lic-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 4px; }
 .lic-list > * { flex: none; }
 </style>
