@@ -2432,6 +2432,18 @@ function ps3Serial(romId, where) {
 // The emulator copy a game really starts with (its own pick, else its console's), so its patches go
 // to that copy's own folders (0.9.15): a fork's portable "user" folder, a Flatpak's sandbox folder,
 // a portable PCSX2. Returns the folder list to try first, or [] to use the usual places.
+// a fork's name for the screens that act on it ("GR2 Fork"), from what Cartridge knows of it: the name you gave it
+// (Linked Folders, From a GitHub Link), its project, or the fork list (emulators.js FORKS). Null for a main copy.
+function forkLabelOf(exe) {
+  if (!exe) return null;
+  const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } }, r = real(exe);
+  const own = Object.entries(config.steam?.forks || {}).find(([p]) => real(p) === r)?.[1]?.name;
+  const custom = (config.customEmus || []).find((x) => x.as === 'fork' && x.path && real(x.path) === r);
+  let found = null; try { found = steamMgr.forksAll().find((f) => real(f.exe) === r)?.name || null; } catch {}
+  return own || (custom ? custom.repo.split('/')[1] : null) || found;
+}
+// "shadPS4 (GR2 Fork)": the emulator and its fork, unless the fork's name already says which emulator it is
+const forkTitle = (parent, fork) => (new RegExp('^' + parent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(fork) ? fork : `${parent} (${/fork/i.test(fork) ? fork : fork + ' Fork'})`);
 function patchHome(romId, emu) {
   let t = null;
   try { const key = steamMgr.forRom(Number(romId)).console; t = key ? steamMgr._templateForGame(Number(romId), key) : null; } catch {}
@@ -2439,7 +2451,9 @@ function patchHome(romId, emu) {
   const exe = t.exe, dir = path.dirname(exe), flat = (t.args || '').match(/run\s+(?:--\S+\s+)*(\S+)/)?.[1] || '';
   const home = os.homedir();
   if (emu === 'shadps4') {
-    if (fs.existsSync(path.join(dir, 'user', 'patches'))) return { pick: exe, shad: [path.join(dir, 'user')] }; // portable copy or fork
+    // a portable copy or fork (0.9.64, owner: a game set to the GR2 fork uses the fork's own settings and patches): its
+    // user/ folder whether or not it has patches yet (they're downloaded into it), not only once it has them
+    if (fs.existsSync(path.join(dir, 'user'))) return { pick: exe, shad: [path.join(dir, 'user')], fork: forkLabelOf(exe) };
     return { pick: exe };
   }
   if (emu === 'rpcs3') return { pick: exe, rpcs3Home: /net\.rpcs3\.RPCS3/.test(flat) ? path.join(home, '.var/app/net.rpcs3.RPCS3/config/rpcs3') : null };
@@ -2999,7 +3013,7 @@ function gameSettingsCtx(romId) {
   if (st.emu === 'pcsx2') return { emu: 'pcsx2', serial: st.serial, crc: st.version, pcsx2: st.dir };
   if (st.emu === 'dolphin') return { emu: 'dolphin', serial: st.serial, dolphin: st.dir };
   if (st.emu === 'ppsspp') return { emu: 'ppsspp', serial: st.serial, ppsspp: st.dir };
-  if (st.emu === 'shadps4') return { emu: 'shadps4', serial: st.serial, shadUser: st.dir };
+  if (st.emu === 'shadps4') return { emu: 'shadps4', serial: st.serial, shadUser: st.dir, fork: st.fork || null };
   return { emu: st.emu, why: 'Cartridge can’t change this emulator’s per-game settings yet.' };
 }
 // Cemu's community graphic packs, fetched like Cemu's own download (cemuPacks.downloadCommunity), weekly
@@ -3014,12 +3028,23 @@ async function freshCemuPacks(romId, force = false) {
   } catch (e) { log('cemu graphic packs download failed:', e.message); if (force) throw new Error('Cemu\'s graphic packs couldn\'t be downloaded: ' + e.message); return fs.existsSync(path.join(st.dir.root, 'graphicPacks')) ? '' : 'Cemu\'s graphic packs couldn\'t be downloaded: ' + e.message; }
 }
 // An emulator installed from a GitHub link, set up once its program is known (0.9.24, 0.9.32 for folders)
-let customPending = null;
-async function finishCustom({ repo, file, folder, as, of, key, tag, name }) {
+let customPending = null, phoneLinkNow = null;
+// is this program running (its path in a process's command line)? Before files under it move (0.9.64)
+function progRunning(file) {
+  const real = (() => { try { return fs.realpathSync(file); } catch { return file; } })();
+  for (const d of (() => { try { return fs.readdirSync('/proc'); } catch { return []; } })()) {
+    if (!/^\d+$/.test(d)) continue;
+    let c = ''; try { c = fs.readFileSync(`/proc/${d}/cmdline`, 'utf8'); } catch { continue; }
+    if (c.includes(file) || c.includes(real)) return true;
+  }
+  return false;
+}
+async function finishCustom({ repo, file, folder, as, of, key, tag, name, files }) {
   let setup;
   if (as === 'fork') { steamMgr.markFork(file, of, name); setup = 'fork'; }
   else { setup = steamMgr.useFile(key, file); if (setup?.needs) setup = steamMgr.useFile(key, file, { args: '"{ROM}"' }); setup = 'console'; }
-  config.customEmus = [...(config.customEmus || []).filter((x) => x.repo !== repo && x.path !== file), { repo, path: file, folder: folder || null, as, of: as === 'fork' ? of : null, key: as === 'console' ? key : null, tag, at: Date.now() }];
+  // files: the release's own files (forkVersions.js: what moves when you switch versions, 0.9.64)
+  config.customEmus = [...(config.customEmus || []).filter((x) => x.repo !== repo && x.path !== file), { repo, path: file, folder: folder || null, as, of: as === 'fork' ? of : null, key: as === 'console' ? key : null, tag, at: Date.now(), files: files || null }];
   saveConfig();
   try { await steamMgr.scanEmulators(); } catch {}
   log('emulator from a link', repo, tag, file, setup);
@@ -3132,9 +3157,9 @@ function ps4PatchState(romId, r) {
   const ph = patchHome(romId, 'shadps4');
   // 0.9.23: shadPS4's user folder even before it has patches (Cartridge downloads them, freshShadPatches)
   const shadUser = path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local/share'), 'shadPS4');
-  const dir = (ph.shad || []).find((d) => fs.existsSync(path.join(d, 'patches'))) || patchesMod.shadDirs()[0] || (ph.shad || []).find((d) => fs.existsSync(d)) || (fs.existsSync(shadUser) ? shadUser : null);
+  const dir = (ph.shad || []).find((d) => fs.existsSync(d)) || patchesMod.shadDirs()[0] || (fs.existsSync(shadUser) ? shadUser : null); // 0.9.64: the fork's own folder first
   if (!dir) return { emu: 'shadps4', serial, why: 'shadPS4 hasn’t been started on this device yet, so it has no folder for patches. Start it once, then come back.' };
-  return { emu: 'shadps4', serial, version: patchesMod.ps4Version(where), dir };
+  return { emu: 'shadps4', serial, version: patchesMod.ps4Version(where), dir, fork: dir === (ph.shad || [])[0] ? ph.fork || null : null };
 }
 // PS2 games: PCSX2 must have the game in its game list (that is where the serial and CRC come from)
 const PS2_IDS_FILE = path.join(USER_DATA, 'ps2-ids.json');
@@ -4913,54 +4938,123 @@ const handlers = {
     if (emuGetRun) throw new Error('Another emulator is downloading. Wait for it to finish.');
     const rel = await require('./github').release(repo).catch((e) => { throw new Error(`GitHub: ${e.message}`); });
     if (!rel) throw new Error('That project has no releases on GitHub.');
-    const asset = C.pickAsset(rel.assets), archive = !asset && C.pickArchive(rel.assets);
-    if (!asset && !archive) throw new Error('Its newest release has no Linux AppImage or Linux archive to install.');
+    const asset = C.pickAsset(rel.assets), linuxArchive = !asset && C.pickArchive(rel.assets);
+    // 0.9.64: no Linux build at all: its Windows build, run through Proton (a lone .exe goes in a folder of its own)
+    const win = !asset && !linuxArchive ? C.pickWindows(rel.assets) : null, archive = linuxArchive || win;
+    if (!asset && !archive) throw new Error('Its newest release has no Linux or Windows build to install (Android, macOS and source code can’t run here).');
     const dir = config.emuDir || path.join(os.homedir(), 'Applications');
     const prev = (config.customEmus || []).find((x) => x.repo === repo);
     // an AppImage goes in as one file; an archive (0.9.32, owner: GR2 fork as a Linux .zip) unpacks into its own folder there
-    const dest = asset ? path.join(dir, C.fileName(repo, asset)) : path.join(dir, repo.split('/')[1].replace(/[^\w.-]+/g, ''));
+    // 0.9.64: an update goes where the copy already is (a fork you linked to its project, wherever it lives), the
+    // release it replaces kept aside (forkVersions.js) so you can go back
+    const prevDest = prev && (asset ? (prev.path && !prev.folder && /\.appimage$/i.test(prev.path) ? prev.path : null) : prev.folder || null);
+    const dest = prevDest || (asset ? path.join(dir, C.fileName(repo, asset)) : path.join(dir, repo.split('/')[1].replace(/[^\w.-]+/g, '')));
     const mine = (config.customEmus || []).find((x) => x.path === dest || x.folder === dest);
     if (fs.existsSync(dest) && !mine) throw new Error(`${path.basename(dest)} is already in ${dir.replace(os.homedir(), '~')}. Cartridge leaves it as it is.`);
     fs.mkdirSync(dir, { recursive: true });
-    const src = asset || archive, tmp = path.join(dir, `.${path.basename(dest)}.cartridge-new${asset ? '' : path.extname(archive.name) || '.zip'}`);
+    const src = asset || archive, tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.cartridge-new${asset ? '' : path.extname(archive.name) || '.zip'}`);
+    let relFiles = null;
     emuGetRun = { abort: new AbortController() };
     try {
       let got = 0, last = 0;
       await downloadTo(src.url, tmp, emuGetRun, (n) => { got += n; const now = Date.now(); if (now - last > 400) { last = now; broadcast('emuget-custom', { pct: src.size ? Math.min(99, Math.floor((got / src.size) * 100)) : null }); } }, { plain: true });
+      const FV = require('./forkVersions'), store = FV.storeOf(dir, repo.split('/')[1]), keepOld = prev && prev.tag !== rel.tag && fs.existsSync(dest), oldTag = prev?.tag || 'as found'; // a fork linked to its project has no tag yet: kept as found
       if (asset) {
         if (!require('./emuUpdates').looksRunnable(tmp, asset.name)) throw new Error('What came down wasn’t a working AppImage.');
+        if (keepOld) FV.keep({ base: path.dirname(dest), files: [path.basename(dest)], store, tag: oldTag });
         fs.chmodSync(tmp, 0o755); fs.renameSync(tmp, dest);
       } else {
         broadcast('emuget-custom', { pct: null });
         const out = dest + '.cartridge-new';
         fs.rmSync(out, { recursive: true, force: true });
-        await unpackTo(tmp, out);
+        if (win && /\.exe$/i.test(win.name)) { fs.mkdirSync(out, { recursive: true }); fs.copyFileSync(tmp, path.join(out, win.name)); }
+        else await unpackTo(tmp, out);
         // one folder around everything is taken off, as the emulators' own zips are packed
         const top = fs.readdirSync(out);
         const inner = top.length === 1 && isDir(path.join(out, top[0])) ? path.join(out, top[0]) : out;
-        // an update lays the new files over the folder, so anything the emulator keeps there (portable user data) stays
+        // an update lays the new files over the folder, so anything the emulator keeps there (portable user data) stays;
+        // the release it replaces (its own files only) is kept aside first (0.9.64)
+        const newFiles = FV.filesOf(inner);
+        if (keepOld) FV.keep({ base: dest, files: prev.files || newFiles.filter((r) => fs.existsSync(path.join(dest, r))), store, tag: oldTag });
         fs.mkdirSync(dest, { recursive: true });
         fs.cpSync(inner, dest, { recursive: true, force: true });
         fs.rmSync(out, { recursive: true, force: true });
+        relFiles = newFiles;
       }
     } finally { fs.rmSync(tmp, { force: true }); emuGetRun = null; }
     const name = repo.split('/')[1];
-    if (asset) return finishCustom({ repo, file: dest, folder: null, as, of, key, tag: rel.tag, name });
+    if (asset) return finishCustom({ repo, file: dest, folder: null, as, of, key, tag: rel.tag, name, files: [path.basename(dest)] });
     // which program in the folder is the emulator: the one used before, the only one, or the user picks
-    const progs = programsInFolder(dest);
-    if (!progs.length) throw new Error(`${name} was unpacked into ${dest.replace(os.homedir(), '~')}, but there’s no AppImage or Linux program in it.`);
-    for (const p of progs) { try { fs.chmodSync(p.path, 0o755); } catch {} } // zips don't keep the run bit
+    const progs = win ? C.windowsProgramsIn(require('./forkVersions').filesOf(dest).map((rel2) => { let size = 0; try { size = fs.statSync(path.join(dest, rel2)).size; } catch {} return { rel: rel2, path: path.join(dest, rel2), size }; })) : programsInFolder(dest);
+    if (!progs.length) throw new Error(`${name} was unpacked into ${dest.replace(os.homedir(), '~')}, but there’s no ${win ? 'Windows program' : 'AppImage or Linux program'} in it.`);
+    if (!win) for (const p of progs) { try { fs.chmodSync(p.path, 0o755); } catch {} } // zips don't keep the run bit
     const again = prev?.folder === dest && prev.path && progs.find((p) => p.path === prev.path);
-    if (again || progs.length === 1) return finishCustom({ repo, file: (again || progs[0]).path, folder: dest, as, of, key, tag: rel.tag, name });
-    customPending = { repo, folder: dest, as, of, key, tag: rel.tag, name, files: progs.map((p) => p.path) };
+    if (again || progs.length === 1) return finishCustom({ repo, file: (again || progs[0]).path, folder: dest, as, of, key, tag: rel.tag, name, files: relFiles });
+    customPending = { repo, folder: dest, as, of, key, tag: rel.tag, name, files: progs.map((p) => p.path), relFiles };
     return { pick: progs.map((p) => ({ path: p.path, rel: p.rel, size: p.size, appimage: p.appimage })), folder: dest, name, tag: rel.tag };
+  },
+  // 0.9.64 (owner: typing GitHub links is a pain): search GitHub by a few words, and send the link from the phone
+  'github:search': ({ q }) => require('./github').search(q),
+  'phone:open': async ({ title } = {}) => {
+    phoneLinkNow?.close(); phoneLinkNow = null;
+    const s = await require('./phoneLink').open({ title, onText: (text) => { phoneLinkNow = null; broadcast('phone-text', { text }); } });
+    phoneLinkNow = s; log('phone link page open on', s.urls.length, 'address(es)');
+    return { urls: s.urls };
+  },
+  'phone:close': () => { phoneLinkNow?.close(); phoneLinkNow = null; return true; },
+  // what a link would install, before anything downloads (0.9.64: you see the project, its release and the file first)
+  'emuget:preview': async ({ link }) => {
+    const C = require('./customEmu'), repo = C.repoOf(link);
+    if (!repo) throw new Error('That isn’t a GitHub project link. It looks like github.com/owner/project.');
+    const [rel, info] = await Promise.all([require('./github').release(repo).catch((e) => { throw new Error(`GitHub: ${e.message}`); }), webFetch(`https://api.github.com/repos/${repo}`, { headers: { 'User-Agent': 'Cartridge' }, signal: AbortSignal.timeout(15000) }).then((r) => (r.ok ? r.json() : null)).catch(() => null)]);
+    if (!rel) throw new Error('That project has no releases on GitHub.');
+    const a = C.pickAsset(rel.assets), z = !a && C.pickArchive(rel.assets), w = !a && !z && C.pickWindows(rel.assets);
+    return { repo, tag: rel.tag, date: rel.date, file: (a || z || w)?.name || null, size: (a || z || w)?.size || 0, kind: a ? 'appimage' : z ? 'archive' : w ? 'windows' : null, stars: info?.stargazers_count ?? null, description: info?.description || '', fork: !!info?.fork, others: rel.assets.length };
+  },
+  // versions of a GitHub-link emulator or fork (0.9.64, forkVersions.js): the one in use and the ones kept beside it
+  'emuget:versions': ({ path: file }) => {
+    const x = (config.customEmus || []).find((c) => c.path === file);
+    if (!x) return { linked: false, kept: [] };
+    const FV = require('./forkVersions'), store = FV.storeOf(path.dirname(x.folder || x.path), x.repo.split('/')[1]);
+    return { linked: true, repo: x.repo, current: x.tag || null, kept: FV.list(store) };
+  },
+  'emuget:useVersion': ({ path: file, tag }) => {
+    const x = (config.customEmus || []).find((c) => c.path === file);
+    if (!x) throw new Error('Only emulators installed from a GitHub link keep versions.');
+    if (progRunning(x.path)) throw new Error(`Close ${x.repo.split('/')[1]} first.`);
+    const FV = require('./forkVersions'), base = x.folder || path.dirname(x.path), store = FV.storeOf(path.dirname(x.folder || x.path), x.repo.split('/')[1]);
+    const placed = FV.swap({ base, store, current: x.tag || 'unknown', files: x.files || [path.basename(x.path)], to: tag });
+    x.files = x.folder ? placed : [path.basename(x.path)]; x.tag = tag; saveConfig();
+    try { fs.chmodSync(x.path, 0o755); } catch {}
+    log('emulator version switched', x.repo, tag);
+    return { tag };
+  },
+  'emuget:dropVersion': ({ path: file, tag }) => {
+    const x = (config.customEmus || []).find((c) => c.path === file);
+    if (!x || tag === x.tag) throw new Error('That version is the one in use.');
+    const FV = require('./forkVersions');
+    return FV.drop(FV.storeOf(path.dirname(x.folder || x.path), x.repo.split('/')[1]), tag);
+  },
+  // a fork Cartridge found (not installed through it) linked to its GitHub project (0.9.64, owner: the GR2 fork wasn't
+  // in Emulators and couldn't be updated): from then on it updates from that project, in place, with versions kept
+  'emuget:adopt': ({ path: file, link, of }) => {
+    const repo = require('./customEmu').repoOf(link);
+    if (!repo) throw new Error('That isn’t a GitHub project link. It looks like github.com/owner/project.');
+    if (!fs.existsSync(file)) throw new Error('That program isn’t there any more.');
+    const appimage = /\.appimage$/i.test(file);
+    const folder = appimage ? null : path.dirname(file);
+    const files = folder ? require('./forkVersions').filesOf(folder).filter((r) => !/^(user|portable|config|data|saves?)\//i.test(r)) : [path.basename(file)];
+    config.customEmus = [...(config.customEmus || []).filter((x) => x.path !== file), { repo, path: file, folder, as: 'fork', of, key: null, tag: null, at: Date.now(), files, adopted: true }];
+    saveConfig();
+    log('fork linked to its project', file, repo);
+    return { repo };
   },
   // the program the user picked in an unpacked release (0.9.32)
   'emuget:customPick': ({ file }) => {
     const p = customPending;
     if (!p || !p.files.includes(file)) throw new Error('Pick one of the programs from that release.');
     customPending = null;
-    return finishCustom({ ...p, file });
+    return finishCustom({ ...p, file, files: p.relFiles });
   },
   'emuget:cancel': () => { emuGetRun?.abort.abort(); return true; },
   // emulator updates (0.9.16): each installed copy, its version and whether a newer one is out
@@ -4986,12 +5080,19 @@ const handlers = {
     // project's releases, never the emulator they're a fork of; listed even when the scan doesn't know them
     const customs = (config.customEmus || []).filter((x) => x.path && fs.existsSync(x.path));
     for (const x of customs) if (!list.some((e) => e.path === x.path)) list.push({ id: x.of || 'custom', label: x.repo.split('/')[1], kind: 'appimage', path: x.path });
+    // 0.9.64 (owner: forks as full emulators, under the emulator they come from): every fork found, with forkOf, so the
+    // Emulators page lists it in its parent's Forks; one not installed through Cartridge can be linked to its project
+    let forks = []; try { forks = steamMgr.forksAll(); } catch {}
+    const forkAt = new Map(forks.filter((f) => f.exe && fs.existsSync(f.exe)).map((f) => [realOf(f.exe), f]));
+    for (let i = list.length - 1; i >= 0; i--) { const f = list[i].path && forkAt.get(realOf(list[i].path)); if (f) list[i] = { ...list[i], id: f.of, label: f.name, fork: true, forkOf: f.of }; }
+    for (const [, f] of forkAt) if (!list.some((e) => e.path && realOf(e.path) === realOf(f.exe))) list.push({ id: f.of, label: f.name, kind: /\.appimage$/i.test(f.exe) ? 'appimage' : 'folder', path: f.exe, fork: true, forkOf: f.of });
     for (const e of list) {
       const custom = customs.find((x) => x.path === e.path);
+      if (e.fork && !custom) { out.push(() => ({ ...e, noSource: true, linkable: true, channel: null, channels: [], page: null })); continue; } // never the parent's releases: link it to its own project first
       if (custom) {
         const ck = 'gh:' + custom.repo; let c = cache[ck];
         if (!cached && (fresh || !c || Date.now() - c.t > TTL)) jobs.push(require('./github').release(custom.repo).then((r) => { cache[ck] = { t: Date.now(), tag: r?.tag || null }; }).catch((err) => { cache[ck] = { t: c?.t || 0, tag: c?.tag || null, error: err.message }; }));
-        out.push(() => { const c = cache[ck]; return ({ ...e, label: custom.repo.split('/')[1], version: custom.tag, custom: { repo: custom.repo }, forkOf: custom.as === 'fork' ? custom.of : null, update: c?.tag && c.tag !== custom.tag ? { version: c.tag, tag: c.tag } : null, latest: c?.tag ? { version: c.tag } : null, error: c?.error || null, channel: null, channels: [], page: `https://github.com/${custom.repo}/releases` }); });
+        out.push(() => { const c = cache[ck]; return ({ ...e, label: custom.repo.split('/')[1], version: custom.tag, custom: { repo: custom.repo }, forkOf: custom.as === 'fork' ? custom.of : null, fork: custom.as === 'fork' || !!e.fork, linked: true, update: c?.tag && c.tag !== custom.tag ? { version: c.tag, tag: c.tag } : null, latest: c?.tag ? { version: c.tag } : null, error: c?.error || null, channel: null, channels: [], page: `https://github.com/${custom.repo}/releases` }); });
         continue;
       }
       if (e.kind === 'flatpak') { out.push((fp) => ({ ...e, update: fp[e.fp] ? { version: fp[e.fp].version } : null, where: fp[e.fp]?.where, channel: 'flathub', channels: [] })); continue; }
@@ -5055,6 +5156,8 @@ const handlers = {
     // from a GitHub link: its own project's newest release, set up the same way again (0.9.28)
     const custom = (config.customEmus || []).find((x) => x.path === file);
     if (custom) { const r = await handlers['emuget:custom']({ link: custom.repo, as: custom.as, of: custom.of, key: custom.key }); log('emulator from a link updated', custom.repo, r.tag); return true; }
+    // a fork never takes the emulator it comes from's release over itself (0.9.64): it's linked to its own project first
+    if (file && (() => { try { const r = fs.realpathSync(file); return steamMgr.forksAll().some((f) => { try { return fs.realpathSync(f.exe) === r; } catch { return false; } }); } catch { return false; } })()) throw new Error('This is a fork: link it to its own GitHub project first (Link to Its Project).');
     if (kind === 'flatpak') {
       broadcast('emu-update', { path: fp, state: 'downloading', pct: null });
       await U.flatpakUpdate(fp, where, (m) => broadcast('emu-update', { path: fp, state: 'downloading', pct: m.pct, text: m.text }), force ? ['install', '--reinstall'] : []);
@@ -5180,7 +5283,7 @@ const handlers = {
     log('folder unlinked', rec.from);
     return true;
   },
-  'gamesettings:get': ({ romId }) => { const c = gameSettingsCtx(Number(romId)); if (c.why) return { why: c.why, emu: c.emu }; c.emuVersion = emuVersionFor(c.emu, Number(romId)); return require('./gameSettings').describe(c); },
+  'gamesettings:get': ({ romId }) => { const c = gameSettingsCtx(Number(romId)); if (c.why) return { why: c.why, emu: c.emu }; c.emuVersion = emuVersionFor(c.emu, Number(romId)); const d = require('./gameSettings').describe(c); if (d && c.fork) { d.parentName = d.name; d.name = forkTitle(d.name, c.fork); d.fork = c.fork; } return d; }, // 0.9.64: a fork's own settings say so
   'gamesettings:set': ({ romId, changes }) => {
     const c = gameSettingsCtx(Number(romId));
     if (c.why) throw new Error(c.why);
@@ -5312,7 +5415,7 @@ const handlers = {
     // Cemu (0.9.37): which title ID it matched by, and packs for this game that only list other regions
     let other = null;
     if (st.emu === 'cemu') { try { other = require('./cemuPacks').otherRegions({ root: st.dir.root, titleIds: st.ids, name: st.title }); } catch {} log('cemu packs', st.title, 'ids', (st.ids || []).join(',') || 'none', 'packs', list.length, other && Object.keys(other).length ? 'other regions ' + JSON.stringify(other) : ''); }
-    return { emu: st.emu, emuName: E.name, serial: st.serial, version: st.version, why, list, other, ids: st.emu === 'cemu' ? st.ids || [] : undefined };
+    return { emu: st.emu, emuName: st.fork ? forkTitle(E.name, st.fork) : E.name, serial: st.serial, version: st.version, why, list, other, ids: st.emu === 'cemu' ? st.ids || [] : undefined };
   },
   // changes: [{ key, on }]. Patches turned on in RPCS3 itself are never turned off here.
   'patches:apply': async ({ romId, changes }) => {

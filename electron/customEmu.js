@@ -25,6 +25,19 @@ function pickArchive(assets) {
   const score = (n) => (/linux/i.test(n) ? 0 : 2) + (/(x86_64|amd64|x64)/i.test(n) ? 0 : 1) + (/appimage/i.test(n) ? -1 : 0) + n.length / 1000;
   return ok.sort((a, b) => score(a.name) - score(b.name))[0] || null;
 }
+// 0.9.64 (owner: "always default to a Linux build; if there absolutely isn't one, Windows, then nothing else"): a Windows
+// x64 build, run through Proton: a lone .exe or an archive holding one. Never Android, macOS, ARM, debug symbols or source.
+const NOT_WIN = /\b(android|apk|ios|mac(os)?|osx|darwin|apple|aarch64|arm64|armhf|armv7|arm|x86_32|i[3-6]86|win32|source|src|symbols|pdb|debug)\b/i;
+function pickWindows(assets) {
+  const ok = (assets || []).filter((a) => (/\.exe$/i.test(a.name) || /\.(zip|7z)$/i.test(a.name)) && !NOT_WIN.test(a.name.replace(/[-_.]+/g, ' ')) && !/setup|installer|uninstall|vc_?redist/i.test(a.name));
+  const score = (n) => (/(win(dows)?|msvc|mingw)/i.test(n) ? 0 : 2) + (/(x86_64|x64|amd64|win64)/i.test(n) ? 0 : 1) + (/\.exe$/i.test(n) ? 1 : 0) + n.length / 1000;
+  return ok.filter((a) => /(win(dows)?|msvc|mingw|\.exe$)/i.test(a.name)).sort((a, b) => score(a.name) - score(b.name))[0] || null;
+}
+// the Windows program in an unpacked folder: .exe files that aren't helpers, the shallowest and biggest first
+function windowsProgramsIn(files) {
+  return files.filter((f) => /\.exe$/i.test(f.rel) && !/(unins|setup|install|update|crash|helper|vc_?redist|dxsetup|7z)/i.test(f.rel.split('/').pop()))
+    .sort((a, b) => a.rel.split('/').length - b.rel.split('/').length || b.size - a.size);
+}
 // what in an unpacked folder could be the emulator: AppImages first, else programs; libraries, helpers and
 // updaters left out. files: [{ rel, size, appimage, elf }]
 function programsIn(files) {
@@ -38,4 +51,4 @@ function fileName(repo, asset) {
   const base = repo.split('/')[1].replace(/[^\w.-]+/g, '');
   return /\.appimage$/i.test(base) ? base : `${base}.AppImage`;
 }
-module.exports = { repoOf, pickAsset, pickArchive, programsIn, fileName };
+module.exports = { repoOf, pickAsset, pickArchive, pickWindows, windowsProgramsIn, programsIn, fileName };

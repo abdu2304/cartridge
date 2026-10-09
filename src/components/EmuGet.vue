@@ -80,7 +80,7 @@
           <div class="eg-head"><PIcon v-if="SLUG[c.key]" :p="{ slug: SLUG[c.key], fs_slug: SLUG[c.key] }" :size="30" /><Icon v-else name="mdiGamepadSquareOutline" :size="28" /><b>{{ c.name }}</b></div>
           <button v-for="e in c.emus" :key="c.key + e.id" class="eg-emu" :class="{ have: e.installed, busy: stateOf(c, e)?.state === 'run' }" data-focus @click="get(c, e)">
             <EmuIcon :id="e.id" :size="34" fallback="mdiGamepadVariantOutline" />
-            <span class="eg-mid"><b>{{ e.label }}</b><span class="muted small">{{ e.from }}<template v-if="e.installed && upOf(e.id)?.channel && CH[upOf(e.id).channel]"> · {{ CH[upOf(e.id).channel] }}</template></span></span>
+            <span class="eg-mid"><b>{{ e.label }}</b><span class="muted small">{{ e.from }}<template v-if="e.installed && upOf(e.id)?.channel && CH[upOf(e.id).channel]"> · {{ CH[upOf(e.id).channel] }}</template><template v-if="forksOf(e.id).length"> · {{ forksOf(e.id).length }} fork{{ forksOf(e.id).length === 1 ? '' : 's' }}</template></span></span>
             <span v-if="e.installed && upRun && upOf(e.id) && upRun === (upOf(e.id).path || upOf(e.id).fp)" class="status"><Icon name="mdiArrowDownCircle" :size="14" />{{ upPct != null ? upPct + '%' : 'Updating' }}</span>
             <span v-else-if="e.installed && upOf(e.id)?.broken" class="status bad"><Icon name="mdiWrench" :size="14" />Repair</span>
             <span v-else-if="e.installed && upOf(e.id)?.update" class="status warn"><Icon name="mdiUpdate" :size="14" />Update · {{ shortVer(upOf(e.id).update) }}</span>
@@ -114,18 +114,30 @@
             <Icon name="mdiPlus" :size="22" />
           </button>
           <template v-else>
-            <div class="eg-head"><Icon name="mdiGithub" :size="28" /><b>From a GitHub Link</b></div>
-            <TextField v-model="gh.link" label="GitHub link" placeholder="github.com/owner/project" icon="mdiLink" />
+            <div class="eg-head"><Icon name="mdiGithub" :size="28" /><b>{{ gh.adopt ? `Link ${gh.adopt.label} to Its Project` : 'From a GitHub Link' }}</b></div>
+            <LinkInput v-model="gh.link" @update:model-value="gh.preview = null" />
+            <!-- 0.9.64 (owner: safety): what it would install, seen before anything downloads -->
+            <div v-if="gh.preview" class="eg-prev">
+              <b>{{ gh.preview.repo }}</b>
+              <span class="muted small">{{ [gh.preview.stars != null ? `${gh.preview.stars} stars` : '', gh.preview.fork ? 'a fork' : '', `release ${gh.preview.tag}${gh.preview.date ? ' of ' + new Date(gh.preview.date).toLocaleDateString() : ''}`].filter(Boolean).join(' · ') }}</span>
+              <span v-if="gh.preview.description" class="muted small">{{ gh.preview.description }}</span>
+              <span class="small">{{ gh.preview.file ? `${gh.preview.kind === 'windows' ? 'Windows build, run through Proton: ' : gh.preview.kind === 'archive' ? 'Linux build: ' : 'Linux AppImage: '}${gh.preview.file}${gh.preview.size ? ' · ' + bytes(gh.preview.size) : ''}` : 'Its newest release has no Linux or Windows build Cartridge can use.' }}</span>
+            </div>
+            <template v-if="!gh.adopt">
             <div class="seg"><button data-focus :class="{ on: gh.as === 'fork' }" @click="gh.as = 'fork'">A Fork Of</button><button data-focus :class="{ on: gh.as === 'console' }" @click="gh.as = 'console'">For a Console</button></div>
             <div class="eg-chips">
               <template v-if="gh.as === 'fork'"><button v-for="x in forkTargets" :key="x.id" class="eg-chip" data-focus :class="{ on: gh.of === x.id }" @click="gh.of = x.id">{{ x.label }}</button></template>
               <template v-else><button v-for="c in list || []" :key="c.key" class="eg-chip" data-focus :class="{ on: gh.key === c.key }" @click="gh.key = c.key">{{ c.name }}</button></template>
             </div>
-            <p class="muted small" style="margin: 0">{{ gh.as === 'fork' ? 'It starts games the way the emulator it comes from does, and shows as that emulator’s fork when you pick emulators for a console.' : 'It becomes that console’s emulator for new Steam shortcuts. If Cartridge doesn’t know it, games are given to it as a file path.' }} The newest Linux AppImage from its releases goes in {{ short(store.config.emuDir) || '~/Applications' }}; a Linux .zip or .tar is unpacked into its own folder there, and you pick its program if there’s more than one.</p>
+            </template>
+            <p v-if="gh.adopt" class="muted small" style="margin: 0">From then on it updates from that project, in place where it is now, and each release it replaces is kept so you can go back. Its own folders (saves, settings) never move.</p>
+            <p v-else class="muted small" style="margin: 0">{{ gh.as === 'fork' ? 'It starts games the way the emulator it comes from does, and shows as that emulator’s fork when you pick emulators for a console.' : 'It becomes that console’s emulator for new Steam shortcuts. If Cartridge doesn’t know it, games are given to it as a file path.' }} The newest Linux AppImage from its releases goes in {{ short(store.config.emuDir) || '~/Applications' }}; a Linux .zip or .tar is unpacked into its own folder there, and you pick its program if there’s more than one. With no Linux build at all, its Windows build runs through Proton. Check It shows the project and the file before anything downloads.</p>
             <div v-if="gh.busy" class="eg-ghbar"><i :class="{ live: gh.pct == null }" :style="{ width: (gh.pct ?? 100) + '%' }" /></div>
             <div class="row" style="gap: 10px; justify-content: flex-end">
-              <button class="btn" data-focus :disabled="gh.busy" @click="gh.open = false">Cancel</button>
-              <button class="btn primary" data-focus :disabled="gh.busy || !gh.link || (gh.as === 'fork' ? !gh.of : !gh.key)" @click="installLink"><Icon name="mdiDownload" />{{ gh.busy ? (gh.pct != null ? gh.pct + '%' : 'Downloading…') : 'Install' }}</button>
+              <button class="btn" data-focus :disabled="gh.busy" @click="closeGh">Cancel</button>
+              <button v-if="gh.adopt" class="btn primary" data-focus :disabled="gh.busy || !gh.link" @click="adoptLink"><Icon name="mdiGithub" />Link It</button>
+              <button v-else-if="!gh.preview" class="btn primary" data-focus :disabled="gh.busy || !gh.link || (gh.as === 'fork' ? !gh.of : !gh.key)" @click="previewLink"><Icon :name="gh.busy ? 'mdiSync' : 'mdiMagnify'" :class="{ spin: gh.busy }" />{{ gh.busy ? 'Looking…' : 'Check It' }}</button>
+              <button v-else class="btn primary" data-focus :disabled="gh.busy || !gh.preview.file || (gh.as === 'fork' ? !gh.of : !gh.key)" @click="installLink"><Icon name="mdiDownload" />{{ gh.busy ? (gh.pct != null ? gh.pct + '%' : 'Downloading…') : 'Install' }}</button>
             </div>
           </template>
         </section>
@@ -146,6 +158,7 @@ import Icon from './Icon.vue';
 import EmuIcon from './EmuIcon.vue';
 import PIcon from './PIcon.vue';
 import TextField from './TextField.vue';
+import LinkInput from './LinkInput.vue';
 
 const props = defineProps({ flow: Boolean, updates: Boolean });
 const emit = defineEmits(['done', 'phase']);
@@ -153,8 +166,10 @@ const emit = defineEmits(['done', 'phase']);
 // says whether it's up to date, and picking one with an update installs it (same channels as before)
 const ups = ref(null), upBusy = ref(false), upRun = ref(''), upPct = ref(null);
 const upCount = computed(() => (ups.value || []).filter((u) => u.update).length);
-const upOf = (id) => { const l = (ups.value || []).filter((u) => u.id === id); return l.find((u) => u.update) || l[0] || null; };
-const others = computed(() => { const known = new Set(all.value.map((x) => x.e.id)); return (ups.value || []).filter((u) => !known.has(u.id)); });
+const upOf = (id) => { const l = (ups.value || []).filter((u) => u.id === id && !u.fork); return l.find((u) => u.update) || l[0] || null; };
+// 0.9.64 (owner: forks belong to the emulator they come from): a fork is listed in its parent's Forks, never on its own
+const forksOf = (id) => (ups.value || []).filter((u) => u.fork && u.forkOf === id);
+const others = computed(() => { const known = new Set(all.value.map((x) => x.e.id)); return (ups.value || []).filter((u) => !u.fork && !known.has(u.id)); });
 // 0.9.37 (owner: slow to open, not live): what was known shows at once, then every emulator is checked again
 let upSeq = 0;
 async function loadUps(fresh = false) {
@@ -222,7 +237,11 @@ async function manage(u) {
     ...(PATH_IDS.has(u.id) ? [{ label: 'Folders', sub: 'Where it keeps games, installed content and saves', value: 'folders', icon: 'mdiFolderCogOutline' }] : []),
     // 0.9.33 (owner): a fork plays with the saves of the emulator it comes from, through Linked Folders
     ...(u.forkOf ? [{ label: 'Share Saves With the Original', sub: 'Link its save folder in Linked Folders', value: 'links', icon: 'mdiLinkVariant' }] : []),
-    ...(u.id === 'shadps4' ? [{ label: 'Versions', sub: 'Which games use which, and more to add', value: 'versions', icon: 'mdiLayersTriple' }] : []),
+    ...(u.id === 'shadps4' && !u.fork ? [{ label: 'Versions', sub: 'Which games use which, and more to add', value: 'versions', icon: 'mdiLayersTriple' }] : []),
+    // 0.9.64: forks under their parent; a fork's own releases kept side by side; a fork found here linked to its project
+    ...(!u.fork && forksOf(u.id).length ? [{ label: `Forks · ${forksOf(u.id).length}`, sub: forksOf(u.id).map((f) => f.label).join(', '), value: 'forks', icon: 'mdiSourceFork' }] : []),
+    ...(u.linked ? [{ label: 'Versions', sub: 'Go back to a release you had, or remove kept ones', value: 'fversions', icon: 'mdiLayersTriple' }] : []),
+    ...(u.linkable ? [{ label: 'Link to Its Project', sub: 'Its GitHub project, so it can update and keep versions', value: 'adopt', icon: 'mdiGithub' }] : []),
     ...(u.page ? [{ label: 'Open Its Download Page', value: 'page', icon: 'mdiOpenInNew' }] : []),
     ...(u.site && u.site !== u.page ? [{ label: 'Open Its Website', value: 'site', icon: 'mdiWeb' }] : []),
     { label: 'Delete', sub: u.kind === 'flatpak' ? 'Uninstall the Flatpak' : 'Your saves and settings stay', value: 'delete', icon: 'mdiDeleteOutline', danger: true },
@@ -234,6 +253,9 @@ async function manage(u) {
   if (v === 'again') return runUpdate(u, true);
   if (v.startsWith('ch:')) { await call('emuup:setChannel', { id: u.id, channel: v.slice(3) }); toast(`${u.label} follows ${CH[v.slice(3)].toLowerCase()} now`, 'ok', 3000); return loadUps(true); }
   if (v === 'versions') return openModal('shadversions', {});
+  if (v === 'forks') { const f = await choose({ title: `${u.label} Forks`, message: 'Forks of it on this device. Each updates from its own project.', options: forksOf(u.id).map((x) => ({ label: x.label, sub: [x.version ? 'Version ' + x.version : '', x.update ? 'Update available' : x.linkable ? 'Not linked to its project yet' : 'Up to date', short(x.path)].filter(Boolean).join(' · '), value: x.path || x.fp, icon: 'mdiSourceFork', raw: true })), sheet: true }); const x = f && forksOf(u.id).find((y) => (y.path || y.fp) === f); return x ? manage(x) : undefined; }
+  if (v === 'fversions') return forkVersions(u);
+  if (v === 'adopt') return adopt(u);
   if (v === 'links') { store.emuPageWant = 'links'; return; }
   if (v === 'folders') return openModal('emupaths', { id: u.id, name: u.label });
   if (v === 'page') return window.open(u.page);
@@ -244,8 +266,42 @@ async function manage(u) {
     await load(); await loadUps();
   }
 }
+// a GitHub-link emulator's or fork's kept releases (0.9.64, forkVersions.js): switch, or remove one
+async function forkVersions(u) {
+  const d = await call('emuget:versions', { path: u.path }).catch((e) => (toast(e.message, 'error'), null));
+  if (!d) return;
+  const v = await choose({ title: `${u.label} Versions`, message: d.kept.length ? 'The one in use stays where it is, so Steam shortcuts keep working; its own folders (saves, settings) never move.' : 'Older releases are kept here when it updates.', sheet: true, options: [
+    { label: d.current || 'In Use', sub: 'In use now', value: null, icon: 'mdiCheckDecagram', selected: true, raw: true },
+    ...d.kept.map((k) => ({ label: k.tag, sub: `Kept ${new Date(k.at).toLocaleDateString()} · ${bytes(k.size)}`, value: 'use:' + k.tag, icon: 'mdiHistory', raw: true })),
+    ...(d.kept.length ? [{ label: 'Remove a Kept Version', value: 'drop', icon: 'mdiDeleteOutline', danger: true }] : []),
+  ] });
+  if (!v) return;
+  if (v === 'drop') { const t = await choose({ title: 'Remove Which?', options: d.kept.map((k) => ({ label: k.tag, sub: bytes(k.size), value: k.tag, icon: 'mdiDeleteOutline', raw: true })) }); if (!t) return; try { await call('emuget:dropVersion', { path: u.path, tag: t }); toast(`${t} removed`, 'ok', 2500); } catch (e) { toast(e.message, 'error', 6000); } return; }
+  const tag = v.slice(4);
+  if (!(await confirm(`Use ${tag}?`, `${u.label} ${d.current || ''} is kept beside it, so you can switch back.`, 'Use It'))) return;
+  try { await call('emuget:useVersion', { path: u.path, tag }); toast(`${u.label} is on ${tag} now`, 'ok', 3000, 'mdiHistory'); } catch (e) { toast(e.message, 'error', 6000); }
+  loadUps(true);
+}
+// a fork Cartridge found, linked to its GitHub project (0.9.64): typed, searched or sent from the phone
+async function adopt(u) {
+  gh.value = { ...GH0(), open: true, adopt: u };
+  await nextTick(); focusFirst(document.querySelector('.eg-gh'));
+}
 // From a GitHub link (0.9.24)
-const gh = ref({ open: false, link: '', as: 'fork', of: '', key: '', busy: false, pct: null });
+const GH0 = () => ({ open: false, link: '', as: 'fork', of: '', key: '', busy: false, pct: null, preview: null, adopt: null });
+const gh = ref(GH0());
+function closeGh() { gh.value = GH0(); }
+// 0.9.64: the project, its release and the file it would install, shown first; nothing runs until Install
+async function previewLink() {
+  const g = gh.value; g.busy = true;
+  try { g.preview = await call('emuget:preview', { link: g.link.trim() }); } catch (e) { toast(e.message, 'error', 6000); }
+  g.busy = false;
+}
+async function adoptLink() {
+  const g = gh.value, u = g.adopt; g.busy = true;
+  try { const r = await call('emuget:adopt', { path: u.path, link: g.link.trim(), of: u.forkOf }); toast(`${u.label} now updates from ${r.repo}`, 'ok', 3500, 'mdiGithub'); closeGh(); loadUps(true); }
+  catch (e) { toast(e.message, 'error', 6000); g.busy = false; }
+}
 const forkTargets = computed(() => uniq.value.map((x) => ({ id: x.e.id, label: x.e.label })).filter((x) => x.id !== 'retroarch'));
 async function installLink() {
   const g = gh.value;
@@ -262,7 +318,7 @@ async function installLink() {
     }
     const what = g.as === 'fork' ? `as a fork of ${forkTargets.value.find((x) => x.id === g.of)?.label}: pick it on a console’s page` : `for ${(list.value || []).find((c) => c.key === g.key)?.name}`;
     toast(`${r.name} ${r.tag} is in ${short(r.folder || r.path.replace(/\/[^/]+$/, ''))}, set up ${what}`, 'ok', 7000, 'mdiGithub');
-    gh.value = { open: false, link: '', as: 'fork', of: '', key: '', busy: false, pct: null };
+    closeGh();
     await load(); await loadUps(true);
   } catch (e) { toast(e.message, 'error', 7000); g.busy = false; }
   ghCalling = false;
@@ -439,6 +495,8 @@ defineExpose({ load });
 .eg-chip { padding: 8px 14px; border-radius: 999px; border: 0; background: var(--s2); color: inherit; font: inherit; font-size: var(--t-sm); }
 .eg-chip.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .eg-chip:focus { background: var(--focus); color: var(--on-focus); outline: none; }
+.eg-prev { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; border-radius: var(--r-md); background: var(--s2); }
+.eg-prev b, .eg-prev span { overflow-wrap: anywhere; }
 .eg-ghbar { height: 6px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
 .eg-ghbar i { display: block; height: 100%; background: currentColor; transition: width var(--progress); }
 .eg-ghbar i.live { animation: egLive var(--loop-pulse) infinite; transform-origin: left; }
