@@ -1,27 +1,17 @@
-## Cartridge 0.9.63 · The Right Version
+## Cartridge 0.9.64 · Forks and Links
 
 ### New
-- **Choose which files to download.** A game made of several separate files in RomM (P.T.'s .pkg and .zip, a game and its update, discs) asks which you want before downloading. Nothing starts ticked, Select All picks everything, and each file shows what it is and its size. Folder games such as PS3 games always come whole.
-- **Xenia Canary patches.** Xbox 360 games get a Patches tab in Game Add-ons, from xenia-canary/game-patches: the same system as RPCS3 and shadPS4. Patches download into Xenia's own patches folder, an update keeps the ones you had on, and files you put there yourself are never replaced. Each patch is listed under the build it's for (Base Game, Title Update 1 and so on).
-- **Game Settings follow the version you have.** Each emulator's settings are now read from its last four releases too, not only its newest code, and Cartridge uses the release you have installed. Eden 0.2.0 now shows GPU Mode as Fast, Balanced and Accurate, as it does itself; before, picking Accurate set Balanced. When Cartridge can't tell which version you have, settings whose choices differ between versions are shown but locked, with a note to change them in the emulator.
-- **Repair for RPCS3's settings file.** If RPCS3 says "Failed to load global config ... illegal map value", an older EmuDeck left two lines joined in its config.yml. Settings → Emulators → Issues shows it, and Repair removes only that text, after a backup. Any other damage is shown with where it is, never changed.
+- **Forks belong to the emulator they come from.** In Settings → Emulators an emulator's row says how many forks it has, and its sheet has **Forks**, listing each one with its version and whether it has an update. Forks Cartridge finds on its own (the shadPS4 GR2 fork, PrimeHack and others) are listed too, not only ones installed through it.
+- **Link to Its Project.** A fork that wasn't installed through Cartridge can be linked to its GitHub project. From then on it updates from that project, in place, where it already is.
+- **Versions, kept side by side.** When an emulator or fork from a GitHub link updates, the release it replaces is kept. Its sheet's **Versions** switches back (or forward) and removes kept ones. The copy in use never moves, so Steam shortcuts keep working, and only the release's own files are swapped: a fork's own folders (its saves and settings) are never touched.
+- **Search GitHub instead of typing a link.** A few words ("shadps4 gr2") list matching projects, most-starred first, with their description and last update.
+- **Send a link from your phone.** Cartridge shows a QR code. Scan it on the same Wi-Fi, paste the link on the page that opens, press Send, and it appears in Cartridge. Nothing leaves your home network, and the page only answers its own secret address and closes after one link or ten minutes.
+- **Check It before installing.** A link first shows the project, its stars, its newest release and the exact file it would install. Nothing downloads until you press Install.
+- **Windows builds through Proton.** A project with no Linux build at all installs its Windows build and runs it through Proton. Linux always comes first, and Android, macOS, ARM and source code are never picked.
 
 ### Changed
-- **One row of tabs.** Game Settings, Game Add-ons and the game page's More now keep their tabs on one row that scrolls. The chosen tab always stays in view, and the edge fades where more tabs continue.
-- **Cemu's Game Add-ons tabs appear once, already counted.** Before, every group showed and then the empty ones vanished as soon as you pressed R1.
-- **Cartridge records more about how it's doing.** Its log now has a line every few minutes (every minute while a game runs) with its memory, the system's free memory and load, and slow steps by name. Vita3K's log is copied every 30 seconds while a Vita game runs. A freeze that takes the whole system down now leaves a trail.
-- **Every failed download or install says why in the log**, and network errors name the site that couldn't be reached.
+- **A game set to a fork uses the fork's own settings and patches.** Gravity Rush 2 with the GR2 fork gets Game Settings and patches in the fork's own folder, and those screens say "shadPS4 (GR2fork)" so it's clear which copy they change.
+- **Windows shortcuts use Steam's own default Proton** (Steam's Settings → Compatibility), unless you picked one in Cartridge.
 
 ### Fixed
-- **Cartridge froze for about 18 seconds every half hour.** Save Sync re-read and fingerprinted every save on each sync, all at once on the part of Cartridge that draws the window. It now remembers each file's fingerprint and only reads what changed, a little at a time. In a test with 400 saves the longest pause went from about 0.9 seconds (far more on a slow external drive) to 10 ms.
-- **A short stall every minute.** The trophy watcher checked every trophy file's date every 8 seconds in a way that blocked the window. It no longer blocks.
-- **A save too big for your server was retried every 30 minutes forever** ("RomM error 413"). Cartridge now tries the server's other address (home or away), remembers the one that takes big saves, and otherwise says plainly that the web server or tunnel in front of RomM limits upload size. It doesn't try that save again until it changes, or until you press Sync Now.
-- **RPCS3 game settings did nothing.** On Linux RPCS3 reads a game's settings beside its config.yml, but Cartridge saved them in a config/ folder only Windows uses. The same was true of RPCS3's recommended settings Cartridge adds after a download, and of the patch switches when RPCS3 hadn't made its own file yet. They're saved in the right place now, and files already saved in the wrong place are moved across, never over RPCS3's own.
-- **Mario Tennis Ultra Smash and other .wua games: "couldn't read this game's title ID".** Cartridge now reads the title IDs inside a .wua file directly, so Game Settings and Cemu's graphic packs work for them.
-- **PCSX2's Game Settings took long to open.** A disc's serial and CRC are read once and remembered, and matching against PCSX2's game list no longer looks up every game on disk.
-- **Your Lime3DS copy could be overwritten with Azahar** by an emulator update. Lime3DS and Citra are their own programs, with their own settings and saves, and both projects have ended, so their copies are no longer updated. A copy Cartridge already replaced still has your Lime3DS settings and saves in their own folder.
-- **Where Your Saves Are could list your saves twice.** Bazzite mounts the system drive a second time under /run/media/system, so the search found the same saves there. Folders are now told apart by the disk's own file number. The search also stops when a game starts.
-- **KytyPS5 just said "Try again".** A short download is now fetched once more by itself, and the message says what happened (how much arrived, or what the download held).
-- **Game Settings showed an error when closed while loading** (and two other windows could do the same).
-- **The emulator update check, the PS1 and PS2 name lists and Linked Folders' check ran twice at the same moment.** Each now runs once.
-- **DuckStation's version showed as "latest".** A rolling release with no number is named by its build date.
+- **A fork could be offered the emulator it comes from's update.** A fork now only ever updates from its own project, after it's linked to it.

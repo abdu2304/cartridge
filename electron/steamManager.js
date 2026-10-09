@@ -122,6 +122,14 @@ function parseTextVdf(t) {
   }
   return root;
 }
+// Steam's own default compatibility tool (0.9.64, owner: "use Steam's Proton"): Settings → Compatibility → "Run other
+// titles with", kept in config.vdf as CompatToolMapping "0" { "name" }. Empty when it was never set.
+function steamDefaultProton(acc) {
+  let t; try { t = fs.readFileSync(files(acc).config, 'utf8'); } catch { return ''; }
+  const v = parseTextVdf(t), find = (o, k) => (o && typeof o === 'object' ? (Object.keys(o).find((x) => x.toLowerCase() === k.toLowerCase()) ?? null) : null);
+  let o = v; for (const k of ['InstallConfigStore', 'Software', 'Valve', 'Steam', 'CompatToolMapping', '0']) { const key = find(o, k); if (key == null) return ''; o = o[key]; }
+  return typeof o?.name === 'string' ? o.name : '';
+}
 // Play time Steam keeps per app, shortcuts included: appid -> { min, last (ms) }. Shortcuts show
 // up under their 32-bit id, or as the long game id ((appid << 32) | 0x02000000) in some versions.
 function readPlaytime(acc) {
@@ -1055,7 +1063,7 @@ module.exports = function createSteamManager(ctx) {
       const appid = shortcutId(target, name);
       entries.push({
         romId: g.rom.id, console: g.key, sig: sigOf(t, mode), name, exe, target, start, lo: launch, directLo: lo, directExe: t.exe, directStart: startOf(t), appid, how: t.how, from: t.from, fallback, emu: t.emu || null,
-        proton: /\.exe$/i.test(t.exe) ? (cfg().proton || 'proton_experimental') : null,
+        proton: /\.exe$/i.test(t.exe) ? (cfg().proton || steamDefaultProton(env.account) || 'proton_experimental') : null, // yours, else Steam's own default (0.9.64)
         // 0.9: console collections on: also the Steam collection named after its console. Only
         // Steam's own collections: Cartridge (RomM) collections are never copied into Steam.
         collections: [...new Set([...(a.collections || []), ...(cfg().consoleCollections ? [colName(g)] : [])])],

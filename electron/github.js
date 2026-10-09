@@ -46,4 +46,29 @@ function parseAssets(html, repo) {
   }
   return out;
 }
-module.exports = { release, fromPages, parseAssets };
+// Search GitHub for projects (0.9.64, owner: typing a whole GitHub link on a controller is a pain): a few words,
+// most-starred first. The API's search allows 10 requests a minute without an account; when it refuses, the search
+// page's own data is read. -> [{ repo, description, stars, updated }]
+async function search(q, { fetchImpl = webFetch } = {}) {
+  const words = String(q || '').trim().slice(0, 120);
+  if (!words) return [];
+  const r = await fetchImpl(`https://api.github.com/search/repositories?q=${encodeURIComponent(words)}&sort=stars&order=desc&per_page=12`, { headers: UA, signal: AbortSignal.timeout(20000) }).catch(() => null);
+  if (r && r.ok) { const j = await r.json(); return (j.items || []).map((x) => ({ repo: x.full_name, description: x.description || '', stars: x.stargazers_count || 0, updated: x.pushed_at || x.updated_at || '', fork: !!x.fork })); }
+  const p = await fetchImpl(`https://github.com/search?q=${encodeURIComponent(words)}&type=repositories&s=stars&o=desc`, { headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) Cartridge', Accept: 'text/html' }, signal: AbortSignal.timeout(20000) });
+  if (!p.ok) throw new Error(`GitHub answered ${p.status}. Try again in a minute.`);
+  return parseSearch(await p.text());
+}
+// the search page carries its results as JSON ("results":[{ "hl_name", "hl_trimmed_description", "followers", "repo": { "repository": { "owner_login", "name", "updated_at" } } }])
+function parseSearch(html) {
+  const out = [], seen = new Set();
+  const m = /<script type="application\/json" data-target="react-app\.embeddedData">([\s\S]*?)<\/script>/.exec(String(html));
+  let results = [];
+  try { results = JSON.parse(m[1]).payload.results || []; } catch {}
+  for (const x of results) {
+    const r = x.repo?.repository, repo = r ? `${r.owner_login}/${r.name}` : String(x.hl_name || '').replace(/<[^>]+>/g, '');
+    if (!/^[\w.-]+\/[\w.-]+$/.test(repo) || seen.has(repo)) continue; seen.add(repo);
+    out.push({ repo, description: String(x.hl_trimmed_description || '').replace(/<[^>]+>/g, ''), stars: x.followers || 0, updated: r?.updated_at || '', fork: false });
+  }
+  return out;
+}
+module.exports = { release, fromPages, parseAssets, search, parseSearch };
