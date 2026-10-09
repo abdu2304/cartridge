@@ -1,0 +1,1534 @@
+{
+ "updated": "2026-10-09",
+ "source": "PCGamingWiki's List of unofficial ports (console sections), each project checked; see docs/recomps.md",
+ "entries": [
+  {
+   "id": "projectr",
+   "name": "ProjectR",
+   "games": [
+    {
+     "title": "San Francisco Rush: The Rock",
+     "console": "arcade"
+    },
+    {
+     "title": "San Francisco Rush 2049",
+     "console": "arcade"
+    }
+   ],
+   "origin": "recomp",
+   "site": "https://t3hd0gg.com/project-r/",
+   "builds": "site",
+   "linuxAsset": "linux-x86_64\\.AppImage$",
+   "windowsAsset": "windows-x86_64\\.exe$",
+   "prerelease": false,
+   "program": "project-r-0.7.1-linux-x86_64.AppImage",
+   "needs": {
+    "what": "Arcade dumps: for The Rock an sfrushrk CHD or raw hard drive dump plus the four audio ROMs (audio.u62, u61, u53, u49, a ZIP of them is accepted); for Rush 2049 an sf2049se, sf2049te or sf2049tea image",
+    "files": "several",
+    "ext": [
+     "chd",
+     "zip"
+    ],
+    "region": null
+   },
+   "setup": {
+    "how": "picker",
+    "arg": "--rtr starts The Rock, --2049 starts Rush 2049 (main menu if not set up)",
+    "notes": "Each game is set up from the main menu's setup option. Needs Vulkan 1.2 and an x86-64-v2 CPU. Controller or wheel, no keyboard and mouse."
+   },
+   "description": "An unofficial native PC port of the San Francisco Rush arcade games The Rock and 2049, using your own arcade dumps."
+  },
+  {
+   "id": "metroid-planets",
+   "name": "Metroid Planets",
+   "games": [
+    {
+     "title": "Metroid",
+     "console": "nes"
+    }
+   ],
+   "origin": "recreation",
+   "site": "https://forum.metroidconstruction.com/index.php/topic,4952.0.html",
+   "builds": "site",
+   "prerelease": false,
+   "setup": {
+    "how": "none",
+    "notes": "A stand-alone Windows fan remake (no ROM needed); on Linux it runs through Wine or Proton."
+   },
+   "description": "A fan remake of the original Metroid by vacantshade, with new areas and modern controls."
+  },
+  {
+   "id": "smb1r",
+   "name": "Super Mario Bros. Remastered",
+   "games": [
+    {
+     "title": "Super Mario Bros.",
+     "console": "nes"
+    }
+   ],
+   "origin": "recreation",
+   "repo": "github:JHDev2006/Super-Mario-Bros.-Remastered-Public",
+   "builds": "linux",
+   "linuxAsset": "^Linux\\.zip$",
+   "windowsAsset": "^Windows\\.zip$",
+   "prerelease": false,
+   "program": "SMB1R.x86_64",
+   "needs": {
+    "what": "An original Super Mario Bros. NES ROM (.nes), checked against the project's own hashes",
+    "files": "rom",
+    "ext": [
+     "nes"
+    ],
+    "region": null
+   },
+   "setup": {
+    "how": "picker",
+    "arg": "-rom {FILE}",
+    "notes": "Takes -rom <path>, else the first .nes beside the program, else asks (file dialog or drop). The ROM is copied to baserom.nes in its config folder, then assets are extracted to resource_packs/BaseAssets. Portable mode: portable.txt beside the program puts everything in config/ there."
+   },
+   "done": "~/.local/share/SMB1R/baserom.nes",
+   "saves": [
+    "~/.local/share/SMB1R/saves"
+   ],
+   "achievements": "~/.local/share/SMB1R/achievements.sav: a text string of 0/1 characters, one per achievement",
+   "license": "GPL-3.0",
+   "description": "A Godot remake of Super Mario Bros. and The Lost Levels with new characters, modes and a level editor, built from your NES ROM."
+  },
+  {
+   "id": "smbc",
+   "name": "SuperMarioBros-C",
+   "games": [
+    {
+     "title": "Super Mario Bros.",
+     "console": "nes"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:MitchellSternke/SuperMarioBros-C",
+   "builds": "none",
+   "program": "smbc",
+   "needs": {
+    "what": "An unmodified Super Mario Bros. (JU) (PRG0) [!].nes ROM",
+    "files": "rom",
+    "ext": [
+     "nes"
+    ],
+    "region": "JP",
+    "sha1": []
+   },
+   "setup": {
+    "how": "place",
+    "place": "Super Mario Bros. (JU) (PRG0) [!].nes",
+    "notes": "Looked for in the working folder; another path can be set as rom_file in smbc.conf (INI) in the working folder."
+   },
+   "description": "Super Mario Bros. translated from 6502 assembly into C++, a static recompilation that still emulates the PPU and APU."
+  },
+  {
+   "id": "zquestclassic",
+   "name": "ZQuest Classic",
+   "games": [
+    {
+     "title": "The Legend of Zelda",
+     "console": "nes"
+    }
+   ],
+   "origin": "recreation",
+   "repo": "github:ZQuestClassic/ZQuestClassic",
+   "site": "https://zquestclassic.com/",
+   "builds": "linux",
+   "linuxAsset": "-linux\\.tar\\.gz$",
+   "windowsAsset": "-windows-x64\\.zip$",
+   "prerelease": false,
+   "program": "zlauncher",
+   "setup": {
+    "how": "none",
+    "notes": "Formerly Zelda Classic. Ships its own recreation of the original quest plus an editor (zeditor) and player (zplayer). Stable tags are 2.55.x; 3.0.0 prereleases and nightlies are also published."
+   },
+   "saves": [
+    "saves (relative to the program folder, config key [zeldadx] save_folder)"
+   ],
+   "license": "GPL-3.0",
+   "description": "A recreation of the original Legend of Zelda engine with a quest editor and thousands of fan-made quests."
+  },
+  {
+   "id": "sm",
+   "name": "sm",
+   "games": [
+    {
+     "title": "Super Metroid",
+     "console": "snes"
+    }
+   ],
+   "origin": "reimplementation",
+   "repo": "github:snesrev/sm",
+   "builds": "none",
+   "program": "sm",
+   "needs": {
+    "what": "Super Metroid as a ROM named sm.smc",
+    "files": "rom",
+    "ext": [
+     "smc",
+     "sfc"
+    ],
+    "region": null,
+    "sha1": [
+     "da957f0d63d14cb441d215462904c4fa8519c613"
+    ]
+   },
+   "setup": {
+    "how": "place",
+    "place": "sm.smc",
+    "arg": "sm {FILE}",
+    "notes": "Reads sm.smc from the working folder, or the first argument. Early version, build it yourself."
+   },
+   "saves": [
+    "saves/sm.srm"
+   ],
+   "license": "MIT",
+   "description": "An early reverse-engineered C reimplementation of Super Metroid."
+  },
+  {
+   "id": "smw",
+   "name": "smw",
+   "games": [
+    {
+     "title": "Super Mario World",
+     "console": "snes"
+    }
+   ],
+   "origin": "reimplementation",
+   "repo": "github:snesrev/smw",
+   "builds": "windows",
+   "windowsAsset": "^smw_[0-9.]+\\.zip$",
+   "prerelease": false,
+   "program": "smw.exe",
+   "needs": {
+    "what": "The US version of Super Mario World as an unheadered ROM named smw.sfc",
+    "files": "rom",
+    "ext": [
+     "sfc",
+     "smc"
+    ],
+    "region": "US",
+    "sha1": [
+     "6B47BB75D16514B6A476AA0C73A683A2A4C18765"
+    ]
+   },
+   "setup": {
+    "how": "place",
+    "place": "smw.sfc",
+    "notes": "The release zip holds smw.exe, SDL2.dll, smw.ini and smw_assets.bps, applied to smw.sfc at start. README says to self-build; Linux needs a self-build."
+   },
+   "saves": [
+    "saves/smw.srm"
+   ],
+   "license": "MIT",
+   "description": "A reverse-engineered C reimplementation of Super Mario World that also runs Lunar Magic additions."
+  },
+  {
+   "id": "zelda3",
+   "name": "zelda3",
+   "games": [
+    {
+     "title": "The Legend of Zelda: A Link to the Past",
+     "console": "snes"
+    }
+   ],
+   "origin": "reimplementation",
+   "repo": "github:snesrev/zelda3",
+   "builds": "windows",
+   "windowsAsset": "^zelda3_v[0-9.]+\\.zip$",
+   "prerelease": false,
+   "program": "zelda3.exe",
+   "needs": {
+    "what": "The US version of A Link to the Past as an unheadered .sfc ROM named zelda3.sfc",
+    "files": "rom",
+    "ext": [
+     "sfc",
+     "smc"
+    ],
+    "region": "US",
+    "sha1": [
+     "6D4F10A8B10E10DBE624CB23CF03B88BB8252973"
+    ]
+   },
+   "setup": {
+    "how": "place",
+    "place": "zelda3.sfc",
+    "notes": "The release zip holds zelda3.exe, SDL2.dll, zelda3.ini and zelda3_assets.bps; at each start the patch is applied to zelda3.sfc beside it (or zelda3_assets.dat is used if present). Linux needs a self-build (make)."
+   },
+   "saves": [
+    "saves/sram.dat"
+   ],
+   "license": "MIT",
+   "description": "A reverse-engineered C reimplementation of A Link to the Past with widescreen, MSU-1 audio and bug fixes."
+  },
+  {
+   "id": "2ship2harkinian",
+   "name": "2 Ship 2 Harkinian",
+   "games": [
+    {
+     "title": "The Legend of Zelda: Majora's Mask",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:2ship2harkinian/2ship2harkinian",
+   "site": "https://2ship.equipment/",
+   "builds": "linux",
+   "linuxAsset": "^2Ship-.*-Linux\\.zip$",
+   "windowsAsset": "^2Ship-.*-Win64\\.zip$",
+   "prerelease": false,
+   "program": "2ship.appimage",
+   "needs": {
+    "what": "A supported Majora's Mask ROM: the US N64 1.0 version or the US GameCube Collector's Edition version",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": [
+     "d6133ace5afaa0882cf214cf88daba39e266c078",
+     "9743aa026e9269b339eb0e3044cd5830a440c1fd"
+    ]
+   },
+   "setup": {
+    "how": "place",
+    "place": "the ROM in the same folder as 2ship.appimage",
+    "notes": "On first run it extracts the ROM into mm.o2r in its data folder (2ship.o2r holds its own assets). On Linux the data folder is the working directory unless SHIP_HOME is set. The release zip is named after the release (e.g. Battler Bravo), so match by -Linux.zip."
+   },
+   "done": "mm.o2r",
+   "saves": [
+    "saves (in the working directory, or $SHIP_HOME/saves)"
+   ],
+   "license": "CC0-1.0",
+   "description": "A native PC port of Majora's Mask built from the decompilation on libultraship, with enhancements and randomiser options."
+  },
+  {
+   "id": "banjorecomp",
+   "name": "Banjo: Recompiled",
+   "games": [
+    {
+     "title": "Banjo-Kazooie",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:BanjoRecomp/BanjoRecomp",
+   "builds": "linux",
+   "linuxAsset": "Linux-X64\\.tar\\.gz$",
+   "windowsAsset": "Windows\\.zip$",
+   "prerelease": false,
+   "program": "BanjoRecompiled",
+   "needs": {
+    "what": "The North American 1.0 version of Banjo-Kazooie as an N64 ROM (.z64; .n64/.v64 are converted)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US"
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Pick the ROM from the main menu the first time; it is checked by hash and stored as bk.n64.us.1.0.z64 in the config folder. portable.txt beside the program keeps saves, config and mods beside it. Needs Vulkan 1.2 and SSE4.1."
+   },
+   "done": "~/.config/BanjoRecompiled/bk.n64.us.1.0.z64",
+   "saves": [
+    "~/.config/BanjoRecompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Banjo-Kazooie into a native PC port with high frame rates, widescreen and mod support."
+  },
+  {
+   "id": "bm64recomp",
+   "name": "Bomberman 64: Recompiled",
+   "games": [
+    {
+     "title": "Bomberman 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:RevoSucks/BM64Recomp",
+   "builds": "linux",
+   "linuxAsset": "AppImage-X64-Release\\.zip$",
+   "windowsAsset": "Windows-RelWithDebInfo\\.zip$",
+   "prerelease": false,
+   "program": "BM64Recompiled-x86_64.AppImage",
+   "needs": {
+    "what": "The North American 1.0 version of Bomberman 64 as an N64 ROM",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US"
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Pick the ROM from the main menu the first time; it is checked by hash and stored as bm64_us.z64 in the config folder. portable.txt beside the program keeps saves, config and mods beside it. Needs Vulkan 1.2 and SSE4.1. The AppImage zip holds BM64Recompiled-x86_64.AppImage."
+   },
+   "done": "~/.config/BM64Recompiled/bm64_us.z64",
+   "saves": [
+    "~/.config/BM64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Bomberman 64 into a native PC port."
+  },
+  {
+   "id": "bmherorecomp",
+   "name": "Bomberman Hero: Recompiled",
+   "games": [
+    {
+     "title": "Bomberman Hero",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:RevoSucks/BMHeroRecomp",
+   "builds": "linux",
+   "linuxAsset": "AppImage-X64-Release\\.zip$",
+   "prerelease": false,
+   "program": "BMHeroRecompiled-x86_64.AppImage",
+   "needs": {
+    "what": "The North American 1.0 version of Bomberman Hero as an N64 ROM",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US"
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Pick the ROM from the main menu the first time; it is checked by hash and stored as bmhero.z64 in the config folder. portable.txt beside the program keeps saves, config and mods beside it. Needs Vulkan 1.2 and SSE4.1. The AppImage zip holds BMHeroRecompiled-x86_64.AppImage."
+   },
+   "done": "~/.config/BMHeroRecompiled/bmhero.z64",
+   "saves": [
+    "~/.config/BMHeroRecompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Bomberman Hero into a native PC port."
+  },
+  {
+   "id": "cv64recomp",
+   "name": "Castlevania 64: Recompiled",
+   "games": [
+    {
+     "title": "Castlevania",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:RevoSucks/CV64Recomp",
+   "builds": "linux",
+   "linuxAsset": "AppImage-X64-Release\\.zip$",
+   "prerelease": false,
+   "program": "CV64Recompiled-x86_64.AppImage",
+   "needs": {
+    "what": "The US 1.0 version of Castlevania (N64) as a ROM",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US"
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Pick the ROM from the main menu the first time; it is checked by hash and stored as cv64.us.1.0.z64 in the config folder. portable.txt beside the program keeps saves, config and mods beside it. Needs Vulkan 1.2 and SSE4.1. The AppImage zip holds CV64Recompiled-x86_64.AppImage."
+   },
+   "done": "~/.config/CV64Recompiled/cv64.us.1.0.z64",
+   "saves": [
+    "~/.config/CV64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A work-in-progress static recompilation of Castlevania 64 into a native PC port."
+  },
+  {
+   "id": "chameleontwist-recomp",
+   "name": "Chameleon Twist: Recompiled",
+   "games": [
+    {
+     "title": "Chameleon Twist",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:Rainchus/ChameleonTwist1-JP-Recomp",
+   "builds": "none",
+   "prerelease": false,
+   "program": "ChameleonTwistJPRecompiled",
+   "needs": {
+    "what": "The Japanese version of Chameleon Twist as an N64 ROM",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "JP"
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Pick the ROM from the main menu the first time; it is checked by hash and stored as ChameleonTwistJP.z64 in the config folder. portable.txt beside the program keeps saves, config and mods beside it. Needs Vulkan 1.2 and SSE4.1."
+   },
+   "done": "~/.config/ChameleonTwistRecompiled/ChameleonTwistJP.z64",
+   "saves": [
+    "~/.config/ChameleonTwistRecompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of the Japanese Chameleon Twist into a native PC port."
+  },
+  {
+   "id": "dino-recomp",
+   "name": "Dinosaur Planet: Recompiled",
+   "games": [
+    {
+     "title": "Dinosaur Planet",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:DinosaurPlanetRecomp/dino-recomp",
+   "builds": "linux",
+   "linuxAsset": "Linux-x64\\.AppImage$",
+   "windowsAsset": "Windows-x64\\.zip$",
+   "prerelease": false,
+   "program": "DinosaurPlanetRecompiled-v0.3.0-Linux-x64.AppImage",
+   "needs": {
+    "what": "The December 2000 Dinosaur Planet prototype ROM released by Forest of Illusion (unpatched)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": null
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Pick the ROM from the main menu the first time; it is checked by hash and stored as dino.z64 in the config folder. portable.txt beside the program keeps saves, config and mods beside it. Needs Vulkan 1.2 and SSE4.1."
+   },
+   "done": "~/.config/DinoPlanetRecompiled/dino.z64",
+   "saves": [
+    "~/.config/DinoPlanetRecompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of the unreleased Dinosaur Planet prototype into a native PC port with mod support."
+  },
+  {
+   "id": "dk64recomp",
+   "name": "DK64 Rekongpiled",
+   "games": [
+    {
+     "title": "Donkey Kong 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:Rainchus/Donkey-Kong-64-Recompiled",
+   "site": "https://dk64recomp.com/",
+   "builds": "linux",
+   "linuxAsset": "Linux.*X64.*\\.zip$",
+   "windowsAsset": "Windows.*\\.zip$",
+   "prerelease": false,
+   "program": "DK64Recompiled",
+   "needs": {
+    "what": "The US version of Donkey Kong 64 as an N64 ROM",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US"
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Select the ROM in the program the first time; stored as DK64.z64 in the config folder. Linux builds: an x64 binary zip and a Flatpak zip."
+   },
+   "done": "~/.config/DK64Recompiled/DK64.z64",
+   "saves": [
+    "~/.config/DK64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Donkey Kong 64 into a native PC port, made without generative AI."
+  },
+  {
+   "id": "doom64ex",
+   "name": "Doom64EX",
+   "games": [
+    {
+     "title": "Doom 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "reimplementation",
+   "repo": "github:svkaiser/Doom64EX",
+   "site": "https://doom64ex.wordpress.com/",
+   "builds": "none",
+   "program": "doom64ex",
+   "needs": {
+    "what": "A Doom 64 N64 ROM, turned into doom64.wad and doomsnd.sf2 by the program's -wadgen option",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "any"
+   },
+   "setup": {
+    "how": "path",
+    "arg": "doom64ex -wadgen {FILE}",
+    "notes": "-wadgen generates doom64.wad and doomsnd.sf2 and places them where Doom64EX finds them (current folder, program folder, ~/.local/share/doom64ex and system folders). doom64ex.pk3 comes with the build."
+   },
+   "done": "~/.local/share/doom64ex/doom64.wad",
+   "saves": [
+    "~/.local/share/doom64ex"
+   ],
+   "license": "GPL-2.0",
+   "description": "A reverse-engineered recreation of Doom 64 with extra modding features."
+  },
+  {
+   "id": "drmario64-recomp",
+   "name": "Dr. Mario 64 Recompiled",
+   "games": [
+    {
+     "title": "Dr. Mario 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:theboy181/drmario64_recomp_plus",
+   "builds": "windows",
+   "windowsAsset": "Windows\\.zip$",
+   "prerelease": false,
+   "program": "drmario64_recomp.exe",
+   "needs": {
+    "what": "A clean US Dr. Mario 64 ROM",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US"
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Pick the ROM from the main menu the first time; it is checked by hash and stored as drmario64.us.z64 in the config folder. portable.txt beside the program keeps saves, config and mods beside it. Needs Vulkan 1.2 and SSE4.1."
+   },
+   "done": "~/.config/drmario64_recomp/drmario64.us.z64",
+   "saves": [
+    "~/.config/drmario64_recomp/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Dr. Mario 64 with GPU-drawn pills, interpolation and four-player support."
+  },
+  {
+   "id": "dnzhrecomp",
+   "name": "Duke Nukem Zero Hour: Recompiled",
+   "games": [
+    {
+     "title": "Duke Nukem: Zero Hour",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "gitlab:sonicdcer/DNZHRecomp",
+   "builds": "linux",
+   "linuxAsset": "Linux-X64-Release",
+   "windowsAsset": "Windows-RelWithDebInfo",
+   "prerelease": false,
+   "program": "DNZHRecompiled",
+   "needs": {
+    "what": "The US version of Duke Nukem: Zero Hour as an N64 ROM (.z64; other formats converted)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US"
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Pick the ROM from the main menu the first time; stored as dnzh.us.z64 in the config folder. Release links have no extension: the Linux one downloads DNZHRecompiled-0.0.3-Linux-X64-Release.zip holding DNZHRecompiled.tar.gz. GitLab package_files links."
+   },
+   "done": "~/.config/DNZHRecompiled/dnzh.us.z64",
+   "saves": [
+    "~/.config/DNZHRecompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "An early static recompilation of Duke Nukem: Zero Hour into a native PC port."
+  },
+  {
+   "id": "extremegrecomp",
+   "name": "Extreme-G: Recompiled",
+   "games": [
+    {
+     "title": "Extreme-G",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "gitlab:sonicdcer/ExtremeGRecomp",
+   "builds": "linux",
+   "linuxAsset": "Linux-X64-Release(\\.zip)?$",
+   "windowsAsset": "Windows-RelWithDebInfo(\\.zip)?$",
+   "prerelease": false,
+   "program": "ExtremeGRecompiled",
+   "needs": {
+    "what": "The North American 1.0 version of Extreme-G as an N64 ROM (other formats are converted to .z64)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Asks for the ROM in its main menu and copies it as eg.n64.us.z64 into its config folder. The Linux zip (a GitLab package file named without extension) holds ExtremeGRecompiled.tar.gz with the program, assets/ and recompcontrollerdb.txt. portable.txt beside the program keeps saves and config beside it."
+   },
+   "done": "~/.config/ExtremeGRecompiled/eg.n64.us.z64",
+   "saves": [
+    "~/.config/ExtremeGRecompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Extreme-G that runs natively with high frame rates and widescreen."
+  },
+  {
+   "id": "goemon64recomp",
+   "name": "Goemon 64: Recompiled",
+   "games": [
+    {
+     "title": "Mystical Ninja Starring Goemon",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:klorfmorf/Goemon64Recomp",
+   "builds": "linux",
+   "linuxAsset": "Linux-X64-Release\\.zip$",
+   "windowsAsset": "Windows-RelWithDebInfo\\.zip$",
+   "prerelease": true,
+   "program": "Goemon64Recompiled",
+   "needs": {
+    "what": "The North American version of Mystical Ninja Starring Goemon as an N64 ROM (other formats are converted to .z64)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Asks for the ROM in its main menu and copies it as mnsg.us.z64 into its config folder. Linux zip holds Goemon64Recompiled.tar.gz; an AppImage zip is also offered. portable.txt beside the program keeps data beside it."
+   },
+   "done": "~/.config/Goemon64Recompiled/mnsg.us.z64",
+   "saves": [
+    "~/.config/Goemon64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Mystical Ninja Starring Goemon with high frame rates, widescreen and mod support, still in development."
+  },
+  {
+   "id": "goldenrecomp",
+   "name": "GoldenRecomp",
+   "games": [
+    {
+     "title": "GoldenEye 007",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:kholdfuzion/GoldenRecomp",
+   "builds": "none",
+   "needs": {
+    "what": "A special TLB-free, uncompressed GoldenEye 007 ROM and ELF built from a branch of the decompilation (ge007.tlbfree.z64 and ge007.tlbfree.elf), used at build time",
+    "files": "several",
+    "ext": [
+     "z64",
+     "elf"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "none",
+    "notes": "Work in progress with no releases. Building needs the TBLFREE_NOCOMPRESSION branch of kholdfuzion/goldeneye_src, a forked N64Recomp and Visual Studio. The decomp itself checks the US ROM against sha1 abe01e4aeb033b6c0836819f549c791b26cfde83, but that is the stock ROM, not what this port takes."
+   },
+   "license": "GPL-3.0",
+   "description": "An unfinished static recompilation of GoldenEye 007 built on N64Recomp, with no downloadable builds yet."
+  },
+  {
+   "id": "harvestmoon64recomp",
+   "name": "Harvest Moon 64: Recompiled",
+   "games": [
+    {
+     "title": "Harvest Moon 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:HarvestMoon64Recomp/HarvestMoon64Recomp",
+   "builds": "linux",
+   "linuxAsset": "Linux-X64\\.zip$",
+   "windowsAsset": "Windows\\.zip$",
+   "prerelease": false,
+   "program": "HarvestMoon64Recompiled",
+   "needs": {
+    "what": "The North American version of Harvest Moon 64 as an N64 ROM (other formats are converted to .z64)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Asks for the ROM in its main menu and copies it as harvest_moon_64.z64 into its config folder. The Linux zip holds HarvestMoon64Recompiled.tar.gz (program, assets/, recompcontrollerdb.txt). Thunderstore mods are downloaded by hand. portable.txt beside the program keeps saves beside it."
+   },
+   "done": "~/.config/HarvestMoon64Recompiled/harvest_moon_64.z64",
+   "saves": [
+    "~/.config/HarvestMoon64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Harvest Moon 64 that runs natively with high frame rates, widescreen and mods."
+  },
+  {
+   "id": "lighthouse",
+   "name": "Lighthouse",
+   "games": [
+    {
+     "title": "Banjo-Kazooie",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:HarbourMasters/Lighthouse",
+   "builds": "linux",
+   "linuxAsset": "(-Linux\\.zip|^lighthouse\\.appimage)$",
+   "windowsAsset": "-Win64\\.zip$",
+   "prerelease": false,
+   "program": "lighthouse.appimage",
+   "needs": {
+    "what": "A Banjo-Kazooie N64 ROM in .z64 format: US 1.0, US 1.1, Japanese or PAL",
+    "files": "rom",
+    "ext": [
+     "z64"
+    ],
+    "region": "any",
+    "sha1": [
+     "1fe1632098865f639e22c11b9a81ee8f29c75d7a",
+     "ded6ee166e740ad1bc810fd678a84b48e245ab80",
+     "90726d7e7cd5bf6cdfd38f45c9acbf4d45bd9fd8",
+     "bb359a75941df74bf7290212c89fbc6e2c5601fe"
+    ]
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Asks for the ROM on first start and generates bk.o2r. Other regions can be added later as language packs. SHIP_HOME sets the data folder; a folder beside the AppImage holding lighthouse.cfg.json or bk.o2r is used instead."
+   },
+   "done": "~/.local/share/lighthouse/bk.o2r",
+   "saves": [
+    "~/.local/share/lighthouse"
+   ],
+   "license": "CC0-1.0",
+   "description": "A Banjo-Kazooie PC port built on the decompilation, with online multiplayer, rom hack and language support and a randomiser."
+  },
+  {
+   "id": "mariokart64recomp",
+   "name": "MarioKart 64: Recompiled",
+   "games": [
+    {
+     "title": "Mario Kart 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "gitlab:sonicdcer/MarioKart64Recomp",
+   "builds": "linux",
+   "linuxAsset": "Linux-X64-Release(\\.zip)?$",
+   "windowsAsset": "Windows-RelWithDebInfo(\\.zip)?$",
+   "prerelease": false,
+   "program": "MarioKart64Recompiled",
+   "needs": {
+    "what": "The North American version of Mario Kart 64 as an N64 ROM (other formats are converted to .z64)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Asks for the ROM in its main menu and copies it as mk64.us.z64 into its config folder. The Linux zip holds MarioKart64Recompiled.tar.gz. portable.txt beside the program keeps saves and config beside it."
+   },
+   "done": "~/.config/MarioKart64Recompiled/mk64.us.z64",
+   "saves": [
+    "~/.config/MarioKart64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Mario Kart 64 that runs natively with high frame rates and widescreen."
+  },
+  {
+   "id": "megaman64recomp",
+   "name": "MegaMan64Recompiled",
+   "games": [
+    {
+     "title": "Mega Man 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:MegaMan64Recomp/MegaMan64Recompiled",
+   "builds": "linux",
+   "linuxAsset": "Linux-X64\\.zip$",
+   "windowsAsset": "Windows\\.zip$",
+   "prerelease": false,
+   "program": "MegaMan64Recompiled",
+   "needs": {
+    "what": "The US version of Mega Man 64 as an N64 ROM in .z64 format",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Asks for the ROM in its main menu and copies it as megaman.n64.us.1.0.z64 into its config folder. portable.txt beside the program keeps data beside it (N64: Recompiled template)."
+   },
+   "done": "~/.config/MegaMan64Recompiled/megaman.n64.us.1.0.z64",
+   "saves": [
+    "~/.config/MegaMan64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Mega Man 64 built on N64: Recompiled, running natively with modern graphics options."
+  },
+  {
+   "id": "paperboat",
+   "name": "PaperBoat",
+   "games": [
+    {
+     "title": "Paper Mario",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:HarbourMasters/PaperBoat",
+   "builds": "linux",
+   "linuxAsset": "^Paperboat-.*-Linux\\.zip$",
+   "windowsAsset": "^Paperboat-.*-Win64\\.zip$",
+   "prerelease": false,
+   "program": "Paperboat.AppImage",
+   "needs": {
+    "what": "The US version of Paper Mario as an N64 ROM",
+    "files": "rom",
+    "ext": [
+     "z64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": [
+     "3837f44cda784b466c9a2d99df70d77c322b97a0"
+    ]
+   },
+   "setup": {
+    "how": "place",
+    "place": "the ROM in the same folder as Paperboat.AppImage",
+    "notes": "Extracts the ROM into pm64.o2r in its data folder on first run (it also looks for baserom.us.z64 there). Data folder is the working directory unless SHIP_HOME is set. The Linux zip holds Paperboat.AppImage, readme.txt and gamecontrollerdb.txt; zips are named after the release (Mulberry Charlie)."
+   },
+   "done": "pm64.o2r",
+   "saves": [
+    "saves/ in its data folder (working directory, or $SHIP_HOME)"
+   ],
+   "license": "CC0-1.0",
+   "description": "Harbour Masters' native PC port of Paper Mario, built from the decompilation on libultraship, with high frame rates, widescreen and mods."
+  },
+  {
+   "id": "perfectdark",
+   "name": "Perfect Dark PC port",
+   "games": [
+    {
+     "title": "Perfect Dark",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:perfect-dark-pc-port/perfect_dark",
+   "builds": "linux",
+   "linuxAsset": "^pd-x86_64-linux\\.tar\\.gz$",
+   "windowsAsset": "^pd-x86_64-windows\\.zip$",
+   "prerelease": true,
+   "program": "pd.x86_64",
+   "needs": {
+    "what": "The Perfect Dark US V1.1 (ntsc-final) ROM, recommended; US V1.0 also works. PAL and JPN need their own executables",
+    "files": "rom",
+    "ext": [
+     "z64"
+    ],
+    "region": "US",
+    "md5": [
+     "e03b088b6ac9e0080440efed07c1e40f",
+     "7f4171b0c8d17815be37913f535e4e93"
+    ],
+    "sha1": []
+   },
+   "setup": {
+    "how": "place",
+    "place": "data/pd.ntsc-final.z64",
+    "notes": "Put the ROM in a data folder next to pd.x86_64 (or ~/.local/share/perfectdark/data). Optional data/pd.gbc (Perfect Dark GBC ROM) emulates the Transfer Pak. Options --portable, --basedir and --savedir. A rolling ci-dev-build tag is the only release."
+   },
+   "done": "data/pd.ntsc-final.z64",
+   "saves": [
+    "eeprom.bin in the working directory when pd.ini is there, else ~/.local/share/perfectdark/"
+   ],
+   "license": "MIT",
+   "description": "A native PC port of Perfect Dark built from the decompilation, with mouse aim, widescreen and high frame rates."
+  },
+  {
+   "id": "pilotwings64recomp",
+   "name": "Pilotwings 64: Recompiled",
+   "games": [
+    {
+     "title": "Pilotwings 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:gcsmith/Pilotwings64Recomp",
+   "builds": "none",
+   "program": "Pilotwings64Recompiled",
+   "needs": {
+    "what": "The US 1.0 version of Pilotwings 64 as an N64 ROM",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "No prebuilt binaries yet (README: likely not until a 1.0 release). When built, it follows the N64: Recompiled template: asks for the ROM in its main menu and stores it as pilotwings64.n64.us.1.0.z64 in its config folder."
+   },
+   "done": "~/.config/Pilotwings64Recompiled/pilotwings64.n64.us.1.0.z64",
+   "saves": [
+    "~/.config/Pilotwings64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Pilotwings 64 built on N64: Recompiled, with no prebuilt releases yet."
+  },
+  {
+   "id": "quest64recomp",
+   "name": "Quest 64: Recompiled",
+   "games": [
+    {
+     "title": "Quest 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:Rainchus/Quest64-Recomp",
+   "builds": "windows",
+   "windowsAsset": "^Quest64Recompiled.*\\.zip$",
+   "prerelease": false,
+   "program": "Quest64Recompiled.exe",
+   "needs": {
+    "what": "The North American 1.0 version of Quest 64 as an N64 ROM (other formats are converted to .z64)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Asks for the ROM in its main menu and stores it as quest64_us.z64 in its data folder. Only a Windows zip (Quest64Recompiled.exe with DLLs) is released, so it runs through Proton; under Proton the data folder is in the prefix's %LOCALAPPDATA%\\Quest64Recompiled. portable.txt beside the exe keeps saves beside it."
+   },
+   "done": "quest64_us.z64 in %LOCALAPPDATA%\\Quest64Recompiled (Proton prefix), or beside the exe in portable mode",
+   "saves": [
+    "%LOCALAPPDATA%\\Quest64Recompiled\\saves inside the Proton prefix",
+    "saves beside the exe with portable.txt"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Quest 64 with widescreen and high frame rates, released so far as a Windows build."
+  },
+  {
+   "id": "render96ex",
+   "name": "Render96ex",
+   "games": [
+    {
+     "title": "Super Mario 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:Render96/Render96ex",
+   "builds": "none",
+   "needs": {
+    "what": "A Super Mario 64 ROM named baserom.<version>.z64, used at build time",
+    "files": "rom",
+    "ext": [
+     "z64"
+    ],
+    "region": "any",
+    "md5": [],
+    "sha1": [
+     "9bef1128717f958171a4afac3ed78ee2bb4e86ce",
+     "4ac5721683d0e0b6bbb561b58a71740845dceea9",
+     "8a20a5c83d6ceb0f0506cfc9fa20d8f438cafe51"
+    ]
+   },
+   "setup": {
+    "how": "none",
+    "place": "baserom.us.z64 in the source folder before building",
+    "notes": "Source only. After building, the Render96 model pack goes in build/us_pc/dynos/packs and the HD texture pack in build/us_pc/res/gfx."
+   },
+   "saves": [
+    "~/.local/share/sm64ex/sm64_save_file.bin"
+   ],
+   "description": "A fork of sm64ex made for the Render96 HD model and texture packs."
+  },
+  {
+   "id": "shipofharkinian",
+   "name": "Ship of Harkinian",
+   "games": [
+    {
+     "title": "The Legend of Zelda: Ocarina of Time",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:HarbourMasters/Shipwright",
+   "site": "https://www.shipofharkinian.com/",
+   "builds": "linux",
+   "linuxAsset": "^SoH-.*-Linux\\.zip$",
+   "windowsAsset": "^SoH-.*-Win64\\.zip$",
+   "prerelease": false,
+   "program": "soh.appimage",
+   "needs": {
+    "what": "A supported Ocarina of Time ROM: any of the N64 NTSC or PAL versions, the GameCube versions or Master Quest listed by the project",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "any",
+    "md5": [],
+    "sha1": [
+     "328a1f1beba30ce5e178f031662019eb32c5f3b5",
+     "cfbb98d392e4a9d39da8285d10cbef3974c2f012",
+     "0227d7c0074f2d0ac935631990da8ec5914597b4",
+     "f46239439f59a2a594ef83cf68ef65043b1bffe2",
+     "cee6bc3c2a634b41728f2af8da54d9bf8cc14099",
+     "079b855b943d6ad8bd1eb026c0ed169ecbdac7da",
+     "50bebedad9e0f10746a52b07239e47fa6c284d03",
+     "cfecfdc58d650e71a200c81f033de4e6d617a9f6",
+     "ad69c91157f6705e8ab06c79fe08aad47bb57ba7",
+     "d3ecb253776cd847a5aa63d859d8c89a2f37b364",
+     "41b3bdc48d98c48529219919015a1af22f5057c2",
+     "c892bbda3993e66bd0d56a10ecd30b1ee612210f",
+     "dbfc81f655187dc6fefd93fa6798face770d579d",
+     "fa5f5942b27480d60243c2d52c0e93e26b9e6b86",
+     "b82710ba2bd3b4c6ee8aa1a7e9acf787dfc72e9b",
+     "8b5d13aac69bfbf989861cfdc50b1d840945fc1d",
+     "0769c84615422d60f16925cd859593cdfa597f84",
+     "2ce2d1a9f0534c9cd9fa04ea5317b80da21e5e73",
+     "dd14e143c4275861fe93ea79d0c02e36ae8c6c2f"
+    ]
+   },
+   "setup": {
+    "how": "place",
+    "place": "the ROM in the same folder as soh.appimage (9.2.3); newer builds ask with a file picker",
+    "notes": "Extracts the ROM into oot.o2r (oot-mq.o2r for Master Quest) on first run; soh.o2r ships with it. In 9.2.3 the data folder is the working directory unless SHIP_HOME is set; the develop branch (9.3.0) moves it to ~/.local/share/soh/ unless the launch folder already holds shipofharkinian.json or oot.o2r. Custom assets go in mods/. Release zips are named after the release (Ackbar Delta), so match -Linux.zip."
+   },
+   "done": "oot.o2r",
+   "saves": [
+    "Save (in the data folder: the working directory or $SHIP_HOME in 9.2.3)",
+    "~/.local/share/soh/Save (from 9.3.0)"
+   ],
+   "description": "A native PC port of Ocarina of Time built from the decompilation on libultraship, with enhancements, randomiser and mod support."
+  },
+  {
+   "id": "sm64-port",
+   "name": "sm64-port",
+   "games": [
+    {
+     "title": "Super Mario 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:sm64-port/sm64-port",
+   "builds": "none",
+   "program": "sm64.us.f3dex2e",
+   "needs": {
+    "what": "A Super Mario 64 ROM (US, JP or EU) named baserom.<version>.z64, used at build time for asset extraction",
+    "files": "rom",
+    "ext": [
+     "z64"
+    ],
+    "region": "any",
+    "md5": [],
+    "sha1": [
+     "9bef1128717f958171a4afac3ed78ee2bb4e86ce",
+     "4ac5721683d0e0b6bbb561b58a71740845dceea9",
+     "8a20a5c83d6ceb0f0506cfc9fa20d8f438cafe51"
+    ]
+   },
+   "setup": {
+    "how": "none",
+    "place": "baserom.us.z64 in the source folder before building",
+    "notes": "Source only: build with make (VERSION=us|jp|eu); the program lands in build/<version>_pc/. Assets are baked into the build, so nothing is needed at run time."
+   },
+   "saves": [
+    "sm64_save_file.bin in the working directory"
+   ],
+   "description": "The original PC port of the Super Mario 64 decompilation, built from source with your own ROM."
+  },
+  {
+   "id": "sm64ex",
+   "name": "sm64ex",
+   "games": [
+    {
+     "title": "Super Mario 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:sm64pc/sm64ex",
+   "site": "https://sm64pc.info/",
+   "builds": "none",
+   "program": "sm64.us.f3dex2e",
+   "needs": {
+    "what": "A Super Mario 64 ROM named baserom.<version>.z64, used at build time",
+    "files": "rom",
+    "ext": [
+     "z64"
+    ],
+    "region": "any",
+    "md5": [],
+    "sha1": [
+     "9bef1128717f958171a4afac3ed78ee2bb4e86ce",
+     "4ac5721683d0e0b6bbb561b58a71740845dceea9",
+     "8a20a5c83d6ceb0f0506cfc9fa20d8f438cafe51"
+    ]
+   },
+   "setup": {
+    "how": "none",
+    "place": "baserom.us.z64 in the source folder before building",
+    "notes": "Source only (building is described on its wiki). --savepath sets where saves and config go ('.' working directory, '!' program folder)."
+   },
+   "saves": [
+    "~/.local/share/sm64ex/sm64_save_file.bin"
+   ],
+   "description": "A Super Mario 64 PC port based on sm64-port, adding options such as analogue camera, mouse support and texture packs."
+  },
+  {
+   "id": "snapshot",
+   "name": "Snapshot",
+   "games": [
+    {
+     "title": "Pokémon Snap",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:ExpansionPak/Snapshot",
+   "builds": "none",
+   "program": "Zelda64Recompiled",
+   "needs": {
+    "what": "The US version of Pokémon Snap as an N64 ROM",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Very unfinished and without releases. It still uses the Zelda 64: Recompiled template's program id, so a build would keep its data in ~/.config/Zelda64Recompiled and store the ROM there as snap.n64.us.1.0.z64."
+   },
+   "done": "~/.config/Zelda64Recompiled/snap.n64.us.1.0.z64",
+   "saves": [
+    "~/.config/Zelda64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "An early static recompilation of Pokémon Snap built on N64: Recompiled, not yet recommended for play and with no releases."
+  },
+  {
+   "id": "snowboardkids2recomp",
+   "name": "Snowboard Kids 2: Recompiled",
+   "games": [
+    {
+     "title": "Snowboard Kids 2",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:cdlewis/snowboardkids2-recomp",
+   "builds": "linux",
+   "linuxAsset": "Linux-X64-Release\\.tar\\.gz$",
+   "windowsAsset": "Windows-RelWithDebInfo\\.zip$",
+   "prerelease": false,
+   "program": "SnowboardKids2Recompiled",
+   "needs": {
+    "what": "The North American version of Snowboard Kids 2 as an N64 ROM (other formats are converted to .z64)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Asks for the ROM in its main menu and stores it as snowboardkids2.n64.us.z64 in its config folder. The Linux asset is a plain .tar.gz (program, assets/, recompcontrollerdb.txt). portable.txt beside the program keeps data beside it."
+   },
+   "done": "~/.config/SnowboardKids2Recompiled/snowboardkids2.n64.us.z64",
+   "saves": [
+    "~/.config/SnowboardKids2Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Snowboard Kids 2 that runs natively with high frame rates and widescreen."
+  },
+  {
+   "id": "spaghettikart",
+   "name": "SpaghettiKart",
+   "games": [
+    {
+     "title": "Mario Kart 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:HarbourMasters/SpaghettiKart",
+   "builds": "linux",
+   "linuxAsset": "^Spaghetti-Linux\\.zip$",
+   "windowsAsset": "^Spaghetti-Windows\\.zip$",
+   "prerelease": false,
+   "program": "spaghetti.appimage",
+   "needs": {
+    "what": "The US version of Mario Kart 64 as a .z64 ROM (big-endian; .n64 must be converted first)",
+    "files": "rom",
+    "ext": [
+     "z64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": [
+     "579c48e211ae952530ffc8738709f078d5dd215e"
+    ]
+   },
+   "setup": {
+    "how": "picker",
+    "place": "a .z64 ROM in the working directory is found automatically",
+    "notes": "On start it scans the working directory for .z64 files with the right SHA-1, else opens a file dialog, then builds mk64.o2r beside the program. spaghetti.o2r is its own asset archive. The Linux zip holds spaghetti.appimage and gamecontrollerdb.txt. Custom assets go in mods/."
+   },
+   "done": "mk64.o2r",
+   "saves": [
+    "default.sav (EEPROM) in its data folder (working directory, or $SHIP_HOME)",
+    "controllerPak_header.sav and controllerPak_file_<n>.sav in the same folder"
+   ],
+   "description": "A native PC port of Mario Kart 64 built from the decompilation on libultraship, with custom tracks, widescreen and high frame rates."
+  },
+  {
+   "id": "starfox64recomp",
+   "name": "Starfox 64: Recompiled",
+   "games": [
+    {
+     "title": "Star Fox 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "gitlab:sonicdcer/Starfox64Recomp",
+   "builds": "linux",
+   "linuxAsset": "Linux-X64-Release(\\.zip)?$",
+   "windowsAsset": "Windows-RelWithDebInfo(\\.zip)?$",
+   "prerelease": false,
+   "program": "Starfox64Recompiled",
+   "needs": {
+    "what": "The North American 1.1 (Rev A) version of Star Fox 64 as an N64 ROM (other formats are converted to .z64)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Asks for the ROM in its main menu and copies it as sf64.n64.us.1.1.z64 into its config folder. The Linux zip holds Starfox64Recompiled.tar.gz. Mods from Thunderstore go in its mods folder. portable.txt beside the program keeps saves beside it."
+   },
+   "done": "~/.config/Starfox64Recompiled/sf64.n64.us.1.1.z64",
+   "saves": [
+    "~/.config/Starfox64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Star Fox 64 that runs natively with high frame rates, widescreen and mod support."
+  },
+  {
+   "id": "starship",
+   "name": "Starship",
+   "games": [
+    {
+     "title": "Star Fox 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:HarbourMasters/Starship",
+   "builds": "linux",
+   "linuxAsset": "^Starship-.*-Linux\\.zip$",
+   "windowsAsset": "^Starship-.*-Windows\\.zip$",
+   "prerelease": false,
+   "program": "starship.appimage",
+   "needs": {
+    "what": "The US 1.0 or US 1.1 (Rev A) version of Star Fox 64 as a .z64 ROM; an EU or JP ROM can add its voice language",
+    "files": "rom",
+    "ext": [
+     "z64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": [
+     "d8b1088520f7c5f81433292a9258c1184afa1457",
+     "09f0d105f476b00efa5303a3ebc42e60a7753b7a"
+    ]
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "On first run asks for the ROM and builds sf64.o2r beside the program. The Linux zip holds starship.appimage, config.yml, gamecontrollerdb.txt, readme.txt and an empty mods/. Zips are named after the release (Barnard Alfa)."
+   },
+   "done": "sf64.o2r",
+   "saves": [
+    "default.sav in its data folder (working directory, or $SHIP_HOME)"
+   ],
+   "license": "CC0-1.0",
+   "description": "Harbour Masters' native PC port of Star Fox 64, built from the decompilation on libultraship, with high frame rates, widescreen and mods."
+  },
+  {
+   "id": "sm64plus",
+   "name": "Super Mario 64 Plus",
+   "games": [
+    {
+     "title": "Super Mario 64",
+     "console": "n64"
+    }
+   ],
+   "origin": "decomp",
+   "repo": "github:MorsGames/sm64plus",
+   "site": "https://www.mfgg.net/?act=resdb&param=02&c=2&id=38190",
+   "builds": "site",
+   "needs": {
+    "what": "A Super Mario 64 ROM in .z64 format, which its launcher uses to build the game",
+    "files": "rom",
+    "ext": [
+     "z64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": [
+     "9bef1128717f958171a4afac3ed78ee2bb4e86ce"
+    ]
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Distributed as a launcher (MorsGames/sm64plus-launcher, v3.0.0) from MFGG that builds the game from the ROM on the user's machine. Linux launcher builds are only offered on the project's Discord."
+   },
+   "description": "A Super Mario 64 PC port with extra options and fixes, installed through its own launcher that builds the game from your ROM."
+  },
+  {
+   "id": "zelda64recomp",
+   "name": "Zelda 64: Recompiled",
+   "games": [
+    {
+     "title": "The Legend of Zelda: Majora's Mask",
+     "console": "n64"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:Zelda64Recomp/Zelda64Recomp",
+   "builds": "linux",
+   "linuxAsset": "Linux-X64\\.zip$",
+   "windowsAsset": "Windows\\.zip$",
+   "prerelease": false,
+   "program": "Zelda64Recompiled",
+   "needs": {
+    "what": "The North American (US 1.0) version of Majora's Mask as an N64 ROM (other formats are converted to .z64)",
+    "files": "rom",
+    "ext": [
+     "z64",
+     "n64",
+     "v64"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Asks for the ROM in its main menu and copies it as mm.n64.us.1.0.z64 into its config folder. portable.txt beside the program keeps saves, config and mods beside it. Ocarina of Time support is announced but not released."
+   },
+   "done": "~/.config/Zelda64Recompiled/mm.n64.us.1.0.z64",
+   "saves": [
+    "~/.config/Zelda64Recompiled/saves"
+   ],
+   "license": "GPL-3.0",
+   "description": "A static recompilation of Majora's Mask with high frame rates, widescreen, dual analogue controls and mod support."
+  }
+ ]
+}

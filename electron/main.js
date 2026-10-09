@@ -6149,7 +6149,9 @@ function ssUnits(opts) {
       const romIds = RC.matchRoms(e, roms);
       R.saveDirs(e.id).filter((d) => path.resolve(d) !== path.resolve(rec.dir)).forEach((d, i) => {
         const key = i ? `${e.id}-${i}` : e.id;
-        out.push({ key, emu: 'recomp', kind: 'dir', path: d, base: rec.dir, label: e.name, sub: '', romId: romIds[0] ?? null, romIds, card: false, slot: require('./saveSync').slotOf('recomp', key, 'dir'), prog: rec.program, recomp: e.id });
+        // a folder, or one save file (zelda3's saves/zelda3.srm): by what's there, else by the name having an ending
+        const kind = isDir(d) ? 'dir' : fs.existsSync(d) || path.extname(d) ? 'file' : 'dir';
+        out.push({ key, emu: 'recomp', kind, path: d, base: rec.dir, label: e.name, sub: '', romId: romIds[0] ?? null, romIds, card: false, slot: require('./saveSync').slotOf('recomp', key, kind), prog: rec.program, recomp: e.id });
       });
     }
   } catch (er) { log('recomp save units', er.message); }
