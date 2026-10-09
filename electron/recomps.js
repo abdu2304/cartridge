@@ -180,6 +180,21 @@ async function checkGame(e, file) {
   return hit ? { ok: true, hash: h } : { ok: false, hash: h, wrong: true, why: `Your copy isn’t the version ${e.name} needs. It needs: ${need.what}. Yours doesn’t match any version the project lists.` };
 }
 
+// a download's kind from its first bytes (GitLab release links can have no file ending: sonicdcer's ports)
+function sniff(file) {
+  let b = Buffer.alloc(12);
+  try { const fd = fs.openSync(file, 'r'); fs.readSync(fd, b, 0, 12, 0); fs.closeSync(fd); } catch { return null; }
+  if (b.readUInt32LE(0) === 0x04034b50) return '.zip';
+  if (b[0] === 0x1f && b[1] === 0x8b) return '.tar.gz';
+  if (b.toString('latin1', 0, 6) === '7z\xbc\xaf\x27\x1c') return '.7z';
+  if (b[0] === 0xfd && b.toString('latin1', 1, 5) === '7zXZ') return '.tar.xz';
+  if (b[0] === 0x28 && b[1] === 0xb5 && b[2] === 0x2f && b[3] === 0xfd) return '.tar.zst';
+  if (b[0] === 0x7f && b.toString('latin1', 1, 4) === 'ELF') return b[8] === 0x41 && b[9] === 0x49 ? '.AppImage' : '.elf'; // AppImages carry "AI" at byte 8
+  if (b[0] === 0x4d && b[1] === 0x5a) return '.exe';
+  return null;
+}
+const ARCHIVE_END = /\.(zip|7z|rar|tar(\.(gz|xz|zst|bz2))?|tgz|txz)$/i;
+
 // ---------------------------------------------------------------- the engine
 function createRecomps(ctx) {
   const { dataDir, log = () => {} } = ctx;
@@ -239,7 +254,7 @@ function createRecomps(ctx) {
       const lt = latest[e.id] || null;
       out.push({
         id: e.id, name: e.name, games: e.games, origin: e.origin, from: e.from, repo: e.repo || null, description: e.description || '', url: projectUrl(e), site: e.site || null,
-        builds: e.builds, needs: e.needs || null, setup: e.setup || { how: 'none' }, saves: e.saves || [], achievements: e.achievements || null, license: e.license || null,
+        builds: e.builds, needs: e.needs || null, setup: e.setup || { how: 'none' }, done: e.done || null, saves: e.saves || [], achievements: e.achievements || null, license: e.license || null,
         roms: matchRoms(e, roms),
         installed: rec ? { tag: rec.tag, kind: rec.kind, dir: rec.dir, program: rec.program, channel: rec.channel || 'stable', at: rec.at, game: rec.game || null, ready: readyOf(e, rec), here: exists(rec.program), appid: rec.appid || null } : null,
         latest: lt && { tag: lt.tag, date: lt.date, kind: lt.kind, at: lt.at, none: lt.none || null },
@@ -319,19 +334,37 @@ function createRecomps(ctx) {
     const tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.cartridge-dl${ext}`);
     const out = dest + '.cartridge-new';
     const FV = require('./forkVersions'), store = FV.storeOf(path.dirname(dest), path.basename(dest));
-    let program, files, kind = b.kind;
+    let program, files, kind = b.kind, tmpNow = tmp;
     try {
       let got = 0;
       await ctx.download(b.asset.url, tmp, (n) => { got += n; onProgress({ step: 'download', pct: b.asset.size ? Math.min(99, Math.floor((got / b.asset.size) * 100)) : null, got }); }, signal);
       onProgress({ step: 'unpack', pct: null });
       fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
-      const nm = b.asset.name;
-      if (/\.appimage$/i.test(nm)) { fs.copyFileSync(tmp, path.join(out, `${folderName(e).replace(/\s+/g, '')}.AppImage`)); }
-      else if (/\.exe$/i.test(nm)) { fs.copyFileSync(tmp, path.join(out, `${folderName(e).replace(/\s+/g, '')}.exe`)); kind = 'windows'; }
-      else await ctx.unpackTo(tmp, out, nm);
-      // one folder around everything is taken off, as most releases are packed
-      const top = fs.readdirSync(out);
-      const inner = top.length === 1 && fs.statSync(path.join(out, top[0])).isDirectory() ? path.join(out, top[0]) : out;
+      // the name says what it is; without an ending, its first bytes do
+      let nm = b.asset.name;
+      if (!(ARCHIVE_END.test(nm) || /\.(appimage|exe)$/i.test(nm))) {
+        const k = sniff(tmp);
+        if (k) { const t2 = tmp.replace(/\.[^./]*$/, '') + k; fs.renameSync(tmp, t2); tmpNow = t2; nm += k; }
+      }
+      if (/\.appimage$/i.test(nm)) { fs.copyFileSync(tmpNow, path.join(out, `${folderName(e).replace(/\s+/g, '')}.AppImage`)); }
+      else if (/\.elf$/i.test(nm)) { fs.copyFileSync(tmpNow, path.join(out, folderName(e).replace(/\s+/g, ''))); } // a lone Linux program
+      else if (/\.exe$/i.test(nm)) { fs.copyFileSync(tmpNow, path.join(out, `${folderName(e).replace(/\s+/g, '')}.exe`)); kind = 'windows'; }
+      else await ctx.unpackTo(tmpNow, out, nm);
+      // one folder around everything is taken off, as most releases are packed; an archive alone inside the archive
+      // (sonicdcer's zips hold a .tar.gz) is unpacked in its place
+      let inner = out;
+      for (let i = 0; i < 3; i++) {
+        const top = fs.readdirSync(inner);
+        if (top.length !== 1) break;
+        const one = path.join(inner, top[0]);
+        if (fs.statSync(one).isDirectory()) { inner = one; continue; }
+        if (!ARCHIVE_END.test(one)) break;
+        const deeper = path.join(out, '.inner' + i);
+        fs.mkdirSync(deeper, { recursive: true });
+        await ctx.unpackTo(one, deeper, top[0]);
+        fs.rmSync(one, { force: true });
+        inner = deeper;
+      }
       // a Linux archive with no Linux program but a Windows one inside is a Windows build after all
       const C = require('./customEmu');
       const entries = FV.filesOf(inner).map((rel2) => { const p = path.join(inner, rel2); let size = 0; try { size = fs.statSync(p).size; } catch {} return { rel: rel2, path: p, size, appimage: /\.appimage$/i.test(rel2) || !!ctx.appImageType?.(p), elf: !!ctx.isElf?.(p) }; });
@@ -351,7 +384,7 @@ function createRecomps(ctx) {
       fs.cpSync(inner, dest, { recursive: true, force: true });
       program = path.join(dest, pick.rel);
       if (kind === 'linux') { for (const f of entries) if (f.elf || f.appimage || f.path === pick.path) { try { fs.chmodSync(path.join(dest, f.rel), 0o755); } catch {} } }
-    } finally { fs.rmSync(tmp, { force: true }); fs.rmSync(out, { recursive: true, force: true }); }
+    } finally { fs.rmSync(tmp, { force: true }); fs.rmSync(tmpNow, { force: true }); fs.rmSync(out, { recursive: true, force: true }); }
     const saves = checkSaves(meta);
     installs[id] = { ...(prev || {}), id, repo: e.repo, dir: dest, program, kind, tag: rel.tag, date: rel.date, files, channel: ch, at: Date.now(), asset: b.asset.name };
     saveInstalls();
