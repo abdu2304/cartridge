@@ -58,7 +58,7 @@ const tab = ref(props.tab || ''); // back from a picker: the tab you were on (0.
 const tabs = computed(() => { const t = [...new Set((d.value?.items || []).map((x) => x.tab || 'General'))]; const a = t.indexOf('Advanced'); if (a >= 0) t.splice(a, 0, 'Steam'); else t.push('Steam'); return t; }); // Advanced stays last (0.9.62) // Steam always: frame generation says why when it can't apply (0.9.28)
 const shown = computed(() => (d.value?.items || []).filter((x) => (x.tab || 'General') === tab.value));
 watch(tabs, (t) => { if (d.value && !t.includes(tab.value)) tab.value = t[0] || ''; }, { immediate: true }); // only once the list is in: before it, Steam is the only tab
-function stepTab(n) { const t = tabs.value; if (t.length < 2) return; tab.value = t[(t.indexOf(tab.value) + n + t.length) % t.length]; nextTick(() => focusFirst(el.value.querySelector('.gs-list') || el.value)); }
+function stepTab(n) { const t = tabs.value; if (t.length < 2) return; tab.value = t[(t.indexOf(tab.value) + n + t.length) % t.length]; nextTick(() => el.value && focusFirst(el.value.querySelector('.gs-list') || el.value)); }
 // frame generation for this game (0.9.24): the same pick as Settings → Steam → Frame generation
 const FGL = { lsfg: 'Lossless Scaling (lsfg-vk)', mako: 'mako-run', off: 'Off' };
 const fg = ref(null), fgWhy = ref('');
@@ -118,6 +118,7 @@ onMounted(async () => {
   loadFg();
   d.value = await call('gamesettings:get', { romId: props.romId }).catch((e) => ({ why: e.message, items: [] }));
   await nextTick();
+  if (!el.value) return; // closed (or reopened) while its settings were loading (0.9.63, owner's log: a null querySelector)
   // back from a picker: the row you picked from, else the first
   const back = props.at && el.value.querySelector(props.at === 'fg' ? '.gs-list .lrow' : `[data-key="${CSS.escape(props.at)}"]`);
   if (back) { back.focus({ preventScroll: true }); back.scrollIntoView({ block: 'center' }); } else focusFirst(el.value);

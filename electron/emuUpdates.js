@@ -88,7 +88,11 @@ function missingLibsAsync(file) {
   });
 }
 // which release source a copy uses: Xenia Edge's AppImage has its own; a Windows build its own files
-const specFor = (id, file = '') => (id === 'xenia' && /edge/i.test(path.basename(file)) ? REPOS.xeniaedge : id === 'xenia' && /\.exe$/i.test(file) ? REPOS['xenia-win'] : REPOS[id]);
+// 0.9.63 (owner's log: lime3ds-gui.AppImage was overwritten with Azahar): Lime3DS and Citra are their own programs with
+// their own settings and saves (lime3ds-emu, citra-emu), listed under Azahar's entry by name only. Both projects have
+// ended, so a copy of either has no update source and is never replaced with Azahar.
+const ENDED = { azahar: /lime3ds|citra/i };
+const specFor = (id, file = '') => (ENDED[id]?.test(path.basename(file)) ? null : id === 'xenia' && /edge/i.test(path.basename(file)) ? REPOS.xeniaedge : id === 'xenia' && /\.exe$/i.test(file) ? REPOS['xenia-win'] : REPOS[id]);
 
 function plainEnv() { const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k]; return env; }
 const run = (cmd, args, timeout = 60000) => new Promise((resolve, reject) => execFile(cmd, args, { env: plainEnv(), timeout, maxBuffer: 8 << 20 }, (e, out, err) => (e ? reject(new Error(String(err || e.message).trim().split('\n').pop())) : resolve(String(out)))));
@@ -97,6 +101,8 @@ const run = (cmd, args, timeout = 60000) => new Promise((resolve, reject) => exe
 // 0.9.37: a build number after the version counts (RPCS3's 0.0.38-18166 is newer than 0.0.38-18101: every
 // RPCS3 build shares 0.0.38, so updates were never seen); it becomes the last part, 0.0.38.18166
 const verOf = (s) => { const m = String(s || '').match(/(\d+(?:\.\d+){1,3})(?:-(\d{4,})(?!\d|-\d{2}-))?/); return m ? m[1] + (m[2] ? '.' + m[2] : '') : ''; };
+// 0.9.63 (owner's log: DuckStation "-> latest"): a rolling release with no number anywhere is named by its build date
+const dated = (d) => (d && !isNaN(Date.parse(d)) ? 'build ' + new Date(d).toISOString().slice(0, 10) : '');
 const cmpVer = (a, b) => { const x = verOf(a).split('.').map(Number), y = verOf(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
 
 // Flatpak: which of these app ids have an update, per installation
@@ -171,7 +177,7 @@ async function latestRelease(id, { fetchImpl, spec, file, channel } = {}) {
   for (const t of tries) {
     let rel = null; try { rel = await t(); } catch (e) { lastErr = e; continue; }
     const asset = pickAsset(rel?.assets, r.asset, file);
-    if (asset) return { id, fallback: r.fallback || null, version: verOf(rel.tag) || verOf(asset.name), tag: rel.tag, name: asset.name, url: asset.url, size: asset.size, date: asset.date || rel.date, folder: !!r.wholeFolder, dirBuild: r.dirBuild || null, zipped: r.wholeFolder || r.dirBuild ? null : /\.(zip|tar\.gz|tgz)$/i.test(asset.name) ? r.zipped || /\.AppImage$/i : null };
+    if (asset) return { id, fallback: r.fallback || null, version: verOf(rel.tag) || verOf(asset.name) || dated(asset.date || rel.date), tag: rel.tag, name: asset.name, url: asset.url, size: asset.size, date: asset.date || rel.date, folder: !!r.wholeFolder, dirBuild: r.dirBuild || null, zipped: r.wholeFolder || r.dirBuild ? null : /\.(zip|tar\.gz|tgz)$/i.test(asset.name) ? r.zipped || /\.AppImage$/i : null };
   }
   if (lastErr) throw lastErr; // every source refused: say why
   return null;

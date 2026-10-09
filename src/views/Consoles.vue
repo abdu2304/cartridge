@@ -41,7 +41,7 @@ function focusSys(p) {
   setBg(backdropOf(r));
 }
 useView({ x: () => resync() }, [{ b: 'A', label: 'Open console' }, { b: 'X', label: 'Resync' }, { b: 'Y', label: 'Search' }, { b: 'LT+RT', label: 'Tabs' }]);
-onMounted(async () => { await nextTick(); ensureFocus(el.value.querySelector('.sys-grid') || el.value); });
+onMounted(async () => { await nextTick(); if (el.value) ensureFocus(el.value.querySelector('.sys-grid') || el.value); });
 watch(() => store.libVersion, async () => { await nextTick(); ensureFocus(el.value); });
 </script>
 

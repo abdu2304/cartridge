@@ -185,9 +185,10 @@ const WHERE = {
     const set = abs(iniGet(ini, 'Data Storage', 'save_directory')) || abs(iniGet(ini, 'Data Storage', 'nand_directory'));
     return moved(set, path.join(base, 'nand'), 'nand');
   },
-  // RPCS3 (Emu/vfs_config.h): config/vfs.yml "/dev_hdd0/", where $(EmulatorDir) is its own entry, else RPCS3's folder
+  // RPCS3 (Emu/vfs_config.h): vfs.yml "/dev_hdd0/", where $(EmulatorDir) is its own entry, else RPCS3's folder.
+  // vfs.yml sits beside config.yml on Linux, in config/ only on Windows (0.9.63)
   rpcs3(base) {
-    const y = readText(path.join(base, 'config/vfs.yml'));
+    const y = readText(path.join(base, 'vfs.yml')) || readText(path.join(base, 'config/vfs.yml'));
     const get = (k) => { const m = new RegExp('^' + k.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&') + ':\\s*(.*)$', 'm').exec(y); return m ? m[1].trim().replace(/^"(.*)"$/, '$1').replace(/^'(.*)'$/, '$1') : ''; };
     let emuDir = abs(get('$(EmulatorDir)')) || base; emuDir = emuDir.replace(/\/?$/, '/');
     const hdd = (get('/dev_hdd0/') || '$(EmulatorDir)dev_hdd0/').replace('$(EmulatorDir)', emuDir).replace(/\/+$/, '');

@@ -62,8 +62,12 @@ function createTitleDb({ dataDir, home = os.homedir(), fetchImpl = null, readApp
     if (readAppImageFile) for (const a of appImages(c).filter((x) => D.appRe.test(path.basename(x)))) { try { const b = readAppImageFile(a, D.inApp); if (b) return { text: b.toString('utf8'), from: a }; } catch {} }
     return null;
   }
-  async function load(c) {
-    if (books[c]) return books[c];
+  const loading = {}; // 0.9.63 (owner's log: each list downloaded twice at once): one load per console at a time
+  function load(c) {
+    if (books[c]) return Promise.resolve(books[c]);
+    return (loading[c] ||= loadOne(c).finally(() => { delete loading[c]; }));
+  }
+  async function loadOne(c) {
     const cached = fromCache(c, true);
     if (cached) return (books[c] = cached.names);
     const own = local(c);

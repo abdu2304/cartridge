@@ -627,4 +627,4 @@ function growth({ dirs, total, onPct, every = 1000 }) {
   tick();
   return () => { stopped = true; clearTimeout(timer); };
 }
-module.exports = { pkgDataSize, zipSize, dirSize, unpackedSize, growth, stageForVita3k, VITA3K_END, rpcs3FwDone, rpcs3Dirs, vita3kFsPaths, vita3kWhy, vita3kLogTail, installFirmware, pkgInfo, packagesIn, licencePlan, stageLicences, exdataHas, npdOf, rpcs3Hdds, sfoSerial, install, vitaPrefs, vitaContent, findZrif, installVita, vitaArchiveContents, vitaUnpack, safeToRemove };
+module.exports = { pkgDataSize, zipSize, dirSize, unpackedSize, growth, stageForVita3k, VITA3K_END, rpcs3FwDone, rpcs3Dirs, vita3kFsPaths, vita3kWhy, vita3kLogTail, vita3kLogFile, installFirmware, pkgInfo, packagesIn, licencePlan, stageLicences, exdataHas, npdOf, rpcs3Hdds, sfoSerial, install, vitaPrefs, vitaContent, findZrif, installVita, vitaArchiveContents, vitaUnpack, safeToRemove };

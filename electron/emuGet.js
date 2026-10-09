@@ -70,13 +70,21 @@ async function getAppImage(e, download, opts = {}) {
     if (fs.existsSync(dir) && fs.readdirSync(dir).length) throw new Error(`${e.dirBuild.dir} is already in ${APPS()} without its program. Cartridge leaves it as it is.`);
     fs.mkdirSync(APPS(), { recursive: true });
     const z = dir + '.cartridge-dl';
-    try { await download(rel.url, z, rel.size); if (rel.size && fs.statSync(z).size !== rel.size) throw new Error('The download was incomplete. Try again.'); await U.layFolder(z, dir, rel.name); }
+    try {
+      // 0.9.63 (owner: KytyPS5 "just says Try again"): a short download is fetched once more by itself, and the message
+      // says how much arrived, so the log shows a dropped connection apart from a changed release
+      const got = async () => { await download(rel.url, z, rel.size); return fs.statSync(z).size; };
+      let n = await got();
+      if (rel.size && n !== rel.size) { fs.rmSync(z, { force: true }); n = await got(); }
+      if (rel.size && n !== rel.size) throw new Error(`The download stopped early (${(n / 1048576).toFixed(1)} of ${(rel.size / 1048576).toFixed(1)} MB) twice. Check the connection and try again.`);
+      await U.layFolder(z, dir, rel.name);
+    }
     catch (err) { fs.rmSync(dir, { recursive: true, force: true }); throw err; }
     finally { fs.rmSync(z, { force: true }); }
-    if (!fs.existsSync(prog)) { fs.rmSync(dir, { recursive: true, force: true }); throw new Error(`The download had no ${e.dirBuild.program} in it.`); }
+    if (!fs.existsSync(prog)) { const had = fs.readdirSync(dir).slice(0, 8).join(', '); fs.rmSync(dir, { recursive: true, force: true }); throw new Error(`The download had no ${e.dirBuild.program} in it (it held: ${had || 'nothing'}).`); }
     for (const n of fs.readdirSync(dir)) { const f = path.join(dir, n); try { if (fs.statSync(f).isFile() && U.looksRunnable(f, n) && !/\.(so|dll)(\.|$)/i.test(n)) fs.chmodSync(f, 0o755); } catch {} }
     fs.chmodSync(prog, 0o755);
-    if (!U.looksRunnable(prog, e.dirBuild.program)) throw new Error('What came down wasn’t a working program. Try again later.');
+    if (!U.looksRunnable(prog, e.dirBuild.program)) throw new Error(`${e.dirBuild.program} in the download isn’t a Linux program this device can run.`);
     return { path: prog, version: rel.version };
   }
   const name = String(e.name || rel.name).replace(/[\\/]/g, '_');

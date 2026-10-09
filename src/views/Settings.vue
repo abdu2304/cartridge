@@ -165,7 +165,7 @@
               <button v-for="(i, n) in issues" :key="n" class="lrow" data-focus @click="fixIssue(i)">
                 <Icon :name="ISSUE_ICON[i.kind] || 'mdiAlertCircleOutline'" :size="24" style="color: #ffd978" />
                 <div class="l-mid"><b>{{ i.text }}</b><span v-if="i.sub" class="l-sub">{{ i.sub }}</span></div>
-                <span class="l-end"><Btn b="A" />{{ { collections: 'See them', health: 'Shortcut health', setup: 'Emulator setup', romm: 'RomM settings', fpsteam: 'Allow' }[i.fix] }}</span>
+                <span class="l-end"><Btn b="A" />{{ { collections: 'See them', health: 'Shortcut health', setup: 'Emulator setup', romm: 'RomM settings', fpsteam: 'Allow', rpcs3cfg: 'Repair' }[i.fix] }}</span>
               </button>
             </div>
             <!-- 0.9.37 (owner: BIOS and firmware put where each emulator reads it, by itself): each console that needs some -->
@@ -1003,7 +1003,7 @@ useView({ right: railRight, left: paneLeft, back: () => { if (sec.value === 'syn
   [{ b: 'A', label: 'Select' }, { b: 'B', label: 'Back' }, { b: 'Y', label: 'Find a Setting' }, { b: 'LT+RT', label: 'Tabs' }]);
 // Settings → Emulators → Issues
 const issues = ref(null);
-const ISSUE_ICON = { collections: 'mdiFolderSyncOutline', moved: 'mdiLinkVariantOff', game: 'mdiFileHidden', core: 'mdiPuzzleRemoveOutline', setup: 'mdiRadar', bios: 'mdiChip', romm: 'mdiServerOutline', fpsteam: 'mdiSteam' };
+const ISSUE_ICON = { collections: 'mdiFolderSyncOutline', moved: 'mdiLinkVariantOff', game: 'mdiFileHidden', core: 'mdiPuzzleRemoveOutline', setup: 'mdiRadar', bios: 'mdiChip', romm: 'mdiServerOutline', fpsteam: 'mdiSteam', rpcs3cfg: 'mdiFileAlertOutline' };
 async function loadIssues() { issues.value = await call('issues:list').catch(() => []); store.issues = issues.value.length; texEmus.value = (await call('addons:emulators').catch(() => null)) || []; }
 const texEmus = ref([]);
 // Add-ons page (0.9.17): installed games of consoles with add-ons, by console, and what Cartridge installed
@@ -1068,6 +1068,12 @@ async function fixIssue(i) {
   if (i.fix === 'health') return go('steam-health');
   if (i.fix === 'setup') return go('emu-setup');
   if (i.fix === 'romm') { sec.value = 'romm'; return; }
+  if (!i.fix) return;
+  if (i.fix === 'rpcs3cfg') {
+    if (!(await confirm('Repair RPCS3’s Settings File?', 'Cartridge keeps a copy of the file as it is now, then removes only the text an older EmuDeck left behind. If the file still can’t be read afterwards, the copy goes back and nothing changes.', 'Repair'))) return;
+    try { const r = await call('rpcs3:repairConfig', { root: i.root }); toast(r.already ? 'It reads fine already' : 'Repaired. RPCS3 can load its settings again.', 'ok', 3500, 'mdiCheck'); loadIssues(); } catch (e) { toast(e.message, 'error', 8000); }
+    return;
+  }
   if (i.fix === 'fpsteam') {
     if (!(await confirm('Allow Flatpak Steam?', 'Runs: flatpak override --user --talk-name=org.freedesktop.Flatpak com.valvesoftware.Steam\n\nSteam can then start your emulators from its shortcuts. Restart Steam afterwards.', 'Allow'))) return;
     try { await call('setup:steamFlatpakAllow'); toast('Allowed. Restart Steam to use it.', 'ok', 3500, 'mdiCheck'); loadIssues(); } catch (e) { toast(e.message, 'error', 6000); }

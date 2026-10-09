@@ -230,6 +230,20 @@ function hashEntries(entries, read = (p) => fs.readFileSync(p)) {
   return lines.length ? md5(lines.join('\n')) : null;
 }
 const hashUnit = (u) => hashEntries(entriesOf(u));
+// 0.9.63 (owner's log: the app froze ~18 s every half hour): every save was read and hashed again on each sync, in one
+// go on the main thread. Now a file's md5 is kept by path, size and date (cache: a plain object the caller keeps), so an
+// unchanged save costs a stat; a changed file is read without blocking, and the caller lets the window breathe between saves.
+async function hashUnitAsync(u, cache = {}) {
+  const lines = [];
+  for (const [n, p] of entriesOf(u).filter(([x]) => !x.endsWith('/')).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))) {
+    let st; try { st = await fs.promises.stat(p); } catch { continue; }
+    const k = `${p}|${st.size}|${st.mtimeMs}`;
+    let h = cache[k];
+    if (!h) { h = md5(await fs.promises.readFile(p)); for (const o of Object.keys(cache)) if (o.startsWith(p + '|')) delete cache[o]; cache[k] = h; }
+    lines.push(`${n}:${h}`);
+  }
+  return lines.length ? md5(lines.join('\n')) : null;
+}
 // newest change in a unit (to look again only at saves that changed)
 function changedAt(u) { let t = 0; for (const [, p] of entriesOf(u)) if (p) { try { t = Math.max(t, fs.statSync(p).mtimeMs); } catch {} } return t; }
 
@@ -368,7 +382,7 @@ async function syncUnit(u, rpc, ledger, opts = {}) {
   const home = remote && fitsRom(u.emu, remote.romId, opts) ? remote.romId : u.romId;
   const misfiled = !!remote && remote.romId != null && home !== remote.romId && u.romId != null && fitsRom(u.emu, u.romId, opts);
   const target = u.path || placeFor(u.emu, u.key, opts);
-  const local = u.path ? hashUnit(u) : null;
+  const local = u.path ? (opts.hashCache ? await hashUnitAsync(u, opts.hashCache) : hashUnit(u)) : null;
   const base = ledger.get(u.key) || null;
   let what = decide(local, remote, base);
   if (what === 'conflict' && opts.choice) what = opts.choice === 'mine' ? 'up' : 'down';
@@ -382,6 +396,7 @@ async function syncUnit(u, rpc, ledger, opts = {}) {
   if (what === 'conflict') return { key: u.key, result: 'conflict', local, remote };
   if ((what === 'down' || what === 'up') && running(u.emu, opts.procs)) return { key: u.key, result: 'busy' };
   if (what === 'up') {
+    if (opts.refused?.(u.key, local)) return { key: u.key, result: 'toolarge', error: opts.refused(u.key, local), skipped: true }; // the same save was refused for its size: not again until it changes or you press Sync Now
     const ents = entriesOf(u), buf = zip(ents);
     const name = (u.key.replace(/^[^:]+:/, '').replace(/[^\w.-]+/g, '_') || 'save') + '.zip';
     // into the RomM entry that already holds this save, so every device's copies stay together (0.9.58)
@@ -420,10 +435,14 @@ async function restore(u, save, rpc, ledger, opts = {}) {
 
 // RomM's saves API (backend/endpoints/saves.py): base() -> the server, headers() -> sign-in headers, devId: this
 // device in RomM (its sync records and the 409 on a slot another device saved since)
-function rommRpc({ base, headers, devId = null, fetchImpl = fetch }) {
+// 0.9.63 (owner's log: one PSP save refused with 413 every 30 minutes): a 413 comes from the web server or tunnel in front
+// of RomM, which often caps uploads at 1 MB. altBases() gives the server's other addresses (home and away); an upload
+// refused on one is tried on the others, and onLarge(base) remembers the one that took it for big saves from then on.
+// largeBase() is that remembered address. Refused on all: an error with code 'toolarge' and the file's size.
+function rommRpc({ base, headers, devId = null, fetchImpl = fetch, altBases = async () => [], largeBase = () => null, onLarge = () => {} }) {
   const dq = devId ? { device_id: devId } : {};
-  const go = async (pathname, query, init = {}) => {
-    const url = new URL((await base()) + pathname);
+  const go = async (pathname, query, init = {}, at = null) => {
+    const url = new URL((at || (await base())) + pathname);
     for (const [k, v] of Object.entries(query || {})) if (v != null) url.searchParams.set(k, String(v));
     const r = await fetchImpl(url, { ...init, headers: { ...headers(), ...(init.headers || {}) }, signal: AbortSignal.timeout(180000) });
     if (r.status === 401 || r.status === 403) throw Object.assign(new Error('RomM didn’t let Cartridge read or write saves. Sign in with your password, or pair again so Cartridge can ask for save access.'), { code: 'auth' });
@@ -434,8 +453,17 @@ function rommRpc({ base, headers, devId = null, fetchImpl = fetch }) {
     // every save of Cartridge's under every game (0.9.58: saves are found by key, not by this device's RomM entry)
     listAll: async () => { const r = await go('/api/saves', { ...dq }); if (!r.ok) throw new Error(`RomM error ${r.status} listing saves`); const j = await r.json(); return (Array.isArray(j) ? j : j?.items || []).filter((x) => parseSlot(x.slot)); },
     upload: async (u, buf, name, { overwrite, hash } = {}) => {
-      const fd = new FormData(); fd.append('saveFile', new Blob([buf], { type: 'application/zip' }), name);
-      const r = await go('/api/saves', { rom_id: u.romId, emulator: u.emu, slot: u.slot, autocleanup: 'true', autocleanup_limit: 10, content_hash: hash, overwrite: overwrite ? 'true' : null, ...dq }, { method: 'POST', body: fd });
+      const send = (at) => { const fd = new FormData(); fd.append('saveFile', new Blob([buf], { type: 'application/zip' }), name); return go('/api/saves', { rom_id: u.romId, emulator: u.emu, slot: u.slot, autocleanup: 'true', autocleanup_limit: 10, content_hash: hash, overwrite: overwrite ? 'true' : null, ...dq }, { method: 'POST', body: fd }, at); };
+      const big = buf.length > 1e6 ? largeBase() : null;
+      let r = await send(big);
+      if (r.status === 413) {
+        const tried = [big || (await base())];
+        for (const b of (await altBases()).filter((x) => x && !tried.includes(x))) {
+          tried.push(b);
+          try { const r2 = await send(b); if (r2.status !== 413) { r = r2; if (r2.ok || r2.status === 409) onLarge(b); break; } } catch {}
+        }
+        if (r.status === 413) throw Object.assign(new Error(`Your RomM server refuses files this big (${(buf.length / 1048576).toFixed(1)} MB, error 413). The limit is on the web server or tunnel in front of RomM: raise its upload size limit (nginx: client_max_body_size).`), { code: 'toolarge', size: buf.length });
+      }
       if (r.status === 409) return { conflict: true };
       if (!r.ok) throw new Error(`RomM error ${r.status} saving ${name}`);
       return r.json();
@@ -491,4 +519,4 @@ function remoteOnly(remotes, localKeys, opts = {}) {
   return [...out.values()];
 }
 
-module.exports = { FAMILY_SLUGS, fitsConsole, fitsRom, moveInto, FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };
+module.exports = { FAMILY_SLUGS, fitsConsole, fitsRom, moveInto, FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashUnitAsync, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };

@@ -2,7 +2,7 @@
 // way the emulator's own per-game settings work). Each emulator keeps a per-game file layered over its
 // normal settings; Cartridge writes only that file, only the keys you change, and "Emulator's own" takes
 // a key out again. Formats and keys read from each emulator's source:
-// - RPCS3: config/custom_configs/config_<SERIAL>.yml, applied over its config.yml (Emu/System.cpp);
+// - RPCS3: custom_configs/config_<SERIAL>.yml beside its config.yml (config/ only on Windows), applied over it (Emu/System.cpp);
 //   keys from Emu/system_config.h, values as system_config_types.cpp names them
 // - PCSX2: gamesettings/<SERIAL>_<CRC>.ini (VMManager::GetGameSettingsPath), layered over PCSX2.ini;
 //   keys from Pcsx2Config.cpp ([EmuCore/GS] Renderer, upscale_multiplier; [EmuCore] ...)
@@ -250,7 +250,7 @@ const schemaOf = (ctx) => SCHEMA[ctx.emu] || { name: ctx.name || NAMES[ctx.emu] 
 // ctx: { emu, serial, crc, rpcs3Root, pcsx2: { gamesettings, root }, duckRoot, dolphin: { user, config }, ppsspp: { root, ini }, shadUser }
 function files(ctx) {
   const e = ctx.emu;
-  if (e === 'rpcs3') return { file: path.join(ctx.rpcs3Root, 'config', 'custom_configs', `config_${ctx.serial}.yml`), base: [path.join(ctx.rpcs3Root, 'config', 'config.yml'), path.join(ctx.rpcs3Root, 'config.yml')], kind: 'yml' };
+  if (e === 'rpcs3') { const c = require('./patches').rpcs3CfgDir(ctx.rpcs3Root); return { file: path.join(c, 'custom_configs', `config_${ctx.serial}.yml`), base: [path.join(c, 'config.yml')], kind: 'yml' }; } // 0.9.63: config/ only on Windows
   if (e === 'pcsx2') return { file: path.join(ctx.pcsx2.gamesettings, ctx.serial ? `${ctx.serial}_${ctx.crc}.ini` : `${ctx.crc}.ini`), base: [path.join(ctx.pcsx2.root, 'inis', 'PCSX2.ini')], kind: 'ini' };
   if (e === 'duckstation') return { file: path.join(ctx.duckRoot, 'gamesettings', `${ctx.serial}.ini`), base: [path.join(ctx.duckRoot, 'settings.ini')], kind: 'ini' };
   if (e === 'dolphin') return { file: path.join(ctx.dolphin.user, 'GameSettings', `${ctx.serial}.ini`), base: [path.join(ctx.dolphin.config, 'GFX.ini'), path.join(ctx.dolphin.config, 'Dolphin.ini')], kind: 'ini', dolphin: true };

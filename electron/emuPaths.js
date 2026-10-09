@@ -110,7 +110,7 @@ function locate(id, home = os.homedir()) {
   }
   if (kind === 'rpcs3') {
     const d = require('./patches').rpcs3Dirs(home)[0]; if (!d) return null;
-    const f = [path.join(d.root, 'config', 'vfs.yml'), path.join(d.root, 'vfs.yml')].find(exists) || path.join(d.root, 'config', 'vfs.yml');
+    const f = [path.join(d.cfg, 'vfs.yml'), path.join(d.root, 'config', 'vfs.yml'), path.join(d.root, 'vfs.yml')].find(exists) || path.join(d.cfg, 'vfs.yml'); // 0.9.63: beside config.yml (config/ only on Windows)
     return { id, kind, file: f, root: d.root, emuDir: d.root + '/' };
   }
   if (kind === 'shadps4') {
