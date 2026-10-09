@@ -6,6 +6,12 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 9 Oct 2026 · 0.9.62 Every Game's Settings
+- Owner: take the PPSSPP/Dolphin approach "across the board", add advanced sections, let number settings be typed; plan first, then (on "go") all my recommendations as one update: one Advanced tab at the end, RetroArch core options included. Asked to check Vita3K, Xenia Canary and Flycast: all three have per-game settings (Vita3K config/config_<ID>.xml, Xenia config/<ID>.config.toml, Flycast a [<game ID>] section in emu.cfg).
+- Research split over five agents (sources fetched raw/sparse-cloned; the GitHub API is closed here); two were stopped by usage limits twice, so the PS1 to PS4 readers were checked and finished by hand and RetroArch's core options reader (`retroarchCores.js`) written here: 71 cores probed, 62 parse.
+- Found while building: RPCS3 settings nested three deep (`Video/Vulkan`: ymlGet/ymlPut take a path), shadPS4's JSON needed real types, Flycast keys hold dots (items carry `sec`/`key`), Vita3K reads a missing attribute as off (whole file written from config.yml), Eden's `\default=true` ignores the value, Cemu ignores its shipped profile once yours exists (seeded from it), Ryujinx's game file is a whole Config.json (copied), Cemu was never in raLogin's running list although its patches relied on it.
+- Owner to test: Game Settings on a Switch (Eden), 3DS, Wii U, Vita, Xbox 360, Dreamcast and a RetroArch game; that the values stick when the game starts; the Advanced tab; typing a number out of range.
+
 ## 8 Oct 2026 · 0.9.61 The Old Highlight
 - Owner's photos of 0.9.60 on the TV: "I absolutely despise the new white highlights, I loved the old selection method, please revert back to that", and asked for Continue Playing's dots on Console Spotlight.
 - Done: focus and chosen exactly as 0.9.59 (themes.js `--ring`, `--ring-soft`, `--sel-bg`, `--sel-ring`; files that only changed for the look restored from v0.9.59; `--sel-under`, `--focus-glow`, `--focus-core` gone). The 0.9.60 "no white outline" rule and its test removed; design-rules.md section 6 says focus and chosen stay as they are unless the owner asks. Keyboard suggestion room (`.sugg` padding) kept.

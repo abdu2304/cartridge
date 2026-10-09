@@ -55,7 +55,7 @@ const el = ref(null), d = ref(null), busy = ref(false);
 const rom = computed(() => romById(props.romId));
 const art = computed(() => (rom.value ? cover(rom.value) : ''));
 const tab = ref(props.tab || ''); // back from a picker: the tab you were on (0.9.46: it fell to Steam, the only tab before the list loaded)
-const tabs = computed(() => { const t = [...new Set((d.value?.items || []).map((x) => x.tab || 'General'))]; t.push('Steam'); return t; }); // Steam always: frame generation says why when it can't apply (0.9.28)
+const tabs = computed(() => { const t = [...new Set((d.value?.items || []).map((x) => x.tab || 'General'))]; const a = t.indexOf('Advanced'); if (a >= 0) t.splice(a, 0, 'Steam'); else t.push('Steam'); return t; }); // Advanced stays last (0.9.62) // Steam always: frame generation says why when it can't apply (0.9.28)
 const shown = computed(() => (d.value?.items || []).filter((x) => (x.tab || 'General') === tab.value));
 watch(tabs, (t) => { if (d.value && !t.includes(tab.value)) tab.value = t[0] || ''; }, { immediate: true }); // only once the list is in: before it, Steam is the only tab
 function stepTab(n) { const t = tabs.value; if (t.length < 2) return; tab.value = t[(t.indexOf(tab.value) + n + t.length) % t.length]; nextTick(() => focusFirst(el.value.querySelector('.gs-list') || el.value)); }

@@ -5038,7 +5038,7 @@ const handlers = {
   'gamesettings:set': ({ romId, changes }) => {
     const c = gameSettingsCtx(Number(romId));
     if (c.why) throw new Error(c.why);
-    const names = { rpcs3: 'RPCS3', pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', ppsspp: 'PPSSPP', shadps4: 'shadPS4' };
+    const names = { rpcs3: 'RPCS3', pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', ppsspp: 'PPSSPP', shadps4: 'shadPS4', ...GS_NAME };
     notRunning(c.emu, names[c.emu]);
     const d = require('./gameSettings').apply(c, changes || []);
     log('game settings', c.emu, c.serial, (changes || []).map((x) => `${x.id}=${x.value}`).join(' '));
