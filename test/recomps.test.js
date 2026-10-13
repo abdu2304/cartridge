@@ -78,7 +78,7 @@ test('the game check: extension, listed hashes, and an N64 ROM in another byte o
 });
 
 // a fake GitHub: releases listed by its API, files served from a folder
-function fakeWorld(entries) {
+function fakeWorld(entries, extra = {}) {
   const d = tmp(), data = path.join(d, 'data'), emu = path.join(d, 'Emulation'), home = path.join(d, 'home'), files = path.join(d, 'srv');
   for (const x of [data, emu, home, files]) fs.mkdirSync(x, { recursive: true });
   fs.writeFileSync(path.join(d, 'shipped.json'), JSON.stringify({ updated: '2026-10-09', entries }));
@@ -103,6 +103,7 @@ function fakeWorld(entries) {
     isElf: (f) => path.basename(f) === 'Game', isRunning: () => false,
     trash: async (p) => { trashed.push(p); fs.rmSync(p, { recursive: true, force: true }); },
     recompRoot: () => path.join(emu, 'recomp'), recompRoots: () => [path.join(emu, 'recomp')],
+    ...extra,
   });
   return { d, data, emu, home, publish, eng, trashed };
 }
@@ -217,4 +218,35 @@ test('achievements: Unleashed/Marathon records and ReXGlue unlocks with their na
   fs.mkdirSync(u.dir);
   const gu = RA.gameOf(u, RA.locate(u, { home }));
   assert.deepStrictEqual(gu.trophies.map((t) => [t.id, t.unlocked]), [[24, true], [31, true]]);
+});
+
+test('an update is started once; one that can’t start goes back to the release that worked', async () => {
+  const entry = { id: 'game', name: 'Game Recompiled', games: [{ title: 'Game', console: 'n64' }], repo: 'github:o/game', builds: 'linux', program: 'Game', saves: [], needs: null, setup: { how: 'none' } };
+  const tried = [];
+  const w = fakeWorld([entry], { trialRun: async ({ program }) => { const t = fs.readFileSync(program, 'utf8'); tried.push(t); return /broken/.test(t) ? { failed: true, why: 'It needs libfoo.so.1, which this system doesn’t have.' } : { ok: true }; } });
+  w.publish('v1', 'one');
+  await w.eng.install('game');
+  assert.strictEqual(tried.length, 0, 'a first install isn’t started');
+  w.publish('v2', 'two');
+  assert.strictEqual((await w.eng.install('game')).started, true);
+  w.publish('v3', 'broken');
+  const r = await w.eng.install('game');
+  assert.deepStrictEqual([r.rolledBack, r.tag, r.newTag], [true, 'v2', 'v3']);
+  assert.match(r.why, /libfoo/);
+  const dir = path.join(w.emu, 'recomp', 'n64', 'Game Recompiled');
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'assets.dat'), 'utf8'), 'two', 'the release that worked is back');
+  assert.strictEqual(w.eng.versions('game').current, 'v2');
+});
+
+test('project details: the first real README picture, plain release notes; a link’s console and game guessed', () => {
+  const md = '[![build](https://img.shields.io/x.svg)](ci) <img src="https://example.com/logo.svg"> ![Shot](docs/shot.png "a")';
+  assert.strictEqual(R.readmePicture(md, 'https://raw.githubusercontent.com/o/r/HEAD/'), 'https://raw.githubusercontent.com/o/r/HEAD/docs/shot.png');
+  assert.strictEqual(R.readmePicture('![x](https://github.com/o/r/blob/main/a.png)', 'https://raw.githubusercontent.com/o/r/HEAD/'), 'https://raw.githubusercontent.com/o/r/main/a.png');
+  assert.strictEqual(R.readmePicture('no pictures', 'https://x/'), null);
+  assert.strictEqual(R.plainNotes('## What’s new\n- **Fixed** [saves](http://x)\n\n\n\n`code`'), 'What’s new\n• Fixed saves\n\ncode');
+  assert.ok(R.plainNotes('a '.repeat(800)).length <= 905);
+  const roms = [{ id: 1, name: 'The Legend of Zelda: Majora’s Mask', platform_slug: 'n64' }, { id: 2, name: 'Mask', platform_slug: 'n64' }, { id: 3, name: 'Super Mario World', platform_slug: 'snes' }];
+  assert.deepStrictEqual(R.guessFromText('Zelda64Recomp Static recompilation of Majora’s Mask for PC (N64)', roms, R.CONSOLES), { console: 'n64', title: 'The Legend of Zelda: Majora’s Mask', romId: 1 });
+  assert.deepStrictEqual(R.guessFromText('smw-pc a port of Super Mario World', roms, R.CONSOLES), { console: 'snes', title: 'Super Mario World', romId: 3 });
+  assert.deepStrictEqual(R.guessFromText('a tool', roms, R.CONSOLES), { console: null, title: null, romId: null });
 });

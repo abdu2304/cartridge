@@ -24,6 +24,7 @@
         <div class="con-head"><Icon name="mdiGithub" :size="26" /><b>From a Link</b></div>
         <p class="muted small">A recomp that isn’t in the list: paste its GitHub or GitLab link, say which game it’s for, and it’s added here like the others. Linux builds first, Windows through Proton, nothing else.</p>
         <LinkInput v-model="link" />
+        <p v-if="guessed" class="muted small rc-note">{{ guessed }}</p>
         <div class="row rc-link-row">
           <button class="btn" data-focus :disabled="!link" @click="pickConsole"><Icon name="mdiGamepadSquareOutline" :size="18" />{{ linkCon ? data.consoles[linkCon] : 'Console' }}</button>
           <button class="btn" data-focus :disabled="!link" @click="pickTitle"><Icon name="mdiFormatTitle" :size="18" />{{ linkTitle || 'Game' }}</button>
@@ -35,7 +36,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { store, call, toast, openModal, choose, askText, romById, cover, bgJob } from '../store.js';
 import Icon from './Icon.vue';
 import PIcon from './PIcon.vue';
@@ -47,7 +48,21 @@ const SLUG = { arcade: 'arcade', nes: 'nes', snes: 'snes', n64: 'n64', gb: 'gb',
 const FILTERS = [{ v: 'all', l: 'All' }, { v: 'yours', l: 'For Your Games' }, { v: 'mine', l: 'Installed' }];
 const ORIGIN = { recomp: 'Recompiled', decomp: 'Decompiled', recreation: 'Rebuilt', reimplementation: 'Rebuilt', disassembly: 'Disassembled' };
 const data = ref(null), filter = ref('all'), refreshing = ref(false), busy = ref(false);
-const link = ref(''), linkCon = ref(''), linkTitle = ref('');
+const link = ref(''), linkCon = ref(''), linkTitle = ref(''), guessed = ref(''), linkDesc = ref('');
+// 0.9.66 (agreed plan): the console and game guessed from the project's name and description; you check them, then Add
+let guessT = 0;
+watch(link, (v) => {
+  clearTimeout(guessT); guessed.value = '';
+  if (!/(github|gitlab)\.com\/[\w.-]+\/[\w.-]+|^[\w.-]+\/[\w.-]+$/i.test(String(v || '').trim())) return;
+  guessT = setTimeout(async () => {
+    const g = await call('recomps:guess', { link: v }).catch(() => null);
+    if (!g || link.value !== v) return;
+    linkDesc.value = g.description || '';
+    if (g.console && !linkCon.value) linkCon.value = g.console;
+    if (g.title && !linkTitle.value) linkTitle.value = g.title;
+    if (g.console || g.title) guessed.value = 'Guessed from the project’s name and description. Check both before adding.';
+  }, 700);
+});
 let off = null;
 async function load() { data.value = await call('recomps:list').catch(() => ({ entries: [], consoles: {} })); }
 onMounted(() => { load(); off = window.cart.on('recomp-progress', (m) => { if (m.step === 'unpack') setTimeout(load, 1500); }); });
@@ -103,9 +118,9 @@ async function pickTitle() {
 async function addLink() {
   busy.value = true;
   try {
-    const r = await call('recomps:addLink', { link: link.value, console: linkCon.value, title: linkTitle.value });
+    const r = await call('recomps:addLink', { link: link.value, console: linkCon.value, title: linkTitle.value, description: linkDesc.value });
     toast(r.known ? 'That one is already in the list' : 'Added', 'ok', 2000, 'mdiCheck');
-    link.value = ''; linkTitle.value = ''; await load();
+    link.value = ''; linkTitle.value = ''; linkCon.value = ''; guessed.value = ''; linkDesc.value = ''; await load();
     const e = data.value.entries.find((x) => x.id === r.id);
     if (e) open(e);
   } catch (er) { toast(er.message, 'error'); }

@@ -1201,6 +1201,8 @@ const mediaSizes = [{ v: 'compact', l: 'Compact' }, { v: 'large', l: 'Medium' },
 // 0.9.28 (owner: the flow felt confusing): what you have first, then add-ons, then setup and health checks, then folders
 const EMU_PAGES = [{ v: 'emus', l: 'Emulators' }, { v: 'recomps', l: 'Recomps' }, { v: 'addons', l: 'Game Add-ons' }, { v: 'overview', l: 'Setup and Health' }, { v: 'folders', l: 'Console Folders' }, { v: 'links', l: 'Linked Folders' }];
 // a fork's Manage sheet asks for Linked Folders (0.9.33)
+// another page inside Settings asks for a section (0.9.66: an emulator's Online Play row)
+watch(() => store.settingsWant, (v) => { if (!v) return; store.settingsWant = null; sec.value = v; nextTick(() => { if (input.mode === 'pad') enter(); }); });
 watch(() => store.emuPageWant, (v) => { if (!v) return; store.emuPageWant = null; setEmuPage(v); nextTick(() => focusFirst(paneEl.value, `[data-key="emup-${v}"]`)); });
 // 0.9.44 (owner: Emulators opened on Setup and Health): every section opens on its first page; coming back from a
 // screen opened here returns to the page it was opened from (store.settingsSpot.page)

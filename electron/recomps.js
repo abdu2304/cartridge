@@ -208,6 +208,61 @@ function sniff(file) {
 const ARCHIVE_END = /\.(zip|7z|rar|tar(\.(gz|xz|zst|bz2))?|tgz|txz)$/i;
 
 // ---------------------------------------------------------------- the engine
+
+// ---------------------------------------------------------------- project details (0.9.66, agreed plan: the project's
+// stars, newest version, its release notes and the first picture of its README on the recomp's page)
+// the first picture a README shows: markdown ![](x) or <img src="x">, made absolute against the README's own folder;
+// badges (shields.io and the like, .svg) are skipped
+function readmePicture(md, base) {
+  const re = /!\[[^\]]*\]\(\s*<?([^)\s>]+)>?(?:\s+"[^"]*")?\s*\)|<img[^>]*?\ssrc\s*=\s*["']([^"']+)["']/gi;
+  let m;
+  while ((m = re.exec(String(md || '')))) {
+    const u = (m[1] || m[2] || '').trim();
+    if (!u || /shields\.io|badge|badgen|img\.shields|actions\/workflows|\.svg(\?|$)|discord(app)?\.com\/api|ko-fi|paypal|patreon/i.test(u)) continue;
+    try { const abs = new URL(u, base).href; if (/^https:\/\//.test(abs)) return abs.replace(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/blob\//, 'https://raw.githubusercontent.com/$1/'); } catch {}
+  }
+  return null;
+}
+// release notes as plain text: markdown marks taken off, links to their words, at most ~900 characters
+function plainNotes(md) {
+  let t = String(md || '').replace(/\r/g, '').replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\[([^\]]+)\]\([^)]*\)/g, '$1').replace(/^#{1,6}\s*/gm, '').replace(/^\s*[-*+]\s+/gm, '• ')
+    .replace(/(\*\*|__|`{1,3})/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  if (t.length > 900) t = t.slice(0, 900).replace(/\s+\S*$/, '') + ' …';
+  return t;
+}
+// a link's own words for its console and game (0.9.66, agreed plan: Cartridge guesses, the person confirms): console
+// names and their short forms in the project's name and description, then the library game whose title it holds
+const CON_WORDS = [
+  ['n64', /\b(n64|nintendo 64|ultra ?64)\b/i], ['snes', /\b(snes|super nintendo|super famicom|sfc)\b/i], ['nes', /\b(nes|famicom)\b/i],
+  ['gb', /\bgame ?boy(?! (color|colour|advance))\b|\bgb\b/i], ['gbc', /\b(gbc|game ?boy colou?r)\b/i], ['gba', /\b(gba|game ?boy advance)\b/i],
+  ['nds', /\b(nds|nintendo ds)\b/i], ['3ds', /\b3ds\b/i], ['gamecube', /\b(gamecube|gcn|ngc)\b/i], ['wii', /\bwii(?! ?u)\b/i], ['wiiu', /\bwii ?u\b/i], ['switch', /\b(nintendo switch|switch)\b/i],
+  ['psx', /\b(ps1|psx|playstation 1|playstation one)\b/i], ['ps2', /\b(ps2|playstation 2)\b/i], ['ps3', /\b(ps3|playstation 3)\b/i], ['ps4', /\b(ps4|playstation 4)\b/i], ['psp', /\bpsp\b/i], ['psvita', /\b(vita|psvita)\b/i],
+  ['xbox', /\bxbox(?! ?360| one| series)\b/i], ['xbox360', /\b(xbox ?360|x360)\b/i], ['genesis', /\b(genesis|mega ?drive)\b/i], ['dc', /\bdreamcast\b/i], ['saturn', /\bsaturn\b/i], ['arcade', /\barcade\b/i],
+];
+function guessFromText(text, roms = [], consoles = {}) {
+  const t = String(text || '').replace(/[-_.]+/g, ' ');
+  let con = null;
+  for (const [k, re] of CON_WORDS) if (consoles[k] && re.test(t)) { con = k; break; }
+  // the game: the longest library title whose words all appear, on that console when one was found
+  const words = new Set(norm(t).split(' ').filter(Boolean));
+  let best = null;
+  for (const r of roms) {
+    const slug = consoleOfSlug(r.platform_slug || r.slug || '');
+    if (con && slug && slug !== con) continue;
+    // the whole title, or its part after a colon or dash ("Majora's Mask" of "The Legend of Zelda: Majora's Mask"):
+    // a part counts with two words or more, or one word of six letters or more
+    const parts = [r.name || '', ...String(r.name || '').split(/\s*[:\-–]\s+/).slice(1)];
+    for (const part of parts) {
+      const key = norm(part).split(' ').filter((w) => w.length > 1);
+      if (!key.length || (key.length < 2 && key[0].length < 6) || !key.every((w) => words.has(w))) continue;
+      const len = key.join(' ').length;
+      if (!best || len > best.len) best = { title: r.name, console: slug || null, len, romId: r.id };
+    }
+  }
+  return { console: con || best?.console || null, title: best?.title || null, romId: best?.romId || null };
+}
+
 function createRecomps(ctx) {
   const { dataDir, log = () => {} } = ctx;
   const F = (n) => path.join(dataDir, n);
@@ -412,9 +467,24 @@ function createRecomps(ctx) {
     const saves = checkSaves(meta);
     installs[id] = { ...(prev || {}), id, repo: e.repo, dir: dest, program, kind, tag: rel.tag, date: rel.date, files, channel: ch, at: Date.now(), asset: b.asset.name };
     saveInstalls();
+    // 0.9.66 (agreed plan): after an update the new release is started once before Steam's shortcut follows it. One that
+    // can't start at all (missing libraries, a crash in the first seconds) goes back to the release that worked
+    if (prev && prev.tag && kind === 'linux' && ctx.trialRun) {
+      onProgress({ step: 'trial', pct: null });
+      const t = await ctx.trialRun({ program, args: prev.args || '', cwd: path.dirname(program), ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message }));
+      if (t?.failed) {
+        log('recomp update did not start, back to', prev.tag, id, t.why);
+        try {
+          useVersion(id, prev.tag);
+          if (exists(prev.program)) { installs[id].program = prev.program; saveInstalls(); }
+        } catch (er) { log('recomp roll back after a failed start', id, er.message); return { tag: rel.tag, kind, program, dir: dest, updated: true, started: false, why: t.why, rollBackFailed: er.message, restored: saves.restored, backedUp: !!meta }; }
+        latest[id] = { tag: rel.tag, date: rel.date, kind, name: b.asset.name, at: Date.now(), channel: ch, failed: t.why }; writeJson(F('recomp-latest.json'), latest);
+        return { tag: prev.tag, newTag: rel.tag, kind, program: installs[id].program, dir: dest, updated: false, rolledBack: true, why: t.why, restored: saves.restored, backedUp: !!meta };
+      }
+    }
     latest[id] = { tag: rel.tag, date: rel.date, kind, name: b.asset.name, at: Date.now(), channel: ch }; writeJson(F('recomp-latest.json'), latest);
     log('recomp', prev ? 'updated' : 'installed', id, rel.tag, kind, program);
-    return { tag: rel.tag, kind, program, dir: dest, updated: !!prev, programMoved: !!(prev && prev.program !== program), restored: saves.restored, backedUp: !!meta };
+    return { tag: rel.tag, kind, program, dir: dest, updated: !!prev, programMoved: !!(prev && prev.program !== program), started: prev && kind === 'linux' && ctx.trialRun ? true : undefined, restored: saves.restored, backedUp: !!meta };
   }
   function versions(id) {
     const rec = installs[id];
@@ -498,6 +568,45 @@ function createRecomps(ctx) {
   }
   function markDone(id) { const rec = installs[id]; if (!rec) return false; rec.setupDone = true; saveInstalls(); return true; }
   function setAppid(id, appid) { const rec = installs[id]; if (rec) { rec.appid = appid >>> 0; saveInstalls(); } }
+
+  // ---- the project's own page details, read once a day (recomp-details.json); a failure leaves the page as it was
+  let detailsCache = readJson(F('recomp-details.json'), {});
+  async function details(id, { fresh = false } = {}) {
+    const e = byId(id), r = repoOf(e?.repo);
+    if (!r) return null;
+    const had = detailsCache[id];
+    if (had && !fresh && Date.now() - had.at < 24 * 3600e3) return had;
+    const f = ctx.fetchImpl || require('./webFetch'), H = { 'User-Agent': 'Cartridge', Accept: 'application/json' };
+    const getJson = async (u) => { const res = await f(u, { headers: H, signal: AbortSignal.timeout(15000) }).catch(() => null); return res && res.ok ? res.json().catch(() => null) : null; };
+    const getText = async (u) => { const res = await f(u, { headers: { 'User-Agent': 'Cartridge' }, signal: AbortSignal.timeout(15000) }).catch(() => null); return res && res.ok ? res.text().catch(() => null) : null; };
+    const out = { at: Date.now(), stars: null, description: null, tag: null, date: null, notes: null, picture: null, url: projectUrl(e) };
+    if (r.host === 'github') {
+      const [repo, rel, readme] = await Promise.all([
+        getJson(`https://api.github.com/repos/${r.repo}`),
+        getJson(`https://api.github.com/repos/${r.repo}/releases?per_page=5`),
+        getText(`https://raw.githubusercontent.com/${r.repo}/HEAD/README.md`),
+      ]);
+      if (repo) { out.stars = repo.stargazers_count ?? null; out.description = repo.description || null; }
+      const pick = Array.isArray(rel) ? rel.find((x) => !x.draft && !x.prerelease) || rel.find((x) => !x.draft) : null;
+      if (pick) { out.tag = pick.tag_name; out.date = pick.published_at || null; out.notes = plainNotes(pick.body) || null; }
+      if (readme) out.picture = readmePicture(readme, `https://raw.githubusercontent.com/${r.repo}/HEAD/`);
+    } else {
+      const enc = encodeURIComponent(r.repo);
+      const [repo, rel, readme] = await Promise.all([
+        getJson(`https://gitlab.com/api/v4/projects/${enc}`),
+        getJson(`https://gitlab.com/api/v4/projects/${enc}/releases?per_page=5`),
+        getText(`https://gitlab.com/${r.repo}/-/raw/HEAD/README.md`),
+      ]);
+      if (repo) { out.stars = repo.star_count ?? null; out.description = repo.description || null; }
+      const pick = Array.isArray(rel) ? rel.find((x) => !x.upcoming_release) : null;
+      if (pick) { out.tag = pick.tag_name; out.date = pick.released_at || null; out.notes = plainNotes(pick.description) || null; }
+      if (readme) out.picture = readmePicture(readme, `https://gitlab.com/${r.repo}/-/raw/HEAD/`);
+    }
+    // nothing answered (offline, rate limit): what was known before stays
+    if (out.stars == null && !out.tag && !out.picture && !out.description) return had || null;
+    detailsCache[id] = out; writeJson(F('recomp-details.json'), detailsCache);
+    return out;
+  }
   // ---- from a link (not in the catalogue): the same GitHub card as emulators; console and game said by the user
   function addLink({ repo, console: con, title, name, description }) {
     if (!/^(github|gitlab):[\w.-]+\/[\w.-]+$/.test(repo || '')) throw new Error('That isn’t a GitHub project link.');
@@ -555,7 +664,7 @@ function createRecomps(ctx) {
   }
   const record = (id) => installs[id] || null;
   const reload = () => { cat = null; installs = readJson(F('recomp-installs.json'), {}); };
-  return { catalogue, byId, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
+  return { catalogue, byId, details, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
 }
 
-module.exports = { CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };
+module.exports = { readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };

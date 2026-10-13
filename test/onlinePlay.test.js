@@ -94,3 +94,49 @@ test('Eden writes Qt’s \\default pairs; Ryujinx a number; Dolphin its ini; Aza
   assert.strictEqual(pre.info, true); assert.strictEqual(pre.ready, false); assert.match(pre.note, /SecureInfo_A/); assert.doesNotMatch(pre.note, /otp\.bin/);
   await assert.rejects(() => eng.set('azahar', 'pretendo', true), /Unknown/);
 });
+
+test('RPCN account made over RPCN’s own protocol, then saved for RPCS3; a damaged config.yml is repaired first', async () => {
+  const net = require('net'), R = require('../electron/rpcnClient');
+  const seen = [];
+  // a fake RPCN: version first, then a reply to whatever is asked (error 11 for a taken name)
+  const srv = net.createServer((sock) => {
+    const v = Buffer.alloc(4); v.writeUInt32LE(32);
+    const info = Buffer.alloc(15); info.writeUInt8(3, 0); info.writeUInt32LE(19, 3);
+    sock.write(Buffer.concat([info, v]));
+    sock.on('data', (b) => {
+      const cmd = b.readUInt16LE(1), id = b.readBigUInt64LE(7), body = b.subarray(15).toString('utf8').split('\0');
+      seen.push({ cmd, size: b.readUInt32LE(3), len: b.length, body });
+      const h = Buffer.alloc(15); h.writeUInt8(1, 0); h.writeUInt16LE(cmd, 1); h.writeUInt32LE(16, 3); h.writeBigUInt64LE(id, 7);
+      sock.write(Buffer.concat([h, Buffer.from([body[0] === 'taken' ? 11 : 0])]));
+    });
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  try {
+  const port = srv.address().port, connect = (o, cb) => net.connect({ host: '127.0.0.1', port: o.port }, cb);
+  assert.deepStrictEqual(R.hostOf('np.rpcs3.net'), { host: 'np.rpcs3.net', port: 31313 });
+  await assert.rejects(() => R.create({ host: `x:${port}`, npid: 'taken', hash: 'H', email: 'a@b.c', connect }), /taken/);
+
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-op-')), data = path.join(home, 'data'), dir = path.join(home, '.config/rpcs3');
+  fs.mkdirSync(dir, { recursive: true }); fs.mkdirSync(data);
+  fs.writeFileSync(path.join(dir, 'config.yml'), 'Video:\n  Resolution Scale: 150\n  Write Depth Buffer: falseResolution Scale: = 150\nNet:\n  Internet enabled: Disconnected\n');
+  fs.writeFileSync(path.join(dir, 'rpcn.yml'), `Version: 2\nHost: x:${port}\n`);
+  const eng = createOnline({ home, dataDir: data, installed: () => ['rpcs3'], running: () => false, log: () => {}, rpcnConnect: connect, pbkdf2: async () => 'ab'.repeat(32) });
+  const e = () => eng.list().emus.find((x) => x.emu === 'rpcs3');
+  assert.strictEqual(e().damaged.known, true);
+  assert.strictEqual(e().kinds[0].locked, true);
+  await assert.rejects(() => eng.set('rpcs3', 'rpcn', true), /Repair it first/);
+  await assert.rejects(() => eng.action('rpcs3', 'rpcn', 'create', { npid: 'Player_1', password: 'pw', email: 'a@b.c' }), /Repair it first/);
+  eng.repair('rpcs3');
+  assert.strictEqual(e().damaged, null);
+  await assert.rejects(() => eng.action('rpcs3', 'rpcn', 'create', { npid: 'no', password: 'pw', email: 'a@b.c' }), /3 to 16/);
+  const r = await eng.action('rpcs3', 'rpcn', 'create', { npid: 'Player_1', password: 'pw', email: 'a@b.c' });
+  assert.match(r.message, /token/);
+  const last = seen[seen.length - 1];
+  assert.strictEqual(last.cmd, 2); assert.strictEqual(last.size, last.len);
+  assert.deepStrictEqual(last.body.slice(0, 5), ['Player_1', 'AB'.repeat(32), 'Player_1', 'https://rpcs3.net/cdn/netplay/DefaultAvatar.png', 'a@b.c'], 'the derived hash is sent, never the password');
+  const y = fs.readFileSync(path.join(dir, 'rpcn.yml'), 'utf8');
+  assert.match(y, /NPID: Player_1/); assert.match(y, new RegExp(`Password: ${'AB'.repeat(32)}`)); assert.doesNotMatch(y, /pw\b/);
+  await eng.action('rpcs3', 'rpcn', 'resend');
+  assert.strictEqual(seen[seen.length - 1].cmd, 4);
+  } finally { srv.close(); }
+});
