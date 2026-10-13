@@ -635,7 +635,7 @@ async function more() {
   // 0.9.62 (owner: across the board): every installed game; the window says when its emulator has none of a game's own
   // Online Play (0.9.66): the online features of this console's emulators, on or off, opening Settings → Online Play
   const ops = await Promise.race([call('online:forConsole', { slugs }).catch(() => []), new Promise((r) => setTimeout(() => r([]), 1200))]);
-  for (const o of ops) play.push({ label: `Online Play: ${o.label}`, sub: o.kinds.map((k) => `${k.name} ${k.on ? 'on' : 'off'}`).join(' · '), value: 'online', icon: 'mdiWeb', raw: true });
+  for (const o of ops || []) play.push({ label: `Online Play: ${o.label}`, sub: o.kinds.map((k) => `${k.name} ${k.on ? 'on' : 'off'}`).join(' · '), value: 'online', icon: 'mdiWeb', raw: true });
   if (installedPath.value && !marked.value) play.push({ label: 'Game settings', sub: `${pe || (/\bpsx\b/i.test(slugs) ? 'DuckStation' : 'The emulator')}’s settings for this game only`, value: 'gamesettings', icon: 'mdiTune' });
   // patches and cheats are in Game Add-ons (0.9.24, owner: no separate row for them here)
   // 0.9.28 (owner: PS4 patches had gone from here): PS3 and PS4 too; Game Add-ons shows only the tabs the console has
