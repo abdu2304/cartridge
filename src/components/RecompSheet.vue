@@ -11,7 +11,14 @@
             <p class="muted small">{{ e.games.map((g) => g.title).join(', ') }}{{ e.license ? ' · ' + e.license : '' }}</p>
           </div>
         </div>
-        <p v-if="e.description" class="rcs-desc">{{ e.description }}</p>
+        <p v-if="e.description || det?.description" class="rcs-desc">{{ e.description || det.description }}</p>
+        <!-- 0.9.66 (agreed plan): the project's own page at a glance: its first README picture, stars, newest version, notes -->
+        <img v-if="det?.picture && !picBad" class="rcs-pic" :src="det.picture" alt="" @error="picBad = true" />
+        <div v-if="det && (det.stars != null || det.tag)" class="rcs-proj small muted">
+          <span v-if="det.stars != null"><Icon name="mdiStarOutline" :size="16" /> {{ det.stars.toLocaleString() }}</span>
+          <span v-if="det.tag"><Icon name="mdiTagOutline" :size="16" /> {{ det.tag }}{{ det.date ? ' · ' + new Date(det.date).toLocaleDateString() : '' }}</span>
+        </div>
+        <details v-if="det?.notes" class="rcs-notes small"><summary data-focus tabindex="0">Release Notes · {{ det.tag }}</summary><p>{{ det.notes }}</p></details>
         <div class="rcs-facts small">
           <div><b>Needs</b><span>{{ e.needs ? e.needs.what : 'Nothing more: it plays once it’s installed.' }}</span></div>
           <div v-if="e.needs"><b>Setup</b><span>{{ HOW[e.setup?.how] || HOW.picker }}</span></div>
@@ -54,7 +61,7 @@ import { pushLayer, focusFirst } from '../nav.js';
 import Icon from './Icon.vue';
 
 const props = defineProps({ id: String });
-const el = ref(null), e = ref(null), kept = ref([]), why = ref(''), checking = ref(false), consoles = ref({});
+const el = ref(null), e = ref(null), det = ref(null), picBad = ref(false), kept = ref([]), why = ref(''), checking = ref(false), consoles = ref({});
 const HOW = { place: 'Cartridge links your copy where it looks for it (nothing is copied).', path: 'Cartridge starts it with your copy.', picker: 'It asks for your copy itself the first time; Cartridge shows you the exact path to give it.', none: 'Nothing to set up.' };
 const short = (p) => String(p || '').replace(store.info?.home || '\0', '~');
 const job = computed(() => bgJob('recomp:' + props.id));
@@ -83,6 +90,7 @@ async function load() {
   e.value = l?.entries.find((x) => x.id === props.id) || null;
   if (e.value?.installed) kept.value = (await call('recomps:versions', { id: props.id }).catch(() => ({ kept: [] }))).kept;
   if (e.value && !e.value.installed && !e.value.latest && canGet.value) call('recomps:check', { id: props.id }).then(load).catch((er) => (why.value = er.message));
+  if (e.value?.repo && !det.value) call('recomps:details', { id: props.id }).then((d) => { det.value = d; }).catch(() => {});
 }
 let off = null, layer = null;
 onMounted(async () => {
@@ -97,7 +105,10 @@ async function install() {
   why.value = '';
   try {
     const r = await call('recomps:install', { id: props.id });
-    toast(r.already ? 'Already the newest' : r.updated ? `Updated to ${r.tag}${r.restored ? ', saves put back' : ''}` : `${e.value.name} is installed`, 'ok', 3000, 'mdiCheck');
+    // 0.9.66: the new release is started once; one that can't run here goes back to the one that worked
+    if (r.rolledBack) { why.value = `${r.newTag} couldn’t start here (${r.why}), so ${e.value.name} went back to ${r.tag}. Your saves are as they were.`; toast(`${r.newTag} couldn’t start, kept ${r.tag}`, 'error', 6000); }
+    else if (r.rollBackFailed) why.value = `${r.tag} couldn’t start here (${r.why}), and going back failed: ${r.rollBackFailed}. Use Roll Back.`;
+    else toast(r.already ? 'Already the newest' : r.updated ? `Updated to ${r.tag}${r.started ? ', started once to check' : ''}${r.restored ? ', saves put back' : ''}` : `${e.value.name} is installed`, 'ok', 3000, 'mdiCheck');
   } catch (er) { why.value = er.message; }
   load();
 }
@@ -171,6 +182,11 @@ function openPage() { window.open(e.value.url || e.value.site, '_blank'); }
 .rcs-title h2 { margin: 2px 0 4px; font-size: var(--t-xl); line-height: 1.15; overflow-wrap: anywhere; }
 .rcs-title p { margin: 0; overflow-wrap: anywhere; }
 .rcs-desc { margin: 0; overflow-wrap: anywhere; }
+.rcs-pic { display: block; max-width: 100%; max-height: 220px; object-fit: contain; border-radius: var(--r-md); align-self: flex-start; }
+.rcs-proj { display: flex; flex-wrap: wrap; gap: 4px var(--s-3); }
+.rcs-proj span { display: inline-flex; align-items: center; gap: 4px; }
+.rcs-notes summary { cursor: pointer; font-weight: 600; border-radius: var(--r-sm); padding: 4px 6px; margin-left: -6px; width: max-content; max-width: 100%; }
+.rcs-notes p { margin: 6px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .rcs-facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px var(--s-3); }
 .rcs-facts > div { display: contents; }
 .rcs-facts b { color: var(--muted); font-weight: 600; }

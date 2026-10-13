@@ -6,6 +6,11 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 13 Oct 2026 · 0.9.66 Loose Ends (owner: "do the 6 and push it as a next update")
+- The six things agreed but not done in 0.9.65: recomp project details, link guesses, start-once after a recomp update with automatic roll back, RPCN accounts made in Cartridge (RPCN's own protocol from RPCS3's source) and ShadNet sign-up in an in-app window, Online Play on the emulator sheet, RPCS3 Repair before Online Play writes. Handover Part 13.
+- Owner asked for a resume 5 hours after any credit stop (asleep): send_later set, cancelled after the merge.
+- Checked: npm test (343), build, launch, UI audit, screenshots in Plain and Glass. Not checked: real RPCN or ShadNet servers, a real recomp trial start in Game Mode.
+
 ## 13 Oct 2026 · 0.9.65 Recomps and Online Play (one update, owner: "build the rest of this update and the next one all in one go")
 - Recomp catalogue finished: 96 entries (Xbox 360 set included), Flatpak bundle recomps, achievement paths for Flatpak and ReXGlue profiles.
 - Online Play built (handover Part 12): engine, format writers, pure SHA3 for RPCN, adapters for PPSSPP, PCSX2, RetroArch, RPCS3, shadPS4, Ryujinx, Eden, Dolphin, Azahar and Cemu (the last two report only), Settings section, game page rows, re-check after emulator updates.

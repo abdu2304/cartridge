@@ -21,17 +21,18 @@ The repo is public. Nothing private is in this document. Keep it that way.
 
 ## Part 1. Where things stand right now
 
-- **Latest release:** v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (13 Oct 2026; Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). v0.9.63 "The Right Version" was PR #82. 0.9.64 is the PR after it.
+- **Latest release:** v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). v0.9.63 "The Right Version" was PR #82. 0.9.64 is the PR after it.
 - **Branch:** `claude/relaxed-fermat-30pigp`, merged into `main` by a PR for every release (merge commit, not squash). After a merge, reset the branch to `main` (`git fetch origin main && git checkout -B claude/relaxed-fermat-30pigp origin/main`) before new work.
-- **package.json:** `version` = `versionName` = 0.9.65, `releaseName` "Cartridge 0.9.65". The lockfile's version field is stale and always was; leave it.
-- **Tests:** 340 pass at 0.9.65 (`npm test`; recomps and onlinePlay added). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink; saveSync and gameSettings grew a lot.
+- **package.json:** `version` = `versionName` = 0.9.66, `releaseName` "Cartridge 0.9.66". The lockfile's version field is stale and always was; leave it.
+- **Tests:** 343 pass at 0.9.66 (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink; saveSync and gameSettings grew a lot.
 - **Before every release:** `npm test`, `npx vite build`, the launch check (`CARTRIDGE_SMOKE=1 HOME=$(mktemp -d) xvfb-run -a node_modules/electron/dist/electron . --no-sandbox` must print `SMOKE OK`), `npm run audit:ui` (focus and contrast in six looks, clipping, the tour twice; all zero at 0.9.63 and 0.9.64). Never rebuild `dist` while the audit runs: it reads `dist` and crashes mid-run.
 - **Standing instruction:** when an update is finished, built and launch-checked, open the PR and merge it without asking. A version change on `main` publishes the release to every user.
 
 **What comes next (agreed with the owner, in this order):**
 1. ~~0.9.65 · Recomps~~ and ~~0.9.66 · Online Play~~: both shipped together as 0.9.65 (Parts 11 and 12).
-2. Owner device tests for both (end of Parts 11 and 12), then whatever the owner picks next.
-3. Keep this handover updated after each.
+2. ~~The six things agreed but not done in 0.9.65~~: shipped as 0.9.66 (Part 13).
+3. Owner device tests (end of Parts 11, 12 and 13), then whatever the owner picks next.
+4. Keep this handover updated after each.
 
 **Waiting on the owner:** device tests listed in Part 9; KytyPS5 log after 0.9.63 if it still fails; the Unit 13 freeze test with frame generation off.
 
@@ -286,3 +287,52 @@ Wiimmfi has no setting in current Dolphin: games must be patched first, and Cart
 7. An emulator update, then Online Play still on.
 
 
+
+## Part 13. 0.9.66 · Loose Ends (13 Oct 2026)
+
+After 0.9.65 the owner asked whether anything agreed had not been done. Six things were found by checking the code against Part 7, and the owner said to build them as the next update: "Okay do the 6 and push it as a next update, update handover". The owner also asked for a check-in 5 hours after any stop (they were asleep), which was set with `send_later` and cancelled once the release merged.
+
+**What was done:**
+1. **Recomp project details (7.1 #12).**
+   - `recomps.details(id)` reads the project's API: stars and description.
+   - It also reads the newest release: tag, date, and notes made plain by `plainNotes`.
+   - It takes the README's first picture (`readmePicture`): relative paths are resolved, GitHub `blob` links become raw links, and badges are skipped.
+   - Results are cached for a day in `recomp-details.json`. When nothing answers, the old details stay.
+   - Shown on RecompSheet. Release notes are in a `<details>` that opens with A.
+2. **From a Link guesses (7.1 #16).**
+   - `guessFromText` looks for console words in the project's name, description and topics (`CON_WORDS`), limited to the catalogue's consoles.
+   - It then picks the longest library title, or the part after its colon, whose words all appear there.
+   - Recomps.vue asks `recomps:guess` 700 ms after a link is pasted. It fills only empty choices and says they were guessed.
+3. **Start once after an update (7.1 #13).**
+   - `install` calls `ctx.trialRun` for Linux updates; first installs and Flatpak/Windows builds are not tried.
+   - main spawns the program detached for 6 s, then kills its process group, with Game Mode's background/refocus around it.
+   - It fails only on these signs: `error while loading shared libraries`, exit 126/127, SIGSEGV/ABRT/ILL/BUS/FPE, or a non-zero exit when the recomp is already set up.
+   - A failure runs `useVersion(prev.tag)` and returns `rolledBack`. The Steam repoint only happens on `programMoved`, which a rolled-back result doesn't carry.
+   - It is skipped while a game runs.
+4. **Accounts in Cartridge (7.2).**
+   - **RPCN:** `electron/rpcnClient.js` speaks RPCN's own protocol, read from RPCS3's source (details in CLAUDE.md 0.9.66). The account is made, then saved to rpcn.yml (NPID, the derived Password hash, Version 2, Host), then the token is asked for.
+   - **ShadNet:** its client (shadPS4 src/shadnet) never creates accounts, so its sign-up page opens in Cartridge's own window (`online:browse`).
+5. **Online status on emulator pages (7.2).** The EmuGet manage sheet has an Online Play row with each feature's state, and opens the section.
+6. **RPCS3 Repair first (7.2).**
+   - The adapter's `precheck`/`repair` use the 0.9.63 `rpcs3ConfigCheck`/`rpcs3ConfigRepair`.
+   - A damaged file locks RPCN, shows Repair, makes `prep` refuse every write, and makes `recheck` report instead of writing.
+
+**Checked:**
+- `npm test`: 343 pass. This includes a fake RPCN server that checks the packet sizes and fields, that the hash (not the password) is sent and saved, and Repair before writes. It also covers start-once with a broken update rolled back, and the README picture, notes and link guess.
+- `npx vite build`, the launch check and `npm run audit:ui`.
+- Screenshots of Online Play (a damaged RPCS3) and a recomp page with details, in Plain and Glass.
+
+**Not verified (ask the owner):**
+- A real RPCN account creation against np.rpcs3.net (no network to it here). If RPCN's protocol version moves past 32, Cartridge says so and points to RPCS3.
+- shadps4.net's sign-up page in the window.
+- A real recomp update's trial start in Game Mode: a window appears for a few seconds.
+- GitHub's API rate limit (60 an hour without an account) can leave details empty for a while; they fill in on a later open.
+
+**Owner device tests:**
+1. Make an RPCN account in Cartridge, type the emailed token, turn RPCN on, play a PS3 game online.
+2. Make a ShadNet account from Cartridge.
+3. Open an emulator's sheet and check its Online Play row.
+4. Paste a recomp link (for example Zelda64Recomp) and check the guess.
+5. Open a recomp page and check the stars, picture and release notes.
+6. Update a recomp and watch it start once.
+7. If you have an EmuDeck RPCS3 with the old leftover text, Repair from Online Play.

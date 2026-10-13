@@ -91,6 +91,7 @@ const rpcs3 = {
     note: 'No account yet? Make one here: RPCN emails you a token to type in.',
     on: [[['main', ['Net', 'Internet enabled']], 'Connected'], [['main', ['Net', 'PSN status']], 'RPCN']],
     off: [[['main', ['Net', 'PSN status']], 'Disconnected']],
+    fieldsAlways: true, // the account comes first: made or signed in before RPCN is switched on
     fields: [
       { key: 'npid', label: 'Username', icon: 'mdiAccountOutline', required: true, at: ['rpcn', ['NPID']], check: npidCheck },
       // stored as RPCS3 stores it: PBKDF2-SHA3-256 of what you type, 200,000 rounds, upper-case hex (never the password)
@@ -147,6 +148,7 @@ const shadps4 = {
     on: (g) => [[['main', ['Network', 'connected_to_network']], true], [['main', ['Network', 'shad_net_enabled']], true], [['users', ['Users', 'user', shadUser(g), 'shadnet_enabled']], true]],
     off: [[['main', ['Network', 'shad_net_enabled']], false]],
     isOn: (g) => g(['main', ['Network', 'shad_net_enabled']]) === true && g(['main', ['Network', 'connected_to_network']]) === true,
+    fieldsAlways: true,
     fields: [
       { key: 'npid', label: 'Username', icon: 'mdiAccountOutline', required: true, read: (g) => g(['users', ['Users', 'user', shadUser(g), 'shadnet_npid']]) || '', write: ({ value, put, get, has }) => { if (!has('users')) throw new Error('Open shadPS4 once first, so it makes its user list.'); put(['users', ['Users', 'user', shadUser(get), 'shadnet_npid']], value); } },
       { key: 'password', label: 'Password', icon: 'mdiLockOutline', required: true, secret: true, read: (g) => (g(['users', ['Users', 'user', shadUser(g), 'shadnet_password']]) ? '•' : ''), write: ({ value, put, get, has }) => { if (!has('users')) throw new Error('Open shadPS4 once first, so it makes its user list.'); put(['users', ['Users', 'user', shadUser(get), 'shadnet_password']], value); } },

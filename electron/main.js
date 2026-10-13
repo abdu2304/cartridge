@@ -5066,6 +5066,20 @@ const handlers = {
   // the recomps of one library game (game page More, 0.9.65)
   'recomps:forRom': ({ romId }) => { const rom = romIndexMain().get(Number(romId)); if (!rom) return []; return recomps().list({ roms: [rom] }).entries.filter((e) => e.roms.includes(rom.id)).map((e) => ({ id: e.id, name: e.name, installed: e.installed })); },
   'recomps:check': ({ id, force }) => recomps().check(id, { force }),
+  // 0.9.66: the project's stars, newest version, release notes and first README picture (read once a day)
+  'recomps:details': ({ id, fresh }) => recomps().details(id, { fresh }),
+  // 0.9.66: what a link is for, guessed from its project's name and description against your library; you confirm
+  'recomps:guess': async ({ link }) => {
+    const C = require('./customEmu'), gh = C.repoOf(link);
+    const gl = !gh && /^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([\w.-]+)\/([\w.-]+)/i.exec(String(link || ''));
+    if (!gh && !gl) return null;
+    const repo = gh || `${gl[1]}/${gl[2].replace(/\.git$/i, '')}`;
+    const H = { headers: { 'User-Agent': 'Cartridge', Accept: 'application/json' }, signal: AbortSignal.timeout(12000) };
+    const j = await webFetch(gh ? `https://api.github.com/repos/${repo}` : `https://gitlab.com/api/v4/projects/${encodeURIComponent(repo)}`, H).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+    const R = require('./recomps');
+    const g = R.guessFromText(`${repo.split('/')[1]} ${j?.description || ''} ${(j?.topics || j?.tag_list || []).join(' ')}`, libraryRoms(), R.CONSOLES);
+    return { ...g, description: j?.description || '' };
+  },
   'recomps:install': async ({ id, channel }) => {
     if (recompRun) throw new Error(`${recomps().byId(recompRun.id)?.name || 'Another recomp'} is downloading. Wait for it to finish.`);
     const ac = new AbortController(); recompRun = { id, ac };
@@ -5148,12 +5162,12 @@ const handlers = {
   },
   'recomps:refresh': () => recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }),
   // from a link (not in the list): what it is first, then added with the console and game you say
-  'recomps:addLink': async ({ link, console: con, title }) => {
+  'recomps:addLink': async ({ link, console: con, title, description }) => {
     const C = require('./customEmu'), gh = C.repoOf(link);
     const gl = !gh && /^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([\w.-]+)\/([\w.-]+)/i.exec(String(link || ''));
     const repo = gh ? 'github:' + gh : gl ? `gitlab:${gl[1]}/${gl[2].replace(/\.git$/i, '')}` : null;
     if (!repo) throw new Error('That isn’t a GitHub or GitLab project link.');
-    const r = recomps().addLink({ repo, console: con, title, name: repo.split('/').pop() });
+    const r = recomps().addLink({ repo, console: con, title, name: repo.split('/').pop(), description: String(description || '').slice(0, 300) });
     return r;
   },
   'recomps:folders': () => ({ made: recomps().ensureFolders(), roots: emulationFolders().map((d) => path.join(d, 'recomp')) }),
@@ -6177,6 +6191,30 @@ function recomps() {
     appImageType: (f) => D.appImageType(f), isElf: (f) => D.isElf(f),
     isRunning: (f) => progRunning(f),
     trash: (p) => toTrash(p),
+    // 0.9.66: the new release of an update started once, for a few seconds, then closed. It fails only when it can't
+    // run at all here: missing libraries (127/126, "error while loading shared libraries"), a crash signal, or (once
+    // set up) a non-zero exit straight away. Never during a game.
+    trialRun: ({ program, args, cwd, ready }) => new Promise((resolve) => {
+      if (gameFocus.away || runOn) return resolve({ skipped: 'playing' });
+      const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+      const extra = (args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
+      let out = '', done = false, p;
+      const end = (r) => { if (done) return; done = true; clearTimeout(t); try { process.kill(-p.pid, 'SIGTERM'); } catch {} setTimeout(() => { try { process.kill(-p.pid, 'SIGKILL'); } catch {} }, 1500); if (isGamescope()) { broadcast('background', { away: false }); refocus(); } log('recomp trial', program, JSON.stringify(r)); resolve(r); };
+      try { p = require('child_process').spawn(program, extra, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return resolve({ failed: true, why: e.message }); }
+      if (isGamescope()) broadcast('background', { away: true });
+      const keep = (b) => { out = (out + b).slice(-4000); };
+      p.stdout.on('data', keep); p.stderr.on('data', keep);
+      p.once('error', (e) => end({ failed: true, why: e.code === 'EACCES' ? 'It isn’t allowed to run (its file isn’t executable).' : e.message }));
+      p.once('exit', (code, sig) => {
+        const lib = /error while loading shared libraries: ([^:\s]+)/.exec(out);
+        if (lib) return end({ failed: true, why: `It needs ${lib[1]}, which this system doesn’t have.` });
+        if (code === 126 || code === 127) return end({ failed: true, why: 'This system can’t run it.' });
+        if (/^SIG(SEGV|ABRT|ILL|BUS|FPE)$/.test(sig || '')) return end({ failed: true, why: `It crashed as it started (${sig}).` });
+        if (ready && code) return end({ failed: true, why: `It closed straight away (exit ${code}).` });
+        end({ ok: true, exited: code });
+      });
+      const t = setTimeout(() => end({ ok: true, ran: true }), 6000);
+    }),
     // a Flatpak bundle installed for this user (flatpak install --bundle); its app ID from the bundle's name
     flatpakBundle: (file) => new Promise((ok, bad) => {
       const appId = path.basename(file).replace(/\.flatpak$/i, '');
