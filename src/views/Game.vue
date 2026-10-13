@@ -157,7 +157,7 @@
 import { similarTo } from '../recs.js';
 import { addGame, removeGame, applyChanges, pickEmulator, pickCollections, pickFrameGen } from '../steam.js';
 import { computed, onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue';
-import { store, heroArt, call, img, go, cover, bytes, year, rating, toast, confirm, download, downloadFor, romById, platformById, isNew, setBg, logoOf, resetLogos, artFor, choose, openModal, allRoms, visible, isFavourite, addToCollection, playOf, playtimeText, ago, loadPlay, askText, saveConfig, backdropOf, wantSharp, bgJob, playGame, saveSyncOn } from '../store.js';
+import { store, heroArt, call, img, go, cover, bytes, year, rating, toast, confirm, download, downloadMore, downloadFor, romById, platformById, isNew, setBg, logoOf, resetLogos, artFor, choose, openModal, allRoms, visible, isFavourite, addToCollection, playOf, playtimeText, ago, loadPlay, askText, saveConfig, backdropOf, wantSharp, bgJob, playGame, saveSyncOn } from '../store.js';
 import { pinToStart } from '../startTiles.js';
 import { useView } from '../useView.js';
 import { ensureFocus, focusFirst } from '../nav.js';
@@ -633,6 +633,9 @@ async function more() {
   // PS3 game updates are a tab in Add-ons (0.9.29, owner: no second place for them)
   // 0.9.23 (owner: edit a game's emulator settings from Cartridge)
   // 0.9.62 (owner: across the board): every installed game; the window says when its emulator has none of a game's own
+  // Online Play (0.9.66): the online features of this console's emulators, on or off, opening Settings → Online Play
+  const ops = await Promise.race([call('online:forConsole', { slugs }).catch(() => []), new Promise((r) => setTimeout(() => r([]), 1200))]);
+  for (const o of ops || []) play.push({ label: `Online Play: ${o.label}`, sub: o.kinds.map((k) => `${k.name} ${k.on ? 'on' : 'off'}`).join(' · '), value: 'online', icon: 'mdiWeb', raw: true });
   if (installedPath.value && !marked.value) play.push({ label: 'Game settings', sub: `${pe || (/\bpsx\b/i.test(slugs) ? 'DuckStation' : 'The emulator')}’s settings for this game only`, value: 'gamesettings', icon: 'mdiTune' });
   // patches and cheats are in Game Add-ons (0.9.24, owner: no separate row for them here)
   // 0.9.28 (owner: PS4 patches had gone from here): PS3 and PS4 too; Game Add-ons shows only the tabs the console has
@@ -645,19 +648,30 @@ async function more() {
   if (saveSyncOn()) play.push({ label: 'Saves in RomM', sub: 'Cartridge Save Sync: sync now, or put an older version back', value: 'cloudsaves', icon: 'mdiCloudSyncOutline' }); // 0.9.51
   if (sv?.length) play.push({ label: 'Saves on This Device', sub: `${sv.length} ${sv.length === 1 ? 'save' : 'saves'} · ${sv.some((x) => x.synced) ? 'synced with Syncthing' : 'not synced'} · changed ${ago(Math.max(...sv.map((x) => x.at || 0)))}`, value: 'saves', icon: 'mdiContentSaveOutline' });
   if (installedPath.value) play.push({ label: 'Show file location', value: 'path', icon: 'mdiFolderOutline' });
+  const rcs = await Promise.race([call('recomps:forRom', { romId: Number(props.romId) }).catch(() => []), new Promise((r) => setTimeout(() => r([]), 1200))]);
   const top = [
     { label: fav.value ? 'Remove from favourites' : 'Add to favourites', sub: 'Saved in RomM', value: 'fav', icon: fav.value ? 'mdiHeartOff' : 'mdiHeartOutline' },
     { label: 'Play status', sub: statusText.value || 'None', value: 'status', icon: 'mdiProgressCheck' },
     { label: 'Add to a collection', sub: 'Yours in RomM, or a new one', value: 'col', icon: 'mdiBookmarkPlusOutline' },
     { label: 'Timeline', sub: 'Added, downloaded, played, trophies', value: 'timeline', icon: 'mdiTimelineClockOutline' },
     { label: 'Pin to Start', sub: 'A tile of its own on Start', value: 'pin', icon: 'mdiPinOutline' },
+    // 0.9.65: a native PC port of this game (a recomp), each its own sheet
+    ...rcs.map((r) => ({ label: `Recomp: ${r.name}`, sub: r.installed ? (r.installed.ready ? `Installed ${r.installed.tag}` : 'Installed, needs your game') : 'A native PC port of this game', value: 'recomp:' + r.id, icon: 'mdiRocketLaunchOutline', raw: true })),
     // 0.9.38 (owner): About belongs with the game, last, under Pin to Start (it was in Options)
     { label: 'About', sub: 'Console, ID, version, and what’s installed for it', value: 'about', icon: 'mdiInformationOutline' },
   ];
   if (detail.value?.path_manual) details.unshift({ label: 'Manual', sub: 'The game’s manual from RomM', value: 'manual', icon: 'mdiBookOpenPageVariantOutline' });
+  // Download More Files (0.9.65, owner): a game RomM keeps as several files side by side, some of them not here yet
+  let moreFiles = null;
+  const parts = base.value.files || [];
+  if (installedPath.value && !marked.value && parts.length > 1 && parts.length <= 60 && !parts.some((f) => f.nested)) {
+    const r = await call('dl:filesHere', { romId: props.romId, files: parts.map((f) => ({ file_name: f.file_name, size: f.size })) }).catch(() => null);
+    if (r?.folder && r.here.length < parts.length) moreFiles = { have: r.here, missing: parts.length - r.here.length, total: parts.length };
+  }
   // Options (0.9.16): hide, re-download and delete, out of the header
   const options = [
     { label: u?.hidden ? 'Unhide game' : 'Hide game', sub: u?.hidden ? 'Show it in lists again' : 'Keep it out of Home, Library and Search', value: 'hide', icon: u?.hidden ? 'mdiEyeOutline' : 'mdiEyeOffOutline' },
+    ...(moreFiles ? [{ label: 'Download More Files', sub: `${moreFiles.missing} of ${moreFiles.total} files aren’t on this device yet`, value: 'morefiles', icon: 'mdiFilePlusOutline' }] : []),
     ...(installedPath.value && !marked.value ? [
       { label: 'Re-download', sub: 'The copy on this device is replaced', value: 'redownload', icon: 'mdiRefresh' },
       { label: 'Delete from this device', sub: 'Stays on your RomM server', value: 'delete', icon: 'mdiDeleteOutline', danger: true },
@@ -689,6 +703,7 @@ async function more() {
   }
   if (v === 'steamapply') { await applyChanges(); return; }
   if (v === 'gameemu') { await pickGameEmu(); return; }
+  if (v === 'online') { store.settingsSection = 'online'; go('settings'); return; }
   if (v === 'gamesettings') { openModal('gamesettings', { romId: Number(props.romId), name: base.value.name }); return; }
   if (v === 'shadver') {
     const sv = await call('steam:shadVersions', { romId: Number(props.romId) }).catch(() => null);
@@ -721,7 +736,9 @@ async function more() {
   }
   if (v === 'pkg') { await installPkg(); return; }
   if (v === 'patches') { await openModal('gameaddons', { romId: Number(props.romId), name: base.value.name, tab: 'patches' }); return; }
+  if (typeof v === 'string' && v.startsWith('recomp:')) { await openModal('recomp', { id: v.slice(7) }); return; }
   if (v === 'redownload') { await redownload(); return; }
+  if (v === 'morefiles') { await downloadMore(base.value, moreFiles.have); return; }
   if (v === 'ps3check') {
     toast('Checking Sony’s update list…', 'info', 2500, 'mdiPackageUp');
     const up = await call('ps3up:game', { romId: Number(props.romId), fresh: true }).catch((e) => ({ error: e.message }));

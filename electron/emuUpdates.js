@@ -170,7 +170,7 @@ async function latestRelease(id, { fetchImpl, spec, file, channel } = {}) {
   if (!r) return null;
   // each source in turn (0.9.19): GitHub (its API, else its release pages when the API limit answers 403,
   // github.js) and the project's own Forgejo server; the first with a matching file wins
-  const gh = () => require('./github').release(r.repo, { tag: r.tag, pre: r.pre, fetchImpl });
+  const gh = () => require('./github').release(r.repo, { tag: r.tag, pre: r.pre, fetchImpl, want: r.tag ? null : (assets) => !!pickAsset(assets, r.asset, file) });
   const forges = (r.forge || []).map(([host, repo]) => () => forgeRelease(host, repo, fetchImpl, !!r.pre));
   const tries = r.first === 'forge' ? [...forges, gh] : [gh, ...forges];
   let lastErr = null;

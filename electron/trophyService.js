@@ -18,7 +18,7 @@ const isTrophyNote = (n) => n.data.cartridge === 'trophies' && (n.title === NOTE
 // installed or not, for good. Only names are added: a real name never becomes a code.
 const NAMES_TITLE = 'Cartridge trophy names';
 const NOTE_TAG = 'cartridge-trophies';
-const ORDER = ['rpcs3', 'shadps4', 'xenia', 'vita3k', 'kytyps5'];
+const ORDER = ['rpcs3', 'shadps4', 'xenia', 'vita3k', 'kytyps5', 'recomp'];
 
 module.exports = function createTrophyService(ctx) {
   const { USER_DATA, api, broadcast, log, loadJson } = ctx;
@@ -553,5 +553,7 @@ module.exports = function createTrophyService(ctx) {
     'trophies:sync': () => sync({ force: true }),
   };
   function stop() { clearInterval(pollT); clearTimeout(syncT); }
-  return { start, stop, handlers, iconPath: T.iconPath, refresh };
+  // installed recomps changed (0.9.65): their folders read again
+  const redetect = () => { detect(); return refresh(); };
+  return { start, stop, handlers, iconPath: T.iconPath, refresh, redetect };
 };

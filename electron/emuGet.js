@@ -24,7 +24,7 @@ const CATALOG = [
   { key: 'ps2', name: 'PlayStation 2', emus: [GH('pcsx2', 'pcsx2-Qt.AppImage', { fp: 'net.pcsx2.PCSX2' })] },
   { key: 'ps3', name: 'PlayStation 3', emus: [GH('rpcs3', 'rpcs3.AppImage', { fp: 'net.rpcs3.RPCS3' })] },
   { key: 'ps4', name: 'PlayStation 4', emus: [GH('shadps4', 'Shadps4-qt.AppImage')] },
-  { key: 'ps5', name: 'PlayStation 5', emus: [GH('sharpemu', 'SharpEmu'), GH('kytyps5', 'KytyPS5')] },
+  { key: 'ps5', name: 'PlayStation 5', emus: [GH('sharpemu', 'SharpEmu'), GH('kytyps5', 'KytyPS5', { gate: true })] },
   { key: 'psp', name: 'PSP', emus: [FP('ppsspp', 'org.ppsspp.PPSSPP')] },
   { key: 'psvita', name: 'PS Vita', emus: [GH('vita3k', 'Vita3K.AppImage')] },
   { key: 'gc', name: 'GameCube and Wii', emus: [FP('dolphin', 'org.DolphinEmu.dolphin-emu'), FP('primehack', 'io.github.shiiion.primehack')] },

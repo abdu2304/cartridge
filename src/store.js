@@ -214,7 +214,7 @@ export const romById = (id) => (store.libVersion, romIndex.get(Number(id)));
 export const platformById = (id) => (store.libVersion, store.lib?.platforms.find((p) => p.id === Number(id)));
 // A console's name as your RomM server has it now (renamed consoles show their new name everywhere,
 // 0.9.3 L): from the game's console when the game is in the library, else by slug, else the fallback
-const SRC_SLUG = { rpcs3: ['ps3'], shadps4: ['ps4'], xenia: ['xbox360'], vita3k: ['psvita', 'vita'], kytyps5: ['ps5'] };
+const SRC_SLUG = { rpcs3: ['ps3'], shadps4: ['ps4'], xenia: ['xbox360'], vita3k: ['psvita', 'vita'], kytyps5: ['ps5'], recomp: [] };
 export function consoleName({ romId, slug, src, fallback = '' } = {}) {
   const r = romId ? romById(romId) : null;
   const p = r ? platformById(r.platform_id) : null;
@@ -365,6 +365,21 @@ export async function download(rom, { checkSpace = true, pick = true } = {}) {
   if (checkSpace && p?.target?.path && size && !(await roomFor({ ...rom, fs_size_bytes: size }, p, root))) return false;
   await call('dl:add', { romId: rom.id, name: rom.name, platformSlug: rom.platform_slug, platformName: rom.platform_display_name, size, cover: rom.path_cover_small || rom.url_cover, root, only });
   toast(`Downloading ${rom.name}`, 'info', 2000, 'mdiDownload');
+  return true;
+}
+
+// Download More Files (0.9.65): the files of a game not on this device yet, into the folder it already has.
+// Files already here are shown ticked and greyed, nothing else starts ticked.
+export async function downloadMore(rom, have) {
+  const parts = rom.files || [];
+  const only = await openModal('filepick', { name: rom.name, files: parts, have });
+  if (!only || !only.length) return false;
+  const size = parts.filter((f) => only.includes(f.file_name)).reduce((a, f) => a + (f.size || 0), 0);
+  const p = platformById(rom.platform_id);
+  if (p?.target?.path && size && !(await roomFor({ ...rom, fs_size_bytes: size }, p, null))) return false;
+  try { await call('dl:add', { romId: rom.id, name: rom.name, platformSlug: rom.platform_slug, platformName: rom.platform_display_name, size, cover: rom.path_cover_small || rom.url_cover, only, more: true }); }
+  catch (e) { toast(e.message, 'error'); return false; }
+  toast(`Downloading ${only.length === 1 ? only[0] : only.length + ' more files'}`, 'info', 2000, 'mdiDownload');
   return true;
 }
 

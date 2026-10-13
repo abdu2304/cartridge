@@ -85,6 +85,10 @@ async function pages(width, height) {
   await p.click('[data-tab="consoles"]').catch(() => {}); await p.waitForTimeout(500);
   await p.evaluate(() => { window.__cartStore?.openModal?.('keyboard', { title: 'Search games', value: 'Ratchet & Clank: Size Matters', mode: 'game' }); }).catch(() => {}); await scan('keyboard with suggestions');
   await p.keyboard.press('Escape').catch(() => {});
+  // 0.9.65: the Steam card's Recomps page and one recomp's sheet
+  await p.click('[data-key="sys-steam"]').catch(() => {}); await scan('recomps page');
+  await p.evaluate(() => { window.__cartStore?.openModal?.('recomp', { id: 'zelda64recomp' }); }).catch(() => {}); await scan('pop-up recomp'); await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {});
+  await p.click('[data-tab="consoles"]').catch(() => {}); await p.waitForTimeout(400);
   for (const [type, props] of [['savelocations', {}], ['folderview', { path: '/home/u/.config/PCSX2/memcards' }]]) { await p.evaluate(([t, pr]) => { window.__cartStore?.openModal?.(t, pr); }, [type, props]).catch(() => {}); await scan('pop-up ' + type); await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {}); }
   await browser.close();
   return { bad: [...bad], errors };

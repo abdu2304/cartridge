@@ -43,7 +43,7 @@ const LABEL = { eden: 'Eden', citron: 'Citron', yuzu: 'yuzu', sudachi: 'Sudachi'
 const FAMILY = { eden: 'switch', citron: 'switch', yuzu: 'switch', sudachi: 'switch', suyu: 'switch', torzu: 'switch', switch: 'switch', rpcs3: 'ps3', ps3: 'ps3', ppsspp: 'psp', psp: 'psp', vita3k: 'vita', vita: 'vita', shadps4: 'ps4', ps4: 'ps4', pcsx2: 'ps2', ps2: 'ps2', duckstation: 'ps1', ps1: 'ps1', dolphin: 'gc', gc: 'gc', cemu: 'wiiu', wiiu: 'wiiu', azahar: '3ds', '3ds': '3ds', xenia: 'x360', x360: 'x360', retroarch: 'retroarch' };
 const familyOf = (x) => FAMILY[x] || x;
 const MEMBERS = (fam) => SUPPORTED.filter((e) => familyOf(e) === fam);
-const FAMILY_LABEL = { switch: 'Switch', ps3: 'RPCS3', psp: 'PPSSPP', vita: 'Vita3K', ps4: 'shadPS4', ps2: 'PCSX2', ps1: 'DuckStation', gc: 'Dolphin', wiiu: 'Cemu', '3ds': 'Azahar', x360: 'Xenia', retroarch: 'RetroArch' };
+const FAMILY_LABEL = { recomp: 'Recomp', switch: 'Switch', ps3: 'RPCS3', psp: 'PPSSPP', vita: 'Vita3K', ps4: 'shadPS4', ps2: 'PCSX2', ps1: 'DuckStation', gc: 'Dolphin', wiiu: 'Cemu', '3ds': 'Azahar', x360: 'Xenia', retroarch: 'RetroArch' };
 const labelOf = (x) => LABEL[x] || FAMILY_LABEL[x] || x;
 // The RomM consoles each family's saves belong to (0.9.60, owner: "you have not accounted for games that are on multiple
 // platforms"). A game can be in the library on several consoles under one name (Ratchet & Clank: Size Matters on PSP
@@ -344,6 +344,13 @@ const RUN_MARK = { eden: SW_RUN, citron: SW_RUN, yuzu: SW_RUN, sudachi: SW_RUN, 
 // program inside the AppImage's mount, a distro package), or when it's flatpak/bwrap running the emulator's app ID.
 // procs (tests): command lines as strings (split at spaces) or arrays of arguments.
 const WRAPPERS = /^(flatpak|bwrap|flatpak-spawn|wine|wine64|wine-preloader|wine64-preloader|proton)$/i; // what runs an emulator for it (Flatpaks, Windows builds through Proton)
+// a recomp's program running (0.9.65): its file as argv[0], or named in a wrapper's arguments (Proton, Steam's reaper)
+function progRuns(prog, procs = null) {
+  if (!prog) return false;
+  const want = path.basename(prog);
+  const list = procs ? procs.map((c) => (Array.isArray(c) ? c : String(c).split(' '))) : (() => { const o = []; for (const d of ls('/proc')) if (/^\d+$/.test(d.name)) { try { o.push(fs.readFileSync(`/proc/${d.name}/cmdline`, 'utf8').split('\0').filter(Boolean)); } catch {} } return o; })();
+  return list.some((argv) => argv.some((a, i) => (i === 0 || !a.startsWith('-')) && (a === prog || path.basename(a.replace(/\\/g, '/')) === want)));
+}
 function running(emu, procs = null) {
   const re = RUN_MARK[emu]; if (!re) return false;
   const list = procs ? procs.map((c) => (Array.isArray(c) ? c : String(c).split(' '))) : (() => { const o = []; for (const d of ls('/proc')) if (/^\d+$/.test(d.name)) { try { o.push(fs.readFileSync(`/proc/${d.name}/cmdline`, 'utf8').split('\0').filter(Boolean)); } catch {} } return o; })();
@@ -394,7 +401,7 @@ async function syncUnit(u, rpc, ledger, opts = {}) {
   }
   if (what === 'same') { ledger.set(u.key, { hash: local, remoteId: remote.id, remoteHash: remote.hash, at: Date.now() }); return { key: u.key, result: 'same' }; }
   if (what === 'conflict') return { key: u.key, result: 'conflict', local, remote };
-  if ((what === 'down' || what === 'up') && running(u.emu, opts.procs)) return { key: u.key, result: 'busy' };
+  if ((what === 'down' || what === 'up') && (running(u.emu, opts.procs) || progRuns(u.prog, opts.procs))) return { key: u.key, result: 'busy' };
   if (what === 'up') {
     if (opts.refused?.(u.key, local)) return { key: u.key, result: 'toolarge', error: opts.refused(u.key, local), skipped: true }; // the same save was refused for its size: not again until it changes or you press Sync Now
     const ents = entriesOf(u), buf = zip(ents);
@@ -421,7 +428,7 @@ async function syncUnit(u, rpc, ledger, opts = {}) {
 // an older version from RomM, put back: downloaded and checked like any other, then uploaded as the newest, so every
 // device gets it next (owner: guard rails; the save it replaces is backed up first)
 async function restore(u, save, rpc, ledger, opts = {}) {
-  if (running(u.emu, opts.procs)) return { key: u.key, result: 'busy' };
+  if (running(u.emu, opts.procs) || progRuns(u.prog, opts.procs)) return { key: u.key, result: 'busy' };
   const target = u.path || placeFor(u.emu, u.key, opts);
   if (!target) return { key: u.key, result: 'unplaced', why: hasEmu(u.emu, opts) ? 'nofolder' : 'noemu' };
   const files = unzip(await rpc.download(save.id));
@@ -519,4 +526,4 @@ function remoteOnly(remotes, localKeys, opts = {}) {
   return [...out.values()];
 }
 
-module.exports = { FAMILY_SLUGS, fitsConsole, fitsRom, moveInto, FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashUnitAsync, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };
+module.exports = { progRuns, FAMILY_SLUGS, fitsConsole, fitsRom, moveInto, FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashUnitAsync, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };

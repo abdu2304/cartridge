@@ -1020,10 +1020,11 @@ module.exports = function createSteamManager(ctx) {
     return live.frontRunning(appid);
   }
   function queueInfo() { return { add: queue.add.length, remove: queue.remove.length, total: queue.add.length + queue.remove.length }; }
-  function queueAdd(items) { // [{ romId, collections? }]
+  function queueAdd(items) { // [{ romId, collections? }] or [{ recomp: {...} }] (0.9.65)
+    const keyOf = (x) => (x.recomp ? 'r:' + x.recomp.id : x.romId);
     for (const it of items) {
-      queue.remove = queue.remove.filter((a) => reg[a]?.romId !== it.romId);
-      const i = queue.add.findIndex((a) => a.romId === it.romId);
+      queue.remove = queue.remove.filter((a) => (it.recomp ? reg[a]?.recomp !== it.recomp.id : !reg[a]?.recomp && reg[a]?.romId !== it.romId));
+      const i = queue.add.findIndex((a) => keyOf(a) === keyOf(it));
       if (i >= 0) queue.add[i] = it; else queue.add.push(it);
     }
     saveQueue();
@@ -1047,6 +1048,19 @@ module.exports = function createSteamManager(ctx) {
     const nameCount = {};
     for (const a of queue.add) { const g = byRom.get(a.romId); if (g) nameCount[g.rom.name.toLowerCase()] = (nameCount[g.rom.name.toLowerCase()] || 0) + 1; }
     for (const a of queue.add) {
+      // a recomp (0.9.65): its own program, never an emulator; its own shortcut beside the emulated game's, only in
+      // the Recomps collection (owner: "two shortcuts, kept separate")
+      if (a.recomp) {
+        const r = a.recomp;
+        if (!exists(r.exe)) { skipped.push({ name: r.name, why: 'The recomp isn’t installed any more.' }); continue; }
+        const win = /\.exe$/i.test(r.exe);
+        let target = q(r.exe), launch = r.args || '';
+        if (FLATPAK_STEAM && !win) ({ target, launch } = hostLaunch(r.exe, launch, r.start));
+        const appid = shortcutId(target, r.name);
+        entries.push({ recomp: r.id, romId: null, artRomId: r.artRomId || null, game: r.game || r.name, console: 'recomp', sig: ['recomp', r.exe, launch].join('|'), name: r.name, exe: r.exe, target, start: r.start || path.dirname(r.exe), lo: launch, directLo: launch, directExe: r.exe, directStart: r.start, appid, how: 'recomp', from: r.name, fallback: null, emu: null,
+          proton: win ? (cfg().proton || steamDefaultProton(env.account) || 'proton_experimental') : null, collections: ['Recomps'] });
+        continue;
+      }
       const g = byRom.get(a.romId);
       if (!g) { skipped.push({ romId: a.romId, why: 'not on this device any more' }); continue; }
       if (!g.file) { skipped.push({ romId: a.romId, name: g.rom.name, why: 'Cartridge does not know where this game\'s folder is. Open the game and use Add to Steam to pick it.' }); continue; }
@@ -1103,13 +1117,14 @@ module.exports = function createSteamManager(ctx) {
   // or one of SteamGridDB's styles (alternate, blurred, no_logo, material)
   async function writeArt(e, grid, style) {
     fs.mkdirSync(grid, { recursive: true });
-    const rom = ctx.romById(e.romId);
+    // a recomp (0.9.65): the game's own art when it's in the library, else SteamGridDB by the game's name
+    const rom = ctx.romById(e.romId ?? e.artRomId) || (e.recomp ? { name: e.game || e.name } : null);
     const out = {};
     const put = async (name, getter) => {
       const f = path.join(grid, name);
       try { const buf = await getter(); if (buf) { fs.writeFileSync(f, buf); out[name] = true; } } catch (err) { log('steam art', name, err.message); }
     };
-    const art = ctx.artFor(e.romId) || {};
+    const art = (e.romId ?? e.artRomId) != null ? ctx.artFor(e.romId ?? e.artRomId) || {} : {};
     const sg = style ? (style === 'top' ? undefined : style) : undefined;
     const cover = art.grid || rom?.path_cover_large || rom?.path_cover_small || rom?.url_cover;
     const hero = art.hero || rom?.shot || null;
@@ -1142,7 +1157,7 @@ module.exports = function createSteamManager(ctx) {
     if (!env.account) throw new Error('Steam was not found on this device.');
     if (style && !ctx.getConfig().sgdbKey) throw new Error('Add a SteamGridDB API key in Settings → Look & feel first.');
     const have = new Set(shortcutsOf(env.account).map((x) => x.appid >>> 0));
-    const ours = Object.entries(reg).filter(([id, r]) => r.romId && (have.has(Number(id) >>> 0) || r.live));
+    const ours = Object.entries(reg).filter(([id, r]) => (r.romId || r.recomp) && (have.has(Number(id) >>> 0) || r.live));
     if (!ours.length) return { count: 0 };
     const grid = files(env.account).grid;
     const liveOn = await live.available(env.account.root).catch(() => false);
@@ -1150,7 +1165,7 @@ module.exports = function createSteamManager(ctx) {
     for (const [id, r] of ours) {
       const appid = Number(id) >>> 0;
       ctx.broadcast('steam-progress', { step: 'art', done: n, total: ours.length, name: r.name });
-      await writeArt({ appid, romId: r.romId }, grid, style);
+      await writeArt({ appid, romId: r.romId, recomp: r.recomp, artRomId: r.artRomId, game: r.game, name: r.name }, grid, style);
       if (liveOn) await live.setArtwork(appid, { dir: grid, id: appid }).catch((e) => log('steam live art refresh', e.message));
       n++;
     }
@@ -1182,7 +1197,9 @@ module.exports = function createSteamManager(ctx) {
     const removeIds = p.removing.map((r) => r.appid >>> 0);
     for (const id of removeIds) if (reg[id]) for (const n of [`${id}p.png`, `${id}.png`, `${id}_hero.png`, `${id}_logo.png`, `${id}_icon.png`]) { try { fs.rmSync(path.join(f.grid, n), { force: true }); } catch {} }
     // our registry first, so the launch script knows the games before Steam starts them
-    for (const e of p.entries) reg[e.appid] = { romId: e.romId, name: e.name, console: e.console, exe: e.exe, emu: e.emu, emuExe: e.directExe, sig: e.sig, mode: (cfg().modes || {})[e.console] || 'direct', at: Date.now(), account: p.account.id, collections: e.collections };
+    for (const e of p.entries) reg[e.appid] = e.recomp
+      ? { romId: null, recomp: e.recomp, artRomId: e.artRomId, game: e.game, name: e.name, console: 'recomp', exe: e.exe, sig: e.sig, mode: 'direct', at: Date.now(), account: p.account.id, collections: e.collections }
+      : { romId: e.romId, name: e.name, console: e.console, exe: e.exe, emu: e.emu, emuExe: e.directExe, sig: e.sig, mode: (cfg().modes || {})[e.console] || 'direct', at: Date.now(), account: p.account.id, collections: e.collections };
     for (const id of removeIds) { if (reg[id]) gone[id] = reg[id]; delete reg[id]; }
     saveReg();
     writeScript();
@@ -1541,6 +1558,11 @@ module.exports = function createSteamManager(ctx) {
       const r = reg[sc.appid];
       let l = null; try { l = learnOne(sc); } catch {}
       if (!r && !l) continue; // not a game shortcut Cartridge understands (Steam games, other apps)
+      // a recomp's shortcut (0.9.65): only whether its program is still there
+      if (r?.recomp) {
+        if (!exists(sc.exe)) problems.push({ appid: sc.appid, name: sc.name, ours: true, console: 'recomp', exe: shortPath(sc.exe), issues: [{ kind: 'game', text: `The recomp isn’t at ${shortPath(sc.exe)} any more.`, fix: { label: 'Remove from Steam' } }] });
+        continue;
+      }
       const key = r?.console || l?.console;
       const p = { appid: sc.appid, name: sc.name, ours: !!r, console: key, exe: shortPath(sc.exe), issues: [] };
       const fpId = sc.exe === '/usr/bin/flatpak' || /(^|\/)flatpak$/.test(sc.exe) ? (tokenize(sc.lo + ' ' + (sc.exeRaw || '')).map((t) => t.val).join(' ').match(/run\s+(?:--\S+\s+)*(\S+)/) || [])[1] : null;
@@ -1794,7 +1816,33 @@ module.exports = function createSteamManager(ctx) {
   }
 
   writeScript();
+  // recomps (0.9.65): the shortcut Cartridge made for one (its appid as Steam has it now, live adds included), and
+  // starting any shortcut by appid (a Windows recomp's setup runs through Proton, so through Steam)
+  function recompShortcut(id) {
+    const env = environment(), have = env.account ? new Set(shortcutsOf(env.account).map((x) => x.appid >>> 0)) : new Set();
+    const hit = Object.entries(reg).find(([a, r]) => r.recomp === id && (have.has(Number(a) >>> 0) || r.live));
+    return hit ? { appid: Number(hit[0]) >>> 0, name: hit[1].name, exe: hit[1].exe } : null;
+  }
+  async function runAppid(appid) {
+    const gameId = ((BigInt(appid >>> 0) << 32n) | 0x02000000n).toString(), env = environment();
+    if (env.account && (await live.available(env.account.root).catch(() => false))) { try { await live.runGame(gameId); return { via: 'steam' }; } catch (e) { log('live run failed', e.message); } }
+    const e2 = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE']) delete e2[k];
+    const url = `steam://rungameid/${gameId}`;
+    const tryRun = (cmd, args) => new Promise((ok) => { try { const pr = spawn(cmd, args, { detached: true, stdio: 'ignore', env: e2 }); pr.on('error', () => ok(false)); pr.on('spawn', () => { pr.unref(); ok(true); }); } catch { ok(false); } });
+    for (const [c, a] of [['xdg-open', [url]], ['steam', [url]], ['flatpak', ['run', 'com.valvesoftware.Steam', url]]]) if (await tryRun(c, a)) return { via: 'url' };
+    throw new Error('Steam couldn’t be asked to start it.');
+  }
+  // a recomp's shortcut moved in place (an update put its program somewhere new): same appid, so play time stays
+  async function recompRepoint(id, { exe, start, lo }) {
+    const sc = recompShortcut(id);
+    if (!sc) return false;
+    const env = environment();
+    if (env.account && (await live.available(env.account.root).catch(() => false))) { await live.updateShortcut(sc.appid, { exe: q(exe), start: q(start), lo: lo || '' }); reg[sc.appid].exe = exe; saveReg(); return true; }
+    return false;
+  }
+  const liveNow = async () => { const env = environment(); return !!(env.account && (await live.available(env.account.root).catch(() => false))); };
   const api = {
+    recompShortcut, runAppid, recompRepoint, liveNow, applySoon,
     overview, preview, apply, undo, restartSteam, removeAllOurs, queueAdd, queueRemove, queueClear, queueInfo, test, setTemplate, setMode, verifyCollections,
     collections: () => { const env = environment(); return env.account ? readCollections(env.account) : []; },
     // live changes: is Steam's interface reachable, and turning on its local debugging port
