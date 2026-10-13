@@ -227,6 +227,8 @@ const PATH_IDS = new Set(['pcsx2', 'duckstation', 'dolphin', 'eden', 'citron', '
 async function manage(u) {
   if (!u) return;
   const ch = u.channels || [];
+  // 0.9.66: its online features at a glance (Online Play), when it has any; a slow answer is skipped, not waited on
+  const ol = !u.fork ? await Promise.race([call('online:list').then((r) => r?.emus?.find((x) => x.emu === String(u.id).split('@')[0]) || null).catch(() => null), new Promise((r) => setTimeout(() => r(null), 1200))]) : null;
   const opts = [
     // 0.9.25 (owner): start the emulator itself, for its own settings
     ...(u.kind !== 'windows' && !u.broken ? [{ label: 'Open', sub: `Start ${u.label} on its own, for its own settings`, value: 'open', icon: 'mdiOpenInApp' }] : []),
@@ -234,6 +236,7 @@ async function manage(u) {
     ...(u.kind === 'flatpak' || u.latest ? [{ label: 'Download Again', sub: u.kind === 'flatpak' ? 'Reinstall from Flathub' : `The newest ${CH[u.channel] ? CH[u.channel].toLowerCase().replace(/s$/, '') : 'build'}`, value: 'again', icon: 'mdiDownload' }] : []),
     ...(ch.length > 1 ? ch.map((c) => ({ heading: c === ch[0] ? 'Updates Follow' : undefined, label: CH[c], sub: c === 'pre' ? 'Nightlies and test builds' : 'Releases the project calls finished', value: 'ch:' + c, icon: c === 'pre' ? 'mdiFlask' : 'mdiCheckDecagram', selected: u.channel === c })) : []),
     // the emulator's own folders: games, installed content, saves, textures (0.9.24)
+    ...(ol ? [{ label: 'Online Play', sub: ol.damaged ? 'Its settings file needs a repair first' : ol.kinds.map((k) => (k.info ? `${k.name}${k.ready === false ? ': not set up' : ''}` : `${k.name} ${k.on ? 'on' : 'off'}`)).join(' · '), value: 'online', icon: 'mdiWeb' }] : []),
     ...(PATH_IDS.has(u.id) ? [{ label: 'Folders', sub: 'Where it keeps games, installed content and saves', value: 'folders', icon: 'mdiFolderCogOutline' }] : []),
     // 0.9.33 (owner): a fork plays with the saves of the emulator it comes from, through Linked Folders
     ...(u.forkOf ? [{ label: 'Share Saves With the Original', sub: 'Link its save folder in Linked Folders', value: 'links', icon: 'mdiLinkVariant' }] : []),
@@ -257,6 +260,7 @@ async function manage(u) {
   if (v === 'fversions') return forkVersions(u);
   if (v === 'adopt') return adopt(u);
   if (v === 'links') { store.emuPageWant = 'links'; return; }
+  if (v === 'online') { store.settingsWant = 'online'; return; }
   if (v === 'folders') return openModal('emupaths', { id: u.id, name: u.label });
   if (v === 'page') return window.open(u.page);
   if (v === 'site') return window.open(u.site);

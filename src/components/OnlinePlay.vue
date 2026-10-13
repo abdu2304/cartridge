@@ -11,6 +11,10 @@
       <div v-if="!data.emus.length" class="muted small op-empty">None of the emulators that play online are on this device yet. Get them in Emulators.</div>
       <section v-for="e in data.emus" :key="e.emu" class="op-emu">
         <div class="con-head"><EmuIcon :id="e.emu" :size="30" fallback="mdiGamepadVariantOutline" /><b>{{ e.label }}</b><span v-if="e.version" class="muted small">{{ e.version }}</span><span v-if="e.running" class="status warn">Open now: close it to change these</span></div>
+        <div v-if="e.damaged" class="op-damaged">
+          <p class="op-issue small"><Icon name="mdiAlertOutline" :size="18" /><span>{{ e.damaged.known ? `${e.label}’s settings file is damaged: line ${e.damaged.line} has text an older EmuDeck left behind, so ${e.label} can’t load it. Repair removes only that text, after a backup.` : `${e.label} can’t read line ${e.damaged.line} of its settings file (“${e.damaged.text}”). Fix it in a text editor, or rename the file so ${e.label} makes a new one.` }}</span></p>
+          <button v-if="e.damaged.known" class="lrow" data-focus :disabled="busy || e.running" @click="repair(e)"><Icon name="mdiWrenchOutline" :size="22" /><span class="l-mid"><b>Repair {{ e.label }}’s Settings</b><span class="l-sub">Then its online settings can be changed</span></span></button>
+        </div>
         <div v-for="k in e.kinds" :key="k.id" class="op-kind">
           <div v-if="k.info" class="op-info"><b>{{ k.name }}</b><span v-if="k.ready !== null" class="status" :class="k.ready ? 'ok' : 'warn'">{{ k.ready ? 'Ready' : 'Not Set Up' }}</span><p class="muted small">{{ k.what }}</p></div>
           <Toggle v-else :model-value="k.on" :label="k.name" :desc="k.what" :disabled="busy || e.running || k.locked" @update:model-value="(v) => turn(e, k, v)" />
@@ -65,8 +69,24 @@ async function edit(e, k, f, quiet = false) {
 }
 async function act(e, k, a) {
   if (a.confirm && !(await confirm(a.label, a.confirm, a.label))) return;
-  if (a.url) { window.open(a.url, '_blank'); return; }
-  await run(() => call('online:action', { emu: e.emu, kind: k.id, action: a.id }), (r) => r?.message || 'Done');
+  // a page (a sign-up or a guide) opens in Cartridge's own window; after a sign-up, the new account is asked for
+  if (a.url) {
+    await call('online:browse', { url: a.url, name: a.label }).catch((er) => toast(er.message, 'error'));
+    if (a.then === 'signin') for (const f of k.fields.filter((x) => x.required)) { if (!(await edit(e, k, f, true))) return; }
+    load(); return;
+  }
+  const input = {};
+  for (const q of a.asks || []) {
+    const v = await askText({ title: q.label, placeholder: q.help || '', value: '', password: !!q.secret });
+    if (typeof v !== 'string' || !v.trim()) return;
+    input[q.key] = q.secret ? v : v.trim();
+  }
+  if (a.asks?.length && !(await confirm(a.label, Object.entries(input).filter(([key]) => !(a.asks.find((q) => q.key === key) || {}).secret).map(([key, v]) => `${a.asks.find((q) => q.key === key).label.replace(/^(Pick a|Your) /, '')}: ${v}`).join('\n'), a.label))) return;
+  const r = await run(() => call('online:action', { emu: e.emu, kind: k.id, action: a.id, input }), (x) => x?.message || 'Done');
+  if (r && a.then === 'token') { const f = k.fields.find((x) => x.key === 'token'); if (f) await edit(e, k, f); }
+}
+async function repair(e) {
+  await run(() => call('online:repair', { emu: e.emu }), (r) => (r?.already ? 'It reads fine already' : `Repaired. ${e.label} can load its settings again.`));
 }
 </script>
 
@@ -82,5 +102,7 @@ async function act(e, k, a) {
 .op-issue { display: flex; gap: 8px; align-items: flex-start; color: var(--gold, #ffd978); overflow-wrap: anywhere; }
 .op-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--s-2); }
 .op-info p { flex: 1 1 100%; margin: 0; overflow-wrap: anywhere; }
+.op-damaged { display: flex; flex-direction: column; gap: 4px; }
+.op-damaged .op-issue { margin: 0; }
 .op-empty { padding: var(--s-3) 0; }
 </style>

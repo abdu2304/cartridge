@@ -5959,7 +5959,20 @@ Object.assign(handlers, {
   },
   'online:set': ({ emu, kind, on }) => online().set(emu, kind, !!on),
   'online:field': ({ emu, kind, key, value }) => online().field(emu, kind, key, String(value ?? '')),
-  'online:action': ({ emu, kind, action }) => online().action(emu, kind, action),
+  'online:action': ({ emu, kind, action, input }) => online().action(emu, kind, action, input || {}),
+  'online:repair': ({ emu }) => online().repair(emu),
+  // a sign-up or guide page in Cartridge's own window (0.9.66: ShadNet accounts are made only on shadps4.net);
+  // answers when it closes, so the next step (sign in) follows on its own
+  'online:browse': ({ url, name }) => new Promise((resolve, reject) => {
+    if (!/^https:\/\//i.test(String(url || ''))) return reject(new Error('That page can’t be opened.'));
+    const { session } = require('electron');
+    const bw = new BrowserWindow({ parent: win, width: 1280, height: 800, fullscreen: !!win?.isFullScreen(), autoHideMenuBar: true, backgroundColor: '#111', title: name || 'Cartridge', webPreferences: { session: session.fromPartition('persist:online'), sandbox: true, contextIsolation: true } });
+    bw.webContents.setWindowOpenHandler(({ url: u }) => { if (/^https?:\/\//i.test(u)) bw.loadURL(u); return { action: 'deny' }; });
+    bw.webContents.on('before-input-event', (_e, i) => { if (i.type === 'keyDown' && i.key === 'Escape') bw.close(); });
+    bw.webContents.on('did-finish-load', () => bw.webContents.executeJavaScript(`(() => { if (document.getElementById('cart-back')) return; const b = document.createElement('button'); b.id = 'cart-back'; b.textContent = 'Back to Cartridge'; b.style.cssText = 'position:fixed;z-index:2147483647;right:16px;bottom:16px;padding:12px 20px;border-radius:999px;border:0;background:#fff;color:#111;font:600 16px system-ui,sans-serif;box-shadow:0 4px 18px rgba(0,0,0,.4);cursor:pointer'; b.onclick = () => window.close(); document.body.appendChild(b); })()`).catch(() => {}));
+    bw.on('closed', () => { refocus?.(); resolve({ closed: true }); });
+    bw.loadURL(url).catch((e) => { log('online browse', e.message); });
+  }),
 });
 for (const ch of ['emuup:run', 'emuget:install', 'shadv:install']) {
   const fn = handlers[ch];

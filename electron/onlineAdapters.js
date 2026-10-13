@@ -75,27 +75,59 @@ const retroarch = {
 // ---- RPCS3 (RPCS3/rpcs3 ce10778: Emu/NP/rpcn_config.cpp, rpcs3qt/rpcn_settings_dialog.cpp derive_password,
 // Emu/system_config.h Net). On Linux both files sit in the config folder's root (Utilities/File.cpp:2604-2610).
 const RPCN_SALT = 'No matter where you go, everybody\'s connected.';
+// npid rules from rpcn_settings_dialog.cpp:266-269 (3 to 16 of a-z A-Z 0-9 - _), the password derived as RPCS3 does
+const npidCheck = (v) => (/^[A-Za-z0-9_-]{3,16}$/.test(v) ? null : 'A username is 3 to 16 letters, digits, - or _.');
+const rpcnHash = async (ctx, pw) => String(await ctx.pbkdf2(pw, RPCN_SALT, 200000, 32)).toUpperCase();
 const rpcs3 = {
   emu: 'rpcs3', label: 'RPCS3', proc: /rpcs3/i,
   dirs: ['.config/rpcs3', '.var/app/net.rpcs3.RPCS3/config/rpcs3'],
   files: { main: ['config.yml', 'yaml'], rpcn: ['rpcn.yml', 'yaml', 'Version: 2\nHost: np.rpcs3.net\n'] },
+  // EmuDeck's old "Resolution Scale: = N" leaves config.yml unreadable to RPCS3 (0.9.63): Repair comes first
+  precheck: ({ dir }) => require('./patches').rpcs3ConfigCheck({ cfg: dir }),
+  repair: ({ dir }) => require('./patches').rpcs3ConfigRepair({ cfg: dir }),
   kinds: [{
     id: 'rpcn', name: 'RPCN',
     what: 'RPCS3’s stand-in for PSN: online matchmaking, rooms, friends and scores with other RPCS3 players.',
-    note: 'No account yet? Make one in RPCS3 (Configuration, RPCN, Create Account): it emails you the token.',
+    note: 'No account yet? Make one here: RPCN emails you a token to type in.',
     on: [[['main', ['Net', 'Internet enabled']], 'Connected'], [['main', ['Net', 'PSN status']], 'RPCN']],
     off: [[['main', ['Net', 'PSN status']], 'Disconnected']],
     fields: [
-      { key: 'npid', label: 'Username', icon: 'mdiAccountOutline', required: true, at: ['rpcn', ['NPID']], check: (v) => (/^[A-Za-z0-9_-]{3,16}$/.test(v) ? null : 'A username is 3 to 16 letters, digits, - or _.') },
+      { key: 'npid', label: 'Username', icon: 'mdiAccountOutline', required: true, at: ['rpcn', ['NPID']], check: npidCheck },
       // stored as RPCS3 stores it: PBKDF2-SHA3-256 of what you type, 200,000 rounds, upper-case hex (never the password)
       { key: 'password', label: 'Password', icon: 'mdiLockOutline', required: true, secret: true, at: ['rpcn', ['Password']],
         write: async ({ value, put, get, ctx }) => {
           if (!value) throw new Error('Type your RPCN password.');
-          const hex = String(await ctx.pbkdf2(value, RPCN_SALT, 200000, 32)).toUpperCase();
+          const hex = await rpcnHash(ctx, value);
           put(['rpcn', ['Version']], '2'); if (!get(['rpcn', ['Host']])) put(['rpcn', ['Host']], 'np.rpcs3.net');
           put(['rpcn', ['Password']], hex);
         } },
       { key: 'token', label: 'Token', icon: 'mdiKeyOutline', required: true, at: ['rpcn', ['Token']], check: (v) => (/^[0-9A-Z]{16}$/.test(v) ? null : 'The token RPCN emailed you is 16 capital letters and digits.'), help: 'The 16-character token RPCN emailed you when you made the account.' },
+    ],
+    actions: [
+      // the account made the way RPCS3's own dialog makes it (rpcn_settings_dialog.cpp:264-330), then saved for RPCS3
+      { id: 'create', label: 'Make an RPCN Account', sub: 'RPCN emails you a token to finish', icon: 'mdiAccountPlusOutline', then: 'token',
+        asks: [
+          { key: 'npid', label: 'Pick a Username', help: '3 to 16 letters, digits, - or _. Capitals count.' },
+          { key: 'password', label: 'Pick a Password', secret: true },
+          { key: 'email', label: 'Your Email', help: 'RPCN sends the token that finishes the account here, and nothing else.' },
+        ],
+        run: async ({ input, ready, get, save, ctx }) => {
+          ready();
+          const why = npidCheck(input.npid || '') || (!input.password ? 'Pick a password.' : null) || (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email || '') ? 'That isn’t an email address.' : null);
+          if (why) throw new Error(why);
+          const hash = await rpcnHash(ctx, input.password), host = get(['rpcn', ['Host']]) || 'np.rpcs3.net';
+          await (ctx.rpcn || require('./rpcnClient')).create({ host, npid: input.npid, hash, email: input.email, connect: ctx.rpcnConnect });
+          save([[['rpcn', ['Version']], '2'], [['rpcn', ['Host']], host], [['rpcn', ['NPID']], input.npid], [['rpcn', ['Password']], hash]]);
+          return { message: 'Account made. RPCN emailed you a token: type it next.' };
+        } },
+      { id: 'resend', label: 'Email the Token Again', sub: 'For the username and password saved here', icon: 'mdiEmailOutline',
+        run: async ({ ready, get, ctx }) => {
+          ready();
+          const npid = get(['rpcn', ['NPID']]), hash = get(['rpcn', ['Password']]), host = get(['rpcn', ['Host']]) || 'np.rpcs3.net';
+          if (!npid || !hash) throw new Error('Set your username and password first.');
+          await (ctx.rpcn || require('./rpcnClient')).sendToken({ host, npid, hash, connect: ctx.rpcnConnect });
+          return { message: 'RPCN emailed the token again.' };
+        } },
     ],
   }],
 };
@@ -111,7 +143,7 @@ const shadps4 = {
   kinds: [{
     id: 'shadnet', name: 'ShadNet',
     what: 'shadPS4’s stand-in for PSN, for the few PS4 games that already work online. Early testing.',
-    note: 'Make an account on shadps4.net first (ShadNet, Register).',
+    note: 'No account yet? Make one on shadps4.net from here: ShadNet’s own client has no way to make one.',
     on: (g) => [[['main', ['Network', 'connected_to_network']], true], [['main', ['Network', 'shad_net_enabled']], true], [['users', ['Users', 'user', shadUser(g), 'shadnet_enabled']], true]],
     off: [[['main', ['Network', 'shad_net_enabled']], false]],
     isOn: (g) => g(['main', ['Network', 'shad_net_enabled']]) === true && g(['main', ['Network', 'connected_to_network']]) === true,
@@ -119,7 +151,7 @@ const shadps4 = {
       { key: 'npid', label: 'Username', icon: 'mdiAccountOutline', required: true, read: (g) => g(['users', ['Users', 'user', shadUser(g), 'shadnet_npid']]) || '', write: ({ value, put, get, has }) => { if (!has('users')) throw new Error('Open shadPS4 once first, so it makes its user list.'); put(['users', ['Users', 'user', shadUser(get), 'shadnet_npid']], value); } },
       { key: 'password', label: 'Password', icon: 'mdiLockOutline', required: true, secret: true, read: (g) => (g(['users', ['Users', 'user', shadUser(g), 'shadnet_password']]) ? '•' : ''), write: ({ value, put, get, has }) => { if (!has('users')) throw new Error('Open shadPS4 once first, so it makes its user list.'); put(['users', ['Users', 'user', shadUser(get), 'shadnet_password']], value); } },
     ],
-    actions: [{ id: 'register', label: 'Make a ShadNet Account', sub: 'shadps4.net', icon: 'mdiOpenInNew', url: 'https://www.shadps4.net/shadnet/register/' }],
+    actions: [{ id: 'register', label: 'Make a ShadNet Account', sub: 'Opens shadps4.net’s sign-up page here', icon: 'mdiAccountPlusOutline', url: 'https://www.shadps4.net/shadnet/register/', then: 'signin' }],
   }],
 };
 

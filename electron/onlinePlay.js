@@ -60,16 +60,18 @@ function createOnline(ctx) {
       if (!have.has(a.emu) && !(dir && exists(path.join(dir, a.files.main[0])))) continue;
       const t = dir ? texts(a, dir) : {};
       const running = !!ctx.running?.(a.emu);
+      // a settings file the emulator itself can't read (RPCS3's EmuDeck leftover): Repair is offered before anything is written
+      let damaged = null; if (dir && t.main != null) try { damaged = a.precheck?.({ dir, ctx }) || null; } catch {}
       // a kind with `status` reports what it can't change (Pretendo's console files): { ready, note }
       const statusOf = (k) => { try { return k.status?.({ dir, home, exists, get: (ref) => get(a, t, ref) }) || null; } catch { return null; } };
       emus.push({
-        emu: a.emu, label: a.label, dir, version: ctx.versionOf?.(a.emu) || null, running, opened: !!(dir && t.main != null),
+        emu: a.emu, label: a.label, dir, version: ctx.versionOf?.(a.emu) || null, running, opened: !!(dir && t.main != null), damaged,
         kinds: a.kinds.map((k) => { const st = statusOf(k); return {
-          id: k.id, name: k.name, what: k.what, note: !t.main ? `Open ${a.label} once first, so it makes its settings file.` : st?.note || k.note || null, locked: !t.main && !k.noFile,
+          id: k.id, name: k.name, what: k.what, note: !t.main ? `Open ${a.label} once first, so it makes its settings file.` : st?.note || k.note || null, locked: (!t.main && !k.noFile) || !!damaged,
           info: !!k.info, ready: st ? !!st.ready : null,
           on: !!(!k.info && t.main != null && isOn(a, k, t)), showFields: !!(k.fieldsAlways || k.info),
           fields: (k.fields || []).map((f) => ({ key: f.key, label: f.label, icon: f.icon, required: !!f.required, secret: !!f.secret, choices: f.choices || null, free: !!f.free, help: f.help || '', placeholder: f.placeholder || '', note: f.note || '', value: t.main != null ? fieldValue(a, f, t) : '' })),
-          actions: (k.actions || []).map((x) => ({ id: x.id, label: x.label, sub: x.sub || '', icon: x.icon, url: x.url || null, confirm: x.confirm || null })),
+          actions: (k.actions || []).map((x) => ({ id: x.id, label: x.label, sub: x.sub || '', icon: x.icon, url: x.url || null, confirm: x.confirm || null, asks: x.asks || null, then: x.then || null })),
         }; }),
       });
       for (const i of rec[a.emu]?.issues || []) issues.push({ emu: a.emu, kind: i.kind, text: i.text });
@@ -84,6 +86,8 @@ function createOnline(ctx) {
     if (!dir) throw new Error(`${a.label}’s settings folder wasn’t found. Open ${a.label} once first.`);
     const before = texts(a, dir);
     if (before.main == null) throw new Error(`Open ${a.label} once first, so it makes its settings file.`);
+    const bad = a.precheck?.({ dir, ctx });
+    if (bad) throw new Error(bad.known ? `${a.label}’s settings file is damaged (line ${bad.line}). Repair it first, at the top of ${a.label}’s section.` : `${a.label} can’t read line ${bad.line} of its settings file (“${bad.text}”), so Cartridge leaves it alone. Fix it in a text editor, or rename it so ${a.label} makes a new one.`);
     return { a, dir, before, t: { ...before } };
   }
   const remember = (emu, fn) => { rec[emu] ||= { kinds: {}, fields: {} }; fn(rec[emu]); saveRec(); };
@@ -110,10 +114,23 @@ function createOnline(ctx) {
     log('online', emu, kind, 'set', key);
     return { ok: true };
   }
-  async function action(emu, kind, id) {
+  // an action may ask for input (`asks`) and write settings afterwards (`ready` checks the file can be written first,
+  // so an account is never made and then left unsaved; `save` writes pairs of [ref, value])
+  async function action(emu, kind, id, input = {}) {
     const a = ADAPTERS.find((x) => x.emu === emu), k = a?.kinds.find((x) => x.id === kind), x = k?.actions?.find((y) => y.id === id);
     if (!x?.run) throw new Error('Unknown action.');
-    return x.run({ ctx, dir: dirOf(a), adapter: a });
+    return x.run({
+      ctx, dir: dirOf(a), adapter: a, input,
+      ready: () => { prep(emu); },
+      get: (ref) => { const { a: A, t } = prep(emu); return get(A, t, ref); },
+      save: (pairs) => { const { a: A, dir, before, t } = prep(emu); for (const [ref, v] of pairs) put(A, t, ref, v); write(A, dir, before, t); log('online', emu, kind, id); },
+    });
+  }
+  function repair(emu) {
+    const a = ADAPTERS.find((x) => x.emu === emu);
+    if (!a?.repair) throw new Error('Nothing to repair.');
+    if (ctx.running?.(emu)) throw new Error(`Close ${a.label} first.`);
+    return a.repair({ dir: dirOf(a), ctx });
   }
   // after an emulator update (owner): what Cartridge turned on is checked again; settings an update reset are put
   // back, and a file that moved or changed shape is reported, never guessed at
@@ -125,6 +142,12 @@ function createOnline(ctx) {
     const before = dir ? texts(a, dir) : {};
     if (!dir || before.main == null) {
       issues.push({ kind: '*', text: `After ${a.label}’s update its settings file isn’t where it was, so its online settings couldn’t be checked. Open ${a.label} once, then come back here.` });
+      remember(emu, (x) => { x.issues = issues; });
+      return { checked: true, issues };
+    }
+    let bad = null; try { bad = a.precheck?.({ dir, ctx }) || null; } catch {}
+    if (bad) {
+      issues.push({ kind: '*', text: `After ${a.label}’s update its settings file can’t be read (line ${bad.line}), so its online settings weren’t checked. ${bad.known ? 'Repair it in Online Play.' : 'Fix it in a text editor.'}` });
       remember(emu, (x) => { x.issues = issues; });
       return { checked: true, issues };
     }
@@ -140,6 +163,6 @@ function createOnline(ctx) {
     remember(emu, (x) => { x.issues = issues; x.checkedAt = Date.now(); });
     return { checked: true, fixed, issues };
   }
-  return { list, set, field, action, recheck, dirOf: (emu) => dirOf(ADAPTERS.find((x) => x.emu === emu)), records: () => rec };
+  return { list, set, field, action, repair, recheck, dirOf: (emu) => dirOf(ADAPTERS.find((x) => x.emu === emu)), records: () => rec };
 }
 module.exports = { createOnline, ADAPTERS, truthy };

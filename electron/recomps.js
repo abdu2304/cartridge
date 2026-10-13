@@ -412,9 +412,24 @@ function createRecomps(ctx) {
     const saves = checkSaves(meta);
     installs[id] = { ...(prev || {}), id, repo: e.repo, dir: dest, program, kind, tag: rel.tag, date: rel.date, files, channel: ch, at: Date.now(), asset: b.asset.name };
     saveInstalls();
+    // 0.9.66 (agreed plan): after an update the new release is started once before Steam's shortcut follows it. One that
+    // can't start at all (missing libraries, a crash in the first seconds) goes back to the release that worked
+    if (prev && prev.tag && kind === 'linux' && ctx.trialRun) {
+      onProgress({ step: 'trial', pct: null });
+      const t = await ctx.trialRun({ program, args: prev.args || '', cwd: path.dirname(program), ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message }));
+      if (t?.failed) {
+        log('recomp update did not start, back to', prev.tag, id, t.why);
+        try {
+          useVersion(id, prev.tag);
+          if (exists(prev.program)) { installs[id].program = prev.program; saveInstalls(); }
+        } catch (er) { log('recomp roll back after a failed start', id, er.message); return { tag: rel.tag, kind, program, dir: dest, updated: true, started: false, why: t.why, rollBackFailed: er.message, restored: saves.restored, backedUp: !!meta }; }
+        latest[id] = { tag: rel.tag, date: rel.date, kind, name: b.asset.name, at: Date.now(), channel: ch, failed: t.why }; writeJson(F('recomp-latest.json'), latest);
+        return { tag: prev.tag, newTag: rel.tag, kind, program: installs[id].program, dir: dest, updated: false, rolledBack: true, why: t.why, restored: saves.restored, backedUp: !!meta };
+      }
+    }
     latest[id] = { tag: rel.tag, date: rel.date, kind, name: b.asset.name, at: Date.now(), channel: ch }; writeJson(F('recomp-latest.json'), latest);
     log('recomp', prev ? 'updated' : 'installed', id, rel.tag, kind, program);
-    return { tag: rel.tag, kind, program, dir: dest, updated: !!prev, programMoved: !!(prev && prev.program !== program), restored: saves.restored, backedUp: !!meta };
+    return { tag: rel.tag, kind, program, dir: dest, updated: !!prev, programMoved: !!(prev && prev.program !== program), started: prev && kind === 'linux' && ctx.trialRun ? true : undefined, restored: saves.restored, backedUp: !!meta };
   }
   function versions(id) {
     const rec = installs[id];
