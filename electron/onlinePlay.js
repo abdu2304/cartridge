@@ -47,7 +47,9 @@ function createOnline(ctx) {
       fs.writeFileSync(file + '.cartridge-tmp', after[f]); fs.renameSync(file + '.cartridge-tmp', file);
     }
   }
-  const isOn = (a, k, t) => (k.isOn ? k.isOn((ref) => get(a, t, ref), t) : k.on.every(([ref, v]) => String(get(a, t, ref) ?? '').toLowerCase() === String(v).toLowerCase()));
+  // on/off can depend on the file (shadPS4's account is per user in a list): a function of the getter gives the pairs
+  const pairsOf = (a, t, list) => (typeof list === 'function' ? list((ref) => get(a, t, ref)) : list || []);
+  const isOn = (a, k, t) => (k.isOn ? k.isOn((ref) => get(a, t, ref), t) : pairsOf(a, t, k.on).every(([ref, v]) => String(get(a, t, ref) ?? '').toLowerCase() === String(v).toLowerCase()));
   function fieldValue(a, f, t) { if (f.read) return f.read((ref) => get(a, t, ref), t); const v = get(a, t, f.at); return f.secret ? (v ? '•' : '') : v ?? ''; }
   function list() {
     const have = new Set(ctx.installed?.() || []);
@@ -58,14 +60,17 @@ function createOnline(ctx) {
       if (!have.has(a.emu) && !(dir && exists(path.join(dir, a.files.main[0])))) continue;
       const t = dir ? texts(a, dir) : {};
       const running = !!ctx.running?.(a.emu);
+      // a kind with `status` reports what it can't change (Pretendo's console files): { ready, note }
+      const statusOf = (k) => { try { return k.status?.({ dir, home, exists, get: (ref) => get(a, t, ref) }) || null; } catch { return null; } };
       emus.push({
         emu: a.emu, label: a.label, dir, version: ctx.versionOf?.(a.emu) || null, running, opened: !!(dir && t.main != null),
-        kinds: a.kinds.map((k) => ({
-          id: k.id, name: k.name, what: k.what, note: !t.main ? `Open ${a.label} once first, so it makes its settings file.` : k.note || null, locked: !t.main && !k.noFile,
-          on: !!(t.main != null && isOn(a, k, t)), showFields: !!k.fieldsAlways,
+        kinds: a.kinds.map((k) => { const st = statusOf(k); return {
+          id: k.id, name: k.name, what: k.what, note: !t.main ? `Open ${a.label} once first, so it makes its settings file.` : st?.note || k.note || null, locked: !t.main && !k.noFile,
+          info: !!k.info, ready: st ? !!st.ready : null,
+          on: !!(!k.info && t.main != null && isOn(a, k, t)), showFields: !!(k.fieldsAlways || k.info),
           fields: (k.fields || []).map((f) => ({ key: f.key, label: f.label, icon: f.icon, required: !!f.required, secret: !!f.secret, choices: f.choices || null, free: !!f.free, help: f.help || '', placeholder: f.placeholder || '', note: f.note || '', value: t.main != null ? fieldValue(a, f, t) : '' })),
           actions: (k.actions || []).map((x) => ({ id: x.id, label: x.label, sub: x.sub || '', icon: x.icon, url: x.url || null, confirm: x.confirm || null })),
-        })),
+        }; }),
       });
       for (const i of rec[a.emu]?.issues || []) issues.push({ emu: a.emu, kind: i.kind, text: i.text });
     }
@@ -85,9 +90,9 @@ function createOnline(ctx) {
   // a feature on or off: its own settings written, what it needs checked first
   async function set(emu, kind, on) {
     const { a, dir, before, t } = prep(emu), k = a.kinds.find((x) => x.id === kind);
-    if (!k) throw new Error('Unknown online feature.');
+    if (!k || k.info) throw new Error('Unknown online feature.');
     if (on) for (const f of k.fields || []) if (f.required && !fieldValue(a, f, t)) throw new Error(`Set ${f.label} first.`);
-    for (const [ref, v] of on ? k.on : k.off || []) put(a, t, ref, typeof v === 'function' ? v((r) => get(a, t, r)) : v);
+    for (const [ref, v] of pairsOf(a, t, on ? k.on : k.off)) put(a, t, ref, v);
     write(a, dir, before, t);
     remember(emu, (r) => { r.kinds[kind] = { on, at: Date.now() }; r.issues = (r.issues || []).filter((i) => i.kind !== kind); });
     log('online', emu, kind, on ? 'on' : 'off');
@@ -98,7 +103,7 @@ function createOnline(ctx) {
     if (!f) throw new Error('Unknown setting.');
     const why = f.check?.(value);
     if (why) throw new Error(why);
-    if (f.write) await f.write({ value, put: (ref, v) => put(a, t, ref, v), get: (ref) => get(a, t, ref), ctx });
+    if (f.write) await f.write({ value, put: (ref, v) => put(a, t, ref, v), get: (ref) => get(a, t, ref), ctx, has: (file) => t[file] != null });
     else put(a, t, f.at, value);
     write(a, dir, before, t);
     if (!f.secret) remember(emu, (r) => { r.fields[key] = value; });
@@ -128,7 +133,7 @@ function createOnline(ctx) {
     for (const [kind, s] of Object.entries(r.kinds)) {
       const k = a.kinds.find((x) => x.id === kind);
       if (!k || !s.on) continue;
-      if (!isOn(a, k, t)) { for (const [ref, v] of k.on) put(a, t, ref, typeof v === 'function' ? v((x) => get(a, t, x)) : v); fixed++; }
+      if (!isOn(a, k, t)) { for (const [ref, v] of pairsOf(a, t, k.on)) put(a, t, ref, v); fixed++; }
       for (const f of k.fields || []) if (!f.secret && !f.write && r.fields?.[f.key] != null && get(a, t, f.at) == null) { put(a, t, f.at, r.fields[f.key]); fixed++; }
     }
     if (fixed) { write(a, dir, before, t); log('online: put back after an update', emu, fixed); }

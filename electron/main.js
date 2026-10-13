@@ -6164,6 +6164,13 @@ function recomps() {
     appImageType: (f) => D.appImageType(f), isElf: (f) => D.isElf(f),
     isRunning: (f) => progRunning(f),
     trash: (p) => toTrash(p),
+    // a Flatpak bundle installed for this user (flatpak install --bundle); its app ID from the bundle's name
+    flatpakBundle: (file) => new Promise((ok, bad) => {
+      const appId = path.basename(file).replace(/\.flatpak$/i, '');
+      if (!/^[A-Za-z][\w-]*(\.[\w-]+){2,}$/.test(appId)) return bad(new Error('The Flatpak in the release has an unexpected name.'));
+      require('child_process').execFile('flatpak', ['install', '--user', '--noninteractive', '-y', '--bundle', file], { timeout: 15 * 60e3, env: { ...process.env, LD_PRELOAD: '', LD_LIBRARY_PATH: '' } }, (er, out, err) => (er ? bad(new Error(`Flatpak couldn’t install it: ${String(err || er.message).trim().split('\n').pop()}`)) : ok(appId)));
+    }),
+    flatpakRemove: (appId) => new Promise((ok) => require('child_process').execFile('flatpak', ['uninstall', '--user', '--noninteractive', '-y', appId], { timeout: 5 * 60e3 }, () => ok())),
     search: (q2) => require('./github').search(q2),
     recompRoot: () => path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'),
     recompRoots: () => emulationFolders().map((d) => path.join(d, 'recomp')),
@@ -6186,7 +6193,7 @@ function ssUnits(opts) {
         const key = i ? `${e.id}-${i}` : e.id;
         // a folder, or one save file (zelda3's saves/zelda3.srm): by what's there, else by the name having an ending
         const kind = isDir(d) ? 'dir' : fs.existsSync(d) || path.extname(d) ? 'file' : 'dir';
-        out.push({ key, emu: 'recomp', kind, path: d, base: rec.dir, label: e.name, sub: '', romId: romIds[0] ?? null, romIds, card: false, slot: require('./saveSync').slotOf('recomp', key, kind), prog: rec.program, recomp: e.id });
+        out.push({ key, emu: 'recomp', kind, path: d, base: rec.dir, label: e.name, sub: '', romId: romIds[0] ?? null, romIds, card: false, slot: require('./saveSync').slotOf('recomp', key, kind), prog: rec.flatpak || rec.program, recomp: e.id });
       });
     }
   } catch (er) { log('recomp save units', er.message); }
@@ -6196,7 +6203,7 @@ function ssUnits(opts) {
 function recompTrophies() {
   try {
     const R = recomps(), items = [];
-    for (const e of R.catalogue().entries) { const rec = R.record(e.id); if (rec?.dir) items.push({ id: e.id, name: e.name, game: e.games?.[0]?.title || e.name, program: rec.program, dir: rec.dir, ach: e.achievements && typeof e.achievements === 'object' ? e.achievements : null }); }
+    for (const e of R.catalogue().entries) { const rec = R.record(e.id); if (rec?.dir) items.push({ id: e.id, name: e.name, game: e.games?.[0]?.title || e.name, program: rec.program, dir: rec.dir, flatpak: rec.flatpak || null, ach: e.achievements && typeof e.achievements === 'object' ? e.achievements : null }); }
     require('./trophies').setRecomps(items);
     trophySvc.redetect?.()?.catch?.(() => {});
   } catch (er) { log('recomp achievements', er.message); }

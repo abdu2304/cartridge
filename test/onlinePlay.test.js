@@ -61,3 +61,36 @@ test('PPSSPP: nickname first, then on; never while running; an update that reset
   fs.rmSync(ini);
   assert.match(eng.recheck('ppsspp').issues[0].text, /isn’t where it was/);
 });
+
+test('Eden writes Qt’s \\default pairs; Ryujinx a number; Dolphin its ini; Azahar only reports', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-op-')), data = path.join(home, 'data');
+  const put = (rel, text) => { const f = path.join(home, rel); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, text); return f; };
+  fs.mkdirSync(data);
+  const eden = put('.config/eden/qt-config.ini', '[Services]\nairplane_mode\\default=true\nairplane_mode=true\n\n[UI]\nfoo=1\n');
+  const ryu = put('.config/Ryujinx/Config.json', '{\n  "version": 73,\n  "multiplayer_mode": 0,\n  "ldn_server": ""\n}\n');
+  const dol = put('.config/dolphin-emu/Dolphin.ini', '[Core]\nCPUCore = 1\n');
+  put('.config/azahar-emu/qt-config.ini', '[UI]\n');
+  put('.local/share/azahar-emu/sysdata/otp.bin', 'x');
+  const eng = createOnline({ home, dataDir: data, installed: () => [], running: () => false, log: () => {} });
+  const kind = (emu, id) => eng.list().emus.find((e) => e.emu === emu).kinds.find((k) => k.id === id);
+  // Eden: nickname first; airplane mode off with its \default pair, read as on only then
+  await assert.rejects(() => eng.set('eden', 'rooms', true), /Nickname/);
+  await eng.field('eden', 'rooms', 'nick', 'Player1');
+  await eng.set('eden', 'rooms', true);
+  const et = fs.readFileSync(eden, 'utf8');
+  assert.match(et, /airplane_mode\\default=false/); assert.match(et, /airplane_mode=false/); assert.match(et, /Multiplayer\\nickname=Player1\nMultiplayer\\nickname\\default=false/);
+  assert.strictEqual(kind('eden', 'rooms').on, true);
+  // Ryujinx: multiplayer_mode as a number, passphrase checked
+  await eng.set('ryujinx', 'ldn', true);
+  assert.strictEqual(JSON.parse(fs.readFileSync(ryu, 'utf8')).multiplayer_mode, 1);
+  await assert.rejects(() => eng.field('ryujinx', 'ldn', 'pass', 'secret'), /Ryujinx-/);
+  await eng.field('ryujinx', 'ldn', 'pass', 'Ryujinx-0a1b2c3d');
+  assert.strictEqual(kind('ryujinx', 'ldn').on, true);
+  // Dolphin: sections added in its own spacing
+  await eng.set('dolphin', 'bba', true); await eng.set('dolphin', 'netplay', true);
+  assert.match(fs.readFileSync(dol, 'utf8'), /\[Core\]\nCPUCore = 1\nSerialPort1 = 12[\s\S]*\[NetPlay\]\nTraversalChoice = traversal/);
+  // Azahar: no switch, Pretendo files reported
+  const pre = kind('azahar', 'pretendo');
+  assert.strictEqual(pre.info, true); assert.strictEqual(pre.ready, false); assert.match(pre.note, /SecureInfo_A/); assert.doesNotMatch(pre.note, /otp\.bin/);
+  await assert.rejects(() => eng.set('azahar', 'pretendo', true), /Unknown/);
+});

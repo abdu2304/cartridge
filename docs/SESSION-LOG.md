@@ -6,6 +6,11 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 13 Oct 2026 · 0.9.65 Recomps and Online Play (one update, owner: "build the rest of this update and the next one all in one go")
+- Recomp catalogue finished: 96 entries (Xbox 360 set included), Flatpak bundle recomps, achievement paths for Flatpak and ReXGlue profiles.
+- Online Play built (handover Part 12): engine, format writers, pure SHA3 for RPCN, adapters for PPSSPP, PCSX2, RetroArch, RPCS3, shadPS4, Ryujinx, Eden, Dolphin, Azahar and Cemu (the last two report only), Settings section, game page rows, re-check after emulator updates.
+- Checked: npm test, vite build, screenshots of the section in Plain and Glass, clipping audit, launch check. Not checked: any real online session (no network games in the container).
+
 ## 10 Oct 2026 · 0.9.65 Recomps
 - Owner's decisions are in docs/HANDOVER-0.9.55-to-0.9.64.md Part 7.1 and Part 11. Built: recomp engine, catalogue (77 entries from PCGamingWiki's console sections, owner's saved page), Steam card, Recomps tab and sheet, game setup and version check, own Steam shortcuts in a Recomps collection, updates with save backups and Roll Back, Save Sync and achievements for recomps, KytyPS5 gated on a Linux build, Download More Files.
 - Checked: real installs of Star Fox 64 Recompiled (GitLab, zip holding a tar.gz) and Zelda 64: Recompiled (GitHub) in the container; tests; clipping audit 0; screenshots Plain and Glass.

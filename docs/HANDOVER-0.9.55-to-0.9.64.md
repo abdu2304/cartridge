@@ -21,16 +21,16 @@ The repo is public. Nothing private is in this document. Keep it that way.
 
 ## Part 1. Where things stand right now
 
-- **Latest release:** v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). v0.9.63 "The Right Version" was PR #82. 0.9.64 is the PR after it.
+- **Latest release:** v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (13 Oct 2026; Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). v0.9.63 "The Right Version" was PR #82. 0.9.64 is the PR after it.
 - **Branch:** `claude/relaxed-fermat-30pigp`, merged into `main` by a PR for every release (merge commit, not squash). After a merge, reset the branch to `main` (`git fetch origin main && git checkout -B claude/relaxed-fermat-30pigp origin/main`) before new work.
-- **package.json:** `version` = `versionName` = 0.9.64, `releaseName` "Cartridge 0.9.64". The lockfile's version field is stale and always was; leave it.
-- **Tests:** 326 pass (`npm test`). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink; saveSync and gameSettings grew a lot.
+- **package.json:** `version` = `versionName` = 0.9.65, `releaseName` "Cartridge 0.9.65". The lockfile's version field is stale and always was; leave it.
+- **Tests:** 340 pass at 0.9.65 (`npm test`; recomps and onlinePlay added). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink; saveSync and gameSettings grew a lot.
 - **Before every release:** `npm test`, `npx vite build`, the launch check (`CARTRIDGE_SMOKE=1 HOME=$(mktemp -d) xvfb-run -a node_modules/electron/dist/electron . --no-sandbox` must print `SMOKE OK`), `npm run audit:ui` (focus and contrast in six looks, clipping, the tour twice; all zero at 0.9.63 and 0.9.64). Never rebuild `dist` while the audit runs: it reads `dist` and crashes mid-run.
 - **Standing instruction:** when an update is finished, built and launch-checked, open the PR and merge it without asking. A version change on `main` publishes the release to every user.
 
 **What comes next (agreed with the owner, in this order):**
-1. **0.9.65 · Recomps** (Part 7.1: the full plan and every decision).
-2. **0.9.66 · Online Play** (Part 7.2: research done, decisions made).
+1. ~~0.9.65 · Recomps~~ and ~~0.9.66 · Online Play~~: both shipped together as 0.9.65 (Parts 11 and 12).
+2. Owner device tests for both (end of Parts 11 and 12), then whatever the owner picks next.
 3. Keep this handover updated after each.
 
 **Waiting on the owner:** device tests listed in Part 9; KytyPS5 log after 0.9.63 if it still fails; the Unit 13 freeze test with frame generation off.
@@ -211,7 +211,7 @@ Read the newest SESSION-LOG entry, CLAUDE.md and this file first. When the owner
 
 ---
 
-## Part 11. 0.9.65 · Recomps (added after the release, 10 Oct 2026)
+## Part 11. 0.9.65 · Recomps (10 to 13 Oct 2026)
 
 **What shipped** (code map in CLAUDE.md's 0.9.65 section; catalogue record in docs/recomps.md):
 - Engine `electron/recomps.js`, catalogue `electron/recomps.json` built by `tools/recomps/build.js` from researched entries (repo, builds, asset patterns, game needed, setup kind, done file, saves, achievements). Entries with no project or site are left out and listed in docs/recomps.md.
@@ -223,8 +223,66 @@ Read the newest SESSION-LOG entry, CLAUDE.md and this file first. When the owner
 
 **Owner's decisions in this stretch:** catalogue from PCGamingWiki console sections only (the owner sent the saved page as a zip; its links were read from the HTML); search GitHub for entries without links (most-starred); KytyPS5 hidden, not deleted, until a Linux build returns; Download More Files under Game More → Options with present files ticked and greyed.
 
-**Not finished (next session first):**
-1. Research the remaining rows: batch 5 (Xbox 360 recomps: AC6, re:Blue, Nocturne, Eternal Sonata, Lost Odyssey, Skate 3, Unleashed, Marathon, TiP, SVR07, PGR4, Saints Row, LARecomp, beanRecomp, OpenMBU, Naughty Bear, Fable 2, DBZ) and the rows batches 3 and 4 didn't reach. The brief and batch files were in the session scratchpad (lost); recreate: parse the saved PCGamingWiki page, one entry per project with the schema in tools/recomps/build.js (fields shipped are its SHIP list). For Unleashed/Marathon set `achievements: { format: 'hedge', user: 'UnleashedRecomp'|'MarathonRecomp', file: 'ACH-DATA'|'SonicNextAchievementData.bin' }`; ReXGlue projects `{ format: 'rexglue' }`. Until then the daily refresh adds those rows on the device as "found" entries (setup Picker) when PCGamingWiki answers.
-2. Doubtful entries listed under "Not certain" in docs/recomps.md (DK64 asset names, Chameleon Twist builds, Ship of Harkinian 9.3.0 assets, Star Fox saves folder).
-3. Owner device tests: install a Linux recomp and a Windows-only one (Proton), Set Up With Your Game (place, path, picker), Add to Steam (live and with Steam closed), an update with saves kept, Roll Back, Save Sync of a recomp save, Unleashed achievements, the Steam card at 1280x800 and on the TV, Download More Files, KytyPS5 hidden.
-4. Then 0.9.66 Online Play (Part 7.2).
+**Finished later (13 Oct 2026, same release):** the remaining rows were researched in smaller batches (the agents had hit usage limits), including the Xbox 360 set (batch 5). The catalogue is 96 entries (51 Linux builds, 12 Windows only, 9 on their own site, 24 build it yourself); rows with no project or site are under "Left out" in docs/recomps.md. Two duplicate ids (pokeplatinum-pc, ac6recomp) appear in two batch files; the builder keeps the first and says so. Unleashed Recompiled's Linux build is a Flatpak bundle, so `.flatpak` downloads now install with `flatpak install --user --bundle` (record `kind: 'flatpak'`, launched `flatpak run <id>`, Remove uninstalls it, Roll Back refused). Achievement readers also look in Flatpak sandbox folders (`~/.var/app/<id>/config/<user>/save/`) and ReXGlue's per-profile `profiles/*/achievements/*.toml` (re:Blue).
+
+**Still open:**
+1. Doubtful entries listed under "Not certain" in docs/recomps.md (DK64 asset names, Chameleon Twist builds, Ship of Harkinian 9.3.0 assets, Star Fox saves folder, Cannonball's program name).
+2. Owner device tests: install a Linux recomp, a Windows-only one (Proton) and Unleashed (Flatpak bundle), Set Up With Your Game (place, path, picker), Add to Steam (live and with Steam closed), an update with saves kept, Roll Back, Save Sync of a recomp save, Unleashed achievements, the Steam card at 1280x800 and on the TV, Download More Files, KytyPS5 hidden.
+
+## Part 12. Online Play (built into 0.9.65, 13 Oct 2026)
+
+The owner said: "No need to build in batches. Just build the rest of this update and the next one all in one go." So the planned 0.9.66 shipped inside 0.9.65 ("Recomps and Online Play"). The next update number is free for whatever the owner picks next.
+
+**How it works:**
+- `electron/onlinePlay.js` is the engine, and `electron/onlineAdapters.js` is plain data, one adapter per emulator, citing the source commit and file:line.
+- An adapter names its settings `files` (`{ key: [path in the settings folder, format, text for a new file] }`), the `dirs` to look in (portable first through `ctx.portable`, then XDG and Flatpak), and `kinds` (one online feature each).
+- A kind has `on`/`off` pairs, which may be a function of the getter for shadPS4's per-user list. It can also have `isOn`, `fields` (`at`, or `read`/`write` hooks; `check`; `required`; `secret`; `choices`/`free`), `actions` (urls), `info` (no switch) and `status` (a report like `{ ready, note }`).
+- `electron/onlineFormats.js` changes one key and keeps every other line: ini; Qt (writes `key\default=false` beside each value, which Eden needs); RetroArch cfg; JSON (the same indent, and refuses damaged files); RPCS3's two-level YAML; XML text.
+- Rules:
+  - Never write while the emulator runs (`raLogin.running`).
+  - Back up the file once a day per file into `online-backups/<emu>/`, then write atomically.
+  - Record in `online-play.json` what was turned on and the non-secret fields. Never store passwords.
+  - `recheck(emu)` runs 1.5 s after `emuup:run`, `emuget:install` and `shadv:install`. It puts back what an update reset, and it reports, rather than guessing, when the file is gone.
+- RPCN's password is stored the way RPCS3 stores it: PBKDF2 with SHA3-256 of what was typed, using RPCS3's salt, 200,000 rounds, as upper-case hex.
+  - Electron's BoringSSL has no SHA3, so `electron/sha3.js` is pure JS, checked against Node's own (the test vector "test" gives 3FDD0D3D...).
+  - It takes about 5 s, so main runs it in a worker thread.
+- UI:
+  - `OnlinePlay.vue` is the Settings section `online`, after Saves and Sync, and it is in Find a Setting.
+  - Turning a feature on asks first for its required fields.
+  - The game page (More → Emulator) shows "Online Play: <emulator>" rows from `online:forConsole` and opens the section.
+
+**Per emulator (research by subagents reading each emulator's source; full notes were in the session scratchpad):**
+
+| Emulator | What it does |
+| --- | --- |
+| PPSSPP | `PSP/SYSTEM/ppsspp.ini` `[Network] EnableWlan`, NickName (not "PPSSPP"), proAdhocServer (the list from PPSSPP's adhoc-servers.json), InfrastructureUsername. |
+| PCSX2 | `inis/PCSX2.ini` `[DEV9/Eth]` EthEnable/EthApi=Sockets/EthDevice=Auto. DNS1 with ModeDNS1 Manual (PCSX2 reads DNS1 only). |
+| RetroArch | `netplay_use_mitm_server`, `netplay_nickname`, `netplay_mitm_server` (nyc, madrid, saopaulo, singapore). Hosting and joining happen in RetroArch. |
+| RPCS3 | `config.yml` Net `Internet enabled: Connected`, `PSN status: RPCN`; `rpcn.yml` NPID, Password (hashed), Token, Version 2, Host np.rpcs3.net. Accounts are made in RPCS3. |
+| shadPS4 | `config.json` Network `connected_to_network`, `shad_net_enabled`. `users.json` `Users.user[]` (id 1000, else the first) `shadnet_enabled`, `shadnet_npid`, `shadnet_password` (plain, as shadPS4 sends it). Register at shadps4.net. |
+| Ryujinx | `Config.json` `multiplayer_mode` 1 (a number), `ldn_server` (empty = ldn.ryujinx.app:30456), `multiplayer_ldn_passphrase` (`Ryujinx-` + 8 hex). No account. |
+| Eden | `qt-config.ini` `[Services] airplane_mode=false`, `[UI] Multiplayer\nickname`, `[WebService] eden_username`, each with `\default=false`. Rooms are joined in Eden only (no command line for it). |
+| Dolphin | `Dolphin.ini` `[NetPlay] TraversalChoice` traversal/direct, Nickname; `[Core] EnableWiiLink`; `[Core] SerialPort1 = 12` (built-in BBA) plus `BBA_BUILTIN_DNS`. |
+| Azahar | Lobby server `[WebService] web_api_url` (the source ships none). The nickname is the emulated 3DS username in NAND (not written). Pretendo: reports otp.bin, SecureInfo_A, LocalFriendCodeSeed_B, movable.sed in its data folder. |
+| Cemu | Pretendo report only: otp.bin (1024 B) and seeprom.bin (512 B) in its data folder. Cemu greys out the service choice until the files are valid and keeps it per account itself. |
+
+Wiimmfi has no setting in current Dolphin: games must be patched first, and Cartridge says so and links the patcher.
+
+**Unverified (ask the owner or check on a device):**
+1. Ryujinx was read from an archive mirror (git.ryujinx.app was unreachable). It is the Ryubing line; the Flatpak folders used (io.github.ryubing.Ryujinx, org.ryujinx.Ryujinx) are the ids emulators.js already knows, not checked on Flathub.
+2. Eden's and Azahar's Flatpak ids come from their desktop files.
+3. Whether every Switch game needs airplane_mode off for local wireless.
+4. Cemu's per-account `SelectedService` attribute format wasn't confirmed, which is why Cartridge doesn't write it.
+5. RPCN sign-in with a real account; ShadNet with a real account (early testing upstream).
+6. That a real emulator update which resets a setting gets it back.
+
+**Owner device tests:**
+1. RPCN sign in, then a game's online menu.
+2. PPSSPP ad hoc between two devices.
+3. Ryujinx LDN.
+4. Dolphin host code.
+5. PCSX2 DEV9 with a revival DNS.
+6. The section at 1280x800 and on the TV, in Plain and Glass.
+7. An emulator update, then Online Play still on.
+
+

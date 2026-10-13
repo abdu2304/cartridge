@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-10",
+ "updated": "2026-10-13",
  "source": "PCGamingWiki's List of unofficial ports (console sections), each project checked; see docs/recomps.md",
  "entries": [
   {
@@ -2148,6 +2148,46 @@
    "description": "A native PC port of Mario Kart Wii by static recompilation, built on your own machine from your PAL disc by its setup tool, with Retro Rewind support."
   },
   {
+   "id": "sonic3air",
+   "name": "Sonic 3 A.I.R.",
+   "games": [
+    {
+     "title": "Sonic 3 & Knuckles",
+     "console": "genesis"
+    }
+   ],
+   "origin": "recreation",
+   "repo": "github:Eukaryot/sonic3air",
+   "site": "https://sonic3air.org/",
+   "builds": "linux",
+   "linuxAsset": "^sonic3air_game\\.tar\\.gz$",
+   "windowsAsset": "^sonic3air_game\\.zip$",
+   "prerelease": false,
+   "program": "sonic3air_game/sonic3air_linux",
+   "needs": {
+    "what": "The Sonic 3 & Knuckles ROM from the Steam release (Sega Classics), Sonic_Knuckles_wSonic3.bin, 4 MB",
+    "files": "rom",
+    "ext": [
+     "bin"
+    ],
+    "region": "any",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "place",
+    "place": "Sonic_Knuckles_wSonic3.bin in ~/.local/share/Sonic3AIR/ (or next to sonic3air_linux, or the path in config.json RomPath)",
+    "notes": "On Linux there is no file picker: if the ROM is not found it shows an error and closes. It looks in its app data folder, the last known ROM path, config.json RomPath, the working folder, then Steam's 'steamapps/common/Sega Classics/uncompressed ROMs/' (native and Flatpak Steam). A ROM found elsewhere is copied into ~/.local/share/Sonic3AIR/. The ROM is checked by size (0x400000) and a Murmur2 64-bit checksum, not md5."
+   },
+   "done": "~/.local/share/Sonic3AIR/Sonic_Knuckles_wSonic3.bin",
+   "saves": [
+    "~/.local/share/Sonic3AIR/storage/ (persistent data) and ~/.local/share/Sonic3AIR/savestates/; uses ./savedata beside the program instead if that folder exists"
+   ],
+   "achievements": "Has its own in-game achievements, kept with its persistent data in ~/.local/share/Sonic3AIR/ (format not checked)",
+   "license": "GPL-3.0",
+   "description": "A fan-made widescreen remaster of Sonic 3 & Knuckles running the original game's logic as scripts in its own Oxygen engine, with mods and many extras."
+  },
+  {
    "id": "sor2-new-era",
    "name": "Streets of Rage 2 New Era",
    "games": [
@@ -2285,6 +2325,44 @@
    ],
    "license": "MIT",
    "description": "A fan-made remake of LSD: Dream Emulator in Unity, with the game's content included and support for mods."
+  },
+  {
+   "id": "medievilrecomp",
+   "name": "MediEvil Recomp",
+   "games": [
+    {
+     "title": "MediEvil",
+     "console": "psx"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:BlackLabelHQ/MediEvilRecomp",
+   "builds": "linux",
+   "linuxAsset": "^MediEvilRecomp-.*-linux-x64\\.tar\\.gz$",
+   "windowsAsset": "^MediEvilRecomp-.*-windows-x64\\.zip$",
+   "program": "run.sh",
+   "needs": {
+    "what": "The North American (NTSC-U, SCUS-94227) PlayStation disc of MediEvil as a .cue with its two .bin tracks, or a .chd",
+    "files": "disc",
+    "ext": [
+     "cue",
+     "bin",
+     "chd"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Built on the same RecompOne runtime as SymphonyRecomp: on first start a disc picker pop-up asks for the .cue or .chd and saves it as CdPath in settings.json in the working folder. MediEvil sets no disc check of its own, so any readable image is accepted. run.sh installs the .NET 10 runtime into ~/.dotnet if missing, then starts the medievil program. It has its own auto-updater."
+   },
+   "done": "settings.json",
+   "saves": [
+    "carda.sav and cardb.sav (memory cards) in the working folder"
+   ],
+   "license": "MIT (RecompOne runtime); no licence file in MediEvilRecomp",
+   "description": "Static recompilation of MediEvil for PlayStation, with widescreen and better rendering options."
   },
   {
    "id": "psydoom",
@@ -2781,6 +2859,610 @@
    ],
    "license": "BSD-3-Clause",
    "description": "A static recompilation of the Xbox 360 Ace Combat 6 for Windows, built on the ReXGlue SDK, with 60 FPS and keyboard and mouse controls."
+  },
+  {
+   "id": "beanrecomp",
+   "name": "BeanRecomp",
+   "games": [
+    {
+     "title": "GoldenEye 007 (Xbox Live Arcade remaster, codename Bean)",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:Fable2Recomp/beanRecomp",
+   "builds": "none",
+   "needs": {
+    "what": "The Xbox 360 GoldenEye 007 Remastered (Xbox Live version) executable, used at build time",
+    "files": "folder",
+    "ext": [
+     "xex"
+    ],
+    "region": null,
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "none",
+    "notes": "Early groundwork only (PPC register handling, compiling the recompiled code); no runnable program and no releases. Last change March 2025."
+   },
+   "license": "MIT",
+   "description": "An early, unfinished static recompilation of the unreleased Xbox 360 GoldenEye 007 remaster using XenonRecomp, with nothing playable yet."
+  },
+  {
+   "id": "eternalsonatareprise",
+   "name": "Eternal Sonata: Reprise",
+   "games": [
+    {
+     "title": "Eternal Sonata",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:birabittoh/EternalSonataReprise",
+   "builds": "linux",
+   "linuxAsset": "^eternalsonata-.*-linux-amd64\\.tar\\.gz$",
+   "windowsAsset": "^eternalsonata-.*-win-amd64\\.zip$",
+   "prerelease": false,
+   "program": "eternalsonata",
+   "needs": {
+    "what": "An Xbox 360 disc image (.iso) of Eternal Sonata, PAL, USA or Japanese release (USA and JP default.xex are patched into the PAL one); title updates optional",
+    "files": "disc",
+    "ext": [
+     "iso"
+    ],
+    "region": "any",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "On first start it asks for the game (an ISO, or an already extracted folder) and extracts it into assets/ beside the program, then writes game_data_root to eternalsonata.toml. The extracted default.xex must match SHA-256 91184E77...949501E after patching. An empty portable.txt beside the program keeps saves there instead."
+   },
+   "done": "assets/default.xex",
+   "saves": [
+    "~/.local/share/eternalsonata (ReXGlue user folder: XDG_DATA_HOME/<app name>); user/ beside the program with portable.txt"
+   ],
+   "achievements": {
+    "format": "rexglue"
+   },
+   "license": "MIT",
+   "description": "A static recompilation of Eternal Sonata for Xbox 360, built on a ReXGlue SDK fork, running natively on Linux and Windows with mod support."
+  },
+  {
+   "id": "fable2recomp",
+   "name": "Fable2Recomp",
+   "games": [
+    {
+     "title": "Fable II",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:Fable2Recomp/Fable2Recomp",
+   "builds": "none",
+   "needs": {
+    "what": "The Xbox 360 game files of Fable II (Game of the Year edition with title update 1) extracted into the assets folder",
+    "files": "folder",
+    "ext": [
+     "xex"
+    ],
+    "region": null,
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "place",
+    "place": "assets/ (game files, needed at build time for code generation)",
+    "notes": "Work in progress with no releases: it has to be built from source with the ReXGlue SDK and the game's files."
+   },
+   "license": "MIT",
+   "description": "A work-in-progress static recompilation of Fable II for Xbox 360, built on the ReXGlue SDK, with no released builds yet."
+  },
+  {
+   "id": "larecomp",
+   "name": "LARecomp",
+   "games": [
+    {
+     "title": "Midnight Club: Los Angeles",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:mzzvxm/larecomp",
+   "builds": "none",
+   "program": "larecomp.exe",
+   "needs": {
+    "what": "Midnight Club: Los Angeles (Complete Edition, US Xbox 360) extracted from the disc: a folder holding default.xex and the xarchive_*.rpf archives, or the disc as an ISO for its install wizard",
+    "files": "folder",
+    "ext": [
+     "xex",
+     "rpf",
+     "iso"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "place",
+    "place": "MCLA_Game_Files/ (or game/ or assets/) next to the program or a folder above it, holding default.xex and xarchive_*.rpf",
+    "arg": "--game_data_root={FILE}",
+    "notes": "Also reads the MCLA_GAME_DATA environment variable. With no game data found, an ISO install wizard offers to extract the disc. A folder only counts with default.xex and at least one archive. Can import saves from Xenia or RPCS3 on first run. Recommended to run with --clock_no_scaling=true (works around a frame rate collapse) and REX_LOG_LEVEL=warn."
+   },
+   "saves": [
+    "Documents/larecomp inside the Proton prefix (ReXGlue user data folder)"
+   ],
+   "achievements": {
+    "format": "rexglue"
+   },
+   "description": "A static recompilation of the Xbox 360 Midnight Club: Los Angeles for Windows, built on the ReXGlue SDK, with correct physics above 30 FPS and an in-game settings menu."
+  },
+  {
+   "id": "lostodysseyrecomp",
+   "name": "Lost Odyssey Recomp",
+   "games": [
+    {
+     "title": "Lost Odyssey",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:freefrank/LostOdysseyRecomp",
+   "builds": "linux",
+   "linuxAsset": "^LostOdysseyRecomp-linux-x64-.*\\.AppImage$",
+   "windowsAsset": "^LostOdysseyRecomp-windows-x64-.*\\.zip$",
+   "prerelease": false,
+   "program": "LostOdysseyRecomp-linux-x64-<tag>.AppImage",
+   "needs": {
+    "what": "The four Xbox 360 discs of Lost Odyssey (title ID 4D5307FA), either the USA/Europe set or the Asian multilingual set, not mixed; disc 1 is enough to start. Extracted folders, default.xex, ISOs or Games on Demand data. No title updates or modified XEX.",
+    "files": "several",
+    "ext": [
+     "iso",
+     "xex"
+    ],
+    "region": "any",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "arg": "--game \"{FILE}\"",
+    "notes": "An importer opens when no game is found and copies the discs into game/disc1..disc4 (and dlc/) in its data folder; other discs and DLC are added later in Settings, System, Import discs & DLC. --game <folder or default.xex> skips the importer. On first start it offers to download precompiled shaders. LO_NO_UPDATE=1 skips its update check."
+   },
+   "done": "~/.local/share/lost-odyssey-recomp/game/disc1",
+   "saves": [
+    "~/.local/share/lost-odyssey-recomp/save/ and profile/ (AppImage); settings in ~/.config/lost-odyssey-recomp/settings.ini"
+   ],
+   "license": "GPL-3.0",
+   "description": "A native port of Lost Odyssey for Xbox 360 made with XenonRecomp, with high frame rates, modern upscalers, HDR and a debug menu."
+  },
+  {
+   "id": "marathonrecomp",
+   "name": "Marathon Recompiled",
+   "games": [
+    {
+     "title": "Sonic the Hedgehog (2006)",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:sonicnext-dev/MarathonRecomp",
+   "builds": "none",
+   "program": "MarathonRecomp",
+   "needs": {
+    "what": "Sonic the Hedgehog (2006) for Xbox 360 (not the PS3 version) dumped as containers/images or raw folders, with a Title Update of the same region; the episode and mission pack DLC are optional",
+    "files": "several",
+    "ext": [
+     "iso"
+    ],
+    "region": "any",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "Same installer wizard as Unleashed Recompiled (Add Files or Add Folder, original unmodified files only, disc and Title Update from the same region); writes game/, decrypted/ and dlc/ beside the program (Flatpak build: ~/.var/app/io.github.sonicnext_dev.marathonrecomp/data). --install forces the installer again. The README says it is still in development and not meant for public use; no releases exist."
+   },
+   "done": "game/default.xex",
+   "saves": [
+    "~/.config/MarathonRecomp/save (SonicNextSaveData.bin)"
+   ],
+   "achievements": {
+    "format": "hedge",
+    "user": "MarathonRecomp",
+    "file": "SonicNextAchievementData.bin"
+   },
+   "license": "GPL-3.0",
+   "description": "An unofficial PC port of the Xbox 360 Sonic the Hedgehog (2006) made by static recompilation, for Windows, Linux and macOS, still in development."
+  },
+  {
+   "id": "openmbu",
+   "name": "OpenMBU",
+   "games": [
+    {
+     "title": "Marble Blast Ultra",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "reimplementation",
+   "repo": "github:MBU-Team/OpenMBU",
+   "site": "https://marbleblastultra.com/",
+   "builds": "windows",
+   "windowsAsset": "^OpenMBU-.*\\.zip$",
+   "program": "MBUltra64.exe",
+   "setup": {
+    "how": "none",
+    "notes": "Complete game in the zip (scripts, missions, art), no game files needed. The release holds MBUltra.exe (32-bit), MBUltra64.exe and debug builds plus D3D9/OpenAL DLLs, so it runs through Proton. Linux builds exist only as CI artifacts."
+   },
+   "saves": [
+    "prefs.cs files in the game folder (marble/client/prefs.cs, written by Torque's export)"
+   ],
+   "license": "OpenMBU Fan Revival License (non-commercial)",
+   "description": "A fan revival of the Xbox Live Arcade game Marble Blast Ultra on its original Torque engine source, with controller options, fan-made levels and Discord support."
+  },
+  {
+   "id": "pgr4-recomp",
+   "name": "PGR4-Recomp",
+   "games": [
+    {
+     "title": "Project Gotham Racing 4",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:beatrixzy/PGR4-Recomp",
+   "builds": "windows",
+   "windowsAsset": "^PGR4-Recomp-.*\\.zip$",
+   "prerelease": false,
+   "program": "pgr4_recomp.exe",
+   "args": "--execute_unclipped_draw_vs_on_cpu --gpu_plugin=\"xenos\"",
+   "needs": {
+    "what": "Project Gotham Racing 4 for Xbox 360 extracted from the disc into a folder holding default.xex (a Games on Demand dump converted with god2iso first, then extracted with extract-xiso)",
+    "files": "folder",
+    "ext": [
+     "xex"
+    ],
+    "region": null,
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "path",
+    "arg": "--game_data_root \"{FILE}\"",
+    "notes": "The game will not launch without --execute_unclipped_draw_vs_on_cpu --gpu_plugin=\"xenos\" as well. The zip has one top folder, PGR4-Recomp-v1.2.1/, with pgr4_recomp.exe, rexruntime.dll, rexgpu-xenos*.dll and a run.bat holding the same arguments. The project's SteamOS steps use Proton Experimental. Quote the path (a game on another drive misbehaves otherwise)."
+   },
+   "saves": [
+    "Documents/pgr4_recompiled inside the Proton prefix (ReXGlue user data folder)"
+   ],
+   "license": "MIT",
+   "description": "A work-in-progress static recompilation of the Xbox 360 Project Gotham Racing 4 for Windows, built on the ReXGlue SDK."
+  },
+  {
+   "id": "rb2-dbz1",
+   "name": "rb2: Dragon Ball Z Budokai HD Recompiled",
+   "games": [
+    {
+     "title": "Dragon Ball Z: Budokai HD Collection",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:WistfulHopes/DBZ1",
+   "builds": "windows",
+   "windowsAsset": "^dbz1\\.exe$",
+   "program": "dbz1.exe",
+   "needs": {
+    "what": "The Xbox 360 game files of Dragon Ball Z: Budokai HD (default.xex and the rest of the disc) extracted into a folder",
+    "files": "folder",
+    "ext": [
+     "xex"
+    ],
+    "region": null,
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "path",
+    "place": "assets/ next to dbz1.exe (used when no path is given)",
+    "arg": "\"Z:{FILE}\"",
+    "notes": "Takes the game folder (the one holding default.xex) as its first argument; without one it uses assets/ beside the program. Release is a single bare dbz1.exe, so it runs through Proton."
+   },
+   "license": "BSD-3-Clause",
+   "description": "An early static recompilation of Dragon Ball Z: Budokai HD for Xbox 360, built on the ReXGlue SDK."
+  },
+  {
+   "id": "reblue",
+   "name": "re:Blue",
+   "games": [
+    {
+     "title": "Blue Dragon",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:zolaware/reblue",
+   "builds": "linux",
+   "linuxAsset": "^reblue-.*-x86_64\\.AppImage$",
+   "windowsAsset": "^reblue-.*-win-amd64\\.zip$",
+   "prerelease": false,
+   "program": "reblue-<version>-x86_64.AppImage",
+   "needs": {
+    "what": "Disc images of all three discs of the Global (US/EU) Xbox 360 release of Blue Dragon (.iso, or Games on Demand packages); DLC optional",
+    "files": "several",
+    "ext": [
+     "iso"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "First start opens a setup wizard that asks for each of the three disc images in turn (checked by title ID 4D5307DF), an install folder and a graphics preset, copies the game files into <install>/game/ and copies itself there. From the AppImage the default install folder is ~/.config/reblue. The install is recorded in ~/.config/reblue/install.toml. --repair reopens the wizard; --profile <name> picks a save profile. Japanese and Asian discs not supported yet."
+   },
+   "done": "~/.config/reblue/install.toml",
+   "saves": [
+    "<install folder>/profiles/default/ (saves, reblue.toml settings, achievements); default install folder ~/.config/reblue"
+   ],
+   "achievements": {
+    "format": "rexglue",
+    "file": "<install folder>/profiles/default/achievements/4D5307DF.toml"
+   },
+   "license": "BSD-3-Clause",
+   "description": "A static recompilation of Blue Dragon for Xbox 360 built on the ReXGlue SDK, with high resolutions, unlocked frame rate, save anywhere, mods and DLC support."
+  },
+  {
+   "id": "naughtybear-restuff",
+   "name": "ReStuff",
+   "games": [
+    {
+     "title": "Naughty Bear",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:MaxDeadBear/NaughtyBear_ReStuff",
+   "builds": "linux",
+   "linuxAsset": "^ReStuff-linux-x64\\.tar\\.gz$",
+   "windowsAsset": "^restuff-win-x64\\.zip$",
+   "prerelease": false,
+   "program": "restuff",
+   "needs": {
+    "what": "Naughty Bear: Gold Edition for Xbox 360, with the disc's contents extracted straight into assets/ so that assets/Default.xex exists",
+    "files": "folder",
+    "ext": [
+     "xex"
+    ],
+    "region": null,
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "place",
+    "place": "assets/ next to the program (the Linux build ships ReStuff-linux64/assets/PUT_GAME_FILES_HERE.txt); the files go directly in assets/, not a subfolder",
+    "arg": "--game_data_root={FILE}",
+    "notes": "Looks for assets/Default.xex from the working folder and the program's folder upwards. The Linux archive has one top folder, ReStuff-linux64/, with restuff, librexruntime.so, librexgpu-xenos.so and libshaderc_shared.so.1. prewarm_shaders.sh warms shader caches (optional). restuff.toml is created only if missing. The project's own instructions point to the Goopie launcher, which dumps the ISO."
+   },
+   "done": "assets/Default.xex",
+   "saves": [
+    "~/.local/share/restuff ($XDG_DATA_HOME/restuff; ReXGlue user data folder)"
+   ],
+   "description": "A static recompilation of the Xbox 360 Naughty Bear: Gold Edition built on the ReXGlue SDK, with a native Vulkan renderer, 60 FPS and optional cheats."
+  },
+  {
+   "id": "retip",
+   "name": "ReTiP",
+   "games": [
+    {
+     "title": "Viva Pinata: Trouble in Paradise",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:SolarCookies/TiP-Recomp",
+   "site": "https://gamejolt.com/games/retip/1087631",
+   "builds": "linux",
+   "linuxAsset": "^retip_.*_linux\\.tar\\.xz$",
+   "windowsAsset": "^retip_.*_windows\\.zip$",
+   "prerelease": false,
+   "program": "retip_",
+   "needs": {
+    "what": "The retail Viva Pinata: Trouble in Paradise Xbox 360 disc as an .iso",
+    "files": "disc",
+    "ext": [
+     "iso"
+    ],
+    "region": null,
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "On first run it asks for the .iso and extracts it (the public source looks for the game in assets/ beside the program, assets/default.xex). The Linux archive has no top folder: retip_ (the program), librexruntimerd.so, retip.toml, retip_pipelines.bin, rexcrashreporter and a retip/ folder. F5 opens the mod manager (Thunderstore browser), F4 the settings. Also on GameJolt, which adds GameJolt trophies."
+   },
+   "done": "assets/default.xex",
+   "saves": [
+    "~/.local/share/retip (ReXGlue user data folder)"
+   ],
+   "description": "A static recompilation of the Xbox 360 Viva Pinata: Trouble in Paradise for Windows and Linux with a native renderer, unlocked frame rate and built-in mod support."
+  },
+  {
+   "id": "saintsreborn",
+   "name": "Saints Reborn",
+   "games": [
+    {
+     "title": "Saints Row (2006)",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:whompay/SaintsReborn",
+   "builds": "none",
+   "prerelease": false,
+   "program": "saintsrow.exe",
+   "needs": {
+    "what": "Your own Saints Row (Xbox 360) disc as an .iso, or a folder of its files holding default.xex and packfiles; only the disc version the port was made with is supported",
+    "files": "disc",
+    "ext": [
+     "iso",
+     "xex"
+    ],
+    "region": null,
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "none",
+    "notes": "Releases carry only SaintsReborn-Setup.exe, a Windows installer that downloads a 1.5 GB toolchain and compiles the game from your disc (10 to 60 minutes); the game ends up in dist/ with saintsrow.exe and WhompaysModLoader.exe. Linux Setup is 'coming soon' (to be played through Proton). Options are files beside saintsrow.exe (res_scale.txt, start_windowed, fps_cap.txt)."
+   },
+   "done": "dist/saintsrow.exe",
+   "saves": [
+    "dist/game (beside saintsrow.exe)"
+   ],
+   "license": "Apache-2.0",
+   "description": "An unofficial native Windows port of the Xbox 360 Saints Row, statically recompiled with the ReXGlue SDK and built on your own PC from your own disc, with co-op, 60 FPS and keyboard and mouse."
+  },
+  {
+   "id": "sk82-recomp",
+   "name": "Skate 2 Recompilation Project",
+   "games": [
+    {
+     "title": "Skate 2",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:Skate-2-Team/sk82-recomp",
+   "builds": "none",
+   "needs": {
+    "what": "A legally obtained copy of Skate 2 for Xbox 360",
+    "files": "disc",
+    "ext": [],
+    "region": null,
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "none",
+    "notes": "Early-stage project using XenonRecomp; the README says it is no longer being worked on. No builds."
+   },
+   "description": "An abandoned, early-stage attempt to recompile the Xbox 360 Skate 2 into a native program with XenonRecomp."
+  },
+  {
+   "id": "skate3recomp",
+   "name": "Skate 3 Recomp",
+   "games": [
+    {
+     "title": "Skate 3",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:mchughalex/skate3recomp",
+   "builds": "linux",
+   "linuxAsset": "^Skate3Recomp-Linux\\.zip$",
+   "windowsAsset": "^Skate3Recomp-Windows\\.zip$",
+   "program": "skate3",
+   "needs": {
+    "what": "Your own Xbox 360 Skate 3 disc as an .iso; the program extracts it and then stages Title Update 3 (downloaded for you, or a TU_12K2276_000000C000000.00000000000O3 package you pick)",
+    "files": "disc",
+    "ext": [
+     "iso"
+    ],
+    "region": null,
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "First run shows 'Select ISO'; the disc is extracted into game/ beside the program (game/default.xex). Release builds also need Title Update 3 staged (game/default.xexp and game/data/webkit/EAWebkit.xexp, checked by SHA-256); the program downloads it from xboxunity.net by default. The Linux zip has one top folder, Skate3Recomp-Linux/, with skate3 and librexruntime.so. DLC packages go in a dlc/ folder. The author notes the Windows build through Proton may run better on some hardware."
+   },
+   "done": "game/default.xexp",
+   "saves": [
+    "~/.local/share/skate3 (user data folder; $XDG_DATA_HOME/skate3)",
+    "saves/ beside the program when that folder exists",
+    "the program's folder when portable.txt exists there"
+   ],
+   "description": "An unofficial native recompilation of the Xbox 360 Skate 3 for Windows, Linux and macOS, with a native Direct3D 12 and Vulkan renderer, ultrawide and keyboard controls."
+  },
+  {
+   "id": "svr07-recomp",
+   "name": "SVR07-Recomp",
+   "games": [
+    {
+     "title": "WWE SmackDown vs. Raw 2007",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:HollywoodAkeem/SVR07-Recomp",
+   "builds": "windows",
+   "windowsAsset": "^svr07\\.zip$",
+   "program": "svr07.exe",
+   "needs": {
+    "what": "A retail WWE SmackDown vs. Raw 2007 Xbox 360 disc (USA/Canada recommended), ripped and with its files extracted; a title update can go in assets/1_update",
+    "files": "folder",
+    "ext": [
+     "xex"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "place",
+    "place": "assets/ next to svr07.exe, holding the extracted game files (assets/default.xex)",
+    "notes": "The zip has no top folder: svr07.exe, a small 'Smackdown vs Raw 2007.exe', README, LICENSE, DISCLAIMER. The code points the title update mount at \\assets\\1_update. Windows only (Direct3D 12), so it runs through Proton. About one session in ten ends in a GPU device-lost crash."
+   },
+   "saves": [
+    "Documents/svr07 inside the Proton prefix (ReXGlue user data folder)"
+   ],
+   "license": "BSD-3-Clause",
+   "description": "A static recompilation of the Xbox 360 WWE SmackDown vs. Raw 2007 for Windows, built on a fork of the ReXGlue SDK, playable end to end at 60 FPS."
+  },
+  {
+   "id": "unleashedrecomp",
+   "name": "Unleashed Recompiled",
+   "games": [
+    {
+     "title": "Sonic Unleashed",
+     "console": "xbox360"
+    }
+   ],
+   "origin": "recomp",
+   "repo": "github:hedge-dev/UnleashedRecomp",
+   "builds": "linux",
+   "linuxAsset": "^UnleashedRecomp-Flatpak\\.zip$",
+   "windowsAsset": "^UnleashedRecomp-Windows\\.zip$",
+   "prerelease": false,
+   "program": "io.github.hedge_dev.unleashedrecomp.flatpak",
+   "needs": {
+    "what": "Sonic Unleashed for Xbox 360 (US or EU, not JP), retail disc or digital copy, plus its Title Update; the Adventure Pack DLC are optional but recommended. Dumped from an Xbox 360 as containers/images or raw folders",
+    "files": "several",
+    "ext": [
+     "iso"
+    ],
+    "region": "US",
+    "md5": [],
+    "sha1": []
+   },
+   "setup": {
+    "how": "picker",
+    "notes": "The Linux release is a Flatpak bundle (io.github.hedge_dev.unleashedrecomp.flatpak inside the zip), installed with flatpak install; it installs game data only to ~/.var/app/io.github.hedge_dev.unleashedrecomp/data. First run opens an installer wizard (Add Files for containers or images, Add Folder for raw files) that checks the files against known hashes and writes game/, update/, patched/ and dlc/. In Game Mode on a Steam Deck the file picker may need one Desktop Mode boot first. EU copies are accepted too."
+   },
+   "done": "~/.var/app/io.github.hedge_dev.unleashedrecomp/data/patched/default.xex",
+   "saves": [
+    "~/.config/UnleashedRecomp/save",
+    "~/.config/UnleashedRecomp/mlsave (with Hedge Mod Manager's save redirection)"
+   ],
+   "achievements": {
+    "format": "hedge",
+    "user": "UnleashedRecomp",
+    "file": "ACH-DATA"
+   },
+   "license": "GPL-3.0",
+   "description": "An unofficial PC port of the Xbox 360 Sonic Unleashed made by static recompilation, for Windows and Linux, with high resolutions, ultrawide, high frame rates and modding."
   }
  ]
 }

@@ -329,7 +329,7 @@ function createRecomps(ctx) {
     if (!e) throw new Error('That recomp isn’t in the list.');
     if (!repoOf(e.repo)) throw new Error(e.builds === 'site' ? `${e.name} is downloaded from its own site, not GitHub. Open its page.` : `${e.name} doesn’t publish builds: it has to be built from its source.`);
     const prev = installs[id] || null;
-    if (prev && exists(prev.program) && ctx.isRunning(prev.program)) throw new Error(`Close ${e.name} first.`);
+    if (prev && exists(prev.program) && ctx.isRunning(prev.flatpak || prev.program)) throw new Error(`Close ${e.name} first.`);
     const ch = channel || prev?.channel || 'stable';
     onProgress({ step: 'check', pct: null });
     const rel = await releaseOf(e, { pre: ch === 'pre', fetchImpl: ctx.fetchImpl });
@@ -377,6 +377,18 @@ function createRecomps(ctx) {
         fs.rmSync(one, { force: true });
         inner = deeper;
       }
+      // a Flatpak bundle (Unleashed Recompiled's Linux release): installed for this user and started through flatpak
+      const bundle = /\.flatpak$/i.test(nm) ? tmpNow : FV.filesOf(inner).map((r) => path.join(inner, r)).find((r) => /\.flatpak$/i.test(r));
+      if (bundle) {
+        if (!ctx.flatpakBundle) throw new Error('Flatpak isn’t available here, and this recomp’s Linux release is a Flatpak.');
+        const appId = await ctx.flatpakBundle(bundle);
+        fs.mkdirSync(dest, { recursive: true });
+        installs[id] = { ...(prev || {}), id, repo: e.repo, dir: dest, program: '/usr/bin/flatpak', args: `run ${appId}`, flatpak: appId, kind: 'flatpak', tag: rel.tag, date: rel.date, files: [], channel: ch, at: Date.now(), asset: b.asset.name };
+        saveInstalls();
+        latest[id] = { tag: rel.tag, date: rel.date, kind: 'flatpak', name: b.asset.name, at: Date.now(), channel: ch }; writeJson(F('recomp-latest.json'), latest);
+        log('recomp', prev ? 'updated' : 'installed', id, rel.tag, 'flatpak', appId);
+        return { tag: rel.tag, kind: 'flatpak', program: '/usr/bin/flatpak', dir: dest, updated: !!prev, programMoved: false, restored: checkSaves(meta).restored, backedUp: !!meta };
+      }
       // a Linux archive with no Linux program but a Windows one inside is a Windows build after all
       const C = require('./customEmu');
       const entries = FV.filesOf(inner).map((rel2) => { const p = path.join(inner, rel2); let size = 0; try { size = fs.statSync(p).size; } catch {} return { rel: rel2, path: p, size, appimage: /\.appimage$/i.test(rel2) || !!ctx.appImageType?.(p), elf: !!ctx.isElf?.(p) }; });
@@ -414,6 +426,7 @@ function createRecomps(ctx) {
   function useVersion(id, tag) {
     const rec = installs[id];
     if (!rec) throw new Error('That recomp isn’t installed.');
+    if (rec.kind === 'flatpak') throw new Error('A Flatpak recomp keeps no earlier versions here: Flatpak updates it.');
     if (ctx.isRunning(rec.program)) throw new Error(`Close ${byId(id)?.name || 'it'} first.`);
     const FV = require('./forkVersions'), store = FV.storeOf(path.dirname(rec.dir), path.basename(rec.dir));
     const meta = backupSaves(id, 'switch version');
@@ -436,8 +449,9 @@ function createRecomps(ctx) {
   async function remove(id) {
     const rec = installs[id];
     if (!rec) throw new Error('That recomp isn’t installed.');
-    if (exists(rec.program) && ctx.isRunning(rec.program)) throw new Error(`Close ${byId(id)?.name || 'it'} first.`);
+    if (exists(rec.program) && ctx.isRunning(rec.flatpak || rec.program)) throw new Error(`Close ${byId(id)?.name || 'it'} first.`);
     const meta = backupSaves(id, 'remove');
+    if (rec.flatpak) await ctx.flatpakRemove?.(rec.flatpak).catch((er) => log('recomp flatpak remove', er.message)); // its own data stays, as Flatpak keeps it
     if (fs.existsSync(rec.dir)) await ctx.trash(rec.dir);
     const FV = require('./forkVersions'), store = FV.storeOf(path.dirname(rec.dir), path.basename(rec.dir));
     if (fs.existsSync(store)) await ctx.trash(store).catch(() => {});

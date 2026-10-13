@@ -66,7 +66,9 @@ function locate(it, { home = os.homedir(), env = process.env } = {}) {
   const ach = it.ach || {};
   if (ach.format === 'hedge' && ach.user && ach.file) {
     const portable = fs.existsSync(path.join(it.dir, 'portable.txt')) ? [path.join(it.dir, 'save', ach.file)] : [];
-    const files = [...portable, path.join(home, '.config', ach.user, 'save', ach.file), path.join(home, '.' + ach.user, 'save', ach.file)].filter((f) => fs.existsSync(f));
+    // a Flatpak build (Unleashed's Linux release) keeps it inside its own sandbox folder
+    const fpk = it.flatpak ? [path.join(home, '.var/app', it.flatpak, 'config', ach.user, 'save', ach.file), path.join(home, '.var/app', it.flatpak, '.' + ach.user, 'save', ach.file)] : [];
+    const files = [...portable, ...fpk, path.join(home, '.config', ach.user, 'save', ach.file), path.join(home, '.' + ach.user, 'save', ach.file)].filter((f) => fs.existsSync(f));
     return files.length ? { format: 'hedge', files: files.slice(0, 1), meta: null } : null;
   }
   // ReXGlue: its achievements.toml beside the program marks it; the unlock folder is named after the app
@@ -76,7 +78,10 @@ function locate(it, { home = os.homedir(), env = process.env } = {}) {
   const want = [ach.user, it.name, path.basename(it.program || '', path.extname(it.program || ''))].filter(Boolean).map(norm);
   const apps = ach.user ? [ach.user] : ls(data).filter((n) => want.some((w) => w && (norm(n) === w || norm(n).includes(w) || w.includes(norm(n)))) && norm(n).length > 3);
   const files = [];
-  for (const a of apps) for (const f of ls(path.join(data, a, 'achievements'))) if (/^[0-9A-F]{8}\.toml$/i.test(f)) files.push(path.join(data, a, 'achievements', f));
+  const take = (d) => { for (const f of ls(d)) if (/^[0-9A-F]{8}\.toml$/i.test(f)) files.push(path.join(d, f)); };
+  for (const a of apps) take(path.join(data, a, 'achievements'));
+  // projects that keep profiles (re:Blue: profiles/<name>/achievements/<TITLEID>.toml), beside the program or in its own folder
+  for (const base of [it.dir, ...(ach.user ? [path.join(home, '.config', ach.user), path.join(data, ach.user)] : [])]) for (const p of ls(path.join(base || '', 'profiles'))) take(path.join(base, 'profiles', p, 'achievements'));
   return { format: 'rexglue', files, meta };
 }
 // one recomp's achievements as a trophy-source game (trophies.js): every one the recomp lists, unlocked or not;

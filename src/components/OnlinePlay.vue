@@ -12,7 +12,8 @@
       <section v-for="e in data.emus" :key="e.emu" class="op-emu">
         <div class="con-head"><EmuIcon :id="e.emu" :size="30" fallback="mdiGamepadVariantOutline" /><b>{{ e.label }}</b><span v-if="e.version" class="muted small">{{ e.version }}</span><span v-if="e.running" class="status warn">Open now: close it to change these</span></div>
         <div v-for="k in e.kinds" :key="k.id" class="op-kind">
-          <Toggle :model-value="k.on" :label="k.name" :desc="k.what" :disabled="busy || e.running || k.locked" @update:model-value="(v) => turn(e, k, v)" />
+          <div v-if="k.info" class="op-info"><b>{{ k.name }}</b><span v-if="k.ready !== null" class="status" :class="k.ready ? 'ok' : 'warn'">{{ k.ready ? 'Ready' : 'Not Set Up' }}</span><p class="muted small">{{ k.what }}</p></div>
+          <Toggle v-else :model-value="k.on" :label="k.name" :desc="k.what" :disabled="busy || e.running || k.locked" @update:model-value="(v) => turn(e, k, v)" />
           <div v-if="k.on || k.showFields" class="op-fields">
             <button v-for="f in k.fields" :key="f.key" class="lrow" data-focus :disabled="busy || e.running" @click="edit(e, k, f)">
               <Icon :name="f.icon || 'mdiTextBoxOutline'" :size="22" />
@@ -79,5 +80,7 @@ async function act(e, k, a) {
 .op-note, .op-foot { margin: 0; overflow-wrap: anywhere; }
 .op-issues { display: flex; flex-direction: column; gap: 6px; }
 .op-issue { display: flex; gap: 8px; align-items: flex-start; color: var(--gold, #ffd978); overflow-wrap: anywhere; }
+.op-info { display: flex; flex-wrap: wrap; align-items: center; gap: 6px var(--s-2); }
+.op-info p { flex: 1 1 100%; margin: 0; overflow-wrap: anywhere; }
 .op-empty { padding: var(--s-3) 0; }
 </style>

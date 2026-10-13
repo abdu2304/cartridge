@@ -1,6 +1,6 @@
 # Recomp catalogue
 
-Built 2026-10-10 by `tools/recomps/build.js` from the researched entries. Source list: PCGamingWiki's "List of unofficial ports", console sections only (owner's choice), status notes ignored (owner). Each project was checked from its own repository: tags, release files (a download answering 302), CI, README and source. Entries are shipped in `electron/recomps.json` without the notes below.
+Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source list: PCGamingWiki's "List of unofficial ports", console sections only (owner's choice), status notes ignored (owner). Each project was checked from its own repository: tags, release files (a download answering 302), CI, README and source. Entries are shipped in `electron/recomps.json` without the notes below.
 
 ## Arcade
 
@@ -632,6 +632,16 @@ Built 2026-10-10 by `tools/recomps/build.js` from the researched entries. Source
 - Sources: README.md (setup guide: US ROM CPUE01, first-launch extraction dialog, files extracted beside main, language files); platinum.us/rom_rev0.sha1, rom_rev1.sha1 (ROM SHA-1, revisions 0 and 1); https://github.com/cybervisi0n/pokeplatinum/releases/expanded_assets/v0.1.11 (via WebFetch); curl -I release_linux.zip 302; zls.py listing; tools/scripts/package_artifacts_linux.sh
 - Not certain: Save location not found; done file assumes extraction writes msgdata/ beside the program; Whether both ROM revisions are accepted by the port is not stated; README only says US (CPUE01); Which of main and pokeplatinum.AppImage to run on Linux: both ship; AppImage assumed
 
+### Pokémon Platinum PC Port
+
+- Games: Pokémon Platinum Version
+- Project: github:cybervisi0n/pokeplatinum
+- Builds: Linux build, newest checked v0.1.11 (release_linux.zip, release_win64.zip)
+- Needs: The US Pokémon Platinum DS ROM (CPUE01) as an .nds file (hashes listed by the project)
+- Setup: picker. On first launch a dialog asks for the .nds ROM and its contents are extracted into the program folder; after that the game starts directly. The Linux zip holds pokeplatinum.AppImage, main, firmware.bin and header.bin. Swapping msgdata/msg.narc, msgdata/pl_msg.narc and msgdata/scenario/scr_msg.narc from another language changes most text. Tilde opens settings and debug tools.
+- Sources: README.md (setup guide: US ROM CPUE01, first-launch extraction dialog, files extracted beside main, language files); platinum.us/rom_rev0.sha1, rom_rev1.sha1 (ROM SHA-1, revisions 0 and 1); https://github.com/cybervisi0n/pokeplatinum/releases/expanded_assets/v0.1.11 (via WebFetch); curl -I release_linux.zip 302; zls.py listing; tools/scripts/package_artifacts_linux.sh
+- Not certain: Save location not found; done file assumes extraction writes msgdata/ beside the program; Whether both ROM revisions are accepted by the port is not stated; README only says US (CPUE01); Which of main and pokeplatinum.AppImage to run on Linux: both ship; AppImage assumed
+
 ## Wii
 
 ### Kirby Wii Recomp
@@ -657,6 +667,18 @@ Built 2026-10-10 by `tools/recomps/build.js` from the researched entries. Source
 - Not certain: Install needs a compiler toolchain path on Linux (options --cc, --cxx, --cmake, --ninja); whether the AppImage bundles them was not confirmed; done path is the setup's state file, which may exist before a successful build; Exact game program name inside the install folder not found
 
 ## Genesis
+
+### Sonic 3 A.I.R.
+
+- Games: Sonic 3 & Knuckles
+- Project: github:Eukaryot/sonic3air
+- Builds: Linux build, newest checked v26.03.28.0-stable (sonic3air_game.tar.gz, sonic3air_game.zip)
+- Needs: The Sonic 3 & Knuckles ROM from the Steam release (Sega Classics), Sonic_Knuckles_wSonic3.bin, 4 MB
+- Setup: place (Sonic_Knuckles_wSonic3.bin in ~/.local/share/Sonic3AIR/ (or next to sonic3air_linux, or the path in config.json RomPath)). On Linux there is no file picker: if the ROM is not found it shows an error and closes. It looks in its app data folder, the last known ROM path, config.json RomPath, the working folder, then Steam's 'steamapps/common/Sega Classics/uncompressed ROMs/' (native and Flatpak Steam). A ROM found elsewhere is copied into ~/.local/share/Sonic3AIR/. The ROM is checked by size (0x400000) and a Murmur2 64-bit checksum, not md5.
+- Saves: ~/.local/share/Sonic3AIR/storage/ (persistent data) and ~/.local/share/Sonic3AIR/savestates/; uses ./savedata beside the program instead if that folder exists
+- Achievements: Has its own in-game achievements, kept with its persistent data in ~/.local/share/Sonic3AIR/ (format not checked)
+- Sources: README.md (Sonic 3 - Angel Island Revisited, homepage sonic3air.org); curl -I releases/download/v26.03.28.0-stable/sonic3air_game.tar.gz 302, sonic3air_game.zip 302; test tags have only the zip; tar listing of sonic3air_game.tar.gz: sonic3air_game/sonic3air_linux, setup_linux.sh, config.json; Oxygen/sonic3air/source/sonic3air/ConfigurationImpl.cpp:36-45 (ROM size, checksum, Sonic_Knuckles_wSonic3.bin); Oxygen/oxygenengine/source/oxygen/resources/ResourcesCache.cpp:20-100 (search order, copy to app data); Oxygen/oxygenengine/source/oxygen/platform/PlatformFunctions.cpp:379-410 (Steam search paths); Oxygen/oxygenengine/source/oxygen/application/GameLoader.cpp:54-90 (dialog Windows only; Linux errors and closes); Oxygen/oxygenengine/source/oxygen/engine/EngineMain.cpp:383-395, 536-545 (app data path, savedata fallback, storage/ and savestates/); Oxygen/sonic3air/source/sonic3air/EngineDelegate.cpp:47 (app data folder Sonic3AIR); LICENSE (GPL-3.0)
+- Not certain: Newer -test and -preview tags exist (v26.08.15.0-test) without a Linux tar.gz; only -stable tags carry it, so pick the newest stable; The program reads data/ and config.json relative to the working folder: Start in should be sonic3air_game/; Whether a lock-on ROM dumped from cartridges is accepted is not checked (the checksum is taken after overwrites); Achievements storage format not checked
 
 ### Streets of Rage 2 New Era
 
@@ -702,6 +724,17 @@ Built 2026-10-10 by `tools/recomps/build.js` from the researched entries. Source
 - Saves: ~/.config/unity3d/Figglewatts/LSDR/saves, ~/.config/unity3d/Figglewatts/LSDR/settings.json
 - Sources: https://figglewatts.itch.io/lsd-revamped (lsdr-0.3.0-linux.zip, LSDR.x86_64, Player.log path, In development); LSDR/ProjectSettings/ProjectSettings.asset (companyName Figglewatts, productName LSDR, bundleVersion 0.3.0-pre.5); LSDR/Assets/Scripts/Game/GameSaveSystem.cs:35 (persistentDataPath/saves); LSDR/Assets/Scripts/Game/SettingsSystem.cs:71; git ls-remote: only tag 0.3.0-pre.1
 - Not certain: itch.io downloads may need the itch app or a browser; no direct URL; No sign in the source or the itch page that original game files are needed; treated as needing none; Still in development (pre-release versions)
+
+### MediEvil Recomp
+
+- Games: MediEvil
+- Project: github:BlackLabelHQ/MediEvilRecomp
+- Builds: Linux build, newest checked v0.2b (MediEvilRecomp-v0.2b-linux-x64.tar.gz, MediEvilRecomp-v0.2b-windows-x64.zip)
+- Needs: The North American (NTSC-U, SCUS-94227) PlayStation disc of MediEvil as a .cue with its two .bin tracks, or a .chd
+- Setup: picker. Built on the same RecompOne runtime as SymphonyRecomp: on first start a disc picker pop-up asks for the .cue or .chd and saves it as CdPath in settings.json in the working folder. MediEvil sets no disc check of its own, so any readable image is accepted. run.sh installs the .NET 10 runtime into ~/.dotnet if missing, then starts the medievil program. It has its own auto-updater.
+- Saves: carda.sav and cardb.sav (memory cards) in the working folder
+- Sources: .github/workflows/release.yml:44-68 (linux-x64 tar, windows-x64 zip), 99-122 (run.sh and medievil bundled, MediEvilRecomp-<tag>-<asset>.tar.gz); curl -I releases/download/v0.2b/MediEvilRecomp-v0.2b-linux-x64.tar.gz 302, windows-x64.zip 302; README.md (beta, North American disc, bin/cue or CHD); config/MediEvil.json:3 (SCUS-942.27); Program.cs (no DiscValidator set, Widescreen patches, AutoUpdater); RecompOne RecompOne.Runtime/Host/Window/HostWindow.cs:423-441 (DiscPickerPopup), Runtime.cs:39-50 (ValidateDisc only when a validator is set); RecompOne RecompOne.Runtime/Config/GameConfig.cs:87-88 (carda.sav, cardb.sav)
+- Not certain: Beta (tags end in b); unclear whether GitHub marks them pre-release; settings.json and memory cards are relative to the working folder, so Start in must be the program folder; Needs the .NET 10 runtime; run.sh downloads it into ~/.dotnet on first run (network needed); The batch row had no port name; MediEvilRecomp by BlackLabelHQ is the only port found
 
 ### PsyDoom
 
@@ -857,6 +890,204 @@ Built 2026-10-10 by `tools/recomps/build.js` from the researched entries. Source
 - Saves: Documents/ac6recomp inside the Proton prefix (ReXGlue user data folder: Windows Documents/<app name>)
 - Sources: README.md:4 (work in progress), 47-64 (Windows 10/11, AVX2, D3D12, US only, iso or assets/ beside exe, dlc/, ac6recomp.toml); src/ac6recomp_app.h:44-46 (title ID 0x4E4D07D1); rexglue-sdk src/ui/rex_app.cpp:116-121 and src/core/filesystem_win.cpp:55-58 (user data in Documents/<name>); github.com/sal063/AC6_recomp/releases/expanded_assets/v1.0.0-beta.2 (ac6recomp-1.0.0-beta.2.zip); curl -I releases/download/v1.0.0-beta.2/ac6recomp-1.0.0-beta.2.zip 302; LICENSE (BSD 3-Clause); zip listing: only ac6recomp.exe at the top level
 - Not certain: The batch row points at the dev-test branch; tag v1.0.0-beta.1 is on dev-test, beta.2 is the newest tag; Save location assumed from the ReXGlue SDK default; the game's saves may sit in a content subfolder of it; Built on ReXGlue but no achievements.toml in the repo, so achievements left null; The project's display name is not stated; 'AC6 Recomp' taken from the repo and program name
+
+### AC6 Recomp
+
+- Games: Ace Combat 6: Fires of Liberation
+- Project: github:sal063/AC6_recomp
+- Builds: Windows build (Proton), newest checked v1.0.0-beta.2 (ac6recomp-1.0.0-beta.2.zip)
+- Needs: The US Xbox 360 disc of Ace Combat 6 as an .iso (or its files extracted into an assets folder)
+- Setup: place (the .iso (any name) or an assets/ folder next to ac6recomp.exe; optional extracted DLC in dlc/). The image is picked by the game's title ID 4E4D07D1, so a wrong or damaged image is refused with a message. First run creates ac6recomp.toml beside the program. Needs AVX2 and Direct3D 12 (through Proton on Linux).
+- Saves: Documents/ac6recomp inside the Proton prefix (ReXGlue user data folder: Windows Documents/<app name>)
+- Sources: README.md:4 (work in progress), 47-64 (Windows 10/11, AVX2, D3D12, US only, iso or assets/ beside exe, dlc/, ac6recomp.toml); src/ac6recomp_app.h:44-46 (title ID 0x4E4D07D1); rexglue-sdk src/ui/rex_app.cpp:116-121 and src/core/filesystem_win.cpp:55-58 (user data in Documents/<name>); github.com/sal063/AC6_recomp/releases/expanded_assets/v1.0.0-beta.2 (ac6recomp-1.0.0-beta.2.zip); curl -I releases/download/v1.0.0-beta.2/ac6recomp-1.0.0-beta.2.zip 302; LICENSE (BSD 3-Clause); zip listing: only ac6recomp.exe at the top level
+- Not certain: The batch row points at the dev-test branch; tag v1.0.0-beta.1 is on dev-test, beta.2 is the newest tag; Save location assumed from the ReXGlue SDK default; the game's saves may sit in a content subfolder of it; Built on ReXGlue but no achievements.toml in the repo, so achievements left null; The project's display name is not stated; 'AC6 Recomp' taken from the repo and program name
+
+### BeanRecomp
+
+- Games: GoldenEye 007 (Xbox Live Arcade remaster, codename Bean)
+- Project: github:Fable2Recomp/beanRecomp
+- Builds: Build it yourself
+- Needs: The Xbox 360 GoldenEye 007 Remastered (Xbox Live version) executable, used at build time
+- Setup: none. Early groundwork only (PPC register handling, compiling the recompiled code); no runnable program and no releases. Last change March 2025.
+- Sources: README.md (GoldenEye 007 Remastered codename Bean, XenonRecomp, in development, build steps only); git ls-remote --tags: no tags; last commit 19 Mar 2025; LICENSE (MIT)
+- Not certain: Not playable; may be abandoned; The remaster was never officially released; the game title used here is descriptive
+
+### Eternal Sonata: Reprise
+
+- Games: Eternal Sonata
+- Project: github:birabittoh/EternalSonataReprise
+- Builds: Linux build, newest checked v1.2.5 (eternalsonata-v1.2.5-linux-amd64.tar.gz, eternalsonata-v1.2.5-win-amd64.zip)
+- Needs: An Xbox 360 disc image (.iso) of Eternal Sonata, PAL, USA or Japanese release (USA and JP default.xex are patched into the PAL one); title updates optional
+- Setup: picker. On first start it asks for the game (an ISO, or an already extracted folder) and extracts it into assets/ beside the program, then writes game_data_root to eternalsonata.toml. The extracted default.xex must match SHA-256 91184E77...949501E after patching. An empty portable.txt beside the program keeps saves there instead.
+- Saves: ~/.local/share/eternalsonata (ReXGlue user folder: XDG_DATA_HOME/<app name>); user/ beside the program with portable.txt
+- Achievements: {"format":"rexglue"}
+- Sources: README.md (pre-built releases, prompts to extract the game, PAL/USA/JAP assets, portable.txt, roots in eternalsonata.toml, user data default Documents/eternalsonata); .github/workflows/_build.yml:43-50,240-249 (eternalsonata-<tag>-<platform>), scripts/build.py:126-158 (Linux tar.gz with the program and .so files); curl -I releases/download/v1.2.5/eternalsonata-v1.2.5-linux-amd64.tar.gz 302, -win-amd64.zip 302; src/core/eternalsonata_app.h:188-205 (GameDataSelector, xex SHA-256, release patches); birabittoh/rexglue-sdk thedarkness src/system/game_data_selector.cpp:61-110 (extracts into <exe dir>/assets), src/core/filesystem_posix.cpp:96-104 and src/ui/rex_app.cpp:189-193 (user folder ~/.local/share/<name>); LICENSE (MIT)
+- Not certain: Achievements: has an achievements menu and the SDK's achievement manager, but no achievements.toml in the repo; names may come from the game's XDBF; README says user data defaults to Documents/eternalsonata (Windows wording); on Linux the SDK uses ~/.local/share/eternalsonata; Extraction writes assets/ beside the program, so the program folder must be writable
+
+### Fable2Recomp
+
+- Games: Fable II
+- Project: github:Fable2Recomp/Fable2Recomp
+- Builds: Build it yourself
+- Needs: The Xbox 360 game files of Fable II (Game of the Year edition with title update 1) extracted into the assets folder
+- Setup: place (assets/ (game files, needed at build time for code generation)). Work in progress with no releases: it has to be built from source with the ReXGlue SDK and the game's files.
+- Sources: README.md (work in progress, ReXGlue, based on Fable 2 GOTY TU1, build steps only); git ls-remote --tags: no tags; no .github/workflows in the repo; LICENSE (MIT)
+- Not certain: No releases; playability unknown; Exact files layout and region of the GOTY TU1 base not stated
+
+### LARecomp
+
+- Games: Midnight Club: Los Angeles
+- Project: github:mzzvxm/larecomp
+- Builds: Build it yourself
+- Needs: Midnight Club: Los Angeles (Complete Edition, US Xbox 360) extracted from the disc: a folder holding default.xex and the xarchive_*.rpf archives, or the disc as an ISO for its install wizard
+- Setup: place (MCLA_Game_Files/ (or game/ or assets/) next to the program or a folder above it, holding default.xex and xarchive_*.rpf) (--game_data_root={FILE}). Also reads the MCLA_GAME_DATA environment variable. With no game data found, an ISO install wizard offers to extract the disc. A folder only counts with default.xex and at least one archive. Can import saves from Xenia or RPCS3 on first run. Recommended to run with --clock_no_scaling=true (works around a frame rate collapse) and REX_LOG_LEVEL=warn.
+- Saves: Documents/larecomp inside the Proton prefix (ReXGlue user data folder)
+- Achievements: {"format":"rexglue"}
+- Sources: README.md:3 (Complete Edition, Windows x86-64, ReXGlue); README.md 'Game data' (default.xex + xarchive_*.rpf, --game_data_root, MCLA_GAME_DATA, MCLA_Game_Files/ game/ assets/ walking up, ISO wizard); README.md 'The frame rate collapse' (--clock_no_scaling=true); src/larecomp_app.h:85 (app name larecomp); src/achievements.toml; documentation/TECHNICAL_NOTES.md:3 (title ID 545407F8); git ls-remote --tags: no tags; README only gives build steps
+- Not certain: No releases or tags: build it yourself (Windows only, Clang + ReXGlue SDK 0.10.0); No LICENSE file in the repo; Save folder assumed from the ReXGlue SDK default (Documents/<app name>); Where the ISO wizard extracts to (runtime game_data_root default) was not confirmed; --clock_no_scaling=true is a recommended workaround, not strictly required, so args left null
+
+### Lost Odyssey Recomp
+
+- Games: Lost Odyssey
+- Project: github:freefrank/LostOdysseyRecomp
+- Builds: Linux build, newest checked v0.9.32 (LostOdysseyRecomp-linux-x64-v0.9.32.AppImage, LostOdysseyRecomp-windows-x64-v0.9.32.zip, LostOdysseyRecomp-linux-x64-v0.9.32.flatpak)
+- Needs: The four Xbox 360 discs of Lost Odyssey (title ID 4D5307FA), either the USA/Europe set or the Asian multilingual set, not mixed; disc 1 is enough to start. Extracted folders, default.xex, ISOs or Games on Demand data. No title updates or modified XEX.
+- Setup: picker (--game "{FILE}"). An importer opens when no game is found and copies the discs into game/disc1..disc4 (and dlc/) in its data folder; other discs and DLC are added later in Settings, System, Import discs & DLC. --game <folder or default.xex> skips the importer. On first start it offers to download precompiled shaders. LO_NO_UPDATE=1 skips its update check.
+- Saves: ~/.local/share/lost-odyssey-recomp/save/ and profile/ (AppImage); settings in ~/.config/lost-odyssey-recomp/settings.ini
+- Sources: README.md (Start playing table: package names, importer, files and folders, command-line options --game/--install); docs/INSTALLING.md:48-58 (title ID 4D5307FA, editions and media IDs, no title updates); .github/workflows/release.yml:20-43,483-497 (draft then published as latest, AppImage/zip/flatpak names); curl -I releases/download/v0.9.32/LostOdysseyRecomp-linux-x64-v0.9.32.AppImage 302, -windows-x64-v0.9.32.zip 302, .flatpak 302; CMakeLists.txt:64-109 (XenonRecomp); LICENSE (GPL-3.0)
+- Not certain: The done path assumes the importer's default location (game/ in the data folder); game-path.txt there can point elsewhere; Uses its own XenonRecomp-based runtime, not ReXGlue or hedge-dev's achievement format, so achievements left null; Asset names carry the tag with its leading v, unlike the README's <version> wording
+
+### Marathon Recompiled
+
+- Games: Sonic the Hedgehog (2006)
+- Project: github:sonicnext-dev/MarathonRecomp
+- Builds: Build it yourself
+- Needs: Sonic the Hedgehog (2006) for Xbox 360 (not the PS3 version) dumped as containers/images or raw folders, with a Title Update of the same region; the episode and mission pack DLC are optional
+- Setup: picker. Same installer wizard as Unleashed Recompiled (Add Files or Add Folder, original unmodified files only, disc and Title Update from the same region); writes game/, decrypted/ and dlc/ beside the program (Flatpak build: ~/.var/app/io.github.sonicnext_dev.marathonrecomp/data). --install forces the installer again. The README says it is still in development and not meant for public use; no releases exist.
+- Saves: ~/.config/MarathonRecomp/save (SonicNextSaveData.bin)
+- Achievements: {"format":"hedge","user":"MarathonRecomp","file":"SonicNextAchievementData.bin"}
+- Sources: README.md:7-10 (not meant for public use until an official release; Windows, Linux, macOS); README.md:46-48 (builds only from the Releases page), 58-62 (installer rules, same region), 104-119 (~/.config/MarathonRecomp, portable.txt, --install), 130-132 (Flatpak data folder), 139-141 (no PS3 files); WebFetch github.com/sonicnext-dev/MarathonRecomp/releases: 'There aren't any releases here'; git ls-remote --tags: none; MarathonRecomp/user/paths.h:5, 30-45 (save folder, SonicNextSaveData.bin); MarathonRecomp/user/achievement_data.h:5 (SonicNextAchievementData.bin); MarathonRecomp/install/installer.cpp:20-29, 312-326 (game/, decrypted/, dlc/); COPYING (GPL 3)
+- Not certain: No releases yet: build it yourself; a Switch port (Marathon Recompiled NX) exists elsewhere; done: the installer may produce decrypted/default.xex instead; game/default.xex taken from checkGameInstall's fallback; Whether a Title Update is strictly required was not confirmed (README only says regions must match); Program name assumed MarathonRecomp from USER_DIRECTORY and the Flatpak id
+
+### OpenMBU
+
+- Games: Marble Blast Ultra
+- Project: github:MBU-Team/OpenMBU
+- Builds: Windows build (Proton), newest checked Beta-1.9 (OpenMBU-Beta-1.9.zip, OpenMBU-Beta-1.8.zip)
+- Setup: none. Complete game in the zip (scripts, missions, art), no game files needed. The release holds MBUltra.exe (32-bit), MBUltra64.exe and debug builds plus D3D9/OpenAL DLLs, so it runs through Proton. Linux builds exist only as CI artifacts.
+- Saves: prefs.cs files in the game folder (marble/client/prefs.cs, written by Torque's export)
+- Sources: README.md (revival of Marble Blast Ultra, releases page, site marbleblastultra.com); curl -I releases/download/Beta-1.9/OpenMBU-Beta-1.9.zip 302 (Beta-1.8 too); Linux/AppImage names tried 404; zls.py listing of OpenMBU-Beta-1.9.zip (MBUltra.exe, MBUltra64.exe, main.cs, marble/, common/); .github/workflows/cmake-linux.yml:77-81 (Linux build only uploaded as a CI artifact); game/marble/main.cs:399 (export $pref::* to prefs.cs), game/marble/client/init.cs:4,40; LICENSE.md (OpenMBU Fan Revival License)
+- Not certain: Whether tags are marked pre-release on GitHub not seen (all named Beta-x); Save and high-score location not fully traced; Torque writes prefs into the game folder, so it must be writable; Origin: the project builds on the original GarageGames Torque source and assets; 'reimplementation' is the closest fit; The batch row had no link; MBU-Team/OpenMBU is the project's own repo
+
+### PGR4-Recomp
+
+- Games: Project Gotham Racing 4
+- Project: github:beatrixzy/PGR4-Recomp
+- Builds: Windows build (Proton), newest checked v1.2.1 (PGR4-Recomp-v1.2.1.zip)
+- Needs: Project Gotham Racing 4 for Xbox 360 extracted from the disc into a folder holding default.xex (a Games on Demand dump converted with god2iso first, then extracted with extract-xiso)
+- Setup: path (--game_data_root "{FILE}"). The game will not launch without --execute_unclipped_draw_vs_on_cpu --gpu_plugin="xenos" as well. The zip has one top folder, PGR4-Recomp-v1.2.1/, with pgr4_recomp.exe, rexruntime.dll, rexgpu-xenos*.dll and a run.bat holding the same arguments. The project's SteamOS steps use Proton Experimental. Quote the path (a game on another drive misbehaves otherwise).
+- Saves: Documents/pgr4_recompiled inside the Proton prefix (ReXGlue user data folder)
+- Sources: README.md (port to PC, far from finished; known issues); Setup.md (extract-xiso, god2iso, run.bat, SteamOS: Proton Experimental and launch arguments '--game_data_root "[dir]" --execute_unclipped_draw_vs_on_cpu --gpu_plugin="xenos"', game will NOT launch without them); WebFetch releases/expanded_assets/v1.2.1 (PGR4-Recomp-v1.2.1.zip); curl -I 302; zip listing and run.bat of PGR4-Recomp-v1.2.1.zip; WebFetch releases page: v1.2.1 Latest, not pre-release; src/pgr4_recompiled_app.h:15 (app name pgr4_recompiled); LICENSE (MIT)
+- Not certain: Save folder assumed from the ReXGlue SDK default (Documents/<app name>), not confirmed; Region not stated; README says a v2 with native rendering is planned for 20 November; asset names may change; Overrides CreateAchievementNotificationDialog but ships no achievements.toml, so achievements left null
+
+### rb2: Dragon Ball Z Budokai HD Recompiled
+
+- Games: Dragon Ball Z: Budokai HD Collection
+- Project: github:WistfulHopes/DBZ1
+- Builds: Windows build (Proton), newest checked v0.0.2 (dbz1.exe)
+- Needs: The Xbox 360 game files of Dragon Ball Z: Budokai HD (default.xex and the rest of the disc) extracted into a folder
+- Setup: path (assets/ next to dbz1.exe (used when no path is given)) ("Z:{FILE}"). Takes the game folder (the one holding default.xex) as its first argument; without one it uses assets/ beside the program. Release is a single bare dbz1.exe, so it runs through Proton.
+- Sources: README.md (rb2, Dragon Ball Z Budokai HD Recompiled, extract to assets, launch with first argument pointing to the assets folder); src/main.cpp:52-65 (positional game_directory, default exe_dir/assets), 95 (game:\default.xex); dbz1_config.toml:5-6 (project dbz1, assets/default.xex); curl -I releases/download/v0.0.2/dbz1.exe 302 (v0.0.1 too); no Linux asset found under tried names; LICENSE (BSD 3-Clause)
+- Not certain: No CI; asset names guessed, only dbz1.exe confirmed. A Linux build may exist under another name; Which game of the HD Collection: the project is named DBZ1 (Budokai 1); whether the HD Collection's default.xex covers both games is not checked; Save location not found (older ReXGlue SDK, user data folder not set in main.cpp); Very early (v0.0.x); playability unknown; Region not stated
+
+### re:Blue
+
+- Games: Blue Dragon
+- Project: github:zolaware/reblue
+- Builds: Linux build, newest checked v1.3.1 (reblue-1.3.1-x86_64.AppImage, reblue-1.3.1-win-amd64.zip)
+- Needs: Disc images of all three discs of the Global (US/EU) Xbox 360 release of Blue Dragon (.iso, or Games on Demand packages); DLC optional
+- Setup: picker. First start opens a setup wizard that asks for each of the three disc images in turn (checked by title ID 4D5307DF), an install folder and a graphics preset, copies the game files into <install>/game/ and copies itself there. From the AppImage the default install folder is ~/.config/reblue. The install is recorded in ~/.config/reblue/install.toml. --repair reopens the wizard; --profile <name> picks a save profile. Japanese and Asian discs not supported yet.
+- Saves: <install folder>/profiles/default/ (saves, reblue.toml settings, achievements); default install folder ~/.config/reblue
+- Achievements: {"format":"rexglue","file":"<install folder>/profiles/default/achievements/4D5307DF.toml"}
+- Sources: README.md (three retail discs, Global US/EU release, setup wizard copies itself to the install folder, --repair, --profile, profiles/default/); .github/workflows/_build-linux.yml:51,118 (<asset_base>-x86_64.AppImage), _build-windows.yml:103 (-win-amd64.zip), .github/scripts/resolve.sh:47 (asset_base reblue-<version>); curl -I releases/download/v1.3.1/reblue-1.3.1-x86_64.AppImage 302, reblue-1.3.1-win-amd64.zip 302; .github/workflows/release.yml:4,51-52 (tags with a suffix are pre-releases); src/core/app_root.cpp:47-87 (AppImage root ~/.config/reblue); src/installer/install_registry.cpp:270-273 (install.toml in ~/.config/reblue); src/reblue_app.cpp:418-484 (profiles/<name> is the user data root); src/engine/achievements/achievements.cpp:29-32 (<user_data_root>/achievements/<titleid>.toml); src/core/xcontent.h:23 (title ID 0x4D5307DF); LICENSE (BSD 3-Clause)
+- Not certain: The wizard copies the program into the install folder and restarts from there, so the Steam shortcut may need to point at the copy, not the downloaded AppImage; Achievements are ReXGlue's format but under the profile folder, not ~/.local/share/<app>/achievements, and there is no shipped achievements.toml (names come from the game's own data); Region field set to US though EU discs are also accepted
+
+### ReStuff
+
+- Games: Naughty Bear
+- Project: github:MaxDeadBear/NaughtyBear_ReStuff
+- Builds: Linux build, newest checked release_v1.5.1 (ReStuff-linux-x64.tar.gz, restuff-win-x64.zip)
+- Needs: Naughty Bear: Gold Edition for Xbox 360, with the disc's contents extracted straight into assets/ so that assets/Default.xex exists
+- Setup: place (assets/ next to the program (the Linux build ships ReStuff-linux64/assets/PUT_GAME_FILES_HERE.txt); the files go directly in assets/, not a subfolder) (--game_data_root={FILE}). Looks for assets/Default.xex from the working folder and the program's folder upwards. The Linux archive has one top folder, ReStuff-linux64/, with restuff, librexruntime.so, librexgpu-xenos.so and libshaderc_shared.so.1. prewarm_shaders.sh warms shader caches (optional). restuff.toml is created only if missing. The project's own instructions point to the Goopie launcher, which dumps the ISO.
+- Saves: ~/.local/share/restuff ($XDG_DATA_HOME/restuff; ReXGlue user data folder)
+- Sources: README.md (rexglue-SDK recompilation of Naughty Bear Gold Edition, 60fps, Goopie install steps); WebFetch github.com/MaxDeadBear/NaughtyBear_ReStuff/releases/expanded_assets/release_v1.5.1 (ReStuff-linux-x64.tar.gz, restuff-win-x64.zip); curl -I both 302; releases page: release_v1.5.1 marked Latest; tar listing of ReStuff-linux-x64.tar.gz (ReStuff-linux64/restuff, assets/PUT_GAME_FILES_HERE.txt); README.txt in restuff-win-x64.zip (extract disc into assets, assets\Default.xex); src/restuff_app.h:236-265 (assets/Default.xex search); CMakeLists.txt:56-58, src/main.cpp:36 (app name restuff); rexglue-sdk src/ui/rex_app.cpp:120, src/core/filesystem_posix.cpp:106-115 (user folder XDG_DATA_HOME or ~/.local/share/<name>)
+- Not certain: No LICENSE file in the repo; Region not stated; Gold Edition required; Save folder from the ReXGlue SDK default, not seen in this project; Linux build is built on a dev box (no CI), libraries bundled beside the program
+
+### ReTiP
+
+- Games: Viva Pinata: Trouble in Paradise
+- Project: github:SolarCookies/TiP-Recomp
+- Builds: Linux build, newest checked 1.13.0 (retip_1.13.0_linux.tar.xz, retip_1.13.0_windows.zip)
+- Needs: The retail Viva Pinata: Trouble in Paradise Xbox 360 disc as an .iso
+- Setup: picker. On first run it asks for the .iso and extracts it (the public source looks for the game in assets/ beside the program, assets/default.xex). The Linux archive has no top folder: retip_ (the program), librexruntimerd.so, retip.toml, retip_pipelines.bin, rexcrashreporter and a retip/ folder. F5 opens the mod manager (Thunderstore browser), F4 the settings. Also on GameJolt, which adds GameJolt trophies.
+- Saves: ~/.local/share/retip (ReXGlue user data folder)
+- Sources: README.md (retail disc, Windows/Linux, GameJolt link, select an Iso on first run, F5 mods); WebFetch releases/expanded_assets/1.13.0 (retip_1.13.0_linux.tar.xz, retip_1.13.0_windows.zip); curl -I both 302; WebFetch releases page: ReTiP 1.13.0 Latest, nightlies are pre-releases; tar listing of retip_1.13.0_linux.tar.xz; src/retip_app.h:43 (app name retip), 88 (installed = game_data_root/default.xex), 135-146 (assets/ beside the program)
+- Not certain: The Linux program inside the archive is named 'retip_' (trailing underscore); confirm it is the one to run; The renderer and ISO installer live in a private ReXGlue fork, so the public source may not match the release (game folder and save folder unconfirmed); No LICENSE file in the repo; Nightly pre-releases (nightly_*) sit beside the stable tags; pick non-nightly tags
+
+### Saints Reborn
+
+- Games: Saints Row (2006)
+- Project: github:whompay/SaintsReborn
+- Builds: Build it yourself, newest checked V1.2.2 (SaintsReborn-Setup.exe)
+- Needs: Your own Saints Row (Xbox 360) disc as an .iso, or a folder of its files holding default.xex and packfiles; only the disc version the port was made with is supported
+- Setup: none. Releases carry only SaintsReborn-Setup.exe, a Windows installer that downloads a 1.5 GB toolchain and compiles the game from your disc (10 to 60 minutes); the game ends up in dist/ with saintsrow.exe and WhompaysModLoader.exe. Linux Setup is 'coming soon' (to be played through Proton). Options are files beside saintsrow.exe (res_scale.txt, start_windowed, fps_cap.txt).
+- Saves: dist/game (beside saintsrow.exe)
+- Sources: README.md (renamed from SaintsRowPC; no game code; Easy install with SaintsReborn-Setup.exe; Linux coming soon; saves in dist\game; options files); installer/RELEASE_NOTES.md (Setup builds from .iso or folder with default.xex and packfiles); .github/workflows/setup-app.yml:24-71 (only the Windows setup is attached to releases); git ls-remote --tags github.com/whompay/SaintsReborn (V1.2.2 newest); curl -I releases/download/V1.2.2/SaintsReborn-Setup.exe 302; LICENSE (Apache 2.0)
+- Not certain: Marked builds 'none': the only release asset is a Windows setup that compiles the game, not a ready-to-run build; it may or may not work through Proton; Repo renamed from whompay/SaintsRowPC to whompay/SaintsReborn (old link redirects); latestTag by version number; online-pack is a separate tag; Saves location 'dist\game' is relative to the setup's install folder
+
+### Skate 2 Recompilation Project
+
+- Games: Skate 2
+- Project: github:Skate-2-Team/sk82-recomp
+- Builds: Build it yourself
+- Needs: A legally obtained copy of Skate 2 for Xbox 360
+- Setup: none. Early-stage project using XenonRecomp; the README says it is no longer being worked on. No builds.
+- Sources: README.md (no longer being worked on; early stages; XenonRecomp); git ls-remote --tags: none; no LICENSE file
+- Not certain: Unfinished and abandoned: probably not playable; consider leaving it out of the catalogue; What game files it would need was never documented
+
+### Skate 3 Recomp
+
+- Games: Skate 3
+- Project: github:mchughalex/skate3recomp
+- Builds: Linux build, newest checked v2.0.2 (Skate3Recomp-Linux.zip, Skate3Recomp-Windows.zip)
+- Needs: Your own Xbox 360 Skate 3 disc as an .iso; the program extracts it and then stages Title Update 3 (downloaded for you, or a TU_12K2276_000000C000000.00000000000O3 package you pick)
+- Setup: picker. First run shows 'Select ISO'; the disc is extracted into game/ beside the program (game/default.xex). Release builds also need Title Update 3 staged (game/default.xexp and game/data/webkit/EAWebkit.xexp, checked by SHA-256); the program downloads it from xboxunity.net by default. The Linux zip has one top folder, Skate3Recomp-Linux/, with skate3 and librexruntime.so. DLC packages go in a dlc/ folder. The author notes the Windows build through Proton may run better on some hardware.
+- Saves: ~/.local/share/skate3 (user data folder; $XDG_DATA_HOME/skate3), saves/ beside the program when that folder exists, the program's folder when portable.txt exists there
+- Sources: README.md 'How Do I Play?' (Skate3Recomp-Linux.zip, run skate3, Select ISO, Start Game; Proton note); README.md 'Saves and Portable Mode', 'Installing DLC', 'Building from Source' (TU3 package name); curl -I releases/download/v2.0.2/Skate3Recomp-Linux.zip and -Windows.zip 302; zip listing of Skate3Recomp-Linux.zip; src/skate3_app_common.cpp:186 (kUserDirectoryName skate3), 323-365 (user root, portable.txt), 424-436 (game/ beside config); src/skate3_iso_installer.cpp:362 (installed = game/default.xex); src/skate3_title_update_installer.cpp:43-46 (xboxunity TU URL), 65-70 (staged default.xexp, data/webkit/EAWebkit.xexp with SHA-256), 683-698; rexglue-sdk src/core/filesystem_posix.cpp:106-115 (~/.local/share)
+- Not certain: No LICENSE file in the repo; prerelease status of v2.0.2 not seen (release pages blocked); game/ assumed beside the program: it is the config file's folder, which ReXGlue puts beside the program; Region not stated
+
+### SVR07-Recomp
+
+- Games: WWE SmackDown vs. Raw 2007
+- Project: github:HollywoodAkeem/SVR07-Recomp
+- Builds: Windows build (Proton), newest checked v1.0 (svr07.zip)
+- Needs: A retail WWE SmackDown vs. Raw 2007 Xbox 360 disc (USA/Canada recommended), ripped and with its files extracted; a title update can go in assets/1_update
+- Setup: place (assets/ next to svr07.exe, holding the extracted game files (assets/default.xex)). The zip has no top folder: svr07.exe, a small 'Smackdown vs Raw 2007.exe', README, LICENSE, DISCLAIMER. The code points the title update mount at \assets\1_update. Windows only (Direct3D 12), so it runs through Proton. About one session in ten ends in a GPU device-lost crash.
+- Saves: Documents/svr07 inside the Proton prefix (ReXGlue user data folder)
+- Sources: README.md (Windows 10/11, D3D12, USA/Canada disc recommended, svr07/ with svr07.exe and assets/, known issues); WebFetch releases/expanded_assets/v1.0 (svr07.zip); curl -I 302; zip listing of svr07.zip; src/svr07_app.h:17 (app name svr07), 20-27 (update_data_root \assets\1_update); LICENSE (BSD 3-Clause)
+- Not certain: The zip also holds 'Smackdown vs Raw 2007.exe' (212 KB, built from the same project); unclear whether it is a launcher meant to be run instead; Whether a title update is needed is not stated; Save folder assumed from the ReXGlue SDK default; prerelease status not seen; v1.0 assumed newest (v0.x tags have no svr07.zip)
+
+### Unleashed Recompiled
+
+- Games: Sonic Unleashed
+- Project: github:hedge-dev/UnleashedRecomp
+- Builds: Linux build, newest checked v1.0.3 (UnleashedRecomp-Flatpak.zip, UnleashedRecomp-Windows.zip)
+- Needs: Sonic Unleashed for Xbox 360 (US or EU, not JP), retail disc or digital copy, plus its Title Update; the Adventure Pack DLC are optional but recommended. Dumped from an Xbox 360 as containers/images or raw folders
+- Setup: picker. The Linux release is a Flatpak bundle (io.github.hedge_dev.unleashedrecomp.flatpak inside the zip), installed with flatpak install; it installs game data only to ~/.var/app/io.github.hedge_dev.unleashedrecomp/data. First run opens an installer wizard (Add Files for containers or images, Add Folder for raw files) that checks the files against known hashes and writes game/, update/, patched/ and dlc/. In Game Mode on a Steam Deck the file picker may need one Desktop Mode boot first. EU copies are accepted too.
+- Saves: ~/.config/UnleashedRecomp/save, ~/.config/UnleashedRecomp/mlsave (with Hedge Mod Manager's save redirection)
+- Achievements: {"format":"hedge","user":"UnleashedRecomp","file":"ACH-DATA"}
+- Sources: README.md:7 (Windows and Linux), 'How to Install' (US or EU, JP not supported, Title Update required, DLC optional, Add Files/Add Folder); README.md:194-198, 226-228 (Linux builds are Flatpak only in releases), 276-280 (file picker in Game Mode), 344-359 (~/.config/UnleashedRecomp, save/, mlsave, portable.txt), 381-383 (Flatpak game data folder); WebFetch releases/expanded_assets/v1.0.3 (UnleashedRecomp-Flatpak.zip, UnleashedRecomp-Windows.zip); zip listings: Flatpak zip holds io.github.hedge_dev.unleashedrecomp.flatpak; Windows zip holds UnleashedRecomp.exe; UnleashedRecomp/user/paths.h:5, paths.cpp:12-46 (HOME/.config/UnleashedRecomp); UnleashedRecomp/user/achievement_data.h:5 (ACH-DATA), achievement_manager.h (in the save folder); UnleashedRecomp/install/installer.cpp:18-30, 313-327 (game/, update/default.xexp, patched/default.xex); UnleashedRecomp/CMakeLists.txt:351 (Flatpak GAME_INSTALL_DIRECTORY /var/data); flatpak/io.github.hedge_dev.unleashedrecomp.json (filesystem=host); COPYING (GPL 3)
+- Not certain: Linux build is a Flatpak bundle, not a loose program: Cartridge must install it with flatpak and launch with flatpak run io.github.hedge_dev.unleashedrecomp; region is US or EU (schema allows one value); latestTag v1.0.3 by version; release pages show it as the newest
 
 ## Left out
 
