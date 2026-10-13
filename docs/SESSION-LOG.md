@@ -6,6 +6,13 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 10 Oct 2026 · 0.9.65 Recomps
+- Owner's decisions are in docs/HANDOVER-0.9.55-to-0.9.64.md Part 7.1 and Part 11. Built: recomp engine, catalogue (77 entries from PCGamingWiki's console sections, owner's saved page), Steam card, Recomps tab and sheet, game setup and version check, own Steam shortcuts in a Recomps collection, updates with save backups and Roll Back, Save Sync and achievements for recomps, KytyPS5 gated on a Linux build, Download More Files.
+- Checked: real installs of Star Fox 64 Recompiled (GitLab, zip holding a tar.gz) and Zelda 64: Recompiled (GitHub) in the container; tests; clipping audit 0; screenshots Plain and Glass.
+- Not finished: research batch 5 (the Xbox 360 rows and the rest of PlayStation) and parts of batches 3 and 4 were stopped by usage limits. The daily refresh adds those rows on the device as found entries when PCGamingWiki answers; a next session should research them with tools/recomps/build.js (BRIEF in the handover).
+
+---
+
 ## 9 Oct 2026 · 0.9.64 Forks and Links · handover written
 - Owner (after 0.9.63 was merged): "Continue building, and after every update update the handover document so my other account can understand what you did... leave no stone unturned from the beginning of our chat... start this after 0.9.64". Wrote docs/HANDOVER-0.9.55-to-0.9.64.md (0.9.55 to 0.9.64, the owner's decisions, the agreed 0.9.65 recomps and 0.9.66 Online Play plans) with a pointer at the top of CLAUDE.md. Keep it updated after every update.
 - Built (decisions from the 0.9.63 discussion: forks belong to their parent, never their own rows; versions side by side like shadPS4; fork settings named after the fork; GitHub search and phone QR; Steam's own Proton): see CLAUDE.md 0.9.64. Checked in the harness: the GitHub card with search, phone QR and Check It in Plain and Glass.

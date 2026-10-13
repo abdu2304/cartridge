@@ -40,17 +40,29 @@ function titleKeys(title) {
   out.delete('');
   return [...out];
 }
+// the library's titles by console, indexed once per library (a big library times every recomp is too much work to
+// redo for each one): Map "<console>|<title key>" -> rom ids
+const INDEX = new WeakMap();
+function indexOf(roms) {
+  let ix = INDEX.get(roms);
+  if (ix) return ix;
+  ix = new Map();
+  for (const r of roms || []) {
+    const con = consoleOfSlug(r.platform_slug);
+    if (!con) continue;
+    for (const k of titleKeys(r.name)) { const key = con + '|' + k; const l = ix.get(key); if (l) l.push(r.id); else ix.set(key, [r.id]); }
+  }
+  if (roms && typeof roms === 'object') INDEX.set(roms, ix);
+  return ix;
+}
 // library games this recomp is for: same console family, same title
 function matchRoms(entry, roms) {
-  const out = [];
+  const ix = indexOf(roms || []), out = new Set();
   for (const g of entry.games || []) {
-    const keys = new Set(titleKeys(g.title).concat((g.also || []).flatMap(titleKeys)));
-    for (const r of roms || []) {
-      if (consoleOfSlug(r.platform_slug) !== g.console && !(g.console === 'gbc' && consoleOfSlug(r.platform_slug) === 'gb')) continue;
-      if (titleKeys(r.name).some((k) => keys.has(k))) out.push(r.id);
-    }
+    const cons = g.console === 'gbc' ? ['gbc', 'gb'] : [g.console];
+    for (const k of titleKeys(g.title).concat((g.also || []).flatMap(titleKeys))) for (const c of cons) for (const id of ix.get(c + '|' + k) || []) out.add(id);
   }
-  return [...new Set(out)];
+  return [...out];
 }
 
 // ---------------------------------------------------------------- builds

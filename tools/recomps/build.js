@@ -30,7 +30,7 @@ for (const e of all) {
   if (/—/.test(JSON.stringify(e))) bad('em dash');
   if (e.setup && !['picker', 'place', 'path', 'none'].includes(e.setup.how)) bad('setup.how');
   if (e.setup?.how === 'path' && !/\{FILE\}/.test(e.setup.arg || '')) bad('path setup without {FILE}');
-  if (e.setup?.how === 'place' && !e.setup.place) bad('place setup without a place');
+  if (e.setup?.how === 'place' && !e.setup.place) e.setup.how = 'picker'; // no known place: its own picker, with the path shown
   ids.add(e.id); if (e.repo) repos.add(e.repo.toLowerCase());
   const o = {};
   for (const k of SHIP) if (e[k] != null && !(Array.isArray(e[k]) && !e[k].length)) o[k] = e[k];

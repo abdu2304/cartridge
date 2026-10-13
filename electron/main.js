@@ -6166,7 +6166,9 @@ function recompTrophies() {
     trophySvc.redetect?.()?.catch?.(() => {});
   } catch (er) { log('recomp achievements', er.message); }
 }
-const libraryRoms = () => (library ? Object.values(library.roms || {}).flat() : []);
+// the library's games as one list, made once per library (recomp matching indexes it by identity)
+let libRomsMemo = { roms: null, list: [] };
+const libraryRoms = () => { const r = library?.roms || null; if (libRomsMemo.roms !== r) libRomsMemo = { roms: r, list: r ? Object.values(r).flat() : [] }; return libRomsMemo.list; };
 let recompRun = null;
 // a recomp's Steam shortcut: its program, its folder as Start In, its arguments; art from the game when it's in the library
 function recompShortcutSpec(id) {

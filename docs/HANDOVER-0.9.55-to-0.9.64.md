@@ -207,3 +207,24 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 ## Part 10. How I'd work in your place
 
 Read the newest SESSION-LOG entry, CLAUDE.md and this file first. When the owner sends photos or a log with "don't build yet", investigate read-only and reply per item with cause, fix and options, then one numbered list of questions with your recommendation for each. When they say Start, make a task list, build in commits you push as you go (the test build runs on every push), check everything (tests, build, launch check, audit, screenshots in Plain and Glass), write the SESSION-LOG entry, the CLAUDE.md section and **this handover**, then open and merge the PR. Read every emulator's own source before writing to its files, and every external project's real release layout before installing from it.
+
+
+---
+
+## Part 11. 0.9.65 · Recomps (added after the release, 10 Oct 2026)
+
+**What shipped** (code map in CLAUDE.md's 0.9.65 section; catalogue record in docs/recomps.md):
+- Engine `electron/recomps.js`, catalogue `electron/recomps.json` built by `tools/recomps/build.js` from researched entries (repo, builds, asset patterns, game needed, setup kind, done file, saves, achievements). Entries with no project or site are left out and listed in docs/recomps.md.
+- Install to `<Emulation>/recomp/<console>/<name>`, Linux first, Windows through Proton only without Linux. Download kind read from bytes (GitLab links have no ending); archives inside archives unpacked. Verified with real Star Fox 64 Recompiled and Zelda 64: Recompiled installs.
+- Updates never automatic; saves backed up first (`recomp-backups/`, 10 kept) and checked after; replaced release kept (last two) for Roll Back; stable or pre-release per recomp.
+- Setup: library copy or picked file, checked (extension, project-listed hashes, N64 byte orders); place = symlink, path = launch argument, picker = its own window with the path shown. Windows setup opens through Steam so Proton uses the play prefix.
+- Steam: own shortcut per recomp (never replaces the emulated game's), collection "Recomps", art by the game's name. Save Sync slot `cartridge:recomp:<kind>:<id>`. Achievements: hedge format (Unleashed, Marathon) and ReXGlue (`[unlocked.<id>]` + shipped achievements.toml), read only.
+- Steam card in Consoles (SteamTile.vue), Recomps page, Settings → Emulators → Recomps (out of Update All), game More → "Recomp: <name>". Also KytyPS5 only offered while its newest release has a Linux build; Download More Files.
+
+**Owner's decisions in this stretch:** catalogue from PCGamingWiki console sections only (the owner sent the saved page as a zip; its links were read from the HTML); search GitHub for entries without links (most-starred); KytyPS5 hidden, not deleted, until a Linux build returns; Download More Files under Game More → Options with present files ticked and greyed.
+
+**Not finished (next session first):**
+1. Research the remaining rows: batch 5 (Xbox 360 recomps: AC6, re:Blue, Nocturne, Eternal Sonata, Lost Odyssey, Skate 3, Unleashed, Marathon, TiP, SVR07, PGR4, Saints Row, LARecomp, beanRecomp, OpenMBU, Naughty Bear, Fable 2, DBZ) and the rows batches 3 and 4 didn't reach. The brief and batch files were in the session scratchpad (lost); recreate: parse the saved PCGamingWiki page, one entry per project with the schema in tools/recomps/build.js (fields shipped are its SHIP list). For Unleashed/Marathon set `achievements: { format: 'hedge', user: 'UnleashedRecomp'|'MarathonRecomp', file: 'ACH-DATA'|'SonicNextAchievementData.bin' }`; ReXGlue projects `{ format: 'rexglue' }`. Until then the daily refresh adds those rows on the device as "found" entries (setup Picker) when PCGamingWiki answers.
+2. Doubtful entries listed under "Not certain" in docs/recomps.md (DK64 asset names, Chameleon Twist builds, Ship of Harkinian 9.3.0 assets, Star Fox saves folder).
+3. Owner device tests: install a Linux recomp and a Windows-only one (Proton), Set Up With Your Game (place, path, picker), Add to Steam (live and with Steam closed), an update with saves kept, Roll Back, Save Sync of a recomp save, Unleashed achievements, the Steam card at 1280x800 and on the TV, Download More Files, KytyPS5 hidden.
+4. Then 0.9.66 Online Play (Part 7.2).
