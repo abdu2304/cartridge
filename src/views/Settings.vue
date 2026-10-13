@@ -425,6 +425,7 @@
             <div class="row"><button class="btn" data-focus :disabled="rollBusy" @click="rollBack"><Icon name="mdiHistory" :class="{ spin: rollBusy }" />{{ rollBusy ? 'Working…' : 'Choose an earlier version' }}</button></div>
           </template>
 
+          <OnlinePlay v-else-if="sec === 'online'" />
           <template v-else-if="sec === 'ra'">
             <div class="row"><span class="lbl">On Home</span><div class="seg"><button v-for="m in homeAchOpts" :key="m.v" data-focus :class="{ on: homeAch === m.v }" @click="saveConfig({ ui: { homeAch: m.v } })">{{ m.l }}</button></div></div>
             <p class="muted small" style="margin-top: -6px">A row of your newest achievements and trophies on Home, newest first.</p>
@@ -623,6 +624,7 @@ import EmuIcon from '../components/EmuIcon.vue';
 import EmuGet from '../components/EmuGet.vue';
 import LinkedFolders from '../components/LinkedFolders.vue';
 import Recomps from '../components/Recomps.vue';
+import OnlinePlay from '../components/OnlinePlay.vue';
 import ChangelogCard from '../components/ChangelogCard.vue';
 import ServerStatus from '../components/ServerStatus.vue';
 import ControllerTest from '../components/ControllerTest.vue';
@@ -643,6 +645,7 @@ const sections = [
   { id: 'steam', label: 'Steam', icon: 'mdiSteam', lead: 'Your games in Steam, with their artwork and collections.' },
   { id: 'ra', label: 'Achievements', icon: 'mdiTrophyOutline', lead: 'RetroAchievements and the trophies your emulators keep.' },
   { id: 'syncthing', label: 'Saves and Sync', icon: 'mdiSync', lead: 'Keep saves and more in step between your devices.' },
+  { id: 'online', label: 'Online Play', icon: 'mdiWeb', lead: 'Play online through your emulators: their servers, rooms and accounts.' }, // 0.9.66
   { id: 'ui', label: 'Look & Feel', icon: 'mdiPaletteOutline', lead: 'Colour, style, background, text and motion.' },
   { id: 'controls', label: 'Controls', icon: 'mdiGamepadVariant', lead: 'Controller, touch, keyboard and the Dock.' },
   { id: 'dlup', label: 'Downloads and Updates', icon: 'mdiTrayArrowDown', lead: 'How games download, and Cartridge’s own updates.' },
@@ -693,6 +696,7 @@ const SEARCH = [
   ['Games folders and drives', 'Library · Games and Storage', 'library', 'folders'], ['Add a drive', 'Library · Games and Storage', 'library', 'folders'],
   ['New games go to', 'Library · Games and Storage', 'library', 'folders'], ['Always ask where downloads go', 'Library · Games and Storage', 'library', 'folders'],
   ['BIOS folder', 'Library · Games and Storage', 'library', 'folders'], ['Free up space, storage manager', 'Library · Games and Storage', 'library', 'folders'], ['Check downloaded games', 'Library · Games and Storage', 'library', 'folders'],
+  ['Online play, netplay, RPCN, ShadNet, rooms, ad hoc, Wiimmfi, Pretendo', 'Online Play', 'online'],
   ['Recomps, native ports of console games', 'Emulators · Recomps', 'emu', 'recomps'], ['Zelda 64 Recompiled, Ship of Harkinian, Unleashed...', 'Emulators · Recomps', 'emu', 'recomps'],
   ['Get and update emulators', 'Emulators', 'emu', 'emus'], ['Vita3K, RPCS3, shadPS4, Dolphin, PCSX2...', 'Emulators', 'emu', 'emus'],
   ['Game add-ons, mods, texture packs, patches', 'Emulators · Game Add-ons', 'emu', 'addons'], ['Nexus Mods API key', 'Emulators · Game Add-ons', 'emu', 'addons'], ['BIOS and firmware', 'Emulators · Setup and Health', 'emu', 'overview'],

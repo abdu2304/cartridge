@@ -5930,6 +5930,41 @@ const JOBS = {
   'emuup:all': (a) => ({ key: 'emu:all', kind: 'Update All', title: `${(a.items || []).length} Emulators`, icon: 'mdiUpdate' }),
   'saves:search': () => ({ key: 'savesearch', kind: 'Search', title: 'Search for Saves', icon: 'mdiFolderSearchOutline' }), // 0.9.59
 };
+// Online Play (0.9.66, electron/onlinePlay.js): its handlers, and the check after every emulator update or install
+let onlineEng = null;
+function online() {
+  if (onlineEng) return onlineEng;
+  onlineEng = require('./onlinePlay').createOnline({
+    dataDir: USER_DATA, log,
+    installed: () => { try { return steamMgr.installedEmulators().map((x) => x.id.split('@')[0]); } catch { return []; } },
+    running: (emu) => require('./raLogin').running().has(emu),
+    // a portable copy keeps its settings beside the program (portable/, user/)
+    portable: (emu) => { try { return steamMgr.installedEmulators().filter((x) => x.id.split('@')[0] === emu && x.path).flatMap((x) => { const d = path.dirname(x.path); return [path.join(d, 'portable'), path.join(d, 'user'), path.join(d, 'user', 'config')]; }).filter((d) => isDir(d)); } catch { return []; } },
+    versionOf: (emu) => { try { return steamMgr.installedEmulators().find((x) => x.id.split('@')[0] === emu)?.version || null; } catch { return null; } },
+    pbkdf2: (pw, salt, n, len) => new Promise((ok, bad) => { // the slow hash (RPCN's 200,000 rounds) off the main thread
+      const { Worker } = require('worker_threads');
+      const w = new Worker(`const { parentPort, workerData: d } = require('worker_threads'); parentPort.postMessage(require(d.lib).pbkdf2(d.pw, d.salt, d.n, d.len).toString('hex'));`, { eval: true, workerData: { lib: path.join(__dirname, 'sha3.js'), pw, salt, n, len } });
+      w.once('message', (m) => { w.terminate(); ok(m); }); w.once('error', bad);
+    }),
+  });
+  return onlineEng;
+}
+const onlineRecheck = (id) => { try { const r = online().recheck(String(id || '').split('@')[0]); if (r.fixed || r.issues?.length) log('online after update', id, JSON.stringify(r)); } catch (e) { log('online recheck', id, e.message); } };
+Object.assign(handlers, {
+  'online:list': () => online().list(),
+  // the online features of a console's emulators, for the game page (consoles by RomM slug)
+  'online:forConsole': ({ slugs }) => {
+    const S = String(slugs || ''), want = [[/\bpsp\b/, 'ppsspp'], [/\bps2\b/, 'pcsx2'], [/\bps3\b/, 'rpcs3'], [/\bps4\b/, 'shadps4'], [/\b(ngc|gc|gamecube|wii)\b/, 'dolphin'], [/\b(3ds|n3ds)\b/, 'azahar'], [/\bswitch\b/, 'eden'], [/\bswitch\b/, 'ryujinx'], [/\bwiiu\b/, 'cemu']].filter(([re]) => re.test(S)).map(([, e]) => e);
+    return online().list().emus.filter((e) => want.includes(e.emu)).map((e) => ({ emu: e.emu, label: e.label, kinds: e.kinds.map((k) => ({ name: k.name, on: k.on })) }));
+  },
+  'online:set': ({ emu, kind, on }) => online().set(emu, kind, !!on),
+  'online:field': ({ emu, kind, key, value }) => online().field(emu, kind, key, String(value ?? '')),
+  'online:action': ({ emu, kind, action }) => online().action(emu, kind, action),
+});
+for (const ch of ['emuup:run', 'emuget:install', 'shadv:install']) {
+  const fn = handlers[ch];
+  if (fn) handlers[ch] = async (a = {}) => { const r = await fn(a); setTimeout(() => onlineRecheck(a.id || (ch === 'shadv:install' ? 'shadps4' : '')), 1500); return r; };
+}
 for (const [ch, info] of Object.entries(JOBS)) {
   const fn = handlers[ch];
   if (fn) handlers[ch] = (a = {}) => { let i; try { i = info(a || {}); } catch { return fn(a); } return asJob(i, () => fn(a)); };
