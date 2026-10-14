@@ -4,7 +4,7 @@ A controller-first RomM client for SteamOS and Bazzite, shipped as one AppImage.
 
 **Coming back after 0.9.2 (the first account)?** Read `docs/HANDOVER-0.9.3-to-0.9.21.md` first: everything the second account did from 0.9.3 to 0.9.21, the owner's decisions, what broke and how it was fixed, and what is still open.
 
-**Coming back after 0.9.64 (another account)?** Read `docs/HANDOVER-0.9.55-to-0.9.64.md` first: everything from 0.9.55 to 0.9.64 (freezes found and fixed, Save Sync and the save locator, Game Settings from every emulator's source and per release, RPCS3 paths, Xenia patches, forks with versions, GitHub links from search or the phone), the owner's decisions, and the agreed plans for 0.9.65 (recomps) and 0.9.66 (Online Play). The owner wants it updated after every update.
+**Coming back after 0.9.64 (another account)?** Read `docs/HANDOVER-0.9.55-to-0.9.64.md` first (it now runs to 0.9.66): everything from 0.9.55 on (freezes found and fixed, Save Sync and the save locator, Game Settings from every emulator's source and per release, RPCS3 paths, Xenia patches, forks with versions, GitHub links from search or the phone, recomps, Online Play), the owner's decisions, and in Part 9 what was agreed but isn't done yet. The owner wants it updated after every update: Parts 1, 4, 5, 6 and 9 as well as a new Part.
 
 **Coming back after 0.9.54 (another account)?** Read `docs/HANDOVER-0.9.38-to-0.9.54.md` first: everything from 0.9.38 to 0.9.54 (multi-drive, Glass rebuilt three times, CAE and the engines, Save Sync, CIDE, mods engine and rule book, offline, the new welcome, brand B and the README, obsidian dark Glass), the owner's decisions and what is still open. Then the two older handovers below.
 
