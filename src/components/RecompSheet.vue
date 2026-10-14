@@ -21,7 +21,7 @@
         <details v-if="det?.notes" class="rcs-notes small"><summary data-focus tabindex="0">Release Notes · {{ det.tag }}</summary><p>{{ det.notes }}</p></details>
         <div class="rcs-facts small">
           <div><b>Needs</b><span>{{ e.needs ? e.needs.what : 'Nothing more: it plays once it’s installed.' }}</span></div>
-          <div v-if="e.needs"><b>Setup</b><span>{{ HOW[e.setup?.how] || HOW.picker }}</span></div>
+          <div v-if="e.needs"><b>Setup</b><span>{{ e.stores ? HOW.stored : HOW[e.setup?.how] || HOW.picker }}</span></div>
           <div><b>Build</b><span>{{ buildText }}</span></div>
           <div v-if="e.installed"><b>Here</b><span class="mono">{{ short(e.installed.dir) }}</span></div>
           <div v-if="e.installed?.game"><b>Your Copy</b><span class="mono">{{ short(e.installed.game.file) }}{{ e.installed.game.checked === false ? ' (used anyway)' : '' }}</span></div>
@@ -65,7 +65,7 @@ import Icon from './Icon.vue';
 
 const props = defineProps({ id: String });
 const el = ref(null), e = ref(null), det = ref(null), picBad = ref(false), kept = ref([]), why = ref(''), checking = ref(false), consoles = ref({});
-const HOW = { place: 'Cartridge links your copy where it looks for it (nothing is copied).', path: 'Cartridge starts it with your copy.', picker: 'It asks for your copy itself the first time; Cartridge shows you the exact path to give it.', none: 'Nothing to set up.' };
+const HOW = { stored: 'Cartridge checks your copy and puts it where it keeps it, so it never asks for it.', place: 'Cartridge links your copy where it looks for it (nothing is copied).', path: 'Cartridge starts it with your copy.', picker: 'It asks for your copy itself the first time; Cartridge shows you the exact path to give it.', none: 'Nothing to set up.' };
 const short = (p) => String(p || '').replace(store.info?.home || '\0', '~');
 const job = computed(() => bgJob('recomp:' + props.id));
 const setupJob = computed(() => bgJob('recompset:' + props.id) || bgJob('recompsetup:' + props.id));
