@@ -27,6 +27,9 @@
           <div v-if="e.installed?.game"><b>Your Copy</b><span class="mono">{{ short(e.installed.game.file) }}{{ e.installed.game.checked === false ? ' (used anyway)' : '' }}</span></div>
           <div v-if="e.saves?.length"><b>Saves</b><span>Backed up before every update and removal, then checked.</span></div>
         </div>
+        <!-- 0.9.67: checking your copy, then the recomp building its own files on its first start, with how much it has written -->
+        <div v-if="setupJob" class="rcs-job small"><Icon name="mdiCogOutline" :size="16" class="spin" />{{ setupJob.key.startsWith('recompset:') ? 'Checking your copy' : 'Setting itself up' }}{{ setupJob.text ? ' · ' + setupJob.text : '' }}{{ setupJob.pct != null ? ` · ${setupJob.pct}%` : '' }}<span class="up-bar"><i :style="{ width: (setupJob.pct || 4) + '%' }" /></span></div>
+        <div v-else-if="setupErr" class="rcs-why small"><Icon name="mdiAlertCircleOutline" :size="18" />{{ setupErr.error }}</div>
         <div v-if="job" class="rcs-job small"><Icon name="mdiSync" :size="16" class="spin" />{{ job.text || 'Working' }}{{ job.pct != null ? ` · ${job.pct}%` : '' }}<span class="up-bar"><i :style="{ width: (job.pct || 4) + '%' }" /></span></div>
         <div v-if="why" class="rcs-why small"><Icon name="mdiAlertCircleOutline" :size="18" />{{ why }}</div>
         <div class="rcs-acts" data-scroll>
@@ -65,6 +68,8 @@ const el = ref(null), e = ref(null), det = ref(null), picBad = ref(false), kept 
 const HOW = { place: 'Cartridge links your copy where it looks for it (nothing is copied).', path: 'Cartridge starts it with your copy.', picker: 'It asks for your copy itself the first time; Cartridge shows you the exact path to give it.', none: 'Nothing to set up.' };
 const short = (p) => String(p || '').replace(store.info?.home || '\0', '~');
 const job = computed(() => bgJob('recomp:' + props.id));
+const setupJob = computed(() => bgJob('recompset:' + props.id) || bgJob('recompsetup:' + props.id));
+const setupErr = computed(() => Object.values(store.bgJobs || {}).find((j) => j.key === 'recompsetup:' + props.id && j.state === 'error') || null);
 const consoleName = computed(() => consoles.value[e.value?.games?.[0]?.console] || '');
 const art = computed(() => { const r = e.value?.roms?.length && romById(e.value.roms[0]); return r ? cover(r) : ''; });
 const canGet = computed(() => !!(e.value && e.value.repo && !['none', 'site'].includes(e.value.builds)));
@@ -96,7 +101,7 @@ let off = null, layer = null;
 onMounted(async () => {
   resolveOuter = store.modal?.resolve;
   layer = pushLayer(el.value, { back: () => closeModal(null), start: () => closeModal(null), lb() {}, rb() {}, y() {}, select() {}, lt() {}, rt() {} });
-  off = window.cart.on('bg-job', (j) => { if (j?.key === 'recomp:' + props.id && j.state !== 'run') load(); });
+  off = window.cart.on('bg-job', (j) => { if (['recomp:', 'recompsetup:'].some((k) => j?.key === k + props.id) && j.state !== 'run') load(); });
   await load(); await nextTick(); if (el.value) focusFirst(el.value);
 });
 onBeforeUnmount(() => { off?.(); layer?.pop(); });

@@ -250,3 +250,24 @@ test('project details: the first real README picture, plain release notes; a lin
   assert.deepStrictEqual(R.guessFromText('smw-pc a port of Super Mario World', roms, R.CONSOLES), { console: 'snes', title: 'Super Mario World', romId: 3 });
   assert.deepStrictEqual(R.guessFromText('a tool', roms, R.CONSOLES), { console: null, title: null, romId: null });
 });
+
+test('setup on its first start: bytes written measured against the finished size, done when its done file appears', async () => {
+  const entry = { id: 'game', name: 'Game Recompiled', games: [{ title: 'Game', console: 'n64' }], repo: 'github:o/game', builds: 'linux', program: 'Game', saves: [], needs: { what: 'a ROM' }, setup: { how: 'place', place: 'rom.z64' }, done: 'game.o2r', doneSize: 2000 };
+  let running = true;
+  const w = fakeWorld([entry], { isRunning: () => running });
+  w.publish('v1', 'one');
+  await w.eng.install('game');
+  const dir = path.join(w.emu, 'recomp', 'n64', 'Game Recompiled');
+  assert.strictEqual(w.eng.ready('game'), false);
+  // the recomp writes its file in pieces, then the finished one
+  const steps = [() => fs.writeFileSync(path.join(dir, 'tmp.part'), Buffer.alloc(500)), () => fs.writeFileSync(path.join(dir, 'tmp.part'), Buffer.alloc(1500)), () => { fs.rmSync(path.join(dir, 'tmp.part')); fs.writeFileSync(path.join(dir, 'game.o2r'), Buffer.alloc(2000)); }];
+  const seen = [];
+  const r = await w.eng.watchSetup('game', { sleep: async () => { steps.shift()?.(); }, onProgress: (m) => seen.push(m) });
+  assert.deepStrictEqual(seen.map((m) => [m.got, m.pct]), [[500, 25], [1500, 75]]);
+  assert.deepStrictEqual([r.done, w.eng.ready('game')], [true, true]);
+  assert.strictEqual((await w.eng.watchSetup('game')).watched, false, 'nothing to watch once set up');
+  // closed before it finished: the watch ends after three looks
+  fs.rmSync(path.join(dir, 'game.o2r')); running = false;
+  const r2 = await w.eng.watchSetup('game', { sleep: async () => {} });
+  assert.deepStrictEqual([r2.done, r2.closed], [false, true]);
+});

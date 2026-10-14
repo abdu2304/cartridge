@@ -607,6 +607,50 @@ function createRecomps(ctx) {
     detailsCache[id] = out; writeJson(F('recomp-details.json'), detailsCache);
     return out;
   }
+
+  // ---- setup progress (0.9.67, agreed plan 7.1 #10): while a recomp builds its own files from your copy on its first
+  // starts (Ship of Harkinian making its .o2r, a picker recomp copying your ROM in), Cartridge measures the bytes written
+  // in its folders against the finished size when the catalogue knows it (`doneSize`), and marks it set up when the
+  // catalogue's done file appears. Never more than one watch per recomp; it ends when the recomp closes.
+  const watching = new Set();
+  async function bytesIn(dirs, budget = { n: 60000 }) {
+    let total = 0;
+    const walk = async (d) => {
+      let ents; try { ents = await fs.promises.readdir(d, { withFileTypes: true }); } catch { return; }
+      for (const ent of ents) {
+        if (--budget.n < 0) return;
+        if (ent.name === '.cartridge-versions') continue;
+        const p = path.join(d, ent.name);
+        if (ent.isDirectory()) await walk(p);
+        else if (ent.isFile()) { try { total += (await fs.promises.stat(p)).size; } catch {} }
+      }
+    };
+    for (const d of dirs) await walk(d);
+    return total;
+  }
+  function ready(id) { const e = byId(id); return readyOf(e, installs[id]); }
+  async function watchSetup(id, { onProgress = () => {}, every = 1000, limitMs = 45 * 60e3, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+    const e = byId(id), rec = installs[id];
+    if (!e || !rec || readyOf(e, rec) || watching.has(id)) return { watched: false };
+    watching.add(id);
+    try {
+      const doneAt = e.done ? expandPath(e.done, rec.dir) : null;
+      // the folders it builds into: its own, and the done file's folder when that is elsewhere (~/.config/<Name>)
+      const dirs = [rec.dir, ...(doneAt && !doneAt.startsWith(rec.dir + path.sep) ? [path.dirname(doneAt)] : [])];
+      const base = await bytesIn(dirs), start = Date.now();
+      let gone = 0;
+      for (;;) {
+        await sleep(every);
+        if (readyOf(e, installs[id])) { if (installs[id]) { installs[id].setupDone = true; saveInstalls(); } log('recomp set up', id); return { watched: true, done: true }; }
+        const got = Math.max(0, (await bytesIn(dirs)) - base);
+        onProgress({ step: 'build', got, pct: e.doneSize ? Math.min(99, Math.floor((got / e.doneSize) * 100)) : null });
+        // closed before its files were made (it asked for something, or the copy didn't fit): the watch ends quietly
+        gone = ctx.isRunning(rec.flatpak || rec.program) ? 0 : gone + 1;
+        if (gone >= 3) return { watched: true, done: false, closed: true, got };
+        if (Date.now() - start > limitMs) return { watched: true, done: false, timeout: true, got };
+      }
+    } finally { watching.delete(id); }
+  }
   // ---- from a link (not in the catalogue): the same GitHub card as emulators; console and game said by the user
   function addLink({ repo, console: con, title, name, description }) {
     if (!/^(github|gitlab):[\w.-]+\/[\w.-]+$/.test(repo || '')) throw new Error('That isn’t a GitHub project link.');
@@ -664,7 +708,7 @@ function createRecomps(ctx) {
   }
   const record = (id) => installs[id] || null;
   const reload = () => { cat = null; installs = readJson(F('recomp-installs.json'), {}); };
-  return { catalogue, byId, details, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
+  return { catalogue, byId, details, ready, watchSetup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
 }
 
 module.exports = { readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };

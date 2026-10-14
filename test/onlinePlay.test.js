@@ -140,3 +140,43 @@ test('RPCN account made over RPCN’s own protocol, then saved for RPCS3; a dama
   assert.strictEqual(seen[seen.length - 1].cmd, 4);
   } finally { srv.close(); }
 });
+
+test('after an update: a renamed setting is reported, never written back; a change that breaks the file is undone', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-op-')), data = path.join(home, 'data');
+  const ini = path.join(home, '.config/ppsspp/PSP/SYSTEM/ppsspp.ini');
+  fs.mkdirSync(path.dirname(ini), { recursive: true }); fs.mkdirSync(data);
+  fs.writeFileSync(ini, '[Network]\nEnableWlan = False\n\n[SystemParam]\nNickName = PPSSPP\n');
+  const eng = createOnline({ home, dataDir: data, installed: () => ['ppsspp'], running: () => false, log: () => {} });
+  await eng.field('ppsspp', 'network', 'nick', 'Player1');
+  await eng.set('ppsspp', 'network', true);
+  // PPSSPP itself rewrote the file later (its update renamed EnableWlan): reported, the old name not added back
+  const later = (Date.now() + 60000) / 1000;
+  fs.writeFileSync(ini, '[Network]\nEnableWireless = False\n\n[SystemParam]\nNickName = Player1\n'); fs.utimesSync(ini, later, later);
+  const r = eng.recheck('ppsspp');
+  assert.strictEqual(r.fixed, 0);
+  assert.match(r.issues[0].text, /Network → EnableWlan is no longer in its settings file/);
+  assert.doesNotMatch(fs.readFileSync(ini, 'utf8'), /EnableWlan/);
+  assert.match(eng.list().issues[0].text, /renamed or moved/);
+  // the same key reset by an update (still there, value changed) is put back as before
+  fs.writeFileSync(ini, '[Network]\nEnableWlan = False\n\n[SystemParam]\nNickName = Player1\n'); fs.utimesSync(ini, later + 5, later + 5);
+  assert.strictEqual(eng.recheck('ppsspp').fixed, 1);
+  assert.match(fs.readFileSync(ini, 'utf8'), /EnableWlan = True/);
+
+  // RPCS3: a change RPCS3 couldn't read afterwards puts every file back
+  const { ADAPTERS } = require('../electron/onlinePlay');
+  const rp = ADAPTERS.find((a) => a.emu === 'rpcs3'), keep = rp.precheck;
+  const dir = path.join(home, '.config/rpcs3'); fs.mkdirSync(dir, { recursive: true });
+  const cfg = 'Net:\n  Internet enabled: Disconnected\n  PSN status: Disconnected\n';
+  fs.writeFileSync(path.join(dir, 'config.yml'), cfg); fs.writeFileSync(path.join(dir, 'rpcn.yml'), 'Version: 2\nHost: np.rpcs3.net\nNPID: a_b\nPassword: X\nToken: ABCDEFGHIJKLMNOP\n');
+  let calls = 0;
+  rp.precheck = () => (++calls > 1 ? { line: 3, text: 'x' } : null); // fine before, broken after
+  try {
+    await assert.rejects(() => eng.set('rpcs3', 'rpcn', true), /couldn’t read its settings file after the change.*put back/);
+    assert.strictEqual(fs.readFileSync(path.join(dir, 'config.yml'), 'utf8'), cfg, 'config.yml as it was');
+  } finally { rp.precheck = keep; }
+  // the YAML and JSON checks themselves
+  const F2 = require('../electron/onlineFormats').FORMATS;
+  assert.strictEqual(F2.yaml.valid('Net:\n  PSN status: RPCN\n'), true);
+  assert.strictEqual(F2.yaml.valid('Video:\n  Write Depth Buffer: falseResolution Scale: = 150\n  a: b\n'), false);
+  assert.strictEqual(F2.json.valid('{"a":1}'), true); assert.strictEqual(F2.json.valid('{a'), false);
+});
