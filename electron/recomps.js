@@ -115,8 +115,57 @@ function expandPath(p, dir, home = os.homedir()) {
   if (path.isAbsolute(s)) return path.normalize(s);
   return dir ? path.join(dir, s) : null;
 }
-function saveDirs(e, rec, home) {
-  return [...new Set((e?.saves || []).map((p) => expandPath(p, rec?.dir, home)).filter(Boolean))];
+// 0.9.67: the catalogue's save notes are often sentences ("pokeemerald.sav in the working directory", "Documents/svr07
+// inside the Proton prefix", "~/.local/share/X/storage/ (persistent data) and ~/.local/share/X/savestates/"). Before,
+// a whole sentence was taken as a path, so backups found nothing and Save Sync could make a folder named like it.
+// Now only real paths are read out of a note:
+//  - every ~/ or $XDG_ path in it;
+//  - a leading file or folder name followed by nothing, "(", "in", "beside", "relative", "and", ";" or "," (relative
+//    to the recomp's folder, its working directory); a second name after "and" too;
+//  - Windows notes (Documents/, %APPDATA%, %LOCALAPPDATA%, "inside the Proton prefix") inside the Steam shortcut's own
+//    Proton prefix (compatdata/<appid>), only for Windows builds that are in Steam;
+//  - names with placeholders (<n>, <game>, *) give their folder, or nothing.
+// A Flatpak recomp's ~/.config and ~/.local/share are its sandbox's (~/.var/app/<id>/config, /data).
+const STEAM_ROOTS = (home) => [path.join(home, '.local/share/Steam'), path.join(home, '.steam/steam'), path.join(home, '.var/app/com.valvesoftware.Steam/.local/share/Steam')];
+function protonUser(rec, home) {
+  if (!rec?.appid) return null;
+  for (const r of STEAM_ROOTS(home)) { const d = path.join(r, 'steamapps/compatdata', String(rec.appid), 'pfx/drive_c/users/steamuser'); try { if (fs.statSync(d).isDirectory()) return d; } catch {} }
+  return null;
+}
+const placeholder = (t) => /[<>*]/.test(t);
+function savePaths(note, rec, home = os.homedir()) {
+  const dir = rec?.dir, out = [];
+  let s = String(note || '').trim();
+  if (/^<install folder>/i.test(s)) { if (!dir) return out; s = s.replace(/^<install folder>/i, '').replace(/\s+\(.*$|;.*$/, '').replace(/^\/+/, ''); return s ? [path.join(dir, s)] : out; } // re:Blue: <install folder>/profiles/default
+  if (!s) return out;
+  const add = (p) => { if (p) out.push(p); };
+  const winNote = /inside the Proton prefix|%(LOCAL)?APPDATA%|^Documents[\\/]/i.test(s);
+  if (winNote) {
+    if (rec?.kind !== 'windows') { /* a Linux build: only the Linux paths in the note count (below) */ }
+    else {
+      const user = protonUser(rec, home);
+      const m = /(Documents|%LOCALAPPDATA%|%APPDATA%)[\\/]([^();]+?)(?=\s+inside|\s*\(|\s+on Windows|;|$)/i.exec(s);
+      if (user && m) add(path.join(user, { documents: 'Documents', '%localappdata%': 'AppData/Local', '%appdata%': 'AppData/Roaming' }[m[1].toLowerCase()], ...m[2].trim().split(/[\\/]+/)));
+      return out;
+    }
+  }
+  // ~/ and $XDG_ paths anywhere in the note
+  for (const m of s.matchAll(/(?:^|[\s(;,])((?:~|\$XDG_(?:DATA|CONFIG)_HOME)\/[^\s;,()]*)/g)) { const t = m[1].replace(/[.:]$/, ''); if (!placeholder(t)) add(expandPath(t, dir, home)); }  // a placeholder in a home path (OpenGOAL/<game>) would widen it to other games' folders: left out
+  // a leading relative name, and a second one after "and"
+  const lead = /^([\w.\-\/<>*]+)(?:\s+and\s+(?:the other\s+)?([\w.\-\/<>*]+))?(?=$|\s*\(|\s+in\b|\s+beside\b|\s+relative\b|\s+and\b|\s*[;,])/.exec(s);
+  if (lead && !/^(~|\$|\/)/.test(lead[1])) for (const t of [lead[1], lead[2]].filter(Boolean)) {
+    const u = placeholder(t) ? (t.includes('/') ? t.replace(/\/[^/]*[<>*][^/]*$/, '') : null) : t;
+    if (u && dir) add(path.join(dir, u.replace(/\/$/, '')));
+  }
+  return out;
+}
+function sandboxed(p, rec, home) {
+  if (!rec?.flatpak) return p;
+  const app = path.join(home, '.var/app', rec.flatpak);
+  return p.replace(path.join(home, '.config') + path.sep, path.join(app, 'config') + path.sep).replace(path.join(home, '.local/share') + path.sep, path.join(app, 'data') + path.sep);
+}
+function saveDirs(e, rec, home = os.homedir()) {
+  return [...new Set((e?.saves || []).flatMap((p) => savePaths(p, rec, home)).map((p) => sandboxed(path.normalize(p).replace(/(.)\/+$/, '$1'), rec, home)))];
 }
 
 // ---------------------------------------------------------------- PCGamingWiki
@@ -713,4 +762,4 @@ function createRecomps(ctx) {
   return { catalogue, byId, details, ready, watchSetup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
 }
 
-module.exports = { readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };
+module.exports = { savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };
