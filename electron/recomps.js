@@ -631,7 +631,9 @@ function createRecomps(ctx) {
   function ready(id) { const e = byId(id); return readyOf(e, installs[id]); }
   async function watchSetup(id, { onProgress = () => {}, every = 1000, limitMs = 45 * 60e3, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
     const e = byId(id), rec = installs[id];
-    if (!e || !rec || readyOf(e, rec) || watching.has(id)) return { watched: false };
+    // only with a done file to wait for: without one (33 entries) nothing can say when it's finished, and the person
+    // presses Done instead
+    if (!e || !rec || !e.done || readyOf(e, rec) || watching.has(id)) return { watched: false };
     watching.add(id);
     try {
       const doneAt = e.done ? expandPath(e.done, rec.dir) : null;

@@ -271,3 +271,10 @@ test('setup on its first start: bytes written measured against the finished size
   const r2 = await w.eng.watchSetup('game', { sleep: async () => {} });
   assert.deepStrictEqual([r2.done, r2.closed], [false, true]);
 });
+
+test('no setup watch for a recomp the catalogue gives no done file', async () => {
+  const entry = { id: 'nodone', name: 'No Done', games: [{ title: 'X', console: 'n64' }], repo: 'github:o/nodone', builds: 'linux', program: 'Game', saves: [], needs: { what: 'a ROM' }, setup: { how: 'picker' } };
+  const w = fakeWorld([entry]);
+  w.publish('v1', 'one'); await w.eng.install('nodone');
+  assert.strictEqual((await w.eng.watchSetup('nodone', { sleep: async () => {} })).watched, false);
+});
