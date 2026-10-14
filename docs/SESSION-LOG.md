@@ -6,6 +6,29 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 14 Oct 2026 · Freeze about 30 s after start (owner: "after like 30 seconds ish the app dims and I'd have to close it or it would come back itself", "if it comes back I lose controller support"; not released yet, the owner is sending more bugs)
+- Found by running the real app in simulated Game Mode on a fake Deck home (EmuDeck layout, about 2,800 games, saves, trophies, Steam) with a `--require` hook: a main-process CPU profile plus a log of every stall and every blocking process call (scratchpad, not in the repo). Before: stalls of 2.4 s in the first 10 s and the main thread busy most of the time from 15 s.
+- Causes:
+  - The game ID reader (0.9.60 made it a game per turn) still read each game on the main thread from 15 s after start. One Switch NSP (NCA headers decrypted) or PS2 CHD (hunks decompressed) can take seconds on a Deck; Steam dims a window that stops answering.
+  - Its cache (`game-ids.json`) was saved 2 s after the last read, so during a read-through it never saved. An app closed midway read every game again on the next start.
+  - Steam matching (play time, last played, collections) resolved every installed game's real path (`realpathSync`) on every call, and read up to 1 MB of every PS3/PSP/Vita game for a serial, on the main thread.
+  - 25 s after every start, `recompTrophies` re-read every trophy file even with no recomp installed.
+- Fixed:
+  - `electron/fileIds.js` (pure readers, `createReader`) and `electron/idWorker.js`: IDs are read in a worker thread (`gameId` `extractAsync`, `fileIdsAsync`), falling back to reading in place if the worker can't start.
+  - The ID cache saves at least every 2 s.
+  - `steamManager.warmSerials()` reads serials through the worker before matching (awaited by the handlers and the async collection functions).
+  - `normPath` is memoised for 5 min.
+  - `serialOf` moved to `fileIds.ps3SerialOf` unchanged (the CIDE golden test still passes).
+  - `ps3Serial` is split into the file part and `ps3SerialListed` (games.yml).
+  - Trophy files are re-read for recomps only when the installed recomps change; trophy refresh pauses between emulators.
+  - `steamRunning` runs `pgrep` only when /proc can't be read.
+- Controller after a freeze:
+  - A watchdog logs `main thread stalled N ms` for any stall over 2 s.
+  - In Game Mode it runs what brings the pad back after a game: `refocus()` and `steamFront()`.
+  - Cause not confirmed without a device log. Likely Steam took the pad while the window was dimmed.
+- After: longest stall in the first minute about 300 ms (was about 2,500); 1,632 games' IDs read in the background with no stall over 200 ms. `test/fileIds.test.js`: worker equals in-place, fallback, async identity path. 350 tests pass, build and launch check pass.
+- Owner to test: start in Game Mode and wait a minute; if it still dims, send the log (lines `main thread stalled` and `main thread: longest stall`).
+
 ## 14 Oct 2026 · 0.9.67 Follow Through (owner: "do updates 1-3 but please make sure to triple Check everything we didn't do yet and reflect it in the handover")
 - Built: recomp setup watched with a measured bar; Online Play reports settings an update renamed (adapters `full`); files parsed before and read back after every Online Play write, put back on failure.
 - Triple check of everything not done:

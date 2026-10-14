@@ -95,6 +95,7 @@ function applySteamArt(artDir) {
 // Look at every process (name and command line) plus Steam's pid file, not just one pgrep pattern.
 function steamRunning() {
   const me = String(process.pid);
+  let procOk = true;
   try {
     for (const pid of fs.readdirSync('/proc')) {
       if (!/^\d+$/.test(pid) || pid === me) continue;
@@ -104,10 +105,11 @@ function steamRunning() {
       try { cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0')[0]; } catch {}
       if (/(ubuntu12_32|ubuntu12_64)\/steam(webhelper)?$|\/steam\.sh$/.test(cmd)) return true;
     }
-  } catch {}
+  } catch { procOk = false; }
   for (const f of [path.join(os.homedir(), '.steam/steam.pid'), path.join(os.homedir(), '.var/app/com.valvesoftware.Steam/.steam/steam.pid')]) {
     try { const pid = parseInt(fs.readFileSync(f, 'utf8'), 10); if (pid > 1) { process.kill(pid, 0); return true; } } catch {}
   }
+  if (procOk) return false; // every process was looked at: pgrep (a blocking process start, 20 to 80 ms) only when /proc couldn't be read
   try { execSync('pgrep -x steam || pgrep -x steamwebhelper', { stdio: 'ignore' }); return true; } catch { return false; }
 }
 function waitForSteamExit(ms) {
