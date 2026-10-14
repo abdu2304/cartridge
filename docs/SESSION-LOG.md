@@ -6,20 +6,18 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
-## 14 Oct 2026 · Steam card picture, recomp games without an outside file manager (owner, photo of Consoles on the TV: "Steam controller icon looks like shit and not like others", "when installing a repo file no need to use external file manager but cartridge's built in file manager"; not released yet)
+## 14 Oct 2026 · Steam card picture, recomps set themselves up (owner, photo of Consoles on the TV: "Steam controller icon looks like shit and not like others", "when installing a repo file no need to use external file manager but cartridge's built in file manager"; not released yet)
 - Steam card (`SteamTile.vue`):
   - The controller is drawn filled and lit like RomM's console pictures: a white Steam Controller with shaded grips, round trackpads, stick, face buttons and the Steam button.
   - It replaces a dark outline on a dark card. The card is Steam blue (`#1a9fff` to `#1b2a63`).
   - Checked by render in Plain and Glass beside a console card.
-- Recomps that opened their own file dialog for the game:
-  - N64: Recompiled programs keep a checked big-endian copy as `<game id>.z64` in `~/.config/<App>/` (N64ModernRuntime's stored ROM; the catalogue's `done` file). With that copy there, they never open their file dialog.
-  - `recomps.storedRomOf`/`storeZ64`: Cartridge checks your copy (catalogue hashes), converts .v64/.n64 order and writes it there (temp file, then rename). Never over a different file; Linux builds only (not Windows or Flatpak).
-  - Pickers whose catalogue `arg` has `{FILE}` (SMB1R, Crash Bandicoot Recompiled, Lost Odyssey, Foxhollow) are started with the game instead.
-  - The game is still picked in Cartridge's own file picker (Which Copy? > Pick a File).
-  - List entries carry `stores`; RecompSheet says "Cartridge checks your copy and puts it where it keeps it, so it never asks for it."
+- Recomps with their own setup (owner, after a first try that put N64 ROMs where the recomps keep them: "Just let the setup wizard run normally ... it's too much work and can't be as smooth as what we do for emulators, let's just let it run on its own"):
+  - Recomps whose catalogue setup is `picker` (their own ROM dialog or setup wizard) get no Set Up With Your Game step from Cartridge any more. Open starts them and they set themselves up.
+  - Readiness comes from the done file when the catalogue has one (the 0.9.67 setup watch), else from It's Set Up (shown without a picked game now).
+  - The setup text reads "It sets itself up: open it and follow its own steps the first time."
+  - Place and path recomps keep Cartridge's own picker. The ROM placing and the argument trick were removed again; don't bring them back.
 - Fixed on the way: argument templates that already quoted `"{FILE}"` got doubled quotes, and Windows ones `Z:` twice (`fileArg`).
-- Tested in `test/recomps.test.js`: byte orders, same copy again, refusal over another copy, non-ROMs, which entries qualify (15 or more), quoting.
-- Recomps that still show their own dialog: disc-image wizards (Unleashed, Marathon, Symphony and the other RecompOne ones, Skate 3 and others) with no argument or stored file.
+- Tested in `test/recomps.test.js` (quoting).
 
 ## 14 Oct 2026 · Freeze about 30 s after start (owner: "after like 30 seconds ish the app dims and I'd have to close it or it would come back itself", "if it comes back I lose controller support"; not released yet, the owner is sending more bugs)
 - Found by running the real app in simulated Game Mode on a fake Deck home (EmuDeck layout, about 2,800 games, saves, trophies, Steam) with a `--require` hook: a main-process CPU profile plus a log of every stall and every blocking process call (scratchpad, not in the repo). Before: stalls of 2.4 s in the first 10 s and the main thread busy most of the time from 15 s.

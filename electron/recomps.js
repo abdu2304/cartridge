@@ -227,28 +227,6 @@ function hashFile(file, { n64 = false } = {}) {
 function fileArg(tpl, file, win) {
   return String(tpl).replace(/"?(Z:)?\{FILE\}"?/g, (m, z) => `"${z || win ? 'Z:' : ''}${file}"`);
 }
-// where an N64: Recompiled program keeps its checked ROM (the catalogue's done file: ~/.config/<App>/<game id>.z64), for
-// Linux builds that aren't Flatpaks (a sandbox keeps its own ~/.config)
-function storedRomOf(e, rec) {
-  if (!rec || rec.kind === 'windows' || rec.kind === 'flatpak' || !(e?.games || []).some((g) => g.console === 'n64')) return null;
-  if (!/^~\/\.config\/[^/]+\/[^/]+\.z64$/.test(String(e.done || ''))) return null;
-  return expandPath(e.done);
-}
-// a copy in big-endian (.z64) order whatever order yours is in (.v64 byte-swapped, .n64 little-endian); written beside
-// and renamed into place; an existing different file is left alone
-async function storeZ64(file, target) {
-  let b; try { b = await fsp.readFile(file); } catch { return { ok: false, why: 'That file isn’t there any more.' }; }
-  if (b.length < 0x40 || b.length > 256 << 20) return { ok: false, why: 'That doesn’t look like an N64 ROM.' };
-  const h = b.readUInt32BE(0);
-  if (h === 0x37804012) b.swap16(); else if (h === 0x40123780) b.swap32(); else if (h !== 0x80371240) return { ok: false, why: 'That doesn’t look like an N64 ROM.' };
-  const had = await fsp.readFile(target).catch(() => null);
-  if (had) return had.equals(b) ? { ok: true } : { ok: false, why: `${target.replace(os.homedir(), '~')} is already there with another copy. Cartridge leaves it as it is.` };
-  await fsp.mkdir(path.dirname(target), { recursive: true });
-  const tmp = target + '.cartridge-new';
-  await fsp.writeFile(tmp, b);
-  await fsp.rename(tmp, target);
-  return { ok: true };
-}
 async function checkGame(e, file) {
   const need = e?.needs;
   if (!need) return { ok: true };
@@ -397,7 +375,7 @@ function createRecomps(ctx) {
       const lt = latest[e.id] || null;
       out.push({
         id: e.id, name: e.name, games: e.games, origin: e.origin, from: e.from, repo: e.repo || null, description: e.description || '', url: projectUrl(e), site: e.site || null,
-        builds: e.builds, needs: e.needs || null, setup: e.setup || { how: 'none' }, stores: !!storedRomOf(e, rec || { kind: 'linux' }) || (e.setup?.how === 'picker' && /\{FILE\}/.test(e.setup?.arg || '')), done: e.done || null, saves: e.saves || [], achievements: e.achievements || null, license: e.license || null,
+        builds: e.builds, needs: e.needs || null, setup: e.setup || { how: 'none' }, done: e.done || null, saves: e.saves || [], achievements: e.achievements || null, license: e.license || null,
         roms: matchRoms(e, roms),
         installed: rec ? { tag: rec.tag, kind: rec.kind, dir: rec.dir, program: rec.program, channel: rec.channel || 'stable', at: rec.at, game: rec.game || null, ready: readyOf(e, rec), here: exists(rec.program), appid: rec.appid || null } : null,
         latest: lt && { tag: lt.tag, date: lt.date, kind: lt.kind, at: lt.at, none: lt.none || null },
@@ -630,28 +608,17 @@ function createRecomps(ctx) {
       } else fs.symlinkSync(file, target);
       rec.game.placed = target;
       note = `Linked as ${target.replace(os.homedir(), '~')}.`;
-    } else if ((how === 'path' || how === 'picker') && /\{FILE\}/.test(e.setup?.arg || '')) { // 0.9.68: a picker that also takes the game as an argument never needs its dialog
+    } else if (how === 'path' && e.setup?.arg) {
       args = fileArg(e.setup.arg, file, rec.kind === 'windows');
       rec.args = args;
       note = 'Cartridge starts it with your game.';
-    } else if (how === 'picker' && storedRomOf(e, rec)) {
-      // 0.9.68 (owner: no outside file manager): N64: Recompiled programs check the ROM you pick and keep a big-endian
-      // copy as <game id>.z64 in their own folder (N64ModernRuntime check_stored_rom); with that copy there they never
-      // open their file dialog. Cartridge puts it there itself: checked first, never over another file
-      const target = storedRomOf(e, rec);
-      const r = await storeZ64(file, target);
-      if (!r.ok) return { ok: false, why: r.why };
-      rec.game.placed = target; rec.game.how = 'stored';
-      saveInstalls();
-      log('recomp game set', id, 'stored', chk.ok ? 'checked' : 'used anyway');
-      return { ok: true, how: 'stored', note: `Ready: your copy is where ${e.name} keeps it, so it won’t ask for it.`, checked: chk.ok, path: target };
     } else if (how === 'picker') {
       note = rec.kind === 'windows' ? `When it asks for the game, paste this: Z:${file.replace(/\//g, '\\')}` : `When it asks for the game, pick: ${file}`;
     }
-    if (how !== 'picker' || args) rec.setupDone = true;
+    if (how !== 'picker') rec.setupDone = true;
     saveInstalls();
     log('recomp game set', id, how, chk.ok ? 'checked' : 'used anyway');
-    return { ok: true, how: args ? 'path' : how, note, args, checked: chk.ok, path: rec.kind === 'windows' ? 'Z:' + file.replace(/\//g, '\\') : file };
+    return { ok: true, how, note, args, checked: chk.ok, path: rec.kind === 'windows' ? 'Z:' + file.replace(/\//g, '\\') : file };
   }
   function markDone(id) { const rec = installs[id]; if (!rec) return false; rec.setupDone = true; saveInstalls(); return true; }
   function setAppid(id, appid) { const rec = installs[id]; if (rec) { rec.appid = appid >>> 0; saveInstalls(); } }
@@ -800,4 +767,4 @@ function createRecomps(ctx) {
   return { catalogue, byId, details, ready, watchSetup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
 }
 
-module.exports = { fileArg, storedRomOf, storeZ64, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };
+module.exports = { fileArg, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };

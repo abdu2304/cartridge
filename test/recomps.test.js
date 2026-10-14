@@ -299,34 +299,6 @@ test('save notes read as paths: sentences, Proton prefixes, Flatpak sandboxes, p
   for (const e of require('../electron/recomps.json').entries) for (const p of R.saveDirs(e, { dir: '/E/x', kind: e.builds === 'windows' ? 'windows' : 'linux' }, '/H')) assert.doesNotMatch(p, /\s(in|the|and|beside|inside|relative|when|or)\s|[()<>*%]/, `${e.id}: ${p}`);
 });
 
-// 0.9.68 (owner: no outside file manager): N64: Recompiled programs find a checked copy where they keep it and never
-// open their file dialog; Cartridge writes it there in big-endian order, never over another file
-test('N64 ROMs are stored as <game id>.z64 in big-endian order, never over another copy', async () => {
-  const R = require('../electron/recomps');
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'z64-'));
-  const z64 = Buffer.alloc(0x100); z64.writeUInt32BE(0x80371240, 0); z64.write('ZELDA MAJORA', 0x20, 'latin1');
-  const v64 = Buffer.from(z64); v64.swap16();
-  const n64 = Buffer.from(z64); n64.swap32();
-  for (const [name, b] of [['a.v64', v64], ['a.n64', n64], ['a.z64', z64]]) {
-    const src = path.join(dir, name), out = path.join(dir, name + '-out', 'mm.n64.us.1.0.z64');
-    fs.writeFileSync(src, b);
-    assert.deepStrictEqual(await R.storeZ64(src, out), { ok: true });
-    assert.ok(fs.readFileSync(out).equals(z64), name);
-    assert.deepStrictEqual(await R.storeZ64(src, out), { ok: true }); // the same copy again is fine
-  }
-  const other = path.join(dir, 'other.z64'); const o = Buffer.from(z64); o[0x30] = 1; fs.writeFileSync(other, o);
-  const r = await R.storeZ64(other, path.join(dir, 'a.z64-out', 'mm.n64.us.1.0.z64'));
-  assert.strictEqual(r.ok, false);
-  const junk = path.join(dir, 'junk.bin'); fs.writeFileSync(junk, Buffer.alloc(0x100));
-  assert.strictEqual((await R.storeZ64(junk, path.join(dir, 'j.z64'))).ok, false);
-  const e = { games: [{ console: 'n64' }], done: '~/.config/Zelda64Recompiled/mm.n64.us.1.0.z64' };
-  assert.ok(R.storedRomOf(e, { kind: 'linux' }).endsWith('/.config/Zelda64Recompiled/mm.n64.us.1.0.z64'));
-  assert.strictEqual(R.storedRomOf(e, { kind: 'windows' }), null);
-  assert.strictEqual(R.storedRomOf(e, { kind: 'flatpak' }), null);
-  assert.strictEqual(R.storedRomOf({ ...e, done: 'sm64.o2r' }, { kind: 'linux' }), null);
-  const cat = require('../electron/recomps.json').entries.filter((x) => R.storedRomOf(x, { kind: 'linux' }));
-  assert.ok(cat.length >= 15, `${cat.length} catalogue entries take a stored ROM`);
-});
 
 test('a game file goes into an argument template quoted once, with Z: once for Windows builds', () => {
   const { fileArg } = require('../electron/recomps');
