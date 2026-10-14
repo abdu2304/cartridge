@@ -6,6 +6,20 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 14 Oct 2026 · Handover audit (owner: "Make sure the handover leaves no stones unturned")
+- The handover was checked part by part against the whole session. Added:
+  - the catalogue updates users without a release (fetched daily from `main`, used when `updated` is newer);
+  - PR numbers;
+  - the owner's ways from this stretch (credits, the 5-hour resume, checks for loose ends, "hide, don't delete", zip attachments);
+  - research with subagents, and that its data was not kept;
+  - how to add or fix recomps;
+  - session restarts;
+  - nine new lessons in Part 8, including the handover itself going stale;
+  - research facts found but not offered;
+  - the files Cartridge keeps for recomps and Online Play.
+- Fixed stale lines: RPCN accounts, shadPS4's Network section, the audit's results, the section list in the harness notes.
+- Docs only, no version change.
+
 ## 13 Oct 2026 · 0.9.66 Loose Ends (owner: "do the 6 and push it as a next update")
 - The six things agreed but not done in 0.9.65: recomp project details, link guesses, start-once after a recomp update with automatic roll back, RPCN accounts made in Cartridge (RPCN's own protocol from RPCS3's source) and ShadNet sign-up in an in-app window, Online Play on the emulator sheet, RPCS3 Repair before Online Play writes. Handover Part 13.
 - Owner asked for a resume 5 hours after any credit stop (asleep): send_later set, cancelled after the merge.

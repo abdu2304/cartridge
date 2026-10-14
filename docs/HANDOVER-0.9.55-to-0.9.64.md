@@ -6,14 +6,15 @@ To the Claude on the next account, from the Claude on this one.
 
 Three handovers come before this one: `docs/HANDOVER-0.9.3-to-0.9.21.md`, `docs/HANDOVER-0.9.22-to-0.9.37.md` and `docs/HANDOVER-0.9.38-to-0.9.54.md`. Everything in them about the owner, the process and the do-not-break rules still holds unless this document says otherwise. This one picks up at 0.9.55 (7 October 2026) and runs to 0.9.66 (13 October 2026): **12 releases**. The file keeps its old name so links to it still work. Part 7 holds the plans the owner agreed for recomps and Online Play, with every decision and the reason behind it; both shipped (Parts 11, 12 and 13), and what is still missing from those plans is listed in Part 9.
 
-**The owner asked for this document to be kept up to date after every update from now on.** When you finish an update, add it to Part 4 and Part 6, move what's done out of Part 9, and update Part 1. Keep the same level of detail: what changed, why, what was found, how it was checked, what the owner must test.
+**The owner asked for this document to be kept up to date after every update from now on.** When you finish an update, add a Part for it at the end, add it to Part 4 (releases), Part 5 (code map) and Part 6 (subsystems), add what broke to Part 8, move what's done out of Part 9 and add what's new there, and update Part 1. Then read the whole file once more, top to bottom, against the session: in 0.9.65 and 0.9.66 only new Parts were added at the end and Parts 1 to 9 went stale until the owner asked (Part 8). Keep the same level of detail: what changed, why, what was found, how it was checked, what the owner must test.
 
 Read in this order:
 1. This document, once, top to bottom.
-2. `CLAUDE.md`: its sections "0.9.55" to "0.9.64" are the short technical notes per version, with function names: the index into the code.
+2. `CLAUDE.md`: its sections "0.9.55" to "0.9.66" are the short technical notes per version, with function names: the index into the code.
 3. `docs/SESSION-LOG.md`, newest entry first: the per-update diary with the owner's words and what they must test.
 4. `docs/design-rules.md` before any UI change (section 6: focus and chosen are frozen, see Part 2), `docs/cae.md` before motion, `docs/glass-engine.md` before Glass, `docs/architecture.md` for the engine map, `docs/game-settings/<emu>.md` before touching an emulator's Game Settings.
 5. `CHANGELOG.md` for the exact user-facing wording.
+6. For recomps: `docs/recomps.md` (every catalogue entry with its sources and doubts). For Online Play: the comments at the top of each adapter in `electron/onlineAdapters.js` (repository, commit and file:line for every setting).
 
 The repo is public. Nothing private is in this document. Keep it that way.
 
@@ -21,12 +22,14 @@ The repo is public. Nothing private is in this document. Keep it that way.
 
 ## Part 1. Where things stand right now
 
-- **Latest release:** v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). v0.9.63 "The Right Version" was PR #82. 0.9.64 is the PR after it.
+- **Latest release:** v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). PRs: v0.9.63 #82, v0.9.64 #83, v0.9.65 #84, v0.9.66 #85, the handover catch-up #86 (docs only).
 - **Branch:** `claude/relaxed-fermat-30pigp`, merged into `main` by a PR for every release (merge commit, not squash). After a merge, reset the branch to `main` (`git fetch origin main && git checkout -B claude/relaxed-fermat-30pigp origin/main`) before new work.
 - **package.json:** `version` = `versionName` = 0.9.66, `releaseName` "Cartridge 0.9.66". The lockfile's version field is stale and always was; leave it.
-- **Tests:** 343 pass at 0.9.66 (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink; saveSync and gameSettings grew a lot.
-- **Before every release:** `npm test`, `npx vite build`, the launch check (`CARTRIDGE_SMOKE=1 HOME=$(mktemp -d) xvfb-run -a node_modules/electron/dist/electron . --no-sandbox` must print `SMOKE OK`), `npm run audit:ui` (focus and contrast in six looks, clipping, the tour twice; all zero at 0.9.63 and 0.9.64). Never rebuild `dist` while the audit runs: it reads `dist` and crashes mid-run.
+- **Tests:** 343 pass at 0.9.66 (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink, recomps, onlinePlay (fake RPCN server inside); saveSync and gameSettings grew a lot.
+- **Before every release:** `npm test`, `npx vite build`, the launch check (`CARTRIDGE_SMOKE=1 HOME=$(mktemp -d) xvfb-run -a node_modules/electron/dist/electron . --no-sandbox` must print `SMOKE OK`), `npm run audit:ui` (focus and contrast in six looks, clipping, the tour twice; all zero at 0.9.63, 0.9.64, 0.9.65 and 0.9.66; it takes about 15 minutes, so run it in the background). Never rebuild `dist` while the audit runs: it reads `dist` and crashes mid-run.
 - **Standing instruction:** when an update is finished, built and launch-checked, open the PR and merge it without asking. A version change on `main` publishes the release to every user.
+
+- **Recomp catalogue updates without a release:** every Cartridge fetches `https://raw.githubusercontent.com/abdu2304/cartridge/main/electron/recomps.json` once a day (`catalogueUrl` in main.js) and uses it when its `updated` date is newer than the shipped one. So a catalogue fix merged to `main` reaches every user within a day, with no version bump, but only if `updated` moves on (`node tools/recomps/build.js <batch files> --updated <date>`). A broken catalogue on `main` also reaches everyone: run `npm test` (test/recomps.test.js) before merging one.
 
 **What comes next (agreed with the owner, in this order):**
 1. ~~0.9.65 · Recomps~~ and ~~0.9.66 · Online Play~~: both shipped together as 0.9.65 (Parts 11 and 12).
@@ -34,7 +37,7 @@ The repo is public. Nothing private is in this document. Keep it that way.
 3. Owner device tests (end of Parts 11, 12 and 13), then whatever the owner picks next.
 4. Keep this handover updated after each.
 
-**Waiting on the owner:** device tests listed in Part 9; KytyPS5 log after 0.9.63 if it still fails; the Unit 13 freeze test with frame generation off.
+**Waiting on the owner:** device tests listed in Part 9 (from 0.9.63 to 0.9.66); KytyPS5 log after 0.9.63 if it still fails; the Unit 13 freeze test with frame generation off; whether to build the four items still missing from Part 7 (Part 9) as 0.9.67. Last thing I asked them: "Do you want them built as 0.9.67?" No answer yet.
 
 ---
 
@@ -50,6 +53,12 @@ Everything in the earlier handovers still applies. New in this stretch:
 - **Recomps are the owner's main interest now.** They believe recomps may overtake emulators. See Part 7.1.
 - **Safety they care about:** never download and run something without showing what it is first (0.9.64 "Check It"); never touch saves except Save Sync, Linked Folders and (agreed for 0.9.65) recomp save backups during updates.
 - **When they're unsure, they ask "what does this mean?"** Explain with their own example in plain terms (the Eden GPU Mode numbers explanation is a good model).
+- **Credits decide the pace (0.9.65 to 0.9.66).** They work on prepaid credits and say so: "Can wrap up quickly cause I'm almost out of credits", "I added 5$ credits please finish with 5$", then "I'm stocked up on credits again. No need to build in batches. Just build the rest of this update and the next one all in one go." When credits are short: commit and push working checkpoints often, keep the handover current at every push, and finish the smallest complete piece. When they're stocked up, they want whole updates in one go.
+- **"If I run out of credits mid session please start the project again in 5 hours from now UAE time ... because I will be sleeping."** (13 Oct 2026; they are in the UAE, UTC+4). Done with `send_later` (claude-code-remote) 300 minutes ahead, the message saying exactly what to finish and to re-arm itself, and cancelled (`delete_trigger`) once the release merged. It fired once while the audit was running; the session carried on and re-armed, then cancelled after the merge. Use the same pattern if they ask again; never leave one armed after the work is merged.
+- **They check for loose ends.** After a release they ask "Is there anything we said we'd do but didn't?" and "Did you publish everything to handover?", then "Make sure the handover leaves no stones unturned". Before calling an update finished, go through Part 7 (and any plan in chat) item by item against the code and say plainly what is missing. That check found six gaps after 0.9.65 (built as 0.9.66) and four more after 0.9.66 (Part 9).
+- **"Don't completely delete X, just remove it from the download list until ..."** (KytyPS5, 0.9.65): hide, don't remove; keep the user's copy and its updates working, and bring it back on its own when the condition changes (`gate` in emuGet).
+- **Attachments:** an HTML file they attach can arrive as plain text with the links lost; a zip of the saved page worked (the PCGamingWiki page for the catalogue).
+- **They confirm before building big things.** For recomps they said "confirm before building, I will tell you when to build", answered the questions, then "Okay start".
 
 ---
 
@@ -58,9 +67,13 @@ Everything in the earlier handovers still applies. New in this stretch:
 - **Electron runs in the container** (launch check and Playwright work). If `node_modules/electron/dist` is missing after `npm ci`, fetch `electron-v44.4.5-linux-x64.zip` from GitHub with curl into `node_modules/electron/dist` and write `path.txt` = `electron`.
 - **GitHub access from the container:** the GitHub API is scoped to this repository only (other repos' API answers "sessions are bound to their configured repositories"). `git clone --depth 1` of any public repo works through the proxy, and `raw.githubusercontent.com` files work. So: read other projects' sources by raw URL or a shallow clone, never by the API. `git ls-remote --tags <repo>` works and is how release tags are read.
 - **Other sites:** PCGamingWiki answers with a Cloudflare block from the container (relevant for 0.9.65). git.eden-emu.dev (Forgejo) API and raw files work. The shadPS4 wiki raw pages work.
-- **The UI harness** (`tools/ui-audit/harness.js`): `open({ style, width, height, ui, answers, ... })` stubs `window.cart`. `window.__cartStore.openModal(type, props)` opens any pop-up; don't `await` it inside `page.evaluate` (it resolves only when the pop-up closes). Navigate with `page.click('[data-tab="settings"]')` and `[data-key="sec-<id>"]` (sections: library, emu, steam, ra, syncthing, ui, controls, dlup, about). EmuGet needs `emuget:state: []` and `jobs:list: []` in answers or it throws.
+- **The UI harness** (`tools/ui-audit/harness.js`): `open({ style, width, height, ui, answers, ... })` stubs `window.cart`. `window.__cartStore.openModal(type, props)` opens any pop-up; don't `await` it inside `page.evaluate` (it resolves only when the pop-up closes). Navigate with `page.click('[data-tab="settings"]')` and `[data-key="sec-<id>"]` (sections: library, emu, steam, ra, syncthing, online, ui, controls, dlup, about). EmuGet needs `emuget:state: []` and `jobs:list: []` in answers or it throws. Stub answers live inside a JavaScript template string in harness.js: a `\n` written there becomes a real line break inside a quoted string, the stub script fails, the app never loads and every `page.click` times out (0.9.66). Keep stub texts on one line. The stub has samples for `online:list` (PPSSPP on, RPCS3 with a damaged file, Azahar Pretendo), `recomps:details` and `recomps:guess`, so the audits cover them.
 - **Game Settings data** is generated: `tools/game-settings/gen.js --fetch <dir>` downloads every reader's source files (and, since 0.9.63, each emulator's last four release tags into `<dir>/<id>@<tag>`), then `gen.js <dir>` writes `electron/emuSettingsDb.json`. `--tags-only` fetches only the releases. The sources used for 0.9.63 were master as of 8 Oct 2026 plus tags listed in Part 6.3. Before regenerating, check the output is identical for unchanged sources (it was, byte for byte).
 - **Building a real tool to make test fixtures** worked well: ZArchive's own tool was compiled in the container (`g++` with zstd headers fetched from facebook/zstd and the system libzstd) to make a real `.wua`. Prefer this to fixtures you write by hand from your reading of a format.
+- **Research with subagents (0.9.65, 0.9.66).** The recomp catalogue and the Online Play facts were researched by subagents (Agent tool), each given a brief file (the schema, "cite file:line", "read the project's own source", "save after each entry") and told to write JSON into the scratchpad. They clone sources with `git clone --depth 1` into the scratchpad and read them there. Two lessons: agents hit usage limits on big batches (split into batches of about 10 entries and save after each), and the scratchpad is gone when the session ends, so everything worth keeping must end up in the repo (the catalogue in `electron/recomps.json` + `docs/recomps.md`, the online facts as comments in `electron/onlineAdapters.js`). The research JSON itself was not kept.
+- **Adding or fixing recomps:** write entries as JSON in the shape `tools/recomps/build.js` takes (fields shipped: its `SHIP` list: id, name, games, origin, repo, site, builds, linuxAsset, windowsAsset, prerelease, program, args, needs, setup, done, saves, achievements, license, description; plus `sources` and `uncertain` for docs/recomps.md), then `node tools/recomps/build.js <batch files...> --updated <date>`, which writes both `electron/recomps.json` and `docs/recomps.md`. To change one entry without the old batch files, edit both outputs by hand in the same shape and move `updated` on. A "place" setup without a place becomes "picker"; entries with no repo or site are left out (listed under "Left out").
+- **The session can restart mid-work** ("This session's worker process was restarted"). Files on disk survived; nothing else did. Commit and push a WIP checkpoint after each finished piece.
+- **Tools from outside the repo:** the GitHub tools (`mcp__github__*`) load through ToolSearch and sometimes disconnect for a while; PRs were made and merged with them (`create_pull_request`, `merge_pull_request` with `merge_method: merge`). Reminders: `mcp__claude-code-remote__send_later` / `delete_trigger`.
 - **Measure, don't guess:** `perf_hooks.monitorEventLoopDelay` for main-thread stalls; a Node benchmark of 400 fake saves showed the Save Sync fix (0.9 s block to 10 ms).
 
 ---
@@ -191,6 +204,14 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 - **A null `querySelector` after closing a pop-up while it loads:** after every `await` in a component, check the element still exists (scan done in 0.9.63).
 - **Harness pitfalls:** awaiting `openModal` hangs the audit; rebuilding `dist` mid-audit crashes it.
 - **My own slip in this stretch:** running `node -e "require('./electron/main.js')"` starts the app's main file (it never exits); use `node --check`.
+- **Electron has no SHA3 (0.9.65):** RPCN's password needs PBKDF2 with SHA3-256, and Electron's BoringSSL has none (the XTS trap of 0.9.30 again). Written in pure JS (`electron/sha3.js`), checked against Node's own SHA3, and run in a worker because 200,000 rounds take about 5 s.
+- **One-key writers must copy the file's own style (0.9.65):** the ini writer added `key=value` to an empty section in a file written `key = value`, and the XML writer lost the closing tag's indent. Both fixed and tested; a writer that changes one setting must leave the rest of the file looking as the emulator wrote it.
+- **A failing test hung the whole run (0.9.66):** a test with a fake server stopped at its first failed assert and never closed the server, so `node --test` waited forever with no output. Close servers in `finally`. Run one test file with `timeout 60` when it goes quiet.
+- **The fake RPCS3 damage didn't match the real one (0.9.66):** `Resolution Scale: = 100` on its own line is valid YAML; the real damage joins two lines (`Write Depth Buffer: falseResolution Scale: = 150`). Copy real damage from the owner's log into tests.
+- **A null answer broke the game page in the audit (0.9.65):** `for (const o of ops)` with the stub's null (`f is not iterable`, minified). Guard every list from `call()` with `|| []`. The audit's "page errors" line is the place to look.
+- **Matching keys must match the data (0.9.66):** the link guesser used `ngc` for GameCube while the catalogue's console key is `gamecube`; caught by trying it. Try new helpers on real values before writing tests.
+- **The handover went stale (0.9.65, 0.9.66):** I added Parts 11 to 13 at the end but didn't update Parts 1 to 9; Part 9 still said recomps and Online Play were "not started". The owner had to ask. Update every Part each time (the header says which).
+- **`pkill -f <pattern>` matched my own shell** and killed the command; kill by PID.
 
 ---
 
@@ -222,7 +243,7 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 
 ## Part 10. How I'd work in your place
 
-Read the newest SESSION-LOG entry, CLAUDE.md and this file first. When the owner sends photos or a log with "don't build yet", investigate read-only and reply per item with cause, fix and options, then one numbered list of questions with your recommendation for each. When they say Start, make a task list, build in commits you push as you go (the test build runs on every push), check everything (tests, build, launch check, audit, screenshots in Plain and Glass), write the SESSION-LOG entry, the CLAUDE.md section and **this handover**, then open and merge the PR. Read every emulator's own source before writing to its files, and every external project's real release layout before installing from it.
+Read the newest SESSION-LOG entry, CLAUDE.md and this file first. When the owner sends photos or a log with "don't build yet", investigate read-only and reply per item with cause, fix and options, then one numbered list of questions with your recommendation for each. When they say Start, make a task list, build in commits you push as you go (the test build runs on every push), check everything (tests, build, launch check, audit, screenshots in Plain and Glass), write the SESSION-LOG entry, the CLAUDE.md section and **this handover**, then open and merge the PR. Read every emulator's own source before writing to its files, and every external project's real release layout before installing from it. Before saying an update is finished, check it item by item against its plan (Part 7 for recomps and Online Play) and against everything promised in chat, and list what's missing plainly; the owner will ask.
 
 
 ---
@@ -241,6 +262,8 @@ Read the newest SESSION-LOG entry, CLAUDE.md and this file first. When the owner
 
 **Finished later (13 Oct 2026, same release):** the remaining rows were researched in smaller batches (the agents had hit usage limits), including the Xbox 360 set (batch 5). The catalogue is 96 entries (51 Linux builds, 12 Windows only, 9 on their own site, 24 build it yourself); rows with no project or site are under "Left out" in docs/recomps.md. Two duplicate ids (pokeplatinum-pc, ac6recomp) appear in two batch files; the builder keeps the first and says so. Unleashed Recompiled's Linux build is a Flatpak bundle, so `.flatpak` downloads now install with `flatpak install --user --bundle` (record `kind: 'flatpak'`, launched `flatpak run <id>`, Remove uninstalls it, Roll Back refused). Achievement readers also look in Flatpak sandbox folders (`~/.var/app/<id>/config/<user>/save/`) and ReXGlue's per-profile `profiles/*/achievements/*.toml` (re:Blue).
 
+**Files Cartridge keeps for recomps (user data folder):** `recomp-installs.json` (what's installed, where, which release, the game set up), `recomp-latest.json` (newest release seen per recomp), `recomp-details.json` (0.9.66 project details, daily), `recomps.json` (the catalogue fetched from `main`), `recomps-found.json` (rows PCGamingWiki added since), `recomps-mine.json` (added from a link), `recomp-backups/<id>/` (save backups, 10 kept). Kept releases sit beside the install in `.cartridge-versions/` (forkVersions.js).
+
 **Still open:**
 1. Doubtful entries listed under "Not certain" in docs/recomps.md (DK64 asset names, Chameleon Twist builds, Ship of Harkinian 9.3.0 assets, Star Fox saves folder, Cannonball's program name).
 2. Owner device tests: install a Linux recomp, a Windows-only one (Proton) and Unleashed (Flatpak bundle), Set Up With Your Game (place, path, picker), Add to Steam (live and with Steam closed), an update with saves kept, Roll Back, Save Sync of a recomp save, Unleashed achievements, the Steam card at 1280x800 and on the TV, Download More Files, KytyPS5 hidden.
@@ -252,7 +275,7 @@ The owner said: "No need to build in batches. Just build the rest of this update
 **How it works:**
 - `electron/onlinePlay.js` is the engine, and `electron/onlineAdapters.js` is plain data, one adapter per emulator, citing the source commit and file:line.
 - An adapter names its settings `files` (`{ key: [path in the settings folder, format, text for a new file] }`), the `dirs` to look in (portable first through `ctx.portable`, then XDG and Flatpak), and `kinds` (one online feature each).
-- A kind has `on`/`off` pairs, which may be a function of the getter for shadPS4's per-user list. It can also have `isOn`, `fields` (`at`, or `read`/`write` hooks; `check`; `required`; `secret`; `choices`/`free`), `actions` (urls), `info` (no switch) and `status` (a report like `{ ready, note }`).
+- A kind has `on`/`off` pairs, which may be a function of the getter for shadPS4's per-user list. It can also have `isOn`, `fields` (`at`, or `read`/`write` hooks; `check`; `required`; `secret`; `choices`/`free`), `actions` (a url, or `asks` + `run` since 0.9.66), `info` (no switch) and `status` (a report like `{ ready, note }`).
 - `electron/onlineFormats.js` changes one key and keeps every other line: ini; Qt (writes `key\default=false` beside each value, which Eden needs); RetroArch cfg; JSON (the same indent, and refuses damaged files); RPCS3's two-level YAML; XML text.
 - Rules:
   - Never write while the emulator runs (`raLogin.running`).
@@ -274,8 +297,8 @@ The owner said: "No need to build in batches. Just build the rest of this update
 | PPSSPP | `PSP/SYSTEM/ppsspp.ini` `[Network] EnableWlan`, NickName (not "PPSSPP"), proAdhocServer (the list from PPSSPP's adhoc-servers.json), InfrastructureUsername. |
 | PCSX2 | `inis/PCSX2.ini` `[DEV9/Eth]` EthEnable/EthApi=Sockets/EthDevice=Auto. DNS1 with ModeDNS1 Manual (PCSX2 reads DNS1 only). |
 | RetroArch | `netplay_use_mitm_server`, `netplay_nickname`, `netplay_mitm_server` (nyc, madrid, saopaulo, singapore). Hosting and joining happen in RetroArch. |
-| RPCS3 | `config.yml` Net `Internet enabled: Connected`, `PSN status: RPCN`; `rpcn.yml` NPID, Password (hashed), Token, Version 2, Host np.rpcs3.net. Accounts are made in RPCS3. |
-| shadPS4 | `config.json` Network `connected_to_network`, `shad_net_enabled`. `users.json` `Users.user[]` (id 1000, else the first) `shadnet_enabled`, `shadnet_npid`, `shadnet_password` (plain, as shadPS4 sends it). Register at shadps4.net. |
+| RPCS3 | `config.yml` Net `Internet enabled: Connected`, `PSN status: RPCN`; `rpcn.yml` NPID, Password (hashed), Token, Version 2, Host np.rpcs3.net. Accounts are made in Cartridge since 0.9.66 (Part 13); before that, in RPCS3. |
+| shadPS4 | `config.json` Network (moved from General in shadPS4's MigrateNetworkKeys, so Part 7.2's General keys are old) `connected_to_network`, `shad_net_enabled`. `users.json` `Users.user[]` (id 1000, else the first) `shadnet_enabled`, `shadnet_npid`, `shadnet_password` (plain, as shadPS4 sends it). Register at shadps4.net. |
 | Ryujinx | `Config.json` `multiplayer_mode` 1 (a number), `ldn_server` (empty = ldn.ryujinx.app:30456), `multiplayer_ldn_passphrase` (`Ryujinx-` + 8 hex). No account. |
 | Eden | `qt-config.ini` `[Services] airplane_mode=false`, `[UI] Multiplayer\nickname`, `[WebService] eden_username`, each with `\default=false`. Rooms are joined in Eden only (no command line for it). |
 | Dolphin | `Dolphin.ini` `[NetPlay] TraversalChoice` traversal/direct, Nickname; `[Core] EnableWiiLink`; `[Core] SerialPort1 = 12` (built-in BBA) plus `BBA_BUILTIN_DNS`. |
@@ -283,6 +306,16 @@ The owner said: "No need to build in batches. Just build the rest of this update
 | Cemu | Pretendo report only: otp.bin (1024 B) and seeprom.bin (512 B) in its data folder. Cemu greys out the service choice until the files are valid and keeps it per account itself. |
 
 Wiimmfi has no setting in current Dolphin: games must be patched first, and Cartridge says so and links the patcher.
+
+**Found in research but not offered (each a possible next step, with what's known):**
+- Eden: `[WebService] web_api_url` (default `api.ynet-fun.xyz`) and `eden_token` (48 letters Eden makes itself, plain text); `[Services] network_interface`; per-game `custom/<TID>.ini` can override airplane_mode.
+- Azahar: `[WebService] network_token` (for verified rooms); the room nickname is the emulated 3DS's username, kept in the NAND config save (binary), so not written.
+- Ryujinx: `multiplayer_disable_p2p` (relay instead of UPnP), `multiplayer_lan_interface_id`, `enable_internet_access` (some games and homebrew). A per-game `games/<TID>/Config.json` is a whole config and can leave multiplayer off for that game.
+- Dolphin: `[NetPlay] IndexServer` (lobby.dolphin-emu.org) / `UseIndex` (list a hosted session), traversal server and ports.
+- Cemu: choosing Pretendo is `<AccountService><SelectedService PersistentId=".." Service="2"/>` per account in settings.xml; not written because the attribute format wasn't confirmed and Cemu rewrites it itself once the online files are valid.
+- RetroArch: hosting or joining from Cartridge (RetroArch's own `--host`/`--connect` command-line options were not looked at).
+
+**Files Cartridge keeps for Online Play (user data folder):** `online-play.json` (features turned on and non-secret fields per emulator, issues found after updates), `online-backups/<emu>/<date>-<file>` (the emulator's file before Cartridge's first change that day).
 
 **Unverified (ask the owner or check on a device):**
 1. Ryujinx was read from an archive mirror (git.ryujinx.app was unreachable). It is the Ryubing line; the Flatpak folders used (io.github.ryubing.Ryujinx, org.ryujinx.Ryujinx) are the ids emulators.js already knows, not checked on Flathub.
