@@ -5144,6 +5144,8 @@ const handlers = {
   'recomps:open': async ({ id }) => {
     const R = recomps(), rec = R.record(id), e = R.byId(id);
     if (!rec || !fs.existsSync(rec.program)) throw new Error('Install it first.');
+    // 0.9.67: a recomp that isn't set up yet builds its own files on this start: watched as a background job
+    if (!R.ready(id)) setTimeout(() => recompSetupWatch(id), 4000);
     if (rec.kind === 'windows') {
       const sc = steamMgr.recompShortcut(id);
       if (!sc) throw new Error(`${e.name} is a Windows build, so it runs through Proton: add it to Steam first, then open it.`);
@@ -5940,6 +5942,7 @@ const JOBS = {
   'sync:install': () => ({ key: 'sync:install', kind: 'Install', title: 'Syncthing', icon: 'mdiSync' }),
   // 0.9.58 (owner: Sync Now stopped when leaving the page): it never stopped, but nothing showed it; now it's a job
   'savesync:run': () => ({ key: 'savesync', kind: 'Save Sync', title: 'Cartridge Save Sync', icon: 'mdiCloudSyncOutline' }),
+  'recomps:setGame': (a) => ({ key: 'recompset:' + a.id, kind: 'Recomp Setup', title: recomps().byId(a.id)?.name || 'Recomp', icon: 'mdiCogOutline' }), // 0.9.67: checking a big copy runs on under Downloads
   'recomps:install': (a) => ({ key: 'recomp:' + a.id, kind: recomps().record(a.id) ? 'Recomp Update' : 'Recomp', title: recomps().byId(a.id)?.name || 'Recomp', icon: 'mdiDownload' }), // 0.9.65
   'emuup:all': (a) => ({ key: 'emu:all', kind: 'Update All', title: `${(a.items || []).length} Emulators`, icon: 'mdiUpdate' }),
   'saves:search': () => ({ key: 'savesearch', kind: 'Search', title: 'Search for Saves', icon: 'mdiFolderSearchOutline' }), // 0.9.59
@@ -6180,6 +6183,20 @@ function emulationFolders() {
   return out;
 }
 let recompsEng = null;
+// 0.9.67 (agreed plan 7.1 #10): the recomp's own building on its first starts, as a background job with a measured bar:
+// bytes written in its folders, against the finished size when the catalogue knows it; done when its done file appears
+async function recompSetupWatch(id) {
+  const R = recomps(), e = R.byId(id), key = 'recompsetup:' + id;
+  if (!e || R.ready(id)) return;
+  let started = false;
+  const mb = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`);
+  try {
+    const r = await R.watchSetup(id, { onProgress: (m) => { if (!started) { started = true; bgJob(key, { key, kind: 'Recomp Setup', title: e.name, icon: 'mdiCogOutline', state: 'run', pct: null, text: '', error: '' }); } bgJob(key, { pct: m.pct, text: `${mb(m.got)} written` }); } });
+    if (!started) return;
+    if (r.done) { bgJob(key, { state: 'done', pct: 100, text: 'Set up' }); broadcast('recomp-ready', { id }); }
+    else bgJob(key, { state: 'error', error: r.timeout ? 'Still not set up after 45 minutes. Open it again to carry on.' : `${e.name} closed before it finished setting up. Open it again to carry on.` });
+  } catch (er) { log('recomp setup watch', id, er.message); if (started) bgJob(key, { state: 'error', error: er.message }); }
+}
 function recomps() {
   if (recompsEng) return recompsEng;
   const D = require('./detect');

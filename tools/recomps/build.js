@@ -13,7 +13,7 @@ const at = args.indexOf('--updated');
 const updated = at >= 0 ? args.splice(at, 2)[1] : new Date().toISOString().slice(0, 10);
 const all = [];
 for (const f of args) all.push(...JSON.parse(fs.readFileSync(f, 'utf8')));
-const SHIP = ['id', 'name', 'games', 'origin', 'repo', 'site', 'builds', 'linuxAsset', 'windowsAsset', 'prerelease', 'program', 'args', 'needs', 'setup', 'done', 'saves', 'achievements', 'license', 'description'];
+const SHIP = ['id', 'name', 'games', 'origin', 'repo', 'site', 'builds', 'linuxAsset', 'windowsAsset', 'prerelease', 'program', 'args', 'needs', 'setup', 'done', 'doneSize', 'saves', 'achievements', 'license', 'description'];
 const out = [], problems = [], ids = new Set(), repos = new Set(), left = [];
 for (const e of all) {
   const bad = (m) => problems.push(`${e.id || e.name}: ${m}`);

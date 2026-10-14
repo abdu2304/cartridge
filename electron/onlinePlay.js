@@ -34,10 +34,18 @@ function createOnline(ctx) {
   const get = (a, t, [f, at]) => (t[f] == null ? undefined : FORMATS[a.files[f][1]].get(t[f], at));
   const put = (a, t, [f, at], v) => { t[f] = FORMATS[a.files[f][1]].set(t[f] ?? a.files[f][2] ?? '', at, v); };
   // the files that changed: each backed up once a day into Cartridge's own folder, then replaced in one step
+  // 0.9.67 (agreed plan, 7.2: "parse before and after"): every changed file must still parse before it's written, and
+  // after writing the files are read back and the emulator's own check (RPCS3: can it load config.yml) runs again;
+  // anything wrong puts every file back as it was and says why
   function write(a, dir, before, after) {
     const stamp = new Date().toISOString().slice(0, 10);
-    for (const f of Object.keys(after)) {
-      if (after[f] === before[f]) continue;
+    const changed = Object.keys(after).filter((f) => after[f] !== before[f]);
+    for (const f of changed) {
+      const fmt = FORMATS[a.files[f][1]];
+      if (fmt.valid && !fmt.valid(after[f])) throw new Error(`Cartridge’s change would leave ${path.basename(fileOf(a, dir, f))} unreadable, so nothing was written.`);
+    }
+    const putBack = () => { for (const f of changed) { const file = fileOf(a, dir, f); try { if (before[f] == null) fs.rmSync(file, { force: true }); else { fs.writeFileSync(file + '.cartridge-tmp', before[f]); fs.renameSync(file + '.cartridge-tmp', file); } } catch (e) { log('online: put back', file, e.message); } } };
+    for (const f of changed) {
       const file = fileOf(a, dir, f);
       if (before[f] != null) {
         const bak = path.join(ctx.dataDir, 'online-backups', a.emu, `${stamp}-${path.basename(file)}`);
@@ -46,6 +54,10 @@ function createOnline(ctx) {
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file + '.cartridge-tmp', after[f]); fs.renameSync(file + '.cartridge-tmp', file);
     }
+    let why = null;
+    for (const f of changed) { let back = null; try { back = fs.readFileSync(fileOf(a, dir, f), 'utf8'); } catch {} if (back !== after[f]) { why = `${path.basename(fileOf(a, dir, f))} didn’t read back as written`; break; } }
+    if (!why) { let bad = null; try { bad = a.precheck?.({ dir, ctx }) || null; } catch (e) { bad = { line: 0, text: e.message }; } if (bad) why = `${a.label} couldn’t read its settings file after the change (line ${bad.line})`; }
+    if (why) { putBack(); log('online: change undone', a.emu, why); throw new Error(`${why}, so the file was put back as it was.`); }
   }
   // on/off can depend on the file (shadPS4's account is per user in a list): a function of the getter gives the pairs
   const pairsOf = (a, t, list) => (typeof list === 'function' ? list((ref) => get(a, t, ref)) : list || []);
@@ -98,7 +110,7 @@ function createOnline(ctx) {
     if (on) for (const f of k.fields || []) if (f.required && !fieldValue(a, f, t)) throw new Error(`Set ${f.label} first.`);
     for (const [ref, v] of pairsOf(a, t, on ? k.on : k.off)) put(a, t, ref, v);
     write(a, dir, before, t);
-    remember(emu, (r) => { r.kinds[kind] = { on, at: Date.now() }; r.issues = (r.issues || []).filter((i) => i.kind !== kind); });
+    remember(emu, (r) => { r.kinds[kind] = { on, at: Date.now() }; r.wroteAt = Date.now(); r.issues = (r.issues || []).filter((i) => i.kind !== kind); });
     log('online', emu, kind, on ? 'on' : 'off');
     return { on };
   }
@@ -110,7 +122,7 @@ function createOnline(ctx) {
     if (f.write) await f.write({ value, put: (ref, v) => put(a, t, ref, v), get: (ref) => get(a, t, ref), ctx, has: (file) => t[file] != null });
     else put(a, t, f.at, value);
     write(a, dir, before, t);
-    if (!f.secret) remember(emu, (r) => { r.fields[key] = value; });
+    remember(emu, (r) => { if (!f.secret) r.fields[key] = value; r.wroteAt = Date.now(); });
     log('online', emu, kind, 'set', key);
     return { ok: true };
   }
@@ -153,14 +165,28 @@ function createOnline(ctx) {
     }
     const t = { ...before };
     let fixed = 0;
+    // 0.9.67 (agreed plan, 7.2: "say plainly if the format changed"): emulators marked `full` write every one of their
+    // settings to their file. When such an emulator has rewritten its file since Cartridge last wrote it and a setting
+    // Cartridge uses is gone, the update renamed or moved it: reported, never written back under the old name
+    const mtime = (f) => { try { return fs.statSync(fileOf(a, dir, f)).mtimeMs; } catch { return 0; } };
+    const rewritten = (f) => before[f] != null && mtime(f) > (r.wroteAt || 0) + 2000;
+    const gone = (ref) => a.full && rewritten(ref[0]) && get(a, t, ref) === undefined;
+    const name = (ref) => [].concat(ref[1]).join(' → ');
     for (const [kind, s] of Object.entries(r.kinds)) {
       const k = a.kinds.find((x) => x.id === kind);
       if (!k || !s.on) continue;
+      const missing = pairsOf(a, t, k.on).map(([ref]) => ref).filter(gone);
+      if (missing.length) { issues.push({ kind, text: `After ${a.label}’s update, ${missing.map(name).join(', ')} ${missing.length > 1 ? 'are' : 'is'} no longer in its settings file: the update renamed or moved ${missing.length > 1 ? 'them' : 'it'}. Cartridge didn’t write the old name back. Check ${k.name} in ${a.label} itself; Cartridge needs an update for the new name.` }); continue; }
       if (!isOn(a, k, t)) { for (const [ref, v] of pairsOf(a, t, k.on)) put(a, t, ref, v); fixed++; }
-      for (const f of k.fields || []) if (!f.secret && !f.write && r.fields?.[f.key] != null && get(a, t, f.at) == null) { put(a, t, f.at, r.fields[f.key]); fixed++; }
+      for (const f of k.fields || []) {
+        if (f.secret || f.write || r.fields?.[f.key] == null || get(a, t, f.at) != null) continue;
+        if (gone(f.at)) { issues.push({ kind, text: `After ${a.label}’s update, its ${f.label} setting (${name(f.at)}) is no longer in its settings file: the update renamed or moved it. Cartridge didn’t write it back.` }); continue; }
+        put(a, t, f.at, r.fields[f.key]); fixed++;
+      }
     }
-    if (fixed) { write(a, dir, before, t); log('online: put back after an update', emu, fixed); }
-    remember(emu, (x) => { x.issues = issues; x.checkedAt = Date.now(); });
+    if (fixed) { try { write(a, dir, before, t); log('online: put back after an update', emu, fixed); } catch (e) { issues.push({ kind: '*', text: e.message }); fixed = 0; } }
+    for (const i of issues) log('online: after an update', emu, i.text);
+    remember(emu, (x) => { x.issues = issues; x.checkedAt = Date.now(); if (fixed) x.wroteAt = Date.now(); });
     return { checked: true, fixed, issues };
   }
   return { list, set, field, action, repair, recheck, dirOf: (emu) => dirOf(ADAPTERS.find((x) => x.emu === emu)), records: () => rec };

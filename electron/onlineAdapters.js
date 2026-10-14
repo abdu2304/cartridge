@@ -14,6 +14,7 @@ const PPSSPP_SERVERS = [
 ].map(([value, label, sub]) => ({ value, label, sub }));
 const ppssppNick = (v) => (!/^.{1,32}$/.test(v) ? 'A nickname is 1 to 32 characters.' : /^ppsspp$/i.test(v) ? 'Pick a nickname other than PPSSPP: every player needs their own.' : null);
 const ppsspp = {
+  full: true, // Config.cpp writes every setting on save: a missing key after it rewrote the file means an update renamed it (0.9.67)
   emu: 'ppsspp', label: 'PPSSPP', proc: /ppsspp/i,
   dirs: ['.config/ppsspp', '.var/app/org.ppsspp.PPSSPP/config/ppsspp'],
   files: { main: ['PSP/SYSTEM/ppsspp.ini', 'ini'] },
@@ -35,6 +36,7 @@ const ppsspp = {
 // PCAP needs network capabilities and doesn't work from a Flatpak or AppImage without them.
 const ipv4 = (v) => (!v || /^(\d{1,3}\.){3}\d{1,3}$/.test(v) ? null : 'That isn’t an IPv4 address (four numbers with dots).');
 const pcsx2 = {
+  full: true, // the settings interface saves every key: a missing key after it rewrote the file means an update renamed it (0.9.67)
   emu: 'pcsx2', label: 'PCSX2', proc: /pcsx2/i,
   dirs: ['.config/PCSX2', '.var/app/net.pcsx2.PCSX2/config/PCSX2'],
   files: { main: ['inis/PCSX2.ini', 'ini'] },
@@ -57,6 +59,7 @@ const pcsx2 = {
 // ---- RetroArch (libretro/RetroArch 4709c07: configuration.c netplay keys, network/netplay/netplay_frontend.c:215-221
 // relay handles). Hosting or joining is chosen per session in RetroArch; Cartridge sets the name and the relay.
 const retroarch = {
+  full: true, // retroarch.cfg is written whole on save: a missing key after it rewrote the file means an update renamed it (0.9.67)
   emu: 'retroarch', label: 'RetroArch', proc: /retroarch/i,
   dirs: ['.config/retroarch', '.var/app/org.libretro.RetroArch/config/retroarch'],
   files: { main: ['retroarch.cfg', 'cfg'] },
@@ -79,6 +82,7 @@ const RPCN_SALT = 'No matter where you go, everybody\'s connected.';
 const npidCheck = (v) => (/^[A-Za-z0-9_-]{3,16}$/.test(v) ? null : 'A username is 3 to 16 letters, digits, - or _.');
 const rpcnHash = async (ctx, pw) => String(await ctx.pbkdf2(pw, RPCN_SALT, 200000, 32)).toUpperCase();
 const rpcs3 = {
+  full: true, // config.yml is written whole from its config tree: a missing key after it rewrote the file means an update renamed it (0.9.67)
   emu: 'rpcs3', label: 'RPCS3', proc: /rpcs3/i,
   dirs: ['.config/rpcs3', '.var/app/net.rpcs3.RPCS3/config/rpcs3'],
   files: { main: ['config.yml', 'yaml'], rpcn: ['rpcn.yml', 'yaml', 'Version: 2\nHost: np.rpcs3.net\n'] },
@@ -138,6 +142,7 @@ const rpcs3 = {
 // account is per user in users.json (Users.user[]); the password is stored and sent as typed (client.cpp:200-212).
 const shadUser = (g) => { const list = g(['users', ['Users', 'user']]); if (!Array.isArray(list) || !list.length) return 0; const i = list.findIndex((u) => Number(u?.user_id) === 1000); return i >= 0 ? i : 0; };
 const shadps4 = {
+  full: true, // config.json and users.json are written whole: a missing key after it rewrote the file means an update renamed it (0.9.67)
   emu: 'shadps4', label: 'shadPS4', proc: /shadps4/i,
   dirs: ['.local/share/shadPS4', '.var/app/net.shadps4.shadPS4/data/shadPS4'],
   files: { main: ['config.json', 'json'], users: ['users.json', 'json'] },
@@ -161,6 +166,7 @@ const shadps4 = {
 // ConfigurationFileFormat.cs:457,467,472,477, Common/Configuration/Multiplayer/MultiplayerMode.cs, SharedConstants.cs:5-7).
 // Config.json top-level snake_case keys; multiplayer_mode is a number (0 off, 1 RyuLDN, 2 ldn_mitm). No account.
 const ryujinx = {
+  full: true, // Config.json is serialised whole: a missing key after it rewrote the file means an update renamed it (0.9.67)
   emu: 'ryujinx', label: 'Ryujinx', proc: /ryujinx/i,
   dirs: ['.config/Ryujinx', '.var/app/io.github.ryubing.Ryujinx/config/Ryujinx', '.var/app/org.ryujinx.Ryujinx/config/Ryujinx'],
   files: { main: ['Config.json', 'json'] },
@@ -181,6 +187,7 @@ const ryujinx = {
 // src/frontend_common/config.cpp:396-399,743). qt-config.ini: a value counts only with "key\default=false" beside it.
 // Rooms are joined in Eden (Multiplayer); there is no setting or command to join one.
 const eden = {
+  full: true, // qt-config.ini gets every key with its \\default pair: a missing key after it rewrote the file means an update renamed it (0.9.67)
   emu: 'eden', label: 'Eden', proc: /^eden/i,
   dirs: ['.config/eden', '.var/app/dev.eden_emu.eden/config/eden'],
   files: { main: ['qt-config.ini', 'qt'] },

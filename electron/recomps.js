@@ -115,8 +115,57 @@ function expandPath(p, dir, home = os.homedir()) {
   if (path.isAbsolute(s)) return path.normalize(s);
   return dir ? path.join(dir, s) : null;
 }
-function saveDirs(e, rec, home) {
-  return [...new Set((e?.saves || []).map((p) => expandPath(p, rec?.dir, home)).filter(Boolean))];
+// 0.9.67: the catalogue's save notes are often sentences ("pokeemerald.sav in the working directory", "Documents/svr07
+// inside the Proton prefix", "~/.local/share/X/storage/ (persistent data) and ~/.local/share/X/savestates/"). Before,
+// a whole sentence was taken as a path, so backups found nothing and Save Sync could make a folder named like it.
+// Now only real paths are read out of a note:
+//  - every ~/ or $XDG_ path in it;
+//  - a leading file or folder name followed by nothing, "(", "in", "beside", "relative", "and", ";" or "," (relative
+//    to the recomp's folder, its working directory); a second name after "and" too;
+//  - Windows notes (Documents/, %APPDATA%, %LOCALAPPDATA%, "inside the Proton prefix") inside the Steam shortcut's own
+//    Proton prefix (compatdata/<appid>), only for Windows builds that are in Steam;
+//  - names with placeholders (<n>, <game>, *) give their folder, or nothing.
+// A Flatpak recomp's ~/.config and ~/.local/share are its sandbox's (~/.var/app/<id>/config, /data).
+const STEAM_ROOTS = (home) => [path.join(home, '.local/share/Steam'), path.join(home, '.steam/steam'), path.join(home, '.var/app/com.valvesoftware.Steam/.local/share/Steam')];
+function protonUser(rec, home) {
+  if (!rec?.appid) return null;
+  for (const r of STEAM_ROOTS(home)) { const d = path.join(r, 'steamapps/compatdata', String(rec.appid), 'pfx/drive_c/users/steamuser'); try { if (fs.statSync(d).isDirectory()) return d; } catch {} }
+  return null;
+}
+const placeholder = (t) => /[<>*]/.test(t);
+function savePaths(note, rec, home = os.homedir()) {
+  const dir = rec?.dir, out = [];
+  let s = String(note || '').trim();
+  if (/^<install folder>/i.test(s)) { if (!dir) return out; s = s.replace(/^<install folder>/i, '').replace(/\s+\(.*$|;.*$/, '').replace(/^\/+/, ''); return s ? [path.join(dir, s)] : out; } // re:Blue: <install folder>/profiles/default
+  if (!s) return out;
+  const add = (p) => { if (p) out.push(p); };
+  const winNote = /inside the Proton prefix|%(LOCAL)?APPDATA%|^Documents[\\/]/i.test(s);
+  if (winNote) {
+    if (rec?.kind !== 'windows') { /* a Linux build: only the Linux paths in the note count (below) */ }
+    else {
+      const user = protonUser(rec, home);
+      const m = /(Documents|%LOCALAPPDATA%|%APPDATA%)[\\/]([^();]+?)(?=\s+inside|\s*\(|\s+on Windows|;|$)/i.exec(s);
+      if (user && m) add(path.join(user, { documents: 'Documents', '%localappdata%': 'AppData/Local', '%appdata%': 'AppData/Roaming' }[m[1].toLowerCase()], ...m[2].trim().split(/[\\/]+/)));
+      return out;
+    }
+  }
+  // ~/ and $XDG_ paths anywhere in the note
+  for (const m of s.matchAll(/(?:^|[\s(;,])((?:~|\$XDG_(?:DATA|CONFIG)_HOME)\/[^\s;,()]*)/g)) { const t = m[1].replace(/[.:]$/, ''); if (!placeholder(t)) add(expandPath(t, dir, home)); }  // a placeholder in a home path (OpenGOAL/<game>) would widen it to other games' folders: left out
+  // a leading relative name, and a second one after "and"
+  const lead = /^([\w.\-\/<>*]+)(?:\s+and\s+(?:the other\s+)?([\w.\-\/<>*]+))?(?=$|\s*\(|\s+in\b|\s+beside\b|\s+relative\b|\s+and\b|\s*[;,])/.exec(s);
+  if (lead && !/^(~|\$|\/)/.test(lead[1])) for (const t of [lead[1], lead[2]].filter(Boolean)) {
+    const u = placeholder(t) ? (t.includes('/') ? t.replace(/\/[^/]*[<>*][^/]*$/, '') : null) : t;
+    if (u && dir) add(path.join(dir, u.replace(/\/$/, '')));
+  }
+  return out;
+}
+function sandboxed(p, rec, home) {
+  if (!rec?.flatpak) return p;
+  const app = path.join(home, '.var/app', rec.flatpak);
+  return p.replace(path.join(home, '.config') + path.sep, path.join(app, 'config') + path.sep).replace(path.join(home, '.local/share') + path.sep, path.join(app, 'data') + path.sep);
+}
+function saveDirs(e, rec, home = os.homedir()) {
+  return [...new Set((e?.saves || []).flatMap((p) => savePaths(p, rec, home)).map((p) => sandboxed(path.normalize(p).replace(/(.)\/+$/, '$1'), rec, home)))];
 }
 
 // ---------------------------------------------------------------- PCGamingWiki
@@ -607,6 +656,52 @@ function createRecomps(ctx) {
     detailsCache[id] = out; writeJson(F('recomp-details.json'), detailsCache);
     return out;
   }
+
+  // ---- setup progress (0.9.67, agreed plan 7.1 #10): while a recomp builds its own files from your copy on its first
+  // starts (Ship of Harkinian making its .o2r, a picker recomp copying your ROM in), Cartridge measures the bytes written
+  // in its folders against the finished size when the catalogue knows it (`doneSize`), and marks it set up when the
+  // catalogue's done file appears. Never more than one watch per recomp; it ends when the recomp closes.
+  const watching = new Set();
+  async function bytesIn(dirs, budget = { n: 60000 }) {
+    let total = 0;
+    const walk = async (d) => {
+      let ents; try { ents = await fs.promises.readdir(d, { withFileTypes: true }); } catch { return; }
+      for (const ent of ents) {
+        if (--budget.n < 0) return;
+        if (ent.name === '.cartridge-versions') continue;
+        const p = path.join(d, ent.name);
+        if (ent.isDirectory()) await walk(p);
+        else if (ent.isFile()) { try { total += (await fs.promises.stat(p)).size; } catch {} }
+      }
+    };
+    for (const d of dirs) await walk(d);
+    return total;
+  }
+  function ready(id) { const e = byId(id); return readyOf(e, installs[id]); }
+  async function watchSetup(id, { onProgress = () => {}, every = 1000, limitMs = 45 * 60e3, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+    const e = byId(id), rec = installs[id];
+    // only with a done file to wait for: without one (33 entries) nothing can say when it's finished, and the person
+    // presses Done instead
+    if (!e || !rec || !e.done || readyOf(e, rec) || watching.has(id)) return { watched: false };
+    watching.add(id);
+    try {
+      const doneAt = e.done ? expandPath(e.done, rec.dir) : null;
+      // the folders it builds into: its own, and the done file's folder when that is elsewhere (~/.config/<Name>)
+      const dirs = [rec.dir, ...(doneAt && !doneAt.startsWith(rec.dir + path.sep) ? [path.dirname(doneAt)] : [])];
+      const base = await bytesIn(dirs), start = Date.now();
+      let gone = 0;
+      for (;;) {
+        await sleep(every);
+        if (readyOf(e, installs[id])) { if (installs[id]) { installs[id].setupDone = true; saveInstalls(); } log('recomp set up', id); return { watched: true, done: true }; }
+        const got = Math.max(0, (await bytesIn(dirs)) - base);
+        onProgress({ step: 'build', got, pct: e.doneSize ? Math.min(99, Math.floor((got / e.doneSize) * 100)) : null });
+        // closed before its files were made (it asked for something, or the copy didn't fit): the watch ends quietly
+        gone = ctx.isRunning(rec.flatpak || rec.program) ? 0 : gone + 1;
+        if (gone >= 3) return { watched: true, done: false, closed: true, got };
+        if (Date.now() - start > limitMs) return { watched: true, done: false, timeout: true, got };
+      }
+    } finally { watching.delete(id); }
+  }
   // ---- from a link (not in the catalogue): the same GitHub card as emulators; console and game said by the user
   function addLink({ repo, console: con, title, name, description }) {
     if (!/^(github|gitlab):[\w.-]+\/[\w.-]+$/.test(repo || '')) throw new Error('That isn’t a GitHub project link.');
@@ -664,7 +759,7 @@ function createRecomps(ctx) {
   }
   const record = (id) => installs[id] || null;
   const reload = () => { cat = null; installs = readJson(F('recomp-installs.json'), {}); };
-  return { catalogue, byId, details, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
+  return { catalogue, byId, details, ready, watchSetup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
 }
 
-module.exports = { readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };
+module.exports = { savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };

@@ -6,6 +6,18 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 14 Oct 2026 · 0.9.67 Follow Through (owner: "do updates 1-3 but please make sure to triple Check everything we didn't do yet and reflect it in the handover")
+- Built: recomp setup watched with a measured bar; Online Play reports settings an update renamed (adapters `full`); files parsed before and read back after every Online Play write, put back on failure.
+- Triple check of everything not done:
+  - my pass through Part 7;
+  - an agent sweeping every handover, plan, options file, CLAUDE.md and this log;
+  - a second agent trying to prove each item wrong.
+- Results: 22 items not done, now in handover Part 9 (one more, recomp backups with no screen, found while writing Part 14); settled items listed so they aren't re-added; questions for the owner.
+- It found two shipped bugs, fixed here:
+  - recomp save notes taken as folder names (backups and Save Sync missed them);
+  - It's Set Up only showing once already set up.
+- Checked: npm test (347), build, launch check, UI audit. Not checked: real recomp setup, real emulator updates, Proton-prefix saves.
+
 ## 14 Oct 2026 · Handover audit (owner: "Make sure the handover leaves no stones unturned")
 - The handover was checked part by part against the whole session. Added:
   - the catalogue updates users without a release (fetched daily from `main`, used when `updated` is newer);

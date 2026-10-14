@@ -250,3 +250,51 @@ test('project details: the first real README picture, plain release notes; a lin
   assert.deepStrictEqual(R.guessFromText('smw-pc a port of Super Mario World', roms, R.CONSOLES), { console: 'snes', title: 'Super Mario World', romId: 3 });
   assert.deepStrictEqual(R.guessFromText('a tool', roms, R.CONSOLES), { console: null, title: null, romId: null });
 });
+
+test('setup on its first start: bytes written measured against the finished size, done when its done file appears', async () => {
+  const entry = { id: 'game', name: 'Game Recompiled', games: [{ title: 'Game', console: 'n64' }], repo: 'github:o/game', builds: 'linux', program: 'Game', saves: [], needs: { what: 'a ROM' }, setup: { how: 'place', place: 'rom.z64' }, done: 'game.o2r', doneSize: 2000 };
+  let running = true;
+  const w = fakeWorld([entry], { isRunning: () => running });
+  w.publish('v1', 'one');
+  await w.eng.install('game');
+  const dir = path.join(w.emu, 'recomp', 'n64', 'Game Recompiled');
+  assert.strictEqual(w.eng.ready('game'), false);
+  // the recomp writes its file in pieces, then the finished one
+  const steps = [() => fs.writeFileSync(path.join(dir, 'tmp.part'), Buffer.alloc(500)), () => fs.writeFileSync(path.join(dir, 'tmp.part'), Buffer.alloc(1500)), () => { fs.rmSync(path.join(dir, 'tmp.part')); fs.writeFileSync(path.join(dir, 'game.o2r'), Buffer.alloc(2000)); }];
+  const seen = [];
+  const r = await w.eng.watchSetup('game', { sleep: async () => { steps.shift()?.(); }, onProgress: (m) => seen.push(m) });
+  assert.deepStrictEqual(seen.map((m) => [m.got, m.pct]), [[500, 25], [1500, 75]]);
+  assert.deepStrictEqual([r.done, w.eng.ready('game')], [true, true]);
+  assert.strictEqual((await w.eng.watchSetup('game')).watched, false, 'nothing to watch once set up');
+  // closed before it finished: the watch ends after three looks
+  fs.rmSync(path.join(dir, 'game.o2r')); running = false;
+  const r2 = await w.eng.watchSetup('game', { sleep: async () => {} });
+  assert.deepStrictEqual([r2.done, r2.closed], [false, true]);
+});
+
+test('no setup watch for a recomp the catalogue gives no done file', async () => {
+  const entry = { id: 'nodone', name: 'No Done', games: [{ title: 'X', console: 'n64' }], repo: 'github:o/nodone', builds: 'linux', program: 'Game', saves: [], needs: { what: 'a ROM' }, setup: { how: 'picker' } };
+  const w = fakeWorld([entry]);
+  w.publish('v1', 'one'); await w.eng.install('nodone');
+  assert.strictEqual((await w.eng.watchSetup('nodone', { sleep: async () => {} })).watched, false);
+});
+
+test('save notes read as paths: sentences, Proton prefixes, Flatpak sandboxes, placeholders left out', () => {
+  const rec = { dir: '/E/x', kind: 'linux' };
+  assert.deepStrictEqual(R.savePaths('pokeemerald.sav in the working directory', rec, '/H'), ['/E/x/pokeemerald.sav']);
+  assert.deepStrictEqual(R.savePaths('baserom.sav and baserom.sav2 in the working directory', rec, '/H'), ['/E/x/baserom.sav', '/E/x/baserom.sav2']);
+  assert.deepStrictEqual(R.savePaths('~/.local/share/Sonic3AIR/storage/ (persistent data) and ~/.local/share/Sonic3AIR/savestates/; uses ./savedata', rec, '/H'), ['/H/.local/share/Sonic3AIR/storage/', '/H/.local/share/Sonic3AIR/savestates/']);
+  assert.deepStrictEqual(R.savePaths('GCI files in its memory card folder (exact Linux location not confirmed)', rec, '/H'), []);
+  assert.deepStrictEqual(R.savePaths('~/.config/OpenGOAL/<game>/settings', rec, '/H'), [], 'never widened to every game');
+  assert.deepStrictEqual(R.savePaths('<install folder>/profiles/default/ (saves); default install folder ~/.config/reblue', rec, '/H'), ['/E/x/profiles/default/']);
+  assert.deepStrictEqual(R.savePaths('Documents/svr07 inside the Proton prefix', rec, '/H'), [], 'a Linux build has no Proton prefix');
+  const h = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-pfx-')), user = path.join(h, '.local/share/Steam/steamapps/compatdata/77/pfx/drive_c/users/steamuser');
+  fs.mkdirSync(user, { recursive: true });
+  const win = { dir: '/E/x', kind: 'windows', appid: 77 };
+  assert.deepStrictEqual(R.savePaths('%LOCALAPPDATA%\\Quest64Recompiled\\saves inside the Proton prefix', win, h), [path.join(user, 'AppData/Local/Quest64Recompiled/saves')]);
+  assert.deepStrictEqual(R.savePaths('Documents/ac6recomp inside the Proton prefix (ReXGlue user data folder)', win, h), [path.join(user, 'Documents/ac6recomp')]);
+  assert.deepStrictEqual(R.savePaths('Documents/ac6recomp inside the Proton prefix', { ...win, appid: null }, h), [], 'not in Steam yet: no prefix');
+  assert.deepStrictEqual(R.saveDirs({ saves: ['~/.config/UnleashedRecomp/save', '~/.local/share/skate3 (x; $XDG_DATA_HOME/skate3)'] }, { dir: '/E/x', flatpak: 'io.x.App' }, '/H'), ['/H/.var/app/io.x.App/config/UnleashedRecomp/save', '/H/.var/app/io.x.App/data/skate3']);
+  // every note in the shipped catalogue gives only real paths (no sentence taken as a folder name)
+  for (const e of require('../electron/recomps.json').entries) for (const p of R.saveDirs(e, { dir: '/E/x', kind: e.builds === 'windows' ? 'windows' : 'linux' }, '/H')) assert.doesNotMatch(p, /\s(in|the|and|beside|inside|relative|when|or)\s|[()<>*%]/, `${e.id}: ${p}`);
+});

@@ -112,12 +112,16 @@ function xmlSet(text, at, value) {
   const trail = /\s*$/.exec(t.slice(parent[0], parent[1]))[0], cut = parent[1] - trail.length; // the closing tag keeps its own indent
   return t.slice(0, cut) + `\n${ind}<${at[at.length - 1]}>${xmlEsc(value)}</${at[at.length - 1]}>` + t.slice(cut);
 }
+// 0.9.67 (agreed plan, 7.2: "parse before and after"): a format that can be parsed is parsed after Cartridge's change,
+// before anything is written. YAML through js-yaml (FAILSAFE, as patches.js reads RPCS3's files), JSON with JSON.parse.
+function yamlValid(t) { try { require('js-yaml').load(String(t || ''), { schema: require('js-yaml').FAILSAFE_SCHEMA }); return true; } catch { return false; } }
+function jsonValid(t) { try { JSON.parse(String(t || '')); return true; } catch { return false; } }
 const FORMATS = {
   ini: { get: iniGet, set: (t, at, v) => iniSet(t, at, v) },
   qt: { get: iniGet, set: (t, at, v) => iniSet(t, at, v, { qt: true }) },
   cfg: { get: cfgGet, set: cfgSet },
-  json: { get: jsonGet, set: jsonSet },
-  yaml: { get: yamlGet, set: yamlSet },
+  json: { get: jsonGet, set: jsonSet, valid: jsonValid },
+  yaml: { get: yamlGet, set: yamlSet, valid: yamlValid },
   xml: { get: xmlGet, set: xmlSet },
 };
 module.exports = { FORMATS, iniGet, iniSet, cfgGet, cfgSet, jsonGet, jsonSet, yamlGet, yamlSet, xmlGet, xmlSet };
