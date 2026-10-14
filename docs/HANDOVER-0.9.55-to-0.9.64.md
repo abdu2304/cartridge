@@ -1,10 +1,10 @@
 > **Read first (owner, 6 Oct 2026):** Plain and Glass are two separate modes, never merged. One Style setting (Plain or Glass) covers the whole app; design every element for both, and never let a change for one leak into the other. Details in CLAUDE.md.
 
-# Handover: everything from 0.9.55 to 0.9.64
+# Handover: everything from 0.9.55 to 0.9.66
 
 To the Claude on the next account, from the Claude on this one.
 
-Three handovers come before this one: `docs/HANDOVER-0.9.3-to-0.9.21.md`, `docs/HANDOVER-0.9.22-to-0.9.37.md` and `docs/HANDOVER-0.9.38-to-0.9.54.md`. Everything in them about the owner, the process and the do-not-break rules still holds unless this document says otherwise. This one picks up at 0.9.55 (7 October 2026) and runs to 0.9.64 (9 October 2026): **10 releases**. It also holds the full plans the owner agreed for the next three updates (0.9.65 recomps, 0.9.66 Online Play), with every decision and the reason behind it, so you can build them without asking again.
+Three handovers come before this one: `docs/HANDOVER-0.9.3-to-0.9.21.md`, `docs/HANDOVER-0.9.22-to-0.9.37.md` and `docs/HANDOVER-0.9.38-to-0.9.54.md`. Everything in them about the owner, the process and the do-not-break rules still holds unless this document says otherwise. This one picks up at 0.9.55 (7 October 2026) and runs to 0.9.66 (13 October 2026): **12 releases**. The file keeps its old name so links to it still work. Part 7 holds the plans the owner agreed for recomps and Online Play, with every decision and the reason behind it; both shipped (Parts 11, 12 and 13), and what is still missing from those plans is listed in Part 9.
 
 **The owner asked for this document to be kept up to date after every update from now on.** When you finish an update, add it to Part 4 and Part 6, move what's done out of Part 9, and update Part 1. Keep the same level of detail: what changed, why, what was found, how it was checked, what the owner must test.
 
@@ -79,6 +79,8 @@ Everything in the earlier handovers still applies. New in this stretch:
 | 0.9.62 | Every Game's Settings | Game Settings for every emulator from its source, Advanced tab, typed numbers, 62 RetroArch cores, Xbox 360 and Dreamcast IDs |
 | 0.9.63 | The Right Version | Save Sync freeze, RPCS3 paths and Repair, settings per emulator release, .wua title IDs, one-row tabs, file picker, Xenia patches, log fixes |
 | 0.9.64 | Forks and Links | forks under their parent with versions, Link to Its Project, fork-aware settings and patches, GitHub search, send from phone, Windows builds through Proton |
+| 0.9.65 | Recomps and Online Play | 96 recomps (Steam card, install, updates with saves kept, Roll Back, own Steam shortcuts, Save Sync, achievements), Online Play for ten emulators with a re-check after every emulator update, KytyPS5 hidden without a Linux build, Download More Files (Parts 11 and 12) |
+| 0.9.66 | Loose Ends | RPCN accounts made in Cartridge, ShadNet sign-up in its own window, RPCS3 Repair before Online Play writes, Online Play on emulator pages, recomp project details, link guesses, recomp updates started once before they're kept (Part 13) |
 
 ---
 
@@ -91,6 +93,8 @@ Everything in the earlier handovers still applies. New in this stretch:
 - **Downloads:** `src/components/FilePick.vue`, `store.download(rom, { pick })`, main `dl:add` `only`.
 - **Speed and diagnostics:** `src/imageWorker.js` (pictures in a window worker), main `imgWork`, `healthLine`, `slowSteps`, `keepEmuLog`, `SHARED` (in-flight answers shared), `progRunning`.
 - **Shared UI bits:** `.seg.strip` (styles.css + `strip()` in `src/motion.js`), `src/gameSuggest.js`.
+- **Recomps (0.9.65, 0.9.66):** `electron/recomps.js` (engine, `details`, `guessFromText`, `readmePicture`, `plainNotes`), `electron/recomps.json` (catalogue) built by `tools/recomps/build.js` (record in `docs/recomps.md`), `electron/recompAchievements.js`, main `recomps:*` and `trialRun`, steamManager recomp shortcuts, `src/components/SteamTile.vue`, `Recomps.vue`, `RecompSheet.vue`, `src/views/RecompsView.vue`.
+- **Online Play (0.9.65, 0.9.66):** `electron/onlinePlay.js` (engine), `electron/onlineAdapters.js` (one adapter per emulator, with its source), `electron/onlineFormats.js` (one-key writers), `electron/sha3.js` (pure SHA3/PBKDF2), `electron/rpcnClient.js` (RPCN accounts), main `online:*`, `src/components/OnlinePlay.vue`, the Online Play rows in Game.vue and EmuGet.vue.
 
 ---
 
@@ -138,9 +142,12 @@ Rule (docs/design-rules.md 10b, pinned in test/designRules.test.js): nothing hea
 - **Game-name suggestions (0.9.61):** `src/gameSuggest.js`, in Cartridge's keyboard and the plain text prompt.
 - **Spotlight dots (0.9.61).**
 
+### 6.8 Recomps and 6.9 Online Play
+How they work, what was decided and what wasn't verified: Parts 11 (recomps), 12 (Online Play) and 13 (the 0.9.66 follow-ups) at the end of this file.
+
 ---
 
-## Part 7. The agreed plans for the next updates
+## Part 7. The agreed plans for recomps and Online Play (both shipped: 0.9.65 and 0.9.66; what is still missing is in Part 9)
 
 ### 7.1 0.9.65 · Recomps (the owner's main focus)
 
@@ -199,7 +206,15 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 - The GR2 fork under shadPS4's Forks, Link to Its Project, an update, switching versions back; Game Settings and patches for Gravity Rush 2 naming the fork.
 - GitHub search, sending a link from the phone, Check It, a Windows-only project through Proton.
 
-**Known gaps:** GitHub's search page fallback untested (no access from the container); Romhacking.net untested (Cloudflare); KytyPS5's failure reason unknown until the next log; recomps and Online Play not started.
+**Owner to test on a device (from 0.9.65 and 0.9.66):** the lists at the end of Parts 11, 12 and 13 (recomp installs of each kind, Set Up With Your Game, Add to Steam, an update with saves kept and its trial start, Roll Back, RPCN account and sign-in, ShadNet, PPSSPP ad hoc, Ryujinx LDN, Dolphin host code, PCSX2 DEV9, Online Play still on after an emulator update).
+
+**Agreed in Part 7 but not done yet (found 14 Oct 2026, checking the code against the plan):**
+1. **Recomp setup as a background job with a measured bar (7.1 #10).** Downloading and unpacking a recomp is a background job with a real bar. Setting it up with your game is not: there is no bar while a recomp builds its own files from your copy (Ship of Harkinian extracting its assets), measured by bytes written against the finished size.
+2. **Saying plainly when an emulator update changed its settings format (7.2).** After an update, Online Play reports a missing settings file and a damaged RPCS3 file. It does not notice keys an update renamed or moved: it would write the old names back. Needs each adapter to name the keys that must exist after an update, and a report when they don't.
+3. **RPCS3's config.yml read back after Online Play writes it (7.2: "parse before and after").** It is checked before writing (Repair first) but not parsed again afterwards, with the backup put back if it no longer reads.
+4. **Doubtful catalogue entries** under "Not certain" in docs/recomps.md (DK64 asset names, Chameleon Twist builds, Ship of Harkinian 9.3.0 assets, Star Fox saves folder, Cannonball's program name): need checking against real downloads.
+
+**Known gaps:** GitHub's search page fallback untested (no access from the container); Romhacking.net untested (Cloudflare); KytyPS5's failure reason unknown until the next log; RPCN and ShadNet servers, PCGamingWiki and real recomp trial starts couldn't be reached or run from the container.
 
 **Earlier stretches' open items** (still open): see Part 9 of HANDOVER-0.9.38-to-0.9.54.md.
 
