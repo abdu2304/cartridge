@@ -419,11 +419,33 @@ module.exports = function createSteamManager(ctx) {
   // kept only once the login shell has answered (it's asked in the background, never waited for)
   const binsNow = () => { const d = detect.extraBinDirs(HOME); if (detect.loginPathKnown()) extraBins = d; return d; };
   const BIN_DIRS = () => [...new Set([...(process.env.PATH || '').split(':'), '/usr/bin', '/usr/local/bin', '/usr/games', '/app/bin', path.join(HOME, '.local/bin'), '/var/lib/flatpak/exports/bin', ...(extraBins || binsNow())].filter((d) => d && d.startsWith('/') && !d.includes('/tmp/.mount_')))];
-  const findBin = (names) => { for (const d of BIN_DIRS()) for (const n of names || []) { const f = path.join(d, n); if (exists(f) && !isDir(f)) return f; } return null; };
+  // looked up once per 10 s per set of names (0.9.68: every console asked for every emulator's program names in every
+  // bin folder, the largest part of what was left of the stalls)
+  const binMemo = new Map();
+  const findBin = (names) => {
+    const k = (names || []).join('\0'), hit = binMemo.get(k);
+    if (hit && Date.now() - hit.at < 10000) return hit.val;
+    let val = null;
+    out: for (const d of BIN_DIRS()) for (const n of names || []) { const f = path.join(d, n); if (exists(f) && !isDir(f)) { val = f; break out; } }
+    binMemo.set(k, { at: Date.now(), val });
+    return val;
+  };
   const kindOf = (key) => (key === 'ps4' ? 'eboot' : key === 'wiiu' ? 'rpx' : 'path');
   // Every emulator for this console that is installed here: [{ id, label, t }]. Each copy is listed
   // (someone can have both the Flatpak and an AppImage); the first copy keeps the plain id.
+  // 0.9.68: a short memo. One screen asks for many consoles at once (forksAll walks every console, Settings and the
+  // game page ask again), and every ask checked dozens of paths on disk on the main thread: 200 to 500 ms stalls
+  // on a near-empty test home, far more on a Deck's SD card. The memo holds 4 s and starts again whenever the scan
+  // or your choices change (the scan's time and the Steam settings are in its key).
+  const candMemo = new Map();
   function candidates(key) {
+    const sig = `${found?.at || 0}:${JSON.stringify(cfg())}`, hit = candMemo.get(key);
+    if (hit && hit.sig === sig && Date.now() - hit.at < 4000) return hit.val;
+    const val = candidatesNow(key);
+    candMemo.set(key, { sig, at: Date.now(), val });
+    return val;
+  }
+  function candidatesNow(key) {
     const L = launchersDirs(), out = [];
     // An EmuDeck launcher is often a wrapper: dolphin-emu.sh runs the Dolphin Flatpak, pcsx2-qt.sh the
     // AppImage in ~/Applications. Then that copy is the same install and is not listed again.

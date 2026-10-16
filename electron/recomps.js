@@ -648,7 +648,7 @@ function createRecomps(ctx) {
     // can't start at all (missing libraries, a crash in the first seconds) goes back to the release that worked
     if (prev && prev.tag && kind === 'linux' && ctx.trialRun) {
       onProgress({ step: 'trial', pct: null });
-      const t = await ctx.trialRun({ program, args: prev.args || '', cwd: path.dirname(program), ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message }));
+      const t = await ctx.trialRun({ program, args: launchArgs(id), cwd: path.dirname(program), ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message }));
       if (t?.failed) {
         log('recomp update did not start, back to', prev.tag, id, t.why);
         try {

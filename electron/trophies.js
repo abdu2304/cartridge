@@ -47,7 +47,18 @@ function mountRoots() {
   for (const d of ls('/mnt')) { const q = path.join('/mnt', d); if (isDir(q)) out.push(q); }
   return out;
 }
+// 0.9.68: kept for 10 s per set of extra roots. It's asked for by nearly everything (emulator lists, launchers,
+// trophies, shadPS4 folders), each time looking at every mounted drive on the main thread; a drive plugged in is
+// seen within 10 s
+const rootsMemo = new Map();
 function emulationRoots(extra = []) {
+  const k = extra.join('\0'), hit = rootsMemo.get(k);
+  if (hit && Date.now() - hit.at < 10000) return [...hit.val];
+  const val = emulationRootsNow(extra);
+  rootsMemo.set(k, { at: Date.now(), val });
+  return [...val];
+}
+function emulationRootsNow(extra = []) {
   const roots = new Set();
   for (const base of [HOME, ...mountRoots(), ...extra]) {
     for (const n of ['Emulation', 'emulation', 'retrodeck', 'RetroDECK', 'Emulators', 'emulators']) {

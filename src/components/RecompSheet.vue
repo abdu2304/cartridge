@@ -70,7 +70,7 @@ const HOW = { place: 'Cartridge links your copy where it looks for it (nothing i
 const OWN = ['picker', 'manual'];
 const howText = computed(() => {
   const x = e.value, how = x?.setup?.how;
-  if (how === 'manual') return `Put your copy in place yourself${x.setup.place ? ': ' + x.setup.place : ''}. Then press It’s Set Up.`;
+  if (how === 'manual') return `Put your copy in place yourself${x.setup.place ? ': ' + x.setup.place : ''}.${x.done ? ' Cartridge sees when it’s set up.' : ' Then press It’s Set Up.'}`;
   if (how === 'path' && x.done) return 'Cartridge runs its setup with your copy once.';
   return HOW[how] || HOW.picker;
 });
@@ -90,7 +90,7 @@ const buildText = computed(() => {
 });
 const latestText = computed(() => {
   const l = e.value?.latest;
-  if (!l) return 'Checking its newest release…';
+  if (!l) return why.value ? 'Couldn’t check its newest release' : 'Checking its newest release…'; // 0.9.68: a failed check said "Checking" for good
   if (l.none === 'nobuild') return 'Its newest release has no Linux or Windows build';
   if (l.none) return 'No releases yet';
   return `${l.tag} · ${l.kind === 'windows' ? 'Windows build, through Proton' : 'Linux build'}`;
