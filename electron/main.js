@@ -5127,7 +5127,17 @@ const handlers = {
     }
     return out;
   },
-  'recomps:setGame': ({ id, file, force }) => recomps().setGame(id, file, { force }),
+  'recomps:setGame': async ({ id, file, force }) => {
+    const R = recomps(), r = await R.setGame(id, file, { force });
+    // a one-off setup command (Doom64EX's -wadgen, WiiCompiled's install): run now, watched until its done file is there
+    if (r.ok && r.run) {
+      const rec = R.record(id);
+      if (rec.kind === 'windows') { r.note = 'Start it once through Steam to finish setting up.'; return r; }
+      await startRecomp(id, rec, r.run);
+      setTimeout(() => recompSetupWatch(id), 4000);
+    }
+    return r;
+  },
   'recomps:done': ({ id }) => recomps().markDone(id),
   // Add to Steam: queued and applied straight away when Steam can be changed while it runs; otherwise it waits for
   // Apply in Settings → Steam (Steam restarts for that), and the screen says so
@@ -5154,16 +5164,7 @@ const handlers = {
       if (!sc) throw new Error(`${e.name} is a Windows build, so it runs through Proton: add it to Steam first, then open it.`);
       return steamMgr.runAppid(sc.appid);
     }
-    const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
-    const runLog = path.join(USER_DATA, 'emulator-runs', `recomp-${id}.log`);
-    let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
-    const extra = (rec.args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
-    const p = require('child_process').spawn(rec.program, extra, { cwd: path.dirname(rec.program), env, detached: true, stdio: ['ignore', fd, fd] });
-    if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
-    return await new Promise((ok, bad) => {
-      p.once('error', (er) => bad(new Error(er.code === 'EACCES' ? 'It isn’t allowed to run (its file isn’t executable).' : `It didn’t start: ${er.message}`)));
-      p.once('spawn', () => { log('recomp opened', id); if (isGamescope()) { broadcast('background', { away: true }); p.once('exit', () => { broadcast('background', { away: false }); refocus(); }); } p.unref(); ok({ via: 'direct' }); });
-    });
+    return startRecomp(id, rec, R.launchArgs(id));
   },
   'recomps:refresh': () => recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }),
   // from a link (not in the list): what it is first, then added with the console and game you say
@@ -6200,6 +6201,20 @@ function emulationFolders() {
 let recompsEng = null;
 // 0.9.67 (agreed plan 7.1 #10): the recomp's own building on its first starts, as a background job with a measured bar:
 // bytes written in its folders, against the finished size when the catalogue knows it; done when its done file appears
+// a Linux recomp started from its own folder, with the arguments given (0.9.68: one place for Open and a one-off
+// setup run; Open used to leave out the catalogue's own arguments, PGR4's GPU options and WiiCompiled's launch-base)
+function startRecomp(id, rec, args) {
+  const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+  const runLog = path.join(USER_DATA, 'emulator-runs', `recomp-${id}.log`);
+  let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
+  const extra = (args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
+  const p = require('child_process').spawn(rec.program, extra, { cwd: path.dirname(rec.program), env, detached: true, stdio: ['ignore', fd, fd] });
+  if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
+  return new Promise((ok, bad) => {
+    p.once('error', (er) => bad(new Error(er.code === 'EACCES' ? 'It isn’t allowed to run (its file isn’t executable).' : `It didn’t start: ${er.message}`)));
+    p.once('spawn', () => { log('recomp opened', id, args ? 'with arguments' : ''); if (isGamescope()) { broadcast('background', { away: true }); p.once('exit', () => { broadcast('background', { away: false }); refocus(); }); } p.unref(); ok({ via: 'direct' }); });
+  });
+}
 async function recompSetupWatch(id) {
   const R = recomps(), e = R.byId(id), key = 'recompsetup:' + id;
   if (!e || R.ready(id)) return;
@@ -6306,7 +6321,7 @@ function recompShortcutSpec(id) {
   const R = recomps(), e = R.byId(id), rec = R.record(id);
   if (!e || !rec) throw new Error('Install it first.');
   const romIds = require('./recomps').matchRoms(e, libraryRoms());
-  return { id, name: e.name, exe: rec.program, start: path.dirname(rec.program), args: rec.args || e.args || '', game: e.games?.[0]?.title || e.name, artRomId: romIds[0] ?? null };
+  return { id, name: e.name, exe: rec.program, start: path.dirname(rec.program), args: R.launchArgs(id), game: e.games?.[0]?.title || e.name, artRomId: romIds[0] ?? null };
 }
 
 // Get Emulators' list, as rows per console (sync: the installer's fresh check uses it)

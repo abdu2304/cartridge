@@ -31,6 +31,15 @@ for (const e of all) {
   if (e.setup && !['picker', 'place', 'path', 'none'].includes(e.setup.how)) bad('setup.how');
   if (e.setup?.how === 'path' && !/\{FILE\}/.test(e.setup.arg || '')) bad('path setup without {FILE}');
   if (e.setup?.how === 'place' && !e.setup.place) e.setup.how = 'picker'; // no known place: its own picker, with the path shown
+  // 0.9.68: where Cartridge links your copy is setup.to, written as paths (setup.place is the note in words). A place
+  // without a rule is set up by hand (It's Set Up). Paths are relative to the program's folder, or start with ~/
+  const to = e.setup?.to;
+  if (to) {
+    if (!to.file && !to.dir) bad('setup.to without file or dir');
+    for (const k of ['file', 'dir']) if (to[k] != null && !/^(~\/|\$XDG_(DATA|CONFIG)_HOME\/)?[\w.\-\[\]()!'/ ]+$/.test(to[k])) bad(`setup.to.${k} is not a path: ${to[k]}`);
+    if (to.names && (!Array.isArray(to.names) || to.names.some((n) => !/^[\w.\-]+$/.test(n)))) bad('setup.to.names');
+  }
+  if (e.done && !/^(~\/|\$XDG_(DATA|CONFIG)_HOME\/|\/)?[\w.\-\[\]()!'/ ]+$/.test(e.done)) bad('done is not a path: ' + e.done);
   ids.add(e.id); if (e.repo) repos.add(e.repo.toLowerCase());
   const o = {};
   for (const k of SHIP) if (e[k] != null && !(Array.isArray(e[k]) && !e[k].length)) o[k] = e[k];
@@ -53,6 +62,9 @@ for (const k of order) {
     md.push(`### ${e.name}`, '', `- Games: ${e.games.map((g) => g.title).join(', ')}`, `- Project: ${e.repo || e.site || 'none found'}`, `- Builds: ${BUILD[e.builds] || e.builds}${e.latestTag ? `, newest checked ${e.latestTag}` : ''}${e.assetsSeen?.length ? ` (${e.assetsSeen.join(', ')})` : ''}`);
     if (e.needs) md.push(`- Needs: ${e.needs.what}${e.needs.md5?.length || e.needs.sha1?.length ? ' (hashes listed by the project)' : ''}`);
     if (e.setup?.how) md.push(`- Setup: ${e.setup.how}${e.setup.place ? ` (${e.setup.place})` : ''}${e.setup.arg ? ` (${e.setup.arg})` : ''}${e.setup.notes ? `. ${e.setup.notes}` : ''}`);
+    const to = e.setup?.to;
+    if (to) md.push(`- Placed by Cartridge (0.9.68): ${[to.file && `a file ${/\/$/.test(to.file) ? 'into ' + to.file + ' (keeping its name)' : 'as ' + to.file}`, to.dir && `a folder's contents into ${to.dir}/`, to.names && `disc files named ${to.names.join(', ')}`].filter(Boolean).join('; ')}, beside the program unless the path starts with ~`);
+    else if (e.setup?.how === 'place') md.push("- Placed by you (0.9.68): no rule Cartridge can follow, so you put it in place and press It's Set Up");
     if (e.saves?.length) md.push(`- Saves: ${e.saves.join(', ')}`);
     if (e.achievements) md.push(`- Achievements: ${typeof e.achievements === 'string' ? e.achievements : JSON.stringify(e.achievements)}`);
     if (e.evidence?.length) md.push(`- Sources: ${e.evidence.join('; ')}`);

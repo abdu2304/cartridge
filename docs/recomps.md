@@ -1,6 +1,6 @@
 # Recomp catalogue
 
-Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source list: PCGamingWiki's "List of unofficial ports", console sections only (owner's choice), status notes ignored (owner). Each project was checked from its own repository: tags, release files (a download answering 302), CI, README and source. Entries are shipped in `electron/recomps.json` without the notes below.
+Built 2026-10-16 by `tools/recomps/build.js` from the researched entries. Source list: PCGamingWiki's "List of unofficial ports", console sections only (owner's choice), status notes ignored (owner). Each project was checked from its own repository: tags, release files (a download answering 302), CI, README and source. Entries are shipped in `electron/recomps.json` without the notes below.
 
 ## Arcade
 
@@ -11,6 +11,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Windows build (Proton), newest checked v0.34 (cannonball-v034-w64.zip)
 - Needs: The OutRun arcade ROM set, revision B (the MAME outrun set's files, unzipped); Japanese ROMs optional for the Japanese tracks
 - Setup: place (roms/ beside the program (the OutRun revision B files, e.g. epr-10187.88, mpr-10371.9 ...)). Paths to the roms and res folders are set in config.xml and default to the working directory. Only a Windows build is released (maintained by the author); Linux users build it themselves.
+- Placed by Cartridge (0.9.68): a file into roms/ (keeping its name); a folder's contents into roms/, beside the program unless the path starts with ~
 - Saves: hiscores.xml and the other hiscores_*.xml in data.savepath (default the working directory)
 - Sources: README.md:4 (requires the original ROMs), :10 (author maintains the Windows build only), :53-54 (config.xml paths, revision B romset in roms); roms/roms.txt (file list for revision B); src/main/frontend/config.cpp:92-100 (save path and hiscore files); https://github.com/djyt/cannonball/releases (via WebFetch: v0.34 newest) and expanded_assets/v0.34 (cannonball-v034-w64.zip); curl -I cannonball-v034-w64.zip 302
 - Not certain: Program name inside the Windows zip not confirmed; Licence is the author's own non-commercial licence (docs/license.txt), not an SPDX licence; A Flatpak or distro package may exist for Linux; not checked; Tags v0.181 and v0.191 are older version numbers, not newer releases
@@ -55,6 +56,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Build it yourself
 - Needs: An unmodified Super Mario Bros. (JU) (PRG0) [!].nes ROM
 - Setup: place (Super Mario Bros. (JU) (PRG0) [!].nes). Looked for in the working folder; another path can be set as rom_file in smbc.conf (INI) in the working folder.
+- Placed by Cartridge (0.9.68): a file as Super Mario Bros. (JU) (PRG0) [!].nes, beside the program unless the path starts with ~
 - Sources: README.md:33 (executable smbc); README.md:38,71-74 (ROM name, rom_file in smbc.conf); README.md:112 (statically recompiled); README.md:116-119 (License: TODO); git ls-remote: no tags
 - Not certain: No licence (README says TODO); No save files: the original game has none; Region: the (JU) ROM is the US/Japan release
 
@@ -77,6 +79,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Build it yourself
 - Needs: Super Metroid as a ROM named sm.smc (hashes listed by the project)
 - Setup: place (sm.smc) (sm {FILE}). Reads sm.smc from the working folder, or the first argument. Early version, build it yourself.
+- Placed by Cartridge (0.9.68): a file as sm.smc, beside the program unless the path starts with ~
 - Saves: saves/sm.srm
 - Sources: README.md:9 (sm.smc and its sha1); src/main.c:378 (argument else sm.smc); src/sm_rtl.c:715 (saves/sm.srm); git ls-remote: no tags; LICENSE.txt (MIT)
 - Not certain: Region of the hashed ROM not stated (likely the US/EU combined release)
@@ -88,6 +91,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Windows build (Proton), newest checked v0.1 (smw_0.1.zip)
 - Needs: The US version of Super Mario World as an unheadered ROM named smw.sfc (hashes listed by the project)
 - Setup: place (smw.sfc). The release zip holds smw.exe, SDL2.dll, smw.ini and smw_assets.bps, applied to smw.sfc at start. README says to self-build; Linux needs a self-build.
+- Placed by Cartridge (0.9.68): a file as smw.sfc, beside the program unless the path starts with ~
 - Saves: saves/smw.srm
 - Sources: src/main.c:900-926 (smw_assets.dat or smw_assets.bps + smw.sfc, unheadered); assets/util.py:14 (US SHA1); src/common_rtl.c:792-810 (saves/<title>.srm); release zip listing of smw_0.1.zip; LICENSE.txt (MIT)
 - Not certain: Save file name is saves/<g_rtl_game_info->title>.srm; title assumed 'smw'; Only one old v0.1 release; README says 'You must self-build for now'
@@ -99,6 +103,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Windows build (Proton), newest checked v0.3 (zelda3_v0.3.zip)
 - Needs: The US version of A Link to the Past as an unheadered .sfc ROM named zelda3.sfc (hashes listed by the project)
 - Setup: place (zelda3.sfc). The release zip holds zelda3.exe, SDL2.dll, zelda3.ini and zelda3_assets.bps; at each start the patch is applied to zelda3.sfc beside it (or zelda3_assets.dat is used if present). Linux needs a self-build (make).
+- Placed by Cartridge (0.9.68): a file as zelda3.sfc, beside the program unless the path starts with ~
 - Saves: saves/sram.dat
 - Sources: src/main.c:813-826 (zelda3_assets.dat, else zelda3_assets.bps + zelda3.sfc); assets/util.py:15 (US SHA1); src/zelda_rtl.c:872-883 (saves/sram.dat); release zip listing of zelda3_v0.3.zip (302 and range read); LICENSE.txt (MIT)
 - Not certain: Saves are relative to the working directory, so Start in must be the program folder; Other language ROMs listed in assets/util.py work only when building assets yourself
@@ -112,6 +117,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked 5.0.1 (2Ship-Battler-Bravo-Linux.zip, 2Ship-Battler-Bravo-Win64.zip, 2Ship-Battler-Bravo-Mac.zip)
 - Needs: A supported Majora's Mask ROM: the US N64 1.0 version or the US GameCube Collector's Edition version (hashes listed by the project)
 - Setup: place (the ROM in the same folder as 2ship.appimage). On first run it extracts the ROM into mm.o2r in its data folder (2ship.o2r holds its own assets). On Linux the data folder is the working directory unless SHIP_HOME is set. The release zip is named after the release (e.g. Battler Bravo), so match by -Linux.zip.
+- Placed by Cartridge (0.9.68): a file into ./ (keeping its name), beside the program unless the path starts with ~
 - Saves: saves (in the working directory, or $SHIP_HOME/saves)
 - Sources: README.md:17 (sha1 list docs/supportedHashes.json); README.md:26-28 (Linux: ROM beside the appimage); docs/supportedHashes.json (NTSC-U 1.0, NTSC-U GC); CMakeLists.txt:8,14 (5.0.1, Battler Bravo); mm/2s2h/BenPort.h:36 (appShortName 2ship); mm/2s2h/SaveManager/SaveManager.cpp:33 (saves folder in app directory); libultraship src/ship/core/Context.cpp:346-363 (SHIP_HOME, else '.'); .github/workflows/main.yml:203-212 (2ship.appimage + readme.txt); curl -I 302: github.com/2ship2harkinian/2ship2harkinian/releases/download/5.0.1/2Ship-Battler-Bravo-Linux.zip
 - Not certain: The source row points at HarbourMasters/2ship2harkinian, which now redirects to the 2ship2harkinian organisation; Contents of the Linux zip assumed from the CI artifact (2ship.appimage, readme.txt); Whether the Linux build defines NON_PORTABLE (which would move data to ~/.local/share/2ship) was not found in CMake; assumed portable
@@ -320,6 +326,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked 1.0.2 (Paperboat-Mulberry-Charlie-Linux.zip, Paperboat-Mulberry-Charlie-Win64.zip)
 - Needs: The US version of Paper Mario as an N64 ROM (hashes listed by the project)
 - Setup: place (the ROM in the same folder as Paperboat.AppImage). Extracts the ROM into pm64.o2r in its data folder on first run (it also looks for baserom.us.z64 there). Data folder is the working directory unless SHIP_HOME is set. The Linux zip holds Paperboat.AppImage, readme.txt and gamecontrollerdb.txt; zips are named after the release (Mulberry Charlie).
+- Placed by Cartridge (0.9.68): a file into ./ (keeping its name), beside the program unless the path starts with ~
 - Saves: saves/ in its data folder (working directory, or $SHIP_HOME)
 - Sources: README.md:22 (US SHA1); README.md:32-34 (Linux: ROM beside the appimage); src/port/Engine.cpp:201 (app name boat), 597 (pm64.o2r); src/port/extractor/GameExtractor.cpp:128 (baserom.us.z64); src/port/save/SaveManager.cpp:474-490 (saves/); .github/workflows/release.yml:30-32 (Paperboat-<build name>-Linux.zip); .github/workflows/build.yml:118-121 (zip contents); curl -I 302: releases/download/1.0.2/Paperboat-Mulberry-Charlie-Linux.zip; gamingonlinux.com 2026/09 Harbour Masters release PaperBoat
 - Not certain: Source row had no link; repository found by search and git ls-remote; README calls the program paperboat.appimage but CI names it Paperboat.AppImage; Data folder assumed portable (libultraship returns '.' without NON_PORTABLE)
@@ -331,6 +338,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked ci-dev-build (pd-x86_64-linux.tar.gz, pd-x86_64-windows.zip)
 - Needs: The Perfect Dark US V1.1 (ntsc-final) ROM, recommended; US V1.0 also works. PAL and JPN need their own executables (hashes listed by the project)
 - Setup: place (data/pd.ntsc-final.z64). Put the ROM in a data folder next to pd.x86_64 (or ~/.local/share/perfectdark/data). Optional data/pd.gbc (Perfect Dark GBC ROM) emulates the Transfer Pak. Options --portable, --basedir and --savedir. A rolling ci-dev-build tag is the only release.
+- Placed by Cartridge (0.9.68): a file as data/pd.ntsc-final.z64, beside the program unless the path starts with ~
 - Saves: eeprom.bin in the working directory when pd.ini is there, else ~/.local/share/perfectdark/
 - Sources: README.md:5-16 (ROM versions and md5); README.md:46-50 (ci-dev-build downloads); README.md:60-71 (data folder, ROM name, ~/.local/share/perfectdark); port/src/romdata.c:26 (pd.<romid>.z64); port/src/fs.c:102-174 (save dir rules); port/src/libultra.c:17-18 (eeprom.bin in save dir); port/src/system.c:254 (SDL_GetPrefPath perfectdark); .github/workflows/c-cpp.yml (gh release upload ci-dev-build); curl -I 302: github.com/perfect-dark-pc-port/perfect_dark/releases/download/ci-dev-build/pd-x86_64-linux.tar.gz
 - Not certain: The source row's fgsfdsfgs/perfect_dark redirects to perfect-dark-pc-port/perfect_dark; Only md5s for the US ROMs are listed in needs; JPN 538d2b75945eae069b29c46193e74790 and PAL d9b5cd305d228424891ce38e71bc9213 need separately built executables (pd.pal / pd.jpn); Save folder logic from fs.c: Linux uses the working directory only when pd.ini exists there
@@ -356,6 +364,8 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Saves: %LOCALAPPDATA%\Quest64Recompiled\saves inside the Proton prefix, saves beside the exe with portable.txt
 - Sources: README.md:41,96 (1.0 North American); README.md:91-93 (saves); README.md:101 (portable.txt); include/zelda_config.h:10 (program_id Quest64Recompiled); src/main/main.cpp:355 (game_id quest64_us); curl -I 302 and zip listing: releases/download/v0.1/Quest64Recompiledv0.1.zip (Quest64Recompiled.exe, SDL2.dll, dxil.dll, dxcompiler.dll); Lutris installer 39755 (Windows zip through Wine)
 - Not certain: CI builds Linux artifacts, but the v0.1 release only carries a Windows zip; later releases may add Linux; One news report claimed a Japanese ROM is needed; the README and game_id say US
+- Done file: none since 0.9.68 (the note names a folder inside the Proton prefix or beside the exe, not one path); It's Set Up instead
+
 
 ### Render96ex
 
@@ -375,6 +385,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked 9.2.3 (SoH-Ackbar-Delta-Linux.zip, SoH-Ackbar-Delta-Win64.zip, SoH-Ackbar-Delta-Mac.zip)
 - Needs: A supported Ocarina of Time ROM: any of the N64 NTSC or PAL versions, the GameCube versions or Master Quest listed by the project (hashes listed by the project)
 - Setup: place (the ROM in the same folder as soh.appimage (9.2.3); newer builds ask with a file picker). Extracts the ROM into oot.o2r (oot-mq.o2r for Master Quest) on first run; soh.o2r ships with it. In 9.2.3 the data folder is the working directory unless SHIP_HOME is set; the develop branch (9.3.0) moves it to ~/.local/share/soh/ unless the launch folder already holds shipofharkinian.json or oot.o2r. Custom assets go in mods/. Release zips are named after the release (Ackbar Delta), so match -Linux.zip.
+- Placed by Cartridge (0.9.68): a file into ./ (keeping its name), beside the program unless the path starts with ~
 - Saves: Save (in the data folder: the working directory or $SHIP_HOME in 9.2.3), ~/.local/share/soh/Save (from 9.3.0)
 - Sources: README.md:14 and docs/supportedHashes.json (sha1 list); raw README.md at tag 9.2.3 lines 27-29 (ROM beside the appimage); README.md:23-26 on develop (picker, ~/.local/share/soh/, SHIP_HOME); soh/soh/SaveManager.cpp:127 (Save folder in the app directory); raw CMakeLists.txt at 9.2.3:41 (Ackbar build name); curl -I 302: releases/download/9.2.3/SoH-Ackbar-Delta-Linux.zip; .github/workflows/generate-builds.yml:168-176 (soh.appimage)
 - Not certain: Tag 9.3.0 (Dewey Alfa) exists but SoH-Dewey-Alfa-Linux.zip returned 404; the release may not be published yet; No licence file found in the repository; Folder for ~/.local/share/soh taken from the develop README, not checked in libultraship code for the release build
@@ -397,6 +408,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked v1.5.1 (sm64coopdx_Linux.zip, sm64coopdx_SteamOS.zip, sm64coopdx_Windows.zip)
 - Needs: The US version of Super Mario 64 as a .z64 ROM (hashes listed by the project)
 - Setup: place (any .z64 file in ~/.local/share/sm64coopdx or next to the program (or drag and drop it on the window)). On first start it scans its data folder and then the program folder for a .z64 whose md5 matches the US ROM and copies it to baserom.us.z64 in the data folder. --savepath overrides the data folder.
+- Placed by Cartridge (0.9.68): a file into ~/.local/share/sm64coopdx/ (keeping its name), beside the program unless the path starts with ~
 - Saves: ~/.local/share/sm64coopdx/sm64_save_file.bin
 - Sources: src/pc/rom_checker.cpp:35 (US md5), :62 (baserom.<region>.z64 copy), :96-97 (scans write path then exe folder); sm64.us.sha1; src/pc/platform.c:303 (SDL_GetPrefPath sm64coopdx); src/pc/fs/fs.h:11 SAVE_FILENAME; src/pc/loading.c:190 drag and drop message; .github/workflows/build-coop.yaml:35,67,115 zip names; curl -I releases/download/v1.5.1/sm64coopdx_Linux.zip 302
 - Not certain: SDL_GetPrefPath may fall back to an existing ~/.local/share/sm64ex-coop folder for older installs; sm64coopdx_SteamOS.zip and _Linux.zip are both Linux builds; SteamOS one presumably built against older libraries; No licence file in the repo
@@ -518,6 +530,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked v2.0.9 (LADXHD.Patcher.v2.0.9-Linux-x64 (pixeldrain.com link), LADXHD.Patcher.v2.0.9-Windows (pixeldrain.com link), LADXHD.Patcher.Lite-Linux-x64 (GitLab package file), LADXHD.Patcher.Lite-Windows (GitLab package file))
 - Needs: The folder of the original v1.0.0 PC release of Link's Awakening DX HD (the fan remake once on itch.io), whose Content and Data the patcher updates
 - Setup: place (the patcher in the root folder of the v1.0.0 (or v1.1.4+) release, then run it) (LADXHD.Patcher --headless --platform=linux-x86 --graphics=opengl). The releases are patchers, not the game: run in the v1.0.0 folder they turn it into the latest version and write the Linux binaries "Link's Awakening DX HD" and Launcher (keep them together). Exit code 1 means the game executable was not found. Later updates can be done from the Launcher. A portable.txt beside the program keeps data in the program folder.
+- Placed by you (0.9.68): no rule Cartridge can follow, so you put it in place and press It's Set Up
 - Saves: ~/.local/share/Zelda_LA/SaveFiles, SaveFiles beside the program when portable.txt exists
 - Sources: README.md:12 (requires assets from the original v1.0.0 release), :49-90 (patcher steps, headless options and exit codes); LINUX.md (patcher runs natively, choose Linux and OpenGL, binaries "Link's Awakening DX HD" and Launcher); GitLab API releases v2.0.9 (2026-10-09) asset links; ladxhd_game_source_code/ProjectZ.Core/PlatformServices.cs:225-239 (portable.txt, LocalApplicationData/Zelda_LA, SaveFiles)
 - Not certain: The full patcher downloads are pixeldrain.com links, not GitLab files; only the Lite patchers are GitLab package files; The GitHub link in the row (BigheadSMZ/Zelda-LA-DX-HD-Updated) no longer answers; the project lives on GitLab; Asset names have no file extension in the GitLab link list; the downloaded file's real name and form (single binary or archive) were not checked; Patcher --platform value for x86_64 Linux is written linux-x86 in the README; No licence stated
@@ -551,6 +564,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked v0.9.5 (tmc-multi-linux-x86_64-v0.9.5.tar.gz, tmc-multi-windows-x86_64-v0.9.5.tar.gz, tmc-multi-linux-arm64-v0.9.5.tar.gz, tmc-multi-android-v0.9.5.apk)
 - Needs: The Minish Cap GBA ROM (USA, Europe or Japan), named baserom.gba, baserom_eu.gba or baserom_jp.gba (hashes listed by the project)
 - Setup: place (baserom.gba (USA), baserom_eu.gba or baserom_jp.gba next to tmc_pc). One multi-region binary checks the ROM by SHA-1. On first launch it extracts the asset cache into assets/<region>/ beside the program (a few seconds). Resolves the ROM, sounds.json and assets relative to its own location. Older releases (0.1.x) shipped a separate asset_extractor to run once.
+- Placed by Cartridge (0.9.68): a file as baserom.gba, beside the program unless the path starts with ~
 - Saves: tmc.sav in the working directory (mGBA/VBA-M byte order; tmc.sav.bak kept when migrated)
 - Sources: 999sian/tmc README.md:18-22 (ROM names and SHA-1), :28-60 (release tarballs, setup, first launch extraction), :86-90 (tmc.sav), :233-236 (GPL-3.0); .github/workflows/_build.yaml:50 (linux x86_64 region multi), :697-701 (tmc-<region>-<os>-<arch>-<tag>.tar.gz); .github/workflows/release.yaml:87-91 (uploads *.tar.gz); git ls-remote --tags: newest v1.3.1, also v1.3-E* experimental tags; https://lutris.net/games/install/40002/view (tmc-multi-linux-x86_64-v0.9.2.tar.gz); MatheoVignaud/tmc README ('this fork', older tmc-usa-<os>-<tag> archives); https://github.com/999sian/tmc/releases (via WebFetch: only release v0.9.5, Latest, 28 Sep) and releases/expanded_assets/v0.9.5 (asset names)
 - Not certain: Tags v1.3.x and v1.3-E* exist in git but the only published release is v0.9.5; use the latest release, not the highest tag; The row linked MatheoVignaud/tmc, a contributor's fork; the original project is 999sian/tmc (Project Picori); Whether the save is next to the binary or in the working directory: README says working directory; done path assumes the USA ROM
@@ -616,6 +630,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Windows build (Proton), newest checked partyboard_0.2.0 (partyboard_alpha_0.2.0_x64.zip, partyboard_alpha_0.2.0_x86.zip, partyboard_alpha_0.2.0_android_arm64-v8a.zip)
 - Needs: The US Mario Party 4 disc image (GMPE01, revision 0) as .iso or .rvz
 - Setup: place (the disc image renamed to GMPE01_00 in the program folder). If the image is not in the folder it asks to browse for it at every start. Alpha builds; a controller is required; the x64 build may crash in more places than x86. Releases before 0.1.1 needed the disc's files extracted with Dolphin into GMPE01_00/files.
+- Placed by Cartridge (0.9.68): a file as GMPE01_00, beside the program unless the path starts with ~
 - Saves: %APPDATA%/Party Board (inside the Proton prefix: drive_c/users/steamuser/AppData/Roaming/Party Board); Dolphin-compatible save from 0.2.0
 - Sources: https://github.com/mariopartyrd/marioparty4/releases (via WebFetch: all partyboard tags are pre-releases; 0.2.0 setup and save notes); https://github.com/mariopartyrd/marioparty4/releases/expanded_assets/partyboard_0.2.0 (asset names); curl -I partyboard_alpha_0.2.0_x64.zip; README.md supported versions GMPE01_00, GMPE01_01; src/port/dvd.c (tag partyboard_0.2.0: chdir GMPE01_00/files)
 - Not certain: Revision: release notes say GMPE01 v1.0; press says Rev 0 and Rev 1 USA both work; No Linux build; runs through Proton; Releases are drafted by hand (no release workflow), so asset names may change
@@ -675,6 +690,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked v26.03.28.0-stable (sonic3air_game.tar.gz, sonic3air_game.zip)
 - Needs: The Sonic 3 & Knuckles ROM from the Steam release (Sega Classics), Sonic_Knuckles_wSonic3.bin, 4 MB
 - Setup: place (Sonic_Knuckles_wSonic3.bin in ~/.local/share/Sonic3AIR/ (or next to sonic3air_linux, or the path in config.json RomPath)). On Linux there is no file picker: if the ROM is not found it shows an error and closes. It looks in its app data folder, the last known ROM path, config.json RomPath, the working folder, then Steam's 'steamapps/common/Sega Classics/uncompressed ROMs/' (native and Flatpak Steam). A ROM found elsewhere is copied into ~/.local/share/Sonic3AIR/. The ROM is checked by size (0x400000) and a Murmur2 64-bit checksum, not md5.
+- Placed by Cartridge (0.9.68): a file as ~/.local/share/Sonic3AIR/Sonic_Knuckles_wSonic3.bin, beside the program unless the path starts with ~
 - Saves: ~/.local/share/Sonic3AIR/storage/ (persistent data) and ~/.local/share/Sonic3AIR/savestates/; uses ./savedata beside the program instead if that folder exists
 - Achievements: Has its own in-game achievements, kept with its persistent data in ~/.local/share/Sonic3AIR/ (format not checked)
 - Sources: README.md (Sonic 3 - Angel Island Revisited, homepage sonic3air.org); curl -I releases/download/v26.03.28.0-stable/sonic3air_game.tar.gz 302, sonic3air_game.zip 302; test tags have only the zip; tar listing of sonic3air_game.tar.gz: sonic3air_game/sonic3air_linux, setup_linux.sh, config.json; Oxygen/sonic3air/source/sonic3air/ConfigurationImpl.cpp:36-45 (ROM size, checksum, Sonic_Knuckles_wSonic3.bin); Oxygen/oxygenengine/source/oxygen/resources/ResourcesCache.cpp:20-100 (search order, copy to app data); Oxygen/oxygenengine/source/oxygen/platform/PlatformFunctions.cpp:379-410 (Steam search paths); Oxygen/oxygenengine/source/oxygen/application/GameLoader.cpp:54-90 (dialog Windows only; Linux errors and closes); Oxygen/oxygenengine/source/oxygen/engine/EngineMain.cpp:383-395, 536-545 (app data path, savedata fallback, storage/ and savestates/); Oxygen/sonic3air/source/sonic3air/EngineDelegate.cpp:47 (app data folder Sonic3AIR); LICENSE (GPL-3.0)
@@ -711,6 +727,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked beta-7.1 (ctr-native-beta-7.1-linux-x86.tar.gz, ctr-native-beta-7_1-windows-x86.zip)
 - Needs: The NTSC-U PlayStation disc of Crash Team Racing as a single-track raw .bin (MODE2/2352, data track from byte 0); a cooked .iso will not do
 - Setup: place (assets/ctr-u.bin). Reads the game straight from the image; extracted files in assets/ override it for modding. Single static 32-bit executable with SDL3 built in.
+- Placed by Cartridge (0.9.68): a file as assets/ctr-u.bin, beside the program unless the path starts with ~
 - Saves: memcards/ (relative to the working folder)
 - Sources: README.md:105-122 (release needs ctr_native and assets/ctr-u.bin), :124 (raw MODE2/2352 bin, not .iso); package-linux.sh:9,83 (ctr-native-<version>-linux-x86.tar.gz); CMakeLists.txt:7-12 (32-bit target only); platform/native_memcard.c:22 (memcards default root); github.com/CTR-tools/ctr-native/releases/expanded_assets/beta-7.1 (asset list); curl -I releases/download/beta-7.1/ctr-native-beta-7.1-linux-x86.tar.gz 302
 - Not certain: The batch row had no port name; this project was found by search; Linux build is 32-bit x86; static, but needs 32-bit GL/graphics libraries from the system (SteamOS has them through Steam's runtime, plain distros may not); Windows asset uses an underscore version (beta-7_1) while the Linux one uses a dot; All tags are 'beta-N'; whether GitHub marks them pre-release unknown; memcards/ location assumed relative to the working folder (default root name only)
@@ -754,6 +771,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked v1.0.1 (rechan-linux64.tar.gz, rechan-win64.zip)
 - Needs: The NTSC-U PlayStation disc of Jackie Chan Stuntmaster (SLUS-00684) as a .bin or .iso image
 - Setup: place (discimage/<any name>.bin or .iso (only one image in the folder)). On first launch it checks the disc's boot file is SLUS-00684 and extracts the assets beside the program (folders xc, fe, tim and license.tim); the disc image can be deleted afterwards.
+- Placed by Cartridge (0.9.68): a file into discimage/ (keeping its name), beside the program unless the path starts with ~
 - Saves: userfiles/jcsSAVE<n>.sav and userfiles/jcsAUTOSAVE.sav (relative to the program folder)
 - Sources: README.md:54-67 (discimage folder, one image, built-in extractor); README.md FAQ (NTSC-U SLUS-00684 only); src/pc/apppaths.h (userfiles saves, game.ini, discimage); src/extra/psxdiscextractor.cpp:15-18 (assets present check), :291 (expected serial); scripts/pack-linux64.sh:10, scripts/pack-win64.ps1:8 (archive names); curl -I releases/download/v1.0.1/rechan-linux64.tar.gz 302
 - Not certain: Paths are relative to the working folder, so Start in must be the program folder; Whether a cue/bin with several tracks is accepted not checked (README says .bin or .iso)
@@ -765,6 +783,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked 8.0 (REDRIVER2_Linux_Release.tar.gz, REDRIVER2_Linux_Release_dev.tar.gz, REDRIVER2_Win32_Release.zip, REDRIVER2_Win32_Release_dev.zip)
 - Needs: Both discs of the PAL English (SLES-02993/SLES-12993) or NTSC US (SLUS-01161/SLUS-01318) PlayStation version of Driver 2, each as a single .bin image
 - Setup: place (install/Driver2CD1.bin and install/Driver2CD2.bin). config.ini [cdfs] image=install/Driver2CD1.bin reads the game from disc 1. Movies and audio must then be extracted once with _convert_cd_fmv_xa.sh, which runs jpsxdec and needs Java. Needs SDL2 and OpenAL from the system.
+- Placed by Cartridge (0.9.68): a file into install/ (keeping its name); a folder's contents into install/; disc files named Driver2CD1.bin, Driver2CD2.bin, beside the program unless the path starts with ~
 - Saves: ~/.driver2/progress.dat, ~/.driver2/config.dat
 - Sources: README.md:17-19 (translated from MIPS to C); github.com/OpenDriver2/REDRIVER2/wiki/Installation-instructions (discs, install/ names, Linux steps, Java); data/config.ini:75-77 ([cdfs] image); data/_convert_cd_fmv_xa.sh (CD1/CD2 paths, Java check); src_rebuild/Game/C/loadsave.c:89-98,274-276 ($HOME/.driver2, progress.dat); appveyor.yml:47-54 (artifacts); curl -I releases/download/8.0/REDRIVER2_Linux_Release.tar.gz 302
 - Not certain: Which file proves the movie conversion finished is not known (jpsxdec output names not read); Java is required only for the one-time conversion; Cartridge would have to run the script or explain it; A separate Java Launcher with a setup wizard exists (Windows instructions); not checked for Linux; Region: both PAL English and NTSC US are supported
@@ -776,6 +795,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked recommended-build-2.1 (Severed_Chains_Linux.tar.gz, Severed_Chains_Steam_Deck.tar.gz, Severed_Chains_Windows.zip)
 - Needs: All four discs of the North American PlayStation version of The Legend of Dragoon (SCUS-94491, 94584, 94585, 94586) as .iso or .bin images
 - Setup: place (isos/ (any file names, one image per disc)). On first start it reads each image's disc ID (PAL and Japanese discs are refused) and unpacks the assets into files/. The launch script downloads a Java 25 runtime into jdk25/ the first time (Steam Deck build opens it in Konsole). Java cannot start from a path containing a colon.
+- Placed by Cartridge (0.9.68): a file into isos/ (keeping its name); a folder's contents into isos/, beside the program unless the path starts with ~
 - Saves: saves/ (*.dsav, relative to the program folder)
 - Sources: .github/workflows/publish-release.yml:75-123,160-168 (archive names, prerelease false); .github/workflows/publish.yml:69-70 (isos help file), 167-169 (devbuild tag); build.gradle:225-234 (launch-linux or launch-steamdeck renamed to launch); launch-steamdeck (jdk25 download, colon check); src/main/java/legend/game/unpacker/Unpacker.java:47-48 (disc IDs), 61 (files/), 311 (files/version), 379 (isos); src/main/java/legend/game/saves/SaveManager.java:79-80 (saves/*.dsav); README.md:62,86; curl -I releases/download/recommended-build-2.1/Severed_Chains_Linux.tar.gz 302
 - Not certain: There is also a rolling 'devbuild' release with the same asset names; recommended-build-2.1 picked as the stable one by name; Steam Deck archive differs only in the launch script (Konsole for the Java download); Whether all four discs are required before unpacking starts was not read in detail
@@ -798,6 +818,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Windows build (Proton), newest checked v1.2.256 (wipeout-x64-release.zip)
 - Needs: The USA PlayStation disc of Wipeout as a .cue with its nine .bin tracks (or the 517 game files copied from the disc)
 - Setup: place (wipeout/diskimages/ (the .cue and all .bin tracks)). On start it extracts missing data files and the music from the image (a slow hash-based search on machines with under 8 cores). Loose files can go in wipeout/wipeoutgame and music in wipeout/music. The image can be removed once the main menu has loaded once. Runs through Proton (Proton Experimental suggested).
+- Placed by Cartridge (0.9.68): a file into diskimages/ (keeping its name); a folder's contents into diskimages/, beside the program unless the path starts with ~
 - Sources: README.md:4,31-71 (USA data, diskimages, 9 bin + cue, wipeoutgame, music); github.com/wipeout-phantom-edition/wipeout-phantom-edition/releases/expanded_assets/v1.2.256 (only wipeout-x64-release.zip); curl -I releases/download/v1.2.256/wipeout-x64-release.zip 302; https://www.timeextension.com/guides/how-to-install-wipeout-phantom-edition-on-steam-deck (Proton Experimental, exe in the wipeout folder); zip listing: wipeout/wipeout.exe, wipeout/diskimages/, wipeout/wipeoutgame/, wipeout/phantom/gamedatamanifest
 - Not certain: Program confirmed as wipeout/wipeout.exe by listing the zip (range reads); Save location unknown; Source code is not in the repo (README and releases only); licence unknown; All tags point at the same commit; newest by version is v1.2.256
 
@@ -808,6 +829,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Build it yourself
 - Needs: The game data of the NTSC PlayStation Wipeout (files from the disc, not the image) plus some menu models from the PC version; music as .qoa and the intro as MPEG1 are optional
 - Setup: place (wipeout/ beside the program (wipeout/textures/, wipeout/music/track01.qoa ...)). Assets are read from SDL_GetBasePath (the program folder) unless built with PATH_ASSETS. Analogue sticks must be bound in Options.
+- Placed by Cartridge (0.9.68): a folder's contents into wipeout/, beside the program unless the path starts with ~
 - Saves: ~/.local/share/phoboslab/wipeout/save.dat
 - Sources: README.md:235-247 (assets not included, NTSC data plus PC menu models, folder layout); src/platform_sdl.c:369-385 (SDL_GetBasePath assets, SDL_GetPrefPath phoboslab/wipeout userdata); src/wipeout/game.c:844 (save.dat); git ls-remote: no tags; no .github/workflows
 - Not certain: No releases: Build It Yourself; A browser version is playable on the project's site; not useful to Cartridge; The game data is a folder of extracted files, not a disc image; Cartridge cannot prepare it from a .bin
@@ -842,6 +864,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: From its own site
 - Needs: A PC copy of Half-Life (Steam or otherwise) to run the mod in; the PS2 game itself is not used
 - Setup: place (the decay folder in the Half-Life root folder (next to valve/)) (-game decay). A GoldSrc mod: pick it under Change Game in Half-Life, or restart Steam so it shows as its own entry. Fan PC ports since 2008; Decay: Singularity (decay_single, single player with saves) and Solo Mission (decaysolodemo) are other versions.
+- Placed by you (0.9.68): no rule Cartridge can follow, so you put it in place and press It's Set Up
 - Sources: https://modstalgia.com/half-life/mods/half-life-decay (PC port of the PS2 expansion, decay folder in the game root, Change Game); wiki.sourceruns.org/CategoryDecay.html and runthinkshootlive.com via search (2008 port, 7z, Steam install notes)
 - Not certain: Not a port that reads the PS2 disc: it needs Half-Life for PC, so it may not fit the recomp catalogue; Whether its client/server libraries include Linux builds (Steam's native Half-Life) or need Proton is unknown; Several competing ports exist; which one PCGamingWiki means was not confirmed; '-game decay' is the standard GoldSrc mod switch, not seen on the mod's own page
 
@@ -863,6 +886,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Build it yourself
 - Needs: The original game files of Grand Theft Auto: Liberty City Stories (the folder holding MODELS/GTA3.IMG and the rest)
 - Setup: place (the reLCS program goes inside the GTA LCS game folder and runs from there). Optional extras from the repo's gamefiles/ folder (controller mappings, button icons) are copied into the game folder too. Build with CMake (GLFW or SDL2).
+- Placed by you (0.9.68): no rule Cartridge can follow, so you put it in place and press It's Set Up
 - Saves: userfiles/GTAVCsf<n>.b (relative to the game folder, on Linux)
 - Sources: gitea.com/initdream/relcs README.md (requires original assets, move the executable into the LCS folder, release binary mention); BUILDING.md:160-166 (running, gamefiles extras); src/skel/glfw/glfw.cpp:125-162 (userfiles folder off Windows); src/save/PCSave.cpp:25,34 (GTAVCsf<n>.b); src/core/Game.cpp:471 (MODELS\GTA3.IMG); git ls-remote: mirror has only branch lcs, no tags
 - Not certain: Only a mirror (gitea.com/initdream/relcs) was found; the original GitHub repo appears gone, so no releases and repo null; PCGamingWiki row is 'Grand Theft Auto Re: Liberty City Stories'; assumed to be this reLCS project; Whether the PS2 or PSP game files are needed is not stated in what was read; Save file prefix GTAVCsf left over from reVC code
@@ -887,6 +911,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Windows build (Proton), newest checked v1.0.0-beta.2 (ac6recomp-1.0.0-beta.2.zip)
 - Needs: The US Xbox 360 disc of Ace Combat 6 as an .iso (or its files extracted into an assets folder)
 - Setup: place (the .iso (any name) or an assets/ folder next to ac6recomp.exe; optional extracted DLC in dlc/). The image is picked by the game's title ID 4E4D07D1, so a wrong or damaged image is refused with a message. First run creates ac6recomp.toml beside the program. Needs AVX2 and Direct3D 12 (through Proton on Linux).
+- Placed by Cartridge (0.9.68): a file into ./ (keeping its name); a folder's contents into assets/, beside the program unless the path starts with ~
 - Saves: Documents/ac6recomp inside the Proton prefix (ReXGlue user data folder: Windows Documents/<app name>)
 - Sources: README.md:4 (work in progress), 47-64 (Windows 10/11, AVX2, D3D12, US only, iso or assets/ beside exe, dlc/, ac6recomp.toml); src/ac6recomp_app.h:44-46 (title ID 0x4E4D07D1); rexglue-sdk src/ui/rex_app.cpp:116-121 and src/core/filesystem_win.cpp:55-58 (user data in Documents/<name>); github.com/sal063/AC6_recomp/releases/expanded_assets/v1.0.0-beta.2 (ac6recomp-1.0.0-beta.2.zip); curl -I releases/download/v1.0.0-beta.2/ac6recomp-1.0.0-beta.2.zip 302; LICENSE (BSD 3-Clause); zip listing: only ac6recomp.exe at the top level
 - Not certain: The batch row points at the dev-test branch; tag v1.0.0-beta.1 is on dev-test, beta.2 is the newest tag; Save location assumed from the ReXGlue SDK default; the game's saves may sit in a content subfolder of it; Built on ReXGlue but no achievements.toml in the repo, so achievements left null; The project's display name is not stated; 'AC6 Recomp' taken from the repo and program name
@@ -931,6 +956,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Build it yourself
 - Needs: The Xbox 360 game files of Fable II (Game of the Year edition with title update 1) extracted into the assets folder
 - Setup: place (assets/ (game files, needed at build time for code generation)). Work in progress with no releases: it has to be built from source with the ReXGlue SDK and the game's files.
+- Placed by Cartridge (0.9.68): a folder's contents into assets/, beside the program unless the path starts with ~
 - Sources: README.md (work in progress, ReXGlue, based on Fable 2 GOTY TU1, build steps only); git ls-remote --tags: no tags; no .github/workflows in the repo; LICENSE (MIT)
 - Not certain: No releases; playability unknown; Exact files layout and region of the GOTY TU1 base not stated
 
@@ -941,6 +967,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Build it yourself
 - Needs: Midnight Club: Los Angeles (Complete Edition, US Xbox 360) extracted from the disc: a folder holding default.xex and the xarchive_*.rpf archives, or the disc as an ISO for its install wizard
 - Setup: place (MCLA_Game_Files/ (or game/ or assets/) next to the program or a folder above it, holding default.xex and xarchive_*.rpf) (--game_data_root={FILE}). Also reads the MCLA_GAME_DATA environment variable. With no game data found, an ISO install wizard offers to extract the disc. A folder only counts with default.xex and at least one archive. Can import saves from Xenia or RPCS3 on first run. Recommended to run with --clock_no_scaling=true (works around a frame rate collapse) and REX_LOG_LEVEL=warn.
+- Placed by Cartridge (0.9.68): a file into ./ (keeping its name); a folder's contents into MCLA_Game_Files/, beside the program unless the path starts with ~
 - Saves: Documents/larecomp inside the Proton prefix (ReXGlue user data folder)
 - Achievements: {"format":"rexglue"}
 - Sources: README.md:3 (Complete Edition, Windows x86-64, ReXGlue); README.md 'Game data' (default.xex + xarchive_*.rpf, --game_data_root, MCLA_GAME_DATA, MCLA_Game_Files/ game/ assets/ walking up, ISO wizard); README.md 'The frame rate collapse' (--clock_no_scaling=true); src/larecomp_app.h:85 (app name larecomp); src/achievements.toml; documentation/TECHNICAL_NOTES.md:3 (title ID 545407F8); git ls-remote --tags: no tags; README only gives build steps
@@ -1019,6 +1046,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Linux build, newest checked release_v1.5.1 (ReStuff-linux-x64.tar.gz, restuff-win-x64.zip)
 - Needs: Naughty Bear: Gold Edition for Xbox 360, with the disc's contents extracted straight into assets/ so that assets/Default.xex exists
 - Setup: place (assets/ next to the program (the Linux build ships ReStuff-linux64/assets/PUT_GAME_FILES_HERE.txt); the files go directly in assets/, not a subfolder) (--game_data_root={FILE}). Looks for assets/Default.xex from the working folder and the program's folder upwards. The Linux archive has one top folder, ReStuff-linux64/, with restuff, librexruntime.so, librexgpu-xenos.so and libshaderc_shared.so.1. prewarm_shaders.sh warms shader caches (optional). restuff.toml is created only if missing. The project's own instructions point to the Goopie launcher, which dumps the ISO.
+- Placed by Cartridge (0.9.68): a folder's contents into assets/, beside the program unless the path starts with ~
 - Saves: ~/.local/share/restuff ($XDG_DATA_HOME/restuff; ReXGlue user data folder)
 - Sources: README.md (rexglue-SDK recompilation of Naughty Bear Gold Edition, 60fps, Goopie install steps); WebFetch github.com/MaxDeadBear/NaughtyBear_ReStuff/releases/expanded_assets/release_v1.5.1 (ReStuff-linux-x64.tar.gz, restuff-win-x64.zip); curl -I both 302; releases page: release_v1.5.1 marked Latest; tar listing of ReStuff-linux-x64.tar.gz (ReStuff-linux64/restuff, assets/PUT_GAME_FILES_HERE.txt); README.txt in restuff-win-x64.zip (extract disc into assets, assets\Default.xex); src/restuff_app.h:236-265 (assets/Default.xex search); CMakeLists.txt:56-58, src/main.cpp:36 (app name restuff); rexglue-sdk src/ui/rex_app.cpp:120, src/core/filesystem_posix.cpp:106-115 (user folder XDG_DATA_HOME or ~/.local/share/<name>)
 - Not certain: No LICENSE file in the repo; Region not stated; Gold Edition required; Save folder from the ReXGlue SDK default, not seen in this project; Linux build is built on a dev box (no CI), libraries bundled beside the program
@@ -1073,6 +1101,7 @@ Built 2026-10-13 by `tools/recomps/build.js` from the researched entries. Source
 - Builds: Windows build (Proton), newest checked v1.0 (svr07.zip)
 - Needs: A retail WWE SmackDown vs. Raw 2007 Xbox 360 disc (USA/Canada recommended), ripped and with its files extracted; a title update can go in assets/1_update
 - Setup: place (assets/ next to svr07.exe, holding the extracted game files (assets/default.xex)). The zip has no top folder: svr07.exe, a small 'Smackdown vs Raw 2007.exe', README, LICENSE, DISCLAIMER. The code points the title update mount at \assets\1_update. Windows only (Direct3D 12), so it runs through Proton. About one session in ten ends in a GPU device-lost crash.
+- Placed by Cartridge (0.9.68): a folder's contents into assets/, beside the program unless the path starts with ~
 - Saves: Documents/svr07 inside the Proton prefix (ReXGlue user data folder)
 - Sources: README.md (Windows 10/11, D3D12, USA/Canada disc recommended, svr07/ with svr07.exe and assets/, known issues); WebFetch releases/expanded_assets/v1.0 (svr07.zip); curl -I 302; zip listing of svr07.zip; src/svr07_app.h:17 (app name svr07), 20-27 (update_data_root \assets\1_update); LICENSE (BSD 3-Clause)
 - Not certain: The zip also holds 'Smackdown vs Raw 2007.exe' (212 KB, built from the same project); unclear whether it is a launcher meant to be run instead; Whether a title update is needed is not stated; Save folder assumed from the ReXGlue SDK default; prerelease status not seen; v1.0 assumed newest (v0.x tags have no svr07.zip)

@@ -1,5 +1,5 @@
 {
- "updated": "2026-10-13",
+ "updated": "2026-10-16",
  "source": "PCGamingWiki's List of unofficial ports (console sections), each project checked; see docs/recomps.md",
  "entries": [
   {
@@ -27,7 +27,11 @@
    "setup": {
     "how": "place",
     "place": "roms/ beside the program (the OutRun revision B files, e.g. epr-10187.88, mpr-10371.9 ...)",
-    "notes": "Paths to the roms and res folders are set in config.xml and default to the working directory. Only a Windows build is released (maintained by the author); Linux users build it themselves."
+    "notes": "Paths to the roms and res folders are set in config.xml and default to the working directory. Only a Windows build is released (maintained by the author); Linux users build it themselves.",
+    "to": {
+     "dir": "roms",
+     "file": "roms/"
+    }
    },
    "done": "roms/epr-10187.88",
    "saves": [
@@ -153,7 +157,10 @@
    "setup": {
     "how": "place",
     "place": "Super Mario Bros. (JU) (PRG0) [!].nes",
-    "notes": "Looked for in the working folder; another path can be set as rom_file in smbc.conf (INI) in the working folder."
+    "notes": "Looked for in the working folder; another path can be set as rom_file in smbc.conf (INI) in the working folder.",
+    "to": {
+     "file": "Super Mario Bros. (JU) (PRG0) [!].nes"
+    }
    },
    "description": "Super Mario Bros. translated from 6502 assembly into C++, a static recompilation that still emulates the PPU and APU."
   },
@@ -213,7 +220,10 @@
     "how": "place",
     "place": "sm.smc",
     "arg": "sm {FILE}",
-    "notes": "Reads sm.smc from the working folder, or the first argument. Early version, build it yourself."
+    "notes": "Reads sm.smc from the working folder, or the first argument. Early version, build it yourself.",
+    "to": {
+     "file": "sm.smc"
+    }
    },
    "saves": [
     "saves/sm.srm"
@@ -251,7 +261,10 @@
    "setup": {
     "how": "place",
     "place": "smw.sfc",
-    "notes": "The release zip holds smw.exe, SDL2.dll, smw.ini and smw_assets.bps, applied to smw.sfc at start. README says to self-build; Linux needs a self-build."
+    "notes": "The release zip holds smw.exe, SDL2.dll, smw.ini and smw_assets.bps, applied to smw.sfc at start. README says to self-build; Linux needs a self-build.",
+    "to": {
+     "file": "smw.sfc"
+    }
    },
    "saves": [
     "saves/smw.srm"
@@ -289,7 +302,10 @@
    "setup": {
     "how": "place",
     "place": "zelda3.sfc",
-    "notes": "The release zip holds zelda3.exe, SDL2.dll, zelda3.ini and zelda3_assets.bps; at each start the patch is applied to zelda3.sfc beside it (or zelda3_assets.dat is used if present). Linux needs a self-build (make)."
+    "notes": "The release zip holds zelda3.exe, SDL2.dll, zelda3.ini and zelda3_assets.bps; at each start the patch is applied to zelda3.sfc beside it (or zelda3_assets.dat is used if present). Linux needs a self-build (make).",
+    "to": {
+     "file": "zelda3.sfc"
+    }
    },
    "saves": [
     "saves/sram.dat"
@@ -332,7 +348,10 @@
    "setup": {
     "how": "place",
     "place": "the ROM in the same folder as 2ship.appimage",
-    "notes": "On first run it extracts the ROM into mm.o2r in its data folder (2ship.o2r holds its own assets). On Linux the data folder is the working directory unless SHIP_HOME is set. The release zip is named after the release (e.g. Battler Bravo), so match by -Linux.zip."
+    "notes": "On first run it extracts the ROM into mm.o2r in its data folder (2ship.o2r holds its own assets). On Linux the data folder is the working directory unless SHIP_HOME is set. The release zip is named after the release (e.g. Battler Bravo), so match by -Linux.zip.",
+    "to": {
+     "file": "./"
+    }
    },
    "done": "mm.o2r",
    "saves": [
@@ -1045,7 +1064,10 @@
    "setup": {
     "how": "place",
     "place": "the ROM in the same folder as Paperboat.AppImage",
-    "notes": "Extracts the ROM into pm64.o2r in its data folder on first run (it also looks for baserom.us.z64 there). Data folder is the working directory unless SHIP_HOME is set. The Linux zip holds Paperboat.AppImage, readme.txt and gamecontrollerdb.txt; zips are named after the release (Mulberry Charlie)."
+    "notes": "Extracts the ROM into pm64.o2r in its data folder on first run (it also looks for baserom.us.z64 there). Data folder is the working directory unless SHIP_HOME is set. The Linux zip holds Paperboat.AppImage, readme.txt and gamecontrollerdb.txt; zips are named after the release (Mulberry Charlie).",
+    "to": {
+     "file": "./"
+    }
    },
    "done": "pm64.o2r",
    "saves": [
@@ -1086,7 +1108,10 @@
    "setup": {
     "how": "place",
     "place": "data/pd.ntsc-final.z64",
-    "notes": "Put the ROM in a data folder next to pd.x86_64 (or ~/.local/share/perfectdark/data). Optional data/pd.gbc (Perfect Dark GBC ROM) emulates the Transfer Pak. Options --portable, --basedir and --savedir. A rolling ci-dev-build tag is the only release."
+    "notes": "Put the ROM in a data folder next to pd.x86_64 (or ~/.local/share/perfectdark/data). Optional data/pd.gbc (Perfect Dark GBC ROM) emulates the Transfer Pak. Options --portable, --basedir and --savedir. A rolling ci-dev-build tag is the only release.",
+    "to": {
+     "file": "data/pd.ntsc-final.z64"
+    }
    },
    "done": "data/pd.ntsc-final.z64",
    "saves": [
@@ -1162,7 +1187,6 @@
     "how": "picker",
     "notes": "Asks for the ROM in its main menu and stores it as quest64_us.z64 in its data folder. Only a Windows zip (Quest64Recompiled.exe with DLLs) is released, so it runs through Proton; under Proton the data folder is in the prefix's %LOCALAPPDATA%\\Quest64Recompiled. portable.txt beside the exe keeps saves beside it."
    },
-   "done": "quest64_us.z64 in %LOCALAPPDATA%\\Quest64Recompiled (Proton prefix), or beside the exe in portable mode",
    "saves": [
     "%LOCALAPPDATA%\\Quest64Recompiled\\saves inside the Proton prefix",
     "saves beside the exe with portable.txt"
@@ -1258,7 +1282,10 @@
    "setup": {
     "how": "place",
     "place": "the ROM in the same folder as soh.appimage (9.2.3); newer builds ask with a file picker",
-    "notes": "Extracts the ROM into oot.o2r (oot-mq.o2r for Master Quest) on first run; soh.o2r ships with it. In 9.2.3 the data folder is the working directory unless SHIP_HOME is set; the develop branch (9.3.0) moves it to ~/.local/share/soh/ unless the launch folder already holds shipofharkinian.json or oot.o2r. Custom assets go in mods/. Release zips are named after the release (Ackbar Delta), so match -Linux.zip."
+    "notes": "Extracts the ROM into oot.o2r (oot-mq.o2r for Master Quest) on first run; soh.o2r ships with it. In 9.2.3 the data folder is the working directory unless SHIP_HOME is set; the develop branch (9.3.0) moves it to ~/.local/share/soh/ unless the launch folder already holds shipofharkinian.json or oot.o2r. Custom assets go in mods/. Release zips are named after the release (Ackbar Delta), so match -Linux.zip.",
+    "to": {
+     "file": "./"
+    }
    },
    "done": "oot.o2r",
    "saves": [
@@ -1337,7 +1364,10 @@
    "setup": {
     "how": "place",
     "place": "any .z64 file in ~/.local/share/sm64coopdx or next to the program (or drag and drop it on the window)",
-    "notes": "On first start it scans its data folder and then the program folder for a .z64 whose md5 matches the US ROM and copies it to baserom.us.z64 in the data folder. --savepath overrides the data folder."
+    "notes": "On first start it scans its data folder and then the program folder for a .z64 whose md5 matches the US ROM and copies it to baserom.us.z64 in the data folder. --savepath overrides the data folder.",
+    "to": {
+     "file": "~/.local/share/sm64coopdx/"
+    }
    },
    "done": "~/.local/share/sm64coopdx/baserom.us.z64",
    "saves": [
@@ -1814,7 +1844,10 @@
    "setup": {
     "how": "place",
     "place": "baserom.gba (USA), baserom_eu.gba or baserom_jp.gba next to tmc_pc",
-    "notes": "One multi-region binary checks the ROM by SHA-1. On first launch it extracts the asset cache into assets/<region>/ beside the program (a few seconds). Resolves the ROM, sounds.json and assets relative to its own location. Older releases (0.1.x) shipped a separate asset_extractor to run once."
+    "notes": "One multi-region binary checks the ROM by SHA-1. On first launch it extracts the asset cache into assets/<region>/ beside the program (a few seconds). Resolves the ROM, sounds.json and assets relative to its own location. Older releases (0.1.x) shipped a separate asset_extractor to run once.",
+    "to": {
+     "file": "baserom.gba"
+    }
    },
    "done": "assets/usa",
    "saves": [
@@ -2025,7 +2058,10 @@
    "setup": {
     "how": "place",
     "place": "the disc image renamed to GMPE01_00 in the program folder",
-    "notes": "If the image is not in the folder it asks to browse for it at every start. Alpha builds; a controller is required; the x64 build may crash in more places than x86. Releases before 0.1.1 needed the disc's files extracted with Dolphin into GMPE01_00/files."
+    "notes": "If the image is not in the folder it asks to browse for it at every start. Alpha builds; a controller is required; the x64 build may crash in more places than x86. Releases before 0.1.1 needed the disc's files extracted with Dolphin into GMPE01_00/files.",
+    "to": {
+     "file": "GMPE01_00"
+    }
    },
    "done": "GMPE01_00",
    "saves": [
@@ -2177,7 +2213,10 @@
    "setup": {
     "how": "place",
     "place": "Sonic_Knuckles_wSonic3.bin in ~/.local/share/Sonic3AIR/ (or next to sonic3air_linux, or the path in config.json RomPath)",
-    "notes": "On Linux there is no file picker: if the ROM is not found it shows an error and closes. It looks in its app data folder, the last known ROM path, config.json RomPath, the working folder, then Steam's 'steamapps/common/Sega Classics/uncompressed ROMs/' (native and Flatpak Steam). A ROM found elsewhere is copied into ~/.local/share/Sonic3AIR/. The ROM is checked by size (0x400000) and a Murmur2 64-bit checksum, not md5."
+    "notes": "On Linux there is no file picker: if the ROM is not found it shows an error and closes. It looks in its app data folder, the last known ROM path, config.json RomPath, the working folder, then Steam's 'steamapps/common/Sega Classics/uncompressed ROMs/' (native and Flatpak Steam). A ROM found elsewhere is copied into ~/.local/share/Sonic3AIR/. The ROM is checked by size (0x400000) and a Murmur2 64-bit checksum, not md5.",
+    "to": {
+     "file": "~/.local/share/Sonic3AIR/Sonic_Knuckles_wSonic3.bin"
+    }
    },
    "done": "~/.local/share/Sonic3AIR/Sonic_Knuckles_wSonic3.bin",
    "saves": [
@@ -2290,7 +2329,10 @@
    "setup": {
     "how": "place",
     "place": "assets/ctr-u.bin",
-    "notes": "Reads the game straight from the image; extracted files in assets/ override it for modding. Single static 32-bit executable with SDL3 built in."
+    "notes": "Reads the game straight from the image; extracted files in assets/ override it for modding. Single static 32-bit executable with SDL3 built in.",
+    "to": {
+     "file": "assets/ctr-u.bin"
+    }
    },
    "saves": [
     "memcards/ (relative to the working folder)"
@@ -2436,7 +2478,10 @@
    "setup": {
     "how": "place",
     "place": "discimage/<any name>.bin or .iso (only one image in the folder)",
-    "notes": "On first launch it checks the disc's boot file is SLUS-00684 and extracts the assets beside the program (folders xc, fe, tim and license.tim); the disc image can be deleted afterwards."
+    "notes": "On first launch it checks the disc's boot file is SLUS-00684 and extracts the assets beside the program (folders xc, fe, tim and license.tim); the disc image can be deleted afterwards.",
+    "to": {
+     "file": "discimage/"
+    }
    },
    "done": "license.tim",
    "saves": [
@@ -2474,7 +2519,15 @@
    "setup": {
     "how": "place",
     "place": "install/Driver2CD1.bin and install/Driver2CD2.bin",
-    "notes": "config.ini [cdfs] image=install/Driver2CD1.bin reads the game from disc 1. Movies and audio must then be extracted once with _convert_cd_fmv_xa.sh, which runs jpsxdec and needs Java. Needs SDL2 and OpenAL from the system."
+    "notes": "config.ini [cdfs] image=install/Driver2CD1.bin reads the game from disc 1. Movies and audio must then be extracted once with _convert_cd_fmv_xa.sh, which runs jpsxdec and needs Java. Needs SDL2 and OpenAL from the system.",
+    "to": {
+     "file": "install/",
+     "dir": "install",
+     "names": [
+      "Driver2CD1.bin",
+      "Driver2CD2.bin"
+     ]
+    }
    },
    "saves": [
     "~/.driver2/progress.dat",
@@ -2514,7 +2567,11 @@
    "setup": {
     "how": "place",
     "place": "isos/ (any file names, one image per disc)",
-    "notes": "On first start it reads each image's disc ID (PAL and Japanese discs are refused) and unpacks the assets into files/. The launch script downloads a Java 25 runtime into jdk25/ the first time (Steam Deck build opens it in Konsole). Java cannot start from a path containing a colon."
+    "notes": "On first start it reads each image's disc ID (PAL and Japanese discs are refused) and unpacks the assets into files/. The launch script downloads a Java 25 runtime into jdk25/ the first time (Steam Deck build opens it in Konsole). Java cannot start from a path containing a colon.",
+    "to": {
+     "file": "isos/",
+     "dir": "isos"
+    }
    },
    "done": "files/version",
    "saves": [
@@ -2590,7 +2647,11 @@
    "setup": {
     "how": "place",
     "place": "wipeout/diskimages/ (the .cue and all .bin tracks)",
-    "notes": "On start it extracts missing data files and the music from the image (a slow hash-based search on machines with under 8 cores). Loose files can go in wipeout/wipeoutgame and music in wipeout/music. The image can be removed once the main menu has loaded once. Runs through Proton (Proton Experimental suggested)."
+    "notes": "On start it extracts missing data files and the music from the image (a slow hash-based search on machines with under 8 cores). Loose files can go in wipeout/wipeoutgame and music in wipeout/music. The image can be removed once the main menu has loaded once. Runs through Proton (Proton Experimental suggested).",
+    "to": {
+     "file": "diskimages/",
+     "dir": "diskimages"
+    }
    },
    "description": "An enhanced PC source port of the PlayStation Wipeout, using the PlayStation game data, with uncapped frame rate, widescreen and higher resolutions."
   },
@@ -2619,7 +2680,10 @@
    "setup": {
     "how": "place",
     "place": "wipeout/ beside the program (wipeout/textures/, wipeout/music/track01.qoa ...)",
-    "notes": "Assets are read from SDL_GetBasePath (the program folder) unless built with PATH_ASSETS. Analogue sticks must be bound in Options."
+    "notes": "Assets are read from SDL_GetBasePath (the program folder) unless built with PATH_ASSETS. Analogue sticks must be bound in Options.",
+    "to": {
+     "dir": "wipeout"
+    }
    },
    "saves": [
     "~/.local/share/phoboslab/wipeout/save.dat"
@@ -2851,7 +2915,11 @@
    "setup": {
     "how": "place",
     "place": "the .iso (any name) or an assets/ folder next to ac6recomp.exe; optional extracted DLC in dlc/",
-    "notes": "The image is picked by the game's title ID 4E4D07D1, so a wrong or damaged image is refused with a message. First run creates ac6recomp.toml beside the program. Needs AVX2 and Direct3D 12 (through Proton on Linux)."
+    "notes": "The image is picked by the game's title ID 4E4D07D1, so a wrong or damaged image is refused with a message. First run creates ac6recomp.toml beside the program. Needs AVX2 and Direct3D 12 (through Proton on Linux).",
+    "to": {
+     "file": "./",
+     "dir": "assets"
+    }
    },
    "done": "ac6recomp.toml",
    "saves": [
@@ -2954,7 +3022,10 @@
    "setup": {
     "how": "place",
     "place": "assets/ (game files, needed at build time for code generation)",
-    "notes": "Work in progress with no releases: it has to be built from source with the ReXGlue SDK and the game's files."
+    "notes": "Work in progress with no releases: it has to be built from source with the ReXGlue SDK and the game's files.",
+    "to": {
+     "dir": "assets"
+    }
    },
    "license": "MIT",
    "description": "A work-in-progress static recompilation of Fable II for Xbox 360, built on the ReXGlue SDK, with no released builds yet."
@@ -2988,7 +3059,11 @@
     "how": "place",
     "place": "MCLA_Game_Files/ (or game/ or assets/) next to the program or a folder above it, holding default.xex and xarchive_*.rpf",
     "arg": "--game_data_root={FILE}",
-    "notes": "Also reads the MCLA_GAME_DATA environment variable. With no game data found, an ISO install wizard offers to extract the disc. A folder only counts with default.xex and at least one archive. Can import saves from Xenia or RPCS3 on first run. Recommended to run with --clock_no_scaling=true (works around a frame rate collapse) and REX_LOG_LEVEL=warn."
+    "notes": "Also reads the MCLA_GAME_DATA environment variable. With no game data found, an ISO install wizard offers to extract the disc. A folder only counts with default.xex and at least one archive. Can import saves from Xenia or RPCS3 on first run. Recommended to run with --clock_no_scaling=true (works around a frame rate collapse) and REX_LOG_LEVEL=warn.",
+    "to": {
+     "file": "./",
+     "dir": "MCLA_Game_Files"
+    }
    },
    "saves": [
     "Documents/larecomp inside the Proton prefix (ReXGlue user data folder)"
@@ -3242,7 +3317,10 @@
     "how": "place",
     "place": "assets/ next to the program (the Linux build ships ReStuff-linux64/assets/PUT_GAME_FILES_HERE.txt); the files go directly in assets/, not a subfolder",
     "arg": "--game_data_root={FILE}",
-    "notes": "Looks for assets/Default.xex from the working folder and the program's folder upwards. The Linux archive has one top folder, ReStuff-linux64/, with restuff, librexruntime.so, librexgpu-xenos.so and libshaderc_shared.so.1. prewarm_shaders.sh warms shader caches (optional). restuff.toml is created only if missing. The project's own instructions point to the Goopie launcher, which dumps the ISO."
+    "notes": "Looks for assets/Default.xex from the working folder and the program's folder upwards. The Linux archive has one top folder, ReStuff-linux64/, with restuff, librexruntime.so, librexgpu-xenos.so and libshaderc_shared.so.1. prewarm_shaders.sh warms shader caches (optional). restuff.toml is created only if missing. The project's own instructions point to the Goopie launcher, which dumps the ISO.",
+    "to": {
+     "dir": "assets"
+    }
    },
    "done": "assets/Default.xex",
    "saves": [
@@ -3413,7 +3491,10 @@
    "setup": {
     "how": "place",
     "place": "assets/ next to svr07.exe, holding the extracted game files (assets/default.xex)",
-    "notes": "The zip has no top folder: svr07.exe, a small 'Smackdown vs Raw 2007.exe', README, LICENSE, DISCLAIMER. The code points the title update mount at \\assets\\1_update. Windows only (Direct3D 12), so it runs through Proton. About one session in ten ends in a GPU device-lost crash."
+    "notes": "The zip has no top folder: svr07.exe, a small 'Smackdown vs Raw 2007.exe', README, LICENSE, DISCLAIMER. The code points the title update mount at \\assets\\1_update. Windows only (Direct3D 12), so it runs through Proton. About one session in ten ends in a GPU device-lost crash.",
+    "to": {
+     "dir": "assets"
+    }
    },
    "saves": [
     "Documents/svr07 inside the Proton prefix (ReXGlue user data folder)"
