@@ -6,6 +6,16 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 16 Oct 2026 · 0.9.69 Recomps, Finished (owner: "go clean up and be iterative to make sure everything works and nothing is broken or breaks", after I offered "Recomps, Finished")
+- Built in five commits, each checked before the next (a script runs `npm test` and the build and stops on any failure; after a failed run slipped into one commit through `| grep`, every commit went through it):
+  1. Clean-up: unused imports and dead helpers (ESLint no-unused-vars, each name checked by hand for any other use), GameAddons `curTab`. ESLint warnings 41 to 17 (the rest are deliberate: names left out of object copies, loop variables). The old release branches couldn't be deleted from here (the proxy allows only the session branch; the GitHub API answers 403 for writes): owner to delete them on GitHub.
+  2. Recomp save backups: Save Backups on the recomp page, put one back (current saves backed up first, the chosen backup protected from the ten-backup trim). Checked end to end in the real app: the file came back and a "before restore" backup was made.
+  3. Link recomps: It's Set Up step, guessed save folders for backups only (never Save Sync, nothing over 256 MB), Check It (`recomps:preview`). Checked in the real app: "already in the list" for Zelda 64, a clear error when GitHub can't be reached.
+  4. Copy checked before install, stricter automatic finds (not a fork, a usable build, six a day), daily switch, Flatpak update start. Checked in the real app: Ship of Harkinian with a fake ROM warns before downloading, Zelda 64 passes (no hashes listed), the switch saves `recomps.daily: false`.
+  5. Verification: tests (356), build, crawl of every tab and Settings section, pop-ups, 36 handlers, a main-process profile in simulated Game Mode (one stall over 200 ms, idle samples), UI audit, launch check.
+- Note for next time: the fake RomM in the scratchpad stops when the container restarts; an empty library in a test run means start it again (`node mock68.js` in scratchpad/t).
+- Owner to test: Save Backups on a recomp that has updated; a link recomp (Check It, install, It's Set Up); Install on a recomp whose listed version your copy doesn't match.
+
 ## 16 Oct 2026 · 0.9.68 Set Up Right (owner, after catching up on another account: "Can you do full debugging of what we have so far and patch it in an update")
 - Released with the three unreleased 14 Oct commits below (freeze fix, Steam card, recomps setting themselves up).
 - Found and fixed:
