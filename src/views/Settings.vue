@@ -599,7 +599,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { store, call, go, tab, saveConfig, pickFolder, choose, confirm, toast, openModal, bytes, ago, resync, scanServer, allRoms, romById, cover, resetLogos, askText, activeTabs, TAB_DEFS, consoleName, openTour } from '../store.js';
 import { useView } from '../useView.js';
 import { input, focusFirst, setPointerPref, setRumble, rumble, stopScroll } from '../nav.js';
@@ -1147,8 +1147,6 @@ const allRoots = ref([]), rootTo = ref('most');
 const rootsShown = computed(() => (allRoots.value.length ? allRoots.value : store.config.romsRoot ? [{ path: store.config.romsRoot, main: true, drive: 'Games Folder', here: true, free: 0, total: 0 }] : []));
 const short = (p) => String(p || '').replace(store.info?.home || '\0', '~'); // paths with ~ for home
 // a drive's name from its folder: /run/media/deck/SD/Emulation/roms -> SD
-const rootLabel = (p) => { const parts = p.split('/').filter(Boolean); while (parts.length > 1 && /^(roms|emulation)$/i.test(parts[parts.length - 1])) parts.pop(); return parts[parts.length - 1] || p; };
-const xroots = computed(() => allRoots.value.filter((r) => !r.main));
 async function loadRoots() { const r = await call('roots:list').catch(() => null); if (r) { allRoots.value = r.roots; rootTo.value = r.to; } }
 async function addRoot() {
   const dir = await pickFolder({ title: 'Choose a drive (or a folder on it)', subtitle: 'An Emulation/roms folder is made there, with a folder per console', start: '/run/media' });
@@ -1215,7 +1213,6 @@ const gaFind = ref('');
 const gaCon = ref('');
 // with nothing searched, one console's games at a time; searching looks through all of them
 const gaGroups = computed(() => (gaFind.value.trim() || gaAll.value.length < 2 ? gaAll.value : gaAll.value.filter((g) => g.slug === (gaCon.value || gaAll.value[0]?.slug))));
-function stepGaCon(d) { const l = gaAll.value; if (l.length < 2) return; const i = Math.max(0, l.findIndex((g) => g.slug === gaCon.value)); gaCon.value = l[(i + d + l.length) % l.length].slug; }
 const gaAll = computed(() => {
   const q = gaFind.value.trim().toLowerCase(), by = new Map();
   for (const r of allRoms()) {

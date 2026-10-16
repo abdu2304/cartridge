@@ -93,7 +93,6 @@ function ribbons(g, w, h, S, pal, light) {
 const TAU = Math.PI * 2;
 // a pattern drawn once, then reused every frame
 function once(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')); return c; }
-function rrect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
 // glow sprite (used by Drift and by Game artwork's light)
 function glow(rgb, size) {

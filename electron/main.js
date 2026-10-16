@@ -3367,7 +3367,7 @@ function createWindow() {
     // recomps (0.9.65): recomp/<console> in every Emulation folder once, and the catalogue, PCGamingWiki and installed
     // recomps' releases checked once a day, silently (owner: "without consuming many resources")
     scheduler.add('recomp-folders', { once: true, firstAfter: 25000, deferWhilePlaying: true, run: async () => { try { recomps().ensureFolders(); } catch (e) { log('recomp folders', e.message); } recompTrophies(); } });
-    scheduler.add('recomps-refresh', { every: 24 * 3600e3, firstAfter: 5 * 60000, deferWhilePlaying: true, run: async () => { const r = await recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }); log('recomps refreshed', JSON.stringify(r)); } });
+    scheduler.add('recomps-refresh', { every: 24 * 3600e3, firstAfter: 5 * 60000, deferWhilePlaying: true, run: async () => { if (config.recomps?.daily === false) return; /* 0.9.69: Settings → Recomps, Check Every Day */ const r = await recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }); log('recomps refreshed', JSON.stringify(r)); } });
     scheduler.add('bios-check', { once: true, firstAfter: 45000, deferWhilePlaying: true, run: () => biosSetup({ install: true }).catch(() => {}) }); // 0.9.38: firmware too, when an emulator lacks it
   }
   win.webContents.once('did-finish-load', () => log('ui loaded', Date.now() - startedAt + 'ms', 'window=' + win.getContentSize().join('x'), 'zoom=' + currentZoom()));
@@ -5100,6 +5100,7 @@ const handlers = {
   'recomps:dropVersion': ({ id, tag }) => recomps().dropVersion(id, tag),
   'recomps:channel': ({ id, channel }) => recomps().setChannel(id, channel),
   'recomps:backups': ({ id }) => recomps().backups(id),
+  'recomps:restore': ({ id, stamp }) => recomps().restoreBackup(id, stamp), // 0.9.69
   'recomps:remove': async ({ id, steam }) => {
     const r = await recomps().remove(id);
     recompTrophies();
@@ -5125,6 +5126,15 @@ const handlers = {
       }
       out.push({ romId: rid, name: romName(rid), file });
     }
+    return out;
+  },
+  // 0.9.69 (agreed plan 7.1 #9): your library's copies checked before installing, so a wrong version is said before a
+  // download. Only when the catalogue lists file types or hashes; [] when there's nothing to check against
+  'recomps:checkCopies': async ({ id }) => {
+    const R = recomps(), e = R.byId(id), M = require('./recomps');
+    if (!e?.needs || !(e.needs.ext?.length || e.needs.md5?.length || e.needs.sha1?.length)) return [];
+    const out = [];
+    for (const g of handlers['recomps:gameFiles']({ id }).slice(0, 4)) { const c = await M.checkGame(e, g.file).catch((er) => ({ ok: false, why: er.message })); out.push({ name: g.name, file: g.file, ok: !!c.ok, why: c.why || '' }); }
     return out;
   },
   'recomps:setGame': async ({ id, file, force }) => {
@@ -5168,6 +5178,21 @@ const handlers = {
   },
   'recomps:refresh': () => recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }),
   // from a link (not in the list): what it is first, then added with the console and game you say
+  // Check It for a recomp link (0.9.69, agreed plan 7.1 #16): the project, its newest release and the build Cartridge
+  // would take, before anything is added or downloaded
+  'recomps:preview': async ({ link }) => {
+    const C = require('./customEmu'), R = require('./recomps'), gh = C.repoOf(link);
+    const gl = !gh && /^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([\w.-]+)\/([\w.-]+)/i.exec(String(link || ''));
+    if (!gh && !gl) throw new Error('That isn’t a GitHub or GitLab project link. It looks like github.com/owner/project.');
+    const repo = gh ? 'github:' + gh : `gitlab:${gl[1]}/${gl[2].replace(/\.git$/i, '')}`, path2 = repo.split(':')[1];
+    const H = { headers: { 'User-Agent': 'Cartridge', Accept: 'application/json' }, signal: AbortSignal.timeout(15000) };
+    const [rel, info] = await Promise.all([
+      R.releaseOf({ repo }, { fetchImpl: webFetch }).catch((e) => ({ error: e.message })),
+      webFetch(gh ? `https://api.github.com/repos/${path2}` : `https://gitlab.com/api/v4/projects/${encodeURIComponent(path2)}`, H).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]);
+    const b = rel && !rel.error ? R.pickBuild(rel.assets, {}) : null;
+    return { repo, tag: rel?.tag || null, date: rel?.date || null, error: rel?.error || null, file: b?.asset?.name || null, size: b?.asset?.size || 0, kind: b?.kind || null, stars: info ? info.stargazers_count ?? info.star_count ?? null : null, description: info?.description || '', fork: !!(info?.fork || info?.forked_from_project), known: !!recomps().catalogue().entries.find((e) => e.repo?.toLowerCase() === repo.toLowerCase()) };
+  },
   'recomps:addLink': async ({ link, console: con, title, description }) => {
     const C = require('./customEmu'), gh = C.repoOf(link);
     const gl = !gh && /^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([\w.-]+)\/([\w.-]+)/i.exec(String(link || ''));

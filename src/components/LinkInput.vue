@@ -38,7 +38,7 @@ import { call, toast } from '../store.js';
 import Icon from './Icon.vue';
 import TextField from './TextField.vue';
 
-const props = defineProps({ modelValue: String });
+defineProps({ modelValue: String });
 const emit = defineEmits(['update:modelValue']);
 const way = ref(''), q = ref(''), found = ref([]), busy = ref(false), why = ref('');
 const qr = ref(''), urls = ref([]), phoneWhy = ref('');

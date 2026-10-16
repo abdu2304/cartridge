@@ -469,7 +469,7 @@
 // A replay starts from the current settings: done steps show a green check, nothing is reset, and
 // leaving halfway keeps everything as it was.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { store, call, saveConfig, toast, tab, confirm, openModal, choose, pickFolder, loadLibrary , activeTabs, openTour } from '../store.js';
+import { store, call, saveConfig, toast, tab, confirm, choose, pickFolder, loadLibrary, activeTabs, openTour } from '../store.js';
 import { focusFirst, input } from '../nav.js';
 import { useView } from '../useView.js';
 import Logo from '../components/Logo.vue';

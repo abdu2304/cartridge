@@ -8,14 +8,14 @@
           <h2>{{ name }}</h2>
         </div>
       </div>
-      <div v-if="tabs.length > 1" class="ga-tabs"><Btn b="LB" /><div class="seg strip"><button v-for="t in tabs" :key="t.k" data-focus :data-key="'ga-' + t.k" :class="{ on: tab === t.k }" @click="pick(t.k)">{{ t.l }}</button></div><Btn b="RB" /></div>
+      <div v-if="tabs.length > 1" class="ga-tabs"><Btn b="LB" /><div class="seg strip"><button v-for="t in tabs" :key="t.k" data-focus :data-key="'ga-' + t.k" :class="{ on: curTab === t.k }" @click="pick(t.k)">{{ t.l }}</button></div><Btn b="RB" /></div>
 
       <!-- each part stays alive once opened, so ticks and lists survive moving between tabs -->
       <div ref="body" class="ga-body">
-        <AddonsSheet v-if="seen.addons" ref="ads" v-show="tab === 'mods' || tab === 'tex'" :rom-id="romId" :name="name" embedded :kind="tab === 'mods' ? 'mods' : 'tex'" :on-reopen="reopen" />
+        <AddonsSheet v-if="seen.addons" ref="ads" v-show="curTab === 'mods' || curTab === 'tex'" :rom-id="romId" :name="name" embedded :kind="curTab === 'mods' ? 'mods' : 'tex'" :on-reopen="reopen" />
         <div v-if="seen.patches && !patches && patchTab" class="muted"><Icon name="mdiSync" :size="16" class="spin" /> Reading {{ PATCH_EMU_OF(slug) }}’s list…</div>
-        <PatchesSheet v-if="patches" v-show="patchTab" ref="pt" v-bind="patches" :name="name" :rom-id="romId" embedded :section="sectionOf(tab)" @reload="loadPatches" />
-        <template v-if="tab === 'updates'">
+        <PatchesSheet v-if="patches" v-show="patchTab" ref="pt" v-bind="patches" :name="name" :rom-id="romId" embedded :section="sectionOf(curTab)" @reload="loadPatches" />
+        <template v-if="curTab === 'updates'">
           <div class="ga-up">
             <div class="muted small">From Sony’s own update list, installed into RPCS3 one after another, oldest first. Patches made for a game’s last update need it.</div>
             <div v-if="!up" class="muted"><Icon name="mdiSync" :size="16" class="spin" /> Checking Sony’s update list…</div>
@@ -86,18 +86,18 @@ const tabs = computed(() => {
   return out;
 });
 const first = () => (tabs.value.find((t) => t.k === props.tab || (props.tab === 'patches' && t.k.startsWith('p'))) || tabs.value[0] || {}).k || '';
-const tab = ref(first());
-const patchTab = computed(() => tab.value === 'p' || tab.value.startsWith('p:'));
+const curTab = ref(first()); // the tab shown (the prop `tab` is only where it opens)
+const patchTab = computed(() => curTab.value === 'p' || curTab.value.startsWith('p:'));
 const seen = reactive({ addons: false, patches: false, updates: false });
 function show(k) {
-  tab.value = k;
+  curTab.value = k;
   if (k === 'mods' || k === 'tex') seen.addons = true;
   if (patchTab.value && !seen.patches) { seen.patches = true; loadPatches(); }
   if (k === 'updates' && !seen.updates) { seen.updates = true; loadUp(); }
 }
 function pick(k) { show(k); }
 function step(d) {
-  const t = tabs.value, i = t.findIndex((x) => x.k === tab.value), n = t[(i + d + t.length) % t.length].k;
+  const t = tabs.value, i = t.findIndex((x) => x.k === curTab.value), n = t[(i + d + t.length) % t.length].k;
   show(n);
   nextTick(() => focusFirst(el.value, `[data-key="ga-${n}"]`));
 }
@@ -123,7 +123,7 @@ async function installUp() {
 
 // the add-ons tab asks before removing, which takes the one modal slot: come back to the same tab
 let saved = null;
-function reopen() { if (store.modal?.type !== 'gameaddons') store.modal = { type: 'gameaddons', props: { romId: props.romId, name: props.name, tab: tab.value }, resolve: saved || (() => {}) }; }
+function reopen() { if (store.modal?.type !== 'gameaddons') store.modal = { type: 'gameaddons', props: { romId: props.romId, name: props.name, tab: curTab.value }, resolve: saved || (() => {}) }; }
 // ticks on the Patches tabs change nothing until Apply; B once warns, B again leaves without them
 let warned = false;
 function leave() {
@@ -136,10 +136,10 @@ onMounted(() => {
   off = window.cart.on('ps3-update', (m) => { if (m.romId !== props.romId) return; upText.value = m.state === 'downloading' ? `Downloading ${m.version} · ${m.pct}%` : m.state === 'installing' ? `Installing ${m.version || ''} in RPCS3` : m.state === 'done' ? 'Done' : upText.value; });
   layer = pushLayer(el.value, { back: leave, lb: () => tabs.value.length > 1 && step(-1), rb: () => tabs.value.length > 1 && step(1), x() {}, y() {}, select() {}, lt() {}, rt() {},
     // the right stick moves between mod sites on the Mods tab (0.9.52)
-    rsleft: () => { if (tab.value === 'mods') ads.value?.stepSource(-1); }, rsright: () => { if (tab.value === 'mods') ads.value?.stepSource(1); } });
-  show(tab.value);
+    rsleft: () => { if (curTab.value === 'mods') ads.value?.stepSource(-1); }, rsright: () => { if (curTab.value === 'mods') ads.value?.stepSource(1); } });
+  show(curTab.value);
   if (PATCH_EMU_OF(slug.value) === 'Cemu' && !seen.patches) { seen.patches = true; loadPatches().then(() => { if (props.tab === 'patches' && !patchTab.value) { const t = tabs.value.find((x) => x.k.startsWith('p:')); if (t) { show(t.k); nextTick(() => focusFirst(el.value, `[data-key="ga-${t.k}"]`)); } } }); }
-  nextTick(() => focusFirst(el.value, `[data-key="ga-${tab.value}"]`));
+  nextTick(() => focusFirst(el.value, `[data-key="ga-${curTab.value}"]`));
 });
 onBeforeUnmount(() => { layer?.pop(); off?.(); });
 </script>

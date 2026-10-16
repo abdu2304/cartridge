@@ -84,13 +84,14 @@ function fakeWorld(entries, extra = {}) {
   fs.writeFileSync(path.join(d, 'shipped.json'), JSON.stringify({ updated: '2026-10-09', entries }));
   const releases = [];
   const fetchImpl = async (url) => {
-    if (/api\.github\.com\/repos\/.*\/releases/.test(url)) return { ok: true, status: 200, json: async () => releases };
+    if (/api\.github\.com\/repos\/.*\/releases/.test(url)) return { ok: true, status: 200, json: async () => (/\/nobuild\//.test(url) ? [] : releases) };
+    if (/api\.github\.com\/repos\/[^/]+\/[^/]+$/.test(url)) return { ok: true, status: 200, json: async () => ({ fork: /\/a-fork$/.test(url), stargazers_count: 5 }) }; // project info
     return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
   };
   // a release with a Linux tar.gz holding Game/<program> and a data file
-  const publish = (tag, text) => {
+  const publish = (tag, text, pad = 0) => {
     const src = path.join(files, tag, 'Game'); fs.mkdirSync(src, { recursive: true });
-    fs.writeFileSync(path.join(src, 'Game'), '#!/bin/sh\n' + text); fs.writeFileSync(path.join(src, 'assets.dat'), text);
+    fs.writeFileSync(path.join(src, 'Game'), '#!/bin/sh\n' + text + ' '.repeat(pad)); fs.writeFileSync(path.join(src, 'assets.dat'), text); // pad: big enough to be found without a catalogue program name
     const tar = path.join(files, tag, 'Game-Linux-x64.tar.gz');
     execFileSync('tar', ['-czf', tar, '-C', path.join(files, tag), 'Game']);
     releases.unshift({ tag_name: tag, published_at: '2026-10-0' + releases.length, prerelease: false, draft: false, assets: [{ name: 'Game-Linux-x64.tar.gz', browser_download_url: 'file://' + tar, size: fs.statSync(tar).size }] });
@@ -169,7 +170,9 @@ test('a game placed by link; a wrong copy refused unless used anyway; path setup
 
 test('the daily refresh adds projects new on PCGamingWiki, quietly, once', async () => {
   const w = fakeWorld([{ id: 'u', name: 'Unleashed Recompiled', games: [{ title: 'Sonic Unleashed', console: 'xbox360' }], repo: 'github:hedge-dev/UnleashedRecomp' }]);
-  const rows = R.parseWikitext(['=== Xbox 360 ===', '{|', '|-', '| Sonic Unleashed || [https://github.com/hedge-dev/UnleashedRecomp x]', '|-', '| Skate 3 || [https://github.com/mchughalex/skate3recomp Skate 3 Recomp]', '|}'].join('\n'));
+  const rows = R.parseWikitext(['=== Xbox 360 ===', '{|', '|-', '| Sonic Unleashed || [https://github.com/hedge-dev/UnleashedRecomp x]', '|-', '| Skate 3 || [https://github.com/mchughalex/skate3recomp Skate 3 Recomp]', '|-', '| Halo || [https://github.com/someone/a-fork Halo fork]', '|-', '| Fable || [https://github.com/nobuild/fable Fable]', '|}'].join('\n'));
+  w.publish('v1', 'x'); // a release with a Linux build
+  // 0.9.69: a fork and a project with no usable build are left out
   assert.strictEqual(await w.eng.addFound(rows, { search: null }), 1);
   assert.strictEqual(await w.eng.addFound(rows, { search: null }), 0);
   const e = w.eng.catalogue().entries.find((x) => x.repo === 'github:mchughalex/skate3recomp');
@@ -400,4 +403,47 @@ test('launch arguments: the catalogue\'s own come first; a one-off setup command
   assert.strictEqual(w.eng.launchArgs('o'), 'launch-base', 'play starts it the normal way');
   await w.eng.setGame('e', cue);
   assert.strictEqual(w.eng.launchArgs('e'), `--fast -cue "${cue}"`);
+});
+
+test('save backups put back: the saves there now backed up first, the backup restored kept even at the limit', async () => {
+  const entry = { id: 'b', name: 'B', games: [{ title: 'B', console: 'n64' }], repo: 'github:o/b', builds: 'linux', program: 'Game', saves: ['saves'], needs: null, setup: { how: 'none' } };
+  const w = fakeWorld([entry]);
+  w.publish('v1', 'x');
+  await w.eng.install('b');
+  const dir = w.eng.record('b').dir, sav = path.join(dir, 'saves', 'slot.sav');
+  fs.mkdirSync(path.dirname(sav)); fs.writeFileSync(sav, 'first');
+  w.eng.backupSaves('b', 'update');
+  for (let i = 0; i < 9; i++) { fs.writeFileSync(sav, 'later ' + i); await new Promise((r) => setTimeout(r, 2)); w.eng.backupSaves('b', 'update'); }
+  const list = w.eng.backups('b');
+  assert.strictEqual(list.length, 10);
+  const oldest = list[list.length - 1];
+  assert.strictEqual(oldest.files, 1);
+  fs.writeFileSync(sav, 'now');
+  const r = w.eng.restoreBackup('b', oldest.stamp);
+  assert.deepStrictEqual([r.files, r.savedFirst], [1, true]);
+  assert.strictEqual(fs.readFileSync(sav, 'utf8'), 'first');
+  const after = w.eng.backups('b');
+  assert.ok(after.some((b) => b.stamp === oldest.stamp), 'the backup put back is kept');
+  assert.strictEqual(after[0].why, 'before restore');
+  assert.throws(() => w.eng.restoreBackup('b', '../x'), /isn’t there/);
+});
+
+test('a recomp from a link: set up when you say so, saves guessed for backups only, nothing big', async () => {
+  const w = fakeWorld([]);
+  const r = w.eng.addLink({ repo: 'github:o/game', console: 'n64', title: 'Game', name: 'game' });
+  w.publish('v1', 'x', 600 * 1024);
+  // the fake release's own files: Game and assets.dat
+  await w.eng.install(r.id);
+  const e = w.eng.list().entries.find((x) => x.id === r.id);
+  assert.deepStrictEqual([e.setup.how, !!e.needs, e.installed.ready], ['picker', true, false], 'not ready until It’s Set Up');
+  w.eng.markDone(r.id);
+  assert.strictEqual(w.eng.list().entries.find((x) => x.id === r.id).installed.ready, true);
+  const rec = w.eng.record(r.id);
+  fs.mkdirSync(path.join(rec.dir, 'saves')); fs.writeFileSync(path.join(rec.dir, 'saves', 's.sav'), 'mine');
+  fs.writeFileSync(path.join(rec.dir, 'config.ini'), 'x=1');
+  const big = path.join(rec.dir, 'gamefiles'); fs.mkdirSync(big); fs.writeFileSync(path.join(big, 'disc.iso'), Buffer.alloc(1)); fs.truncateSync(path.join(big, 'disc.iso'), 300 * 1024 * 1024);
+  const cfg = path.join(w.home, '.config', 'Game'); fs.mkdirSync(cfg, { recursive: true }); fs.writeFileSync(path.join(cfg, 'save.dat'), 'x');
+  const got = R.guessSaves(w.eng.byId(r.id), rec, w.home).map((p) => path.relative(w.d, p)).sort();
+  assert.deepStrictEqual(got, [path.relative(w.d, path.join(rec.dir, 'config.ini')), path.relative(w.d, path.join(rec.dir, 'saves')), path.relative(w.d, cfg)].sort());
+  assert.deepStrictEqual(w.eng.saveDirs(r.id), [], 'Save Sync never gets guessed folders');
 });

@@ -1,10 +1,10 @@
 > **Read first (owner, 6 Oct 2026):** Plain and Glass are two separate modes, never merged. One Style setting (Plain or Glass) covers the whole app; design every element for both, and never let a change for one leak into the other. Details in CLAUDE.md.
 
-# Handover: everything from 0.9.55 to 0.9.68
+# Handover: everything from 0.9.55 to 0.9.69
 
 To the Claude on the next account, from the Claude on this one.
 
-Three handovers come before this one: `docs/HANDOVER-0.9.3-to-0.9.21.md`, `docs/HANDOVER-0.9.22-to-0.9.37.md` and `docs/HANDOVER-0.9.38-to-0.9.54.md`. Everything in them about the owner, the process and the do-not-break rules still holds unless this document says otherwise. This one picks up at 0.9.55 (7 October 2026) and runs to 0.9.68 (16 October 2026): **14 releases**. 0.9.68 was made on another account after a catch-up (Part 15). The file keeps its old name so links to it still work. Part 7 holds the plans the owner agreed for recomps and Online Play, with every decision and the reason behind it; both shipped (Parts 11, 12 and 13), and what is still missing from those plans is listed in Part 9.
+Three handovers come before this one: `docs/HANDOVER-0.9.3-to-0.9.21.md`, `docs/HANDOVER-0.9.22-to-0.9.37.md` and `docs/HANDOVER-0.9.38-to-0.9.54.md`. Everything in them about the owner, the process and the do-not-break rules still holds unless this document says otherwise. This one picks up at 0.9.55 (7 October 2026) and runs to 0.9.69 (16 October 2026): **15 releases**. 0.9.68 and 0.9.69 were made on another account after a catch-up (Parts 15 and 16). The file keeps its old name so links to it still work. Part 7 holds the plans the owner agreed for recomps and Online Play, with every decision and the reason behind it; both shipped (Parts 11, 12 and 13), and what is still missing from those plans is listed in Part 9.
 
 **The owner asked for this document to be kept up to date after every update from now on.** When you finish an update, add a Part for it at the end, add it to Part 4 (releases), Part 5 (code map) and Part 6 (subsystems), add what broke to Part 8, move what's done out of Part 9 and add what's new there, and update Part 1. Then read the whole file once more, top to bottom, against the session: in 0.9.65 and 0.9.66 only new Parts were added at the end and Parts 1 to 9 went stale until the owner asked (Part 8). Keep the same level of detail: what changed, why, what was found, how it was checked, what the owner must test.
 
@@ -22,10 +22,10 @@ The repo is public. Nothing private is in this document. Keep it that way.
 
 ## Part 1. Where things stand right now
 
-- **Latest release:** v0.9.68 "Cartridge 0.9.68 · Set Up Right" (16 Oct 2026; Part 15): the freeze fix, the Steam card and recomps setting themselves up (made 14 Oct, unreleased until then) plus a full debugging pass. Before it v0.9.67 "Cartridge 0.9.67 · Follow Through" (14 Oct 2026; Part 14). Before it v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). PRs: v0.9.63 #82, v0.9.64 #83, v0.9.65 #84, v0.9.66 #85, handover catch-ups #86 and #87 (docs only), v0.9.67 #88, v0.9.68 the PR after it.
+- **Latest release:** v0.9.69 "Cartridge 0.9.69 · Recomps, Finished" (16 Oct 2026; Part 16): save backups you can put back, Check It and a setup step for link recomps, the copy checked before install, stricter automatic finds, a daily switch, a clean-up. Before it v0.9.68 "Cartridge 0.9.68 · Set Up Right" (16 Oct 2026; Part 15): the freeze fix, the Steam card and recomps setting themselves up (made 14 Oct, unreleased until then) plus a full debugging pass. Before it v0.9.67 "Cartridge 0.9.67 · Follow Through" (14 Oct 2026; Part 14). Before it v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). PRs: v0.9.63 #82, v0.9.64 #83, v0.9.65 #84, v0.9.66 #85, handover catch-ups #86 and #87 (docs only), v0.9.67 #88, v0.9.68 #89, v0.9.69 the PR after it.
 - **Branch:** `claude/relaxed-fermat-30pigp`, merged into `main` by a PR for every release (merge commit, not squash). After a merge, reset the branch to `main` (`git fetch origin main && git checkout -B claude/relaxed-fermat-30pigp origin/main`) before new work.
-- **package.json:** `version` = `versionName` = 0.9.68, `releaseName` "Cartridge 0.9.68". The lockfile's version field is stale and always was; leave it.
-- **Tests:** 354 pass at 0.9.68 (347 at 0.9.67, 343 at 0.9.66; fileIds added and recomps grown in 0.9.68) (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink, recomps, onlinePlay (fake RPCN server inside); saveSync and gameSettings grew a lot.
+- **package.json:** `version` = `versionName` = 0.9.69, `releaseName` "Cartridge 0.9.69". The lockfile's version field is stale and always was; leave it.
+- **Tests:** 356 pass at 0.9.69, 354 at 0.9.68 (347 at 0.9.67, 343 at 0.9.66; fileIds added and recomps grown in 0.9.68) (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink, recomps, onlinePlay (fake RPCN server inside); saveSync and gameSettings grew a lot.
 - **Before every release:** `npm test`, `npx vite build`, the launch check (`CARTRIDGE_SMOKE=1 HOME=$(mktemp -d) xvfb-run -a node_modules/electron/dist/electron . --no-sandbox` must print `SMOKE OK`), `npm run audit:ui` (focus and contrast in six looks, clipping, the tour twice; all zero at 0.9.63 to 0.9.67; it takes about 15 minutes, so run it in the background). Never rebuild `dist` while the audit runs: it reads `dist` and crashes mid-run.
 - **Standing instruction:** when an update is finished, built and launch-checked, open the PR and merge it without asking. A version change on `main` publishes the release to every user.
 
@@ -36,8 +36,9 @@ The repo is public. Nothing private is in this document. Keep it that way.
 2. ~~The six things agreed but not done in 0.9.65~~: shipped as 0.9.66 (Part 13).
 3. ~~The three Part 7 items left after 0.9.66~~: shipped as 0.9.67 with two bug fixes (Part 14). Everything still not done, checked three times, is in Part 9.
 4. ~~A full debugging pass~~ (owner, on another account after a catch-up): shipped as 0.9.68 (Part 15).
-5. Owner device tests (end of Parts 11 to 15), then whatever the owner picks from Part 9's list. The owner said on 14 Oct they were sending more bugs; none had arrived by 0.9.68.
-6. Keep this handover updated after each.
+5. ~~Recomps, Finished~~ (Part 9 items 1, 2, 4, 5, 6, 9, 10 and 13): shipped as 0.9.69 (Part 16).
+6. Owner device tests (end of Parts 11 to 16), then whatever the owner picks from Part 9's list. The owner said on 14 Oct they were sending more bugs; none had arrived by 0.9.68.
+7. Keep this handover updated after each.
 
 **Waiting on the owner:** the 0.9.68 tests (end of Part 15: Place recomps, Zelda 64's own wizard, Game Mode start with no dimming); device tests listed in Part 9 (from 0.9.63 to 0.9.66); KytyPS5 log after 0.9.63 if it still fails; the Unit 13 freeze test with frame generation off; which of Part 9's not-done items to build next (they built items 1 to 3 of the old list as 0.9.67 and asked for a triple check of the rest).
 
@@ -96,6 +97,7 @@ Everything in the earlier handovers still applies. New in this stretch:
 | 0.9.64 | Forks and Links | forks under their parent with versions, Link to Its Project, fork-aware settings and patches, GitHub search, send from phone, Windows builds through Proton |
 | 0.9.65 | Recomps and Online Play | 96 recomps (Steam card, install, updates with saves kept, Roll Back, own Steam shortcuts, Save Sync, achievements), Online Play for ten emulators with a re-check after every emulator update, KytyPS5 hidden without a Linux build, Download More Files (Parts 11 and 12) |
 | 0.9.67 | Follow Through | recomp setup watched as a background job with a measured bar, Online Play reports settings an update renamed, files parsed before and read back after every Online Play write; fixed: recomp save notes read as real paths (Proton, Flatpak), It's Set Up shown when needed (Part 14) |
+| 0.9.69 | Recomps, Finished | recomp save backups with Put Back, Check It and It's Set Up for link recomps, guessed save backups, copy checked before install, automatic finds vetted, daily switch, Flatpak update start, clean-up (Part 16) |
 | 0.9.68 | Set Up Right | freeze about 30 s after start (game IDs in a worker, memoised lookups), recomp Place setup by real paths (`setup.to`), recomp launch and one-off setup arguments, picker recomps set themselves up, the Steam card's controller (Part 15) |
 | 0.9.66 | Loose Ends | RPCN accounts made in Cartridge, ShadNet sign-up in its own window, RPCS3 Repair before Online Play writes, Online Play on emulator pages, recomp project details, link guesses, recomp updates started once before they're kept (Part 13) |
 
@@ -245,20 +247,20 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 *Recomps (Part 7.1):*
 
 0. **Fixed in 0.9.68 (Part 15):** Place setup, launch and setup arguments, Quest 64's done note. The picker items below still stand; picker recomps now set themselves up with no Set Up step (owner, 14 Oct), so item 3 (copy the path) only matters for recomps whose own picker Cartridge opens.
-1. **No off switch for the daily catalogue refresh (7.1 #5).** The plan said it "runs on by default", which implies one. It's always scheduled (main.js `recomps-refresh`). Only a manual Check for New exists.
-2. **Automatic finds aren't checked enough (7.1 #6).** `addFound` checks forks and stars only on the GitHub-search path, never that the project has a release with a Linux or Windows build. PCGamingWiki rows that already link a project are added with no checks at all. "Not a fork unless the original is gone" isn't handled.
-3. **Picker path not copied (7.1 #8).** The path is shown in a confirm box "ready to paste", but it isn't put on the clipboard. `clip:write` exists; RecompSheet doesn't call it.
-4. **The copy check comes after installing, and can't name missing files (7.1 #9).** `checkGame` runs at Set Up, not before Install. `needs` is free text for games of several files (Unleashed: title update, DLC), so missing files can't be named.
-5. **Recomps from a link have no setup step (7.1 #11).** `addLink` sets `needs: null`, so they count as ready at once, with no Set Up With Your Game and no Done before Add to Steam.
-6. **Recomps from a link or found automatically have no saves (7.1 #13, #14).** They get `saves: []`, so updates back up nothing and Save Sync skips them. The plan said "its folder except program files plus data folders named after it".
+1. ~~**No off switch for the daily catalogue refresh (7.1 #5).**~~ Done in 0.9.69 (Check for New Recomps Every Day). The plan said it "runs on by default", which implies one. It's always scheduled (main.js `recomps-refresh`). Only a manual Check for New exists.
+2. ~~**Automatic finds aren't checked enough (7.1 #6).**~~ Done in 0.9.69 (`vet`: not a fork, a usable build; "not a fork unless the original is gone" still isn't handled). `addFound` checks forks and stars only on the GitHub-search path, never that the project has a release with a Linux or Windows build. PCGamingWiki rows that already link a project are added with no checks at all. "Not a fork unless the original is gone" isn't handled.
+3. **Picker path not copied (7.1 #8).** Mostly moot since 0.9.68: picker recomps set themselves up with no step from Cartridge. The path is shown in a confirm box "ready to paste", but it isn't put on the clipboard. `clip:write` exists; RecompSheet doesn't call it.
+4. **The copy check comes after installing, and can't name missing files (7.1 #9).** Since 0.9.69 the library copy is checked before installing; naming missing files of several-file games is still not done. `checkGame` runs at Set Up, not before Install. `needs` is free text for games of several files (Unleashed: title update, DLC), so missing files can't be named.
+5. ~~**Recomps from a link have no setup step (7.1 #11).**~~ Done in 0.9.69. `addLink` sets `needs: null`, so they count as ready at once, with no Set Up With Your Game and no Done before Add to Steam.
+6. **Recomps from a link or found automatically have no saves (7.1 #13, #14).** Backups done in 0.9.69 (`guessSaves`); Save Sync deliberately not (guessed folders are never uploaded). They get `saves: []`, so updates back up nothing and Save Sync skips them. The plan said "its folder except program files plus data folders named after it".
 7. **Setup isn't redone after an update (7.1 #13).** Things survive implicitly (`rec.game`, args, a link inside the folder), but nothing checks whether the new release needs setting up again.
 8. **No "Updates on Their Own Site" for builds published only as CI artifacts (7.1 #13).** Only `site` and `none` exist. openmbu, for one, has Linux builds only as artifacts and is filed as Windows.
-9. **No "Check It" preview for recomp links (7.1 #16).** Typed links, GitHub search, the phone and the 0.9.66 guess exist. `recomps:addLink` checks only the link's shape, not that a release exists.
-10. **Start-once after an update covers Linux builds only (7.1 #13).** Windows (Proton) and Flatpak updates aren't started before they're kept.
+9. ~~**No "Check It" preview for recomp links (7.1 #16).**~~ Done in 0.9.69. Typed links, GitHub search, the phone and the 0.9.66 guess exist. `recomps:addLink` checks only the link's shape, not that a release exists.
+10. **Start-once after an update covers Linux builds only (7.1 #13).** Flatpak added in 0.9.69 (reported, no roll back); Windows (Proton) still not: it only runs through Steam. Windows (Proton) and Flatpak updates aren't started before they're kept.
 11. **The setup watch starts only from Cartridge's Open (7.1 #10).** A first start from Steam isn't watched. 33 entries with `needs` have no `done` file, so there's no watch and no bar for them. No entry has `doneSize`, so the bar shows MB written, not a percentage. Both need catalogue data, from real installs.
 12. **Doubtful catalogue facts.** docs/recomps.md has **98** "Not certain" lines, not the 5 named before: asset names, program names, save folders, Linux locations "not confirmed". They need checking against real downloads. Save notes that name no real place (Kirby Wii's "Linux location not confirmed", Foxhollow's memory cards, Marble Blast's prefs.cs, the 9 Windows recomps whose saves sit in a Proton prefix until they're in Steam) give no paths since 0.9.67.
 
-13. **Recomp save backups can't be seen or restored from Cartridge (found while writing Part 14).** Backups are made before every update, Roll Back and removal (`recomp-backups/<id>/`, 10 kept), and `recomps:backups` lists them, but no screen calls it and there is no restore. A missing save is put back automatically only right after an update (`checkSaves`).
+13. ~~**Recomp save backups can't be seen or restored from Cartridge (found while writing Part 14).**~~ Done in 0.9.69 (Save Backups). Backups are made before every update, Roll Back and removal (`recomp-backups/<id>/`, 10 kept), and `recomps:backups` lists them, but no screen calls it and there is no restore. A missing save is put back automatically only right after an update (`checkSaves`).
 
 *Online Play (Part 7.2 and Part 12):*
 
@@ -277,7 +279,7 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 19. **A row-by-row check of empty or unclear Settings rows** (0.9.3 G4, plan-0.9.19 §5): deferred, "not audited row by row".
 20. **RomM version check turning features off** (0.9.3 H2): there is a check, an Issues entry and a test (romm.js `rommTooOld`), but by design it says so once instead of switching features off. Ask the owner whether that's enough.
 21. **A frame generation warning for Vita games**, only if the owner's Unit 13 test points at lsfg-vk (this list, item 21).
-22. **Housekeeping:** the remote branches `claude/relaxed-fermat-30pigp-release-g` and `-release-i` still exist (`git ls-remote`). Deleting them needs the owner's OK.
+22. **Housekeeping:** the remote branches `claude/relaxed-fermat-30pigp-release-g` and `-release-i` still exist. The owner said to clean up (16 Oct); both are fully merged, but a session can't delete them (the proxy allows only the session branch, the API refuses writes). The owner deletes them on GitHub (Branches).
 
 *Not to re-add (settled):* Redream, Mednafen and torzu (owner, 1 Oct: "not needed"; the old session-log list is stale); E2's "C's game page later" (the owner picked A only); console-scene backgrounds; multi-language; PS3 mods; PSN sign-in; pausing Syncthing; Ryujinx saves in Save Sync; PS4 .pkg; BigPEmu; Citron offered by default; the plugins the owner said they don't want (ponytail, graphify, rtk).
 
@@ -515,4 +517,28 @@ Made on another account. The owner had worked on 0.9.38 to 0.9.67 elsewhere, ask
 3. Zelda 64: Recompiled: Open, follow its own wizard; it should show as set up once it has your ROM.
 4. Start in Game Mode and wait a minute: no dimming. If it dims, send the log (`main thread stalled`, `main thread: longest stall`).
 5. The Steam card in Consoles at 1280x800 and on the TV.
+
+## Part 16. 0.9.69 · Recomps, Finished (16 Oct 2026)
+
+The owner, after I offered the Part 9 recomp items as one update: "Okay go clean up and be iterative to make sure everything works and nothing is broken or breaks". Built in five commits; each one was tested, built and tried in the real app before the next (scratchpad `check.sh` runs `npm test` and the build and stops on any failure).
+
+**What was done:**
+1. **Clean-up.** Unused imports and helpers removed (ESLint no-unused-vars over electron/ and src/, every name grepped for other uses first: nine files' imports, `srmFor`, `findTemplate`, `safeLs`, `notesFor`, `rrect`, `rootLabel`, `xroots`, `stepGaCon`, `coversFor`, `t0`). GameAddons' shown tab renamed `curTab` (it shared a name with the `tab` prop). The two old release branches can't be deleted from a session (Part 9 item 22).
+2. **Save Backups (Part 9 item 13).** `restoreBackup(id, stamp)`: never while the recomp runs; the saves there now are backed up first (`'before restore'`), with the chosen backup protected from the ten-backup trim (`keep`); backup files copied over, newer files kept. RecompSheet lists them with why and when.
+3. **Link and found recomps (items 5, 6, 9).** `from` link/found entries get a default `needs` and `setup.how: 'picker'`, so It's Set Up shows. `guessSaves` for backups: top-level items in the recomp folder that aren't the release's own files (`rec.files`), and ~/.config and ~/.local/share folders named after the program, project or name, nothing over 256 MB. Save Sync doesn't use them. Check It: `recomps:preview` (project info, newest release, `pickBuild`, fork, already listed), shown under the link field.
+4. **Before install (item 4).** `recomps:checkCopies` checks the library's copies with `checkGame` when the catalogue lists types or hashes; RecompSheet asks "Your Copy May Not Work" before a first install.
+5. **Automatic finds (items 1, 2).** `vet(repo)` in `addFound`: GitHub project info says not a fork, and the newest release has a Linux or Windows build; six vetted per refresh, the rest wait. `config.recomps.daily` (Toggle on the Recomps page) turns the daily refresh off.
+6. **Flatpak update start (item 10).** `ctx.trialRun` with `flatpak run <id>` after a Flatpak recomp's update; a failure is returned as `started: false` with the reason (Flatpak keeps no earlier version).
+
+**Checked:** 356 tests; build; the real app in simulated Game Mode (crawl of every tab and Settings section, four pop-ups, 36 handlers: only `update:releases` fails, for GitHub's certificate in the container); main-process profile: one stall over 200 ms in the first minute, its samples idle; `npm run audit:ui`; launch check; each feature driven in the real app (restore, Check It, the copy warning, the switch).
+
+**One slip, caught:** a test-file edit put the fake release's data file write inside a comment, two tests failed, and the commit went in because the command piped the test output through grep. Fixed in the next commit, and every commit after went through the check script.
+
+**Not verified:** a real link recomp install (GitHub releases aren't reachable from the container); a Flatpak recomp update's start (Unleashed on a device).
+
+**Owner device tests:**
+1. A recomp that has updated: Save Backups, put one back, play.
+2. Paste a recomp link: Check It, Add, Install, open it, It's Set Up.
+3. Install a recomp whose listed version your copy doesn't match: the warning before the download.
+4. Turn Check for New Recomps Every Day off and back on.
 

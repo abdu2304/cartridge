@@ -506,7 +506,6 @@ function cardsFor(t) {
   return { cols: best.cols, rows: best.rows, n: Math.min(24, best.n), cw: best.cw, compact: h / best.rows < 110 };
 }
 const cardsGrid = (t) => { const c = cardsFor(t); return { gridTemplateColumns: `repeat(${c.cols}, ${c.cw ? c.cw + 'px' : 'minmax(0, 1fr)'})`, gridTemplateRows: `repeat(${c.rows}, minmax(0, 1fr))` }; };
-function coversFor(t) { const { pw, ph } = box(t); const area = Math.max(40, ph - 74), rws = Math.max(1, Math.round(area / 190)), coverW = (area / rws) * 0.75 + 10; return { rows: rws, n: Math.min(40, rws * Math.ceil(pw / coverW) + rws) }; }
 // how many covers fan out in a row of games: each shows half of itself past the one before
 function fanN(t) {
   const { pw, ph } = box(t), pad = Math.min(22, ph * 0.09);

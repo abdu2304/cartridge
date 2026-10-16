@@ -7,6 +7,8 @@
       <button class="btn small" data-focus :disabled="refreshing" @click="refresh"><Icon name="mdiSync" :size="18" :class="{ spin: refreshing }" />Check for New</button>
     </div>
     <p v-if="data" class="muted small rc-note">{{ note }}</p>
+    <!-- 0.9.69 (agreed plan): the daily look for new recomps can be turned off; Check for New still works -->
+    <Toggle v-if="data" :model-value="store.config.recomps?.daily !== false" label="Check for New Recomps Every Day" desc="Once a day, quietly: Cartridge’s own list, then PCGamingWiki for projects with a Linux or Windows build. Check for New still works when this is off." @update:model-value="(v) => saveConfig({ recomps: { ...(store.config.recomps || {}), daily: v } })" />
     <div v-if="!data" class="muted small"><Icon name="mdiSync" :size="16" class="spin" /> Reading the list…</div>
     <template v-else>
       <div v-if="!groups.length" class="muted small rc-empty">{{ filter === 'mine' ? 'No recomps installed yet. Pick one from All.' : filter === 'yours' ? 'None of the games in your library has a recomp in the list yet.' : 'The list is empty.' }}</div>
@@ -24,6 +26,8 @@
         <div class="con-head"><Icon name="mdiGithub" :size="26" /><b>From a Link</b></div>
         <p class="muted small">A recomp that isn’t in the list: paste its GitHub or GitLab link, say which game it’s for, and it’s added here like the others. Linux builds first, Windows through Proton, nothing else.</p>
         <LinkInput v-model="link" />
+        <!-- Check It (0.9.69, as for emulators): what the project offers before anything is added -->
+        <p v-if="check" class="small rc-note rc-check" :class="{ warn: check.bad }">{{ check.text }}</p>
         <p v-if="guessed" class="muted small rc-note">{{ guessed }}</p>
         <div class="row rc-link-row">
           <button class="btn" data-focus :disabled="!link" @click="pickConsole"><Icon name="mdiGamepadSquareOutline" :size="18" />{{ linkCon ? data.consoles[linkCon] : 'Console' }}</button>
@@ -37,7 +41,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { store, call, toast, openModal, choose, askText, romById, cover, bgJob } from '../store.js';
+import { store, call, toast, openModal, choose, askText, romById, cover, bgJob, saveConfig } from '../store.js';
+import Toggle from './Toggle.vue';
 import Icon from './Icon.vue';
 import PIcon from './PIcon.vue';
 import LinkInput from './LinkInput.vue';
@@ -48,13 +53,23 @@ const SLUG = { arcade: 'arcade', nes: 'nes', snes: 'snes', n64: 'n64', gb: 'gb',
 const FILTERS = [{ v: 'all', l: 'All' }, { v: 'yours', l: 'For Your Games' }, { v: 'mine', l: 'Installed' }];
 const ORIGIN = { recomp: 'Recompiled', decomp: 'Decompiled', recreation: 'Rebuilt', reimplementation: 'Rebuilt', disassembly: 'Disassembled' };
 const data = ref(null), filter = ref('all'), refreshing = ref(false), busy = ref(false);
-const link = ref(''), linkCon = ref(''), linkTitle = ref(''), guessed = ref(''), linkDesc = ref('');
+const link = ref(''), linkCon = ref(''), linkTitle = ref(''), guessed = ref(''), linkDesc = ref(''), check = ref(null);
+const mb = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(n / 1e6))} MB`);
+function checkText(p) {
+  if (p.known) return { text: 'That project is already in the list.', bad: false };
+  const head = [p.repo.split(':')[1], p.stars != null ? `${p.stars.toLocaleString()} stars` : '', p.fork ? 'a fork' : ''].filter(Boolean).join(' · ');
+  if (p.error) return { text: `${head}. Its releases couldn’t be read: ${p.error}`, bad: true };
+  if (!p.tag) return { text: `${head}. It has no releases, so there’s nothing Cartridge can install.`, bad: true };
+  if (!p.kind) return { text: `${head}. Newest release ${p.tag} has no Linux or Windows build, so Cartridge can’t install it.`, bad: true };
+  return { text: `${head}. Newest release ${p.tag}: ${p.kind === 'windows' ? 'a Windows build, run through Proton' : 'a Linux build'} (${p.file}${p.size ? ', ' + mb(p.size) : ''}).`, bad: false };
+}
 // 0.9.66 (agreed plan): the console and game guessed from the project's name and description; you check them, then Add
 let guessT = 0;
 watch(link, (v) => {
-  clearTimeout(guessT); guessed.value = '';
+  clearTimeout(guessT); guessed.value = ''; check.value = null;
   if (!/(github|gitlab)\.com\/[\w.-]+\/[\w.-]+|^[\w.-]+\/[\w.-]+$/i.test(String(v || '').trim())) return;
   guessT = setTimeout(async () => {
+    call('recomps:preview', { link: v }).then((p) => { if (link.value === v && p) check.value = checkText(p); }).catch((er) => { if (link.value === v) check.value = { text: er.message, bad: true }; });
     const g = await call('recomps:guess', { link: v }).catch(() => null);
     if (!g || link.value !== v) return;
     linkDesc.value = g.description || '';
@@ -120,7 +135,7 @@ async function addLink() {
   try {
     const r = await call('recomps:addLink', { link: link.value, console: linkCon.value, title: linkTitle.value, description: linkDesc.value });
     toast(r.known ? 'That one is already in the list' : 'Added', 'ok', 2000, 'mdiCheck');
-    link.value = ''; linkTitle.value = ''; linkCon.value = ''; guessed.value = ''; linkDesc.value = ''; await load();
+    link.value = ''; linkTitle.value = ''; linkCon.value = ''; guessed.value = ''; linkDesc.value = ''; check.value = null; await load();
     const e = data.value.entries.find((x) => x.id === r.id);
     if (e) open(e);
   } catch (er) { toast(er.message, 'error'); }
@@ -141,4 +156,6 @@ async function addLink() {
 .rc-link { gap: var(--s-2); margin-top: var(--s-3); }
 .rc-link-row { gap: var(--s-2); flex-wrap: wrap; }
 .rc-empty { padding: var(--s-3) 0; }
+.rc-check { overflow-wrap: anywhere; }
+.rc-check.warn { color: var(--danger-t, #ffa39c); }
 </style>

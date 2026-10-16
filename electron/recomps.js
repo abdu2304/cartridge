@@ -168,6 +168,23 @@ function saveDirs(e, rec, home = os.homedir()) {
   return [...new Set((e?.saves || []).flatMap((p) => savePaths(p, rec, home)).map((p) => sandboxed(path.normalize(p).replace(/(.)\/+$/, '$1'), rec, home)))];
 }
 
+// 0.9.69 (agreed plan 7.1 #13): a recomp from a link or found automatically has no save notes. Its backups take what
+// it wrote beside itself (anything at its folder's top that isn't one of its release's own files) and the folders
+// in ~/.config and ~/.local/share named after it (its program, project or name). Backups only: Save Sync stays with
+// the catalogue's known save places, so nothing guessed is ever uploaded.
+const squash = (t) => String(t || '').toLowerCase().replace(/\.(appimage|exe|x86_64)$/i, '').replace(/[^a-z0-9]/g, '');
+function guessSaves(e, rec, home = os.homedir()) {
+  if (!rec?.dir) return [];
+  const out = [], own = new Set((rec.files || []).map((f) => String(f).split('/')[0]));
+  if (own.size) for (const n of (() => { try { return fs.readdirSync(rec.dir); } catch { return []; } })()) if (!own.has(n) && !n.startsWith('.')) out.push(path.join(rec.dir, n));
+  const names = new Set([rec.program && path.basename(rec.program), e?.repo && e.repo.split('/').pop(), e?.name].map(squash).filter((x) => x.length >= 3));
+  for (const base of [path.join(home, '.config'), path.join(home, '.local/share')]) for (const n of (() => { try { return fs.readdirSync(base); } catch { return []; } })()) if (names.has(squash(n))) out.push(path.join(base, n));
+  // nothing big: a game's own files (an extracted disc, an ISO) put beside it would be copied on every update
+  const small = (p) => { let n = 0, left = 20000; const walk = (x) => { if (--left < 0 || n > SAVE_CAP) return; let st; try { st = fs.lstatSync(x); } catch { return; } if (st.isDirectory()) { for (const c of (() => { try { return fs.readdirSync(x); } catch { return []; } })()) walk(path.join(x, c)); } else n += st.size; }; walk(p); return left >= 0 && n <= SAVE_CAP; };
+  return [...new Set(out)].filter(small).slice(0, 20);
+}
+const SAVE_CAP = 256 * 1024 * 1024;
+
 // ---------------------------------------------------------------- PCGamingWiki
 // sections of the list as console keys (the page's own headings)
 const WIKI_SECTIONS = [[/^arcade$/i, 'arcade'], [/nintendo entertainment system|famicom$/i, 'nes'], [/super nintendo/i, 'snes'], [/nintendo 64/i, 'n64'], [/game boy advance/i, 'gba'], [/game boy/i, 'gbc'], [/gamecube/i, 'gamecube'], [/nintendo ds/i, 'nds'], [/wii/i, 'wii'], [/genesis|mega drive/i, 'genesis'], [/playstation 4/i, 'ps4'], [/playstation 2/i, 'ps2'], [/^playstation$/i, 'psx'], [/xbox 360/i, 'xbox360']];
@@ -397,8 +414,11 @@ function createRecomps(ctx) {
       ids.add(e.id); if (e.repo) repos.add(e.repo.toLowerCase());
       // a place with no rule Cartridge can follow (a patcher, a mod folder inside another game): you put it in place
       // yourself, then press It's Set Up (0.9.68)
-      const setup = e.setup?.how === 'place' && !e.setup.to ? { ...e.setup, how: 'manual' } : e.setup;
-      out.push({ ...e, setup, from });
+      let setup = e.setup?.how === 'place' && !e.setup.to ? { ...e.setup, how: 'manual' } : e.setup, needs = e.needs;
+      // 0.9.69: a recomp from a link or found automatically: nothing says what it needs, so it's set up when you say
+      // so (open it, follow its own steps, It's Set Up), never counted as ready the moment it's installed
+      if ((from === 'link' || from === 'found') && !needs) { needs = { what: `Your own copy of ${e.games?.[0]?.title || 'the game'}, if it asks for one. Open it and follow its own steps.`, files: 'any' }; setup = { how: 'picker' }; }
+      out.push({ ...e, setup, needs, from });
     };
     for (const e of base.entries || []) add(e, 'list');
     for (const e of readJson(F('recomps-found.json'), [])) add(e, 'found');
@@ -522,9 +542,9 @@ function createRecomps(ctx) {
     return latest[id];
   }
   // ---- saves: backed up before an update or removal, checked after (owner: updates must never lose saves)
-  function backupSaves(id, why) {
+  function backupSaves(id, why, { keep } = {}) {
     const e = byId(id), rec = installs[id];
-    const dirs = saveDirs(e, rec).filter(exists);
+    const dirs = (e?.saves?.length ? saveDirs(e, rec) : ['link', 'found'].includes(e?.from) ? guessSaves(e, rec) : []).filter(exists); // 0.9.69: guessed for link recomps
     if (!dirs.length) return null;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-'), to = path.join(dataDir, 'recomp-backups', id, stamp);
     const meta = { id, why, at: Date.now(), tag: rec?.tag || null, items: [] };
@@ -532,7 +552,7 @@ function createRecomps(ctx) {
     fs.writeFileSync(path.join(to, 'backup.json'), JSON.stringify(meta, null, 1));
     // ten backups per recomp are kept, the oldest go
     const all = (() => { try { return fs.readdirSync(path.dirname(to)).sort(); } catch { return []; } })();
-    for (const old of all.slice(0, Math.max(0, all.length - 10))) fs.rmSync(path.join(path.dirname(to), old), { recursive: true, force: true });
+    for (const old of all.slice(0, Math.max(0, all.length - 10))) if (old !== keep) fs.rmSync(path.join(path.dirname(to), old), { recursive: true, force: true }); // keep: the one being restored (0.9.69)
     log('recomp saves backed up', id, why, meta.items.length, 'place(s)');
     return meta;
   }
@@ -553,7 +573,26 @@ function createRecomps(ctx) {
   }
   function backups(id) {
     const d = path.join(dataDir, 'recomp-backups', id);
-    return (() => { try { return fs.readdirSync(d); } catch { return []; } })().sort().reverse().map((n) => { const m = readJson(path.join(d, n, 'backup.json'), null); return m && { stamp: n, at: m.at, why: m.why, tag: m.tag, places: m.items.length }; }).filter(Boolean);
+    return (() => { try { return fs.readdirSync(d); } catch { return []; } })().sort().reverse().map((n) => { const m = readJson(path.join(d, n, 'backup.json'), null); return m && { stamp: n, at: m.at, why: m.why, tag: m.tag, places: m.items.length, files: m.items.reduce((a, it) => a + (it.files || 0), 0) }; }).filter(Boolean);
+  }
+  // a backup put back (0.9.69): never while the recomp runs; the saves there now are backed up first, so a restore can
+  // itself be undone. Files in the backup replace the same files; files made since are left where they are.
+  function restoreBackup(id, stamp) {
+    const rec = installs[id], e = byId(id);
+    if (!/^[\w-]+$/.test(String(stamp || ''))) throw new Error('That backup isn’t there.');
+    const d = path.join(dataDir, 'recomp-backups', id, stamp), meta = readJson(path.join(d, 'backup.json'), null);
+    if (!meta?.items?.length) throw new Error('That backup isn’t there.');
+    if (rec && exists(rec.program) && ctx.isRunning(rec.flatpak || rec.program)) throw new Error(`Close ${e?.name || 'it'} first.`);
+    const before = backupSaves(id, 'before restore', { keep: stamp });
+    let files = 0;
+    for (const it of meta.items) {
+      if (!exists(it.copy)) continue;
+      fs.mkdirSync(path.dirname(it.from), { recursive: true });
+      fs.cpSync(it.copy, it.from, { recursive: true, force: true });
+      files += countFiles(it.copy);
+    }
+    log('recomp saves restored', id, stamp, files, 'file(s)');
+    return { files, places: meta.items.length, savedFirst: !!before };
   }
   // ---- install or update: download, unpack, keep the release it replaces, put the new one where the old one is
   async function install(id, { channel, onProgress = () => {}, signal } = {}) {
@@ -619,7 +658,11 @@ function createRecomps(ctx) {
         saveInstalls();
         latest[id] = { tag: rel.tag, date: rel.date, kind: 'flatpak', name: b.asset.name, at: Date.now(), channel: ch }; writeJson(F('recomp-latest.json'), latest);
         log('recomp', prev ? 'updated' : 'installed', id, rel.tag, 'flatpak', appId);
-        return { tag: rel.tag, kind: 'flatpak', program: '/usr/bin/flatpak', dir: dest, updated: !!prev, programMoved: false, restored: checkSaves(meta).restored, backedUp: !!meta };
+        // 0.9.69: an update is started once here too; Flatpak keeps no earlier version for Cartridge to go back to, so a
+        // start that fails is said plainly (its own data is untouched)
+        let t = null;
+        if (prev?.tag && ctx.trialRun) { onProgress({ step: 'trial', pct: null }); t = await ctx.trialRun({ program: '/usr/bin/flatpak', args: `run ${appId}`, cwd: dest, ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message })); }
+        return { tag: rel.tag, kind: 'flatpak', program: '/usr/bin/flatpak', dir: dest, updated: !!prev, programMoved: false, restored: checkSaves(meta).restored, backedUp: !!meta, ...(t ? (t.failed ? { started: false, why: t.why } : { started: true }) : {}) };
       }
       // a Linux archive with no Linux program but a Windows one inside is a Windows build after all
       const C = require('./customEmu');
@@ -868,10 +911,22 @@ function createRecomps(ctx) {
   }
   // rows from the wiki that name a project the catalogue lacks: added quietly, marked found. A row without a project
   // link is looked up on GitHub only when one well-starred, non-fork project names the port (no guesses).
-  async function addFound(rows, { search = ctx.search } = {}) {
+  // 0.9.69 (agreed plan 7.1 #6): a project is only added when its newest release has a Linux or Windows build and it
+  // isn't a fork (GitHub says so); a few are looked at each day and the rest wait for the next refresh
+  async function vet(repo) {
+    const r = repoOf(repo); if (!r) return false;
+    const f = ctx.fetchImpl || require('./webFetch');
+    if (r.host === 'github') {
+      const info = await f(`https://api.github.com/repos/${r.repo}`, { headers: { 'User-Agent': 'Cartridge', Accept: 'application/json' }, signal: AbortSignal.timeout(15000) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+      if (!info || info.fork) return false;
+    }
+    const rel = await releaseOf({ repo }, { fetchImpl: ctx.fetchImpl }).catch(() => null);
+    return !!(rel && pickBuild(rel.assets, {}));
+  }
+  async function addFound(rows, { search = ctx.search, maxVet = 6 } = {}) {
     const known = new Set(catalogue().entries.flatMap((e) => [e.repo?.toLowerCase(), ...(e.games || []).map((g) => g.console + ':' + norm(e.name))]).filter(Boolean));
     const found = readJson(F('recomps-found.json'), []);
-    let n = 0, looked = 0;
+    let n = 0, looked = 0, vetted = 0;
     for (const row of rows) {
       let repo = row.links.map(repoFromLink).find(Boolean);
       if (!repo && search && looked < 5 && row.port.length > 3) {
@@ -881,6 +936,9 @@ function createRecomps(ctx) {
         if (ok.length === 1 || (ok.length > 1 && ok[0].stars >= ok[1].stars * 4)) repo = 'github:' + ok[0].repo;
       }
       if (!repo || known.has(repo.toLowerCase()) || known.has(row.console + ':' + norm(row.port))) continue;
+      if (vetted >= maxVet) break;
+      vetted++;
+      if (!(await vet(repo).catch(() => false))) { log('recomps: not added (no usable build, or a fork)', repo); known.add(repo.toLowerCase()); continue; }
       known.add(repo.toLowerCase());
       found.push({ id: 'found-' + slugId(repo.split(':')[1].replace('/', '-')), name: row.port, games: [{ title: row.game.replace(/\s*\([^)]*\)\s*$/, ''), console: row.console }], origin: 'recomp', repo, builds: 'linux', needs: null, setup: { how: 'picker' }, saves: [], description: '', auto: true, at: Date.now() });
       n++;
@@ -890,7 +948,7 @@ function createRecomps(ctx) {
   }
   const record = (id) => installs[id] || null;
   const reload = () => { cat = null; repaired = false; installs = readJson(F('recomp-installs.json'), {}); };
-  return { catalogue, byId, details, ready, watchSetup, launchArgs, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
+  return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
 }
 
-module.exports = { fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };
+module.exports = { guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };

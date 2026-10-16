@@ -6,7 +6,7 @@
 // Usage: steamHelper.js <job.json>. Progress and the result go to <job>.status.json and a log.
 const fs = require('fs');
 const path = require('path');
-const { execSync, spawn } = require('child_process');
+const { spawn } = require('child_process');
 
 const jobFile = process.argv[2];
 const job = JSON.parse(fs.readFileSync(jobFile, 'utf8'));
