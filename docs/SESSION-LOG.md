@@ -6,6 +6,20 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+## 16 Oct 2026 · 0.9.68 Set Up Right (owner, after catching up on another account: "Can you do full debugging of what we have so far and patch it in an update")
+- Released with the three unreleased 14 Oct commits below (freeze fix, Steam card, recomps setting themselves up).
+- Found and fixed:
+  - **Recomp Place setup took the catalogue's note as a file name.** Ship of Harkinian got a link called "the ROM in the same folder as soh.appimage (9.2.3); newer builds ask with a file picker" beside it (reproduced on a test folder). 21 of 27 Place entries were sentences. Now `setup.to` rules (24 entries), the other 3 by hand; old links put right once (`repairOld`).
+  - **Open left out the catalogue's own arguments** (PGR4's GPU options, WiiCompiled's launch-base); Half-Life: Decay's list became "-game,decay" in Steam. `launchArgs`.
+  - **One-off setup commands were kept as launch arguments** (WiiCompiled ran "install --game" on every start) and carried the program's own name as the first argument (Doom64EX, WiiCompiled). `setupTpl`, `run`.
+  - Quest 64's done note was a sentence (never set up by the watch); removed.
+  - Update trial start used the old stored arguments.
+  - The recomp page said "Checking its newest release" for good after a failed check; asked for It's Set Up where Cartridge can see it itself.
+  - Stalls: `candidates()`, `findBin`, `emulationRoots` checked dozens of paths per console on every ask (profile above).
+- Checked and fine: Zelda 64's done file (its v1.2.2 release has no portable.txt; config.cpp uses ~/.config/Zelda64Recompiled); every `call()` channel, `openModal` type and `go()` page exists; ESLint no-undef over electron/ and src/ (0 errors; one harmless prop/ref name overlap in GameAddons.vue); 36 handlers called in the real app on a fake home (all answer); real installs of Ship of Harkinian 9.2.3 and Zelda 64: Recompiled v1.2.2 through the engine (program found, copy linked beside soh.appimage, not ready until oot.o2r); the crawl of every tab and Settings section (no page errors); `npm run audit:ui` all zero; 354 tests.
+- How it was tested: the real app with Playwright in a fake Deck home (EmuDeck layout, Steam account, fake xprop, `XDG_CURRENT_DESKTOP=gamescope`, `SteamGameId`) against a fake RomM with N64 games; a main-process hook (`electron -r hook.js`) writing a CPU profile and the functions inside each stall over 200 ms. GitHub's API and release pages are blocked from the container, so real installs went through the engine in Node with the release answer stubbed and the real files downloaded (scratchpad, not in the repo).
+- Owner to test: Ship of Harkinian Set Up With Your Game (the ROM beside soh.appimage), Perfect Dark, Sonic 3 A.I.R.; Zelda 64 Open and its own wizard; Game Mode start and a minute's wait (send `main thread stalled` lines if it still dims).
+
 ## 14 Oct 2026 · Steam card picture, recomps set themselves up (owner, photo of Consoles on the TV: "Steam controller icon looks like shit and not like others", "when installing a repo file no need to use external file manager but cartridge's built in file manager"; not released yet)
 - Steam card (`SteamTile.vue`):
   - The controller is drawn filled and lit like RomM's console pictures: a white Steam Controller with shaded grips, round trackpads, stick, face buttons and the Steam button.
