@@ -90,7 +90,7 @@ function fakeWorld(entries, extra = {}) {
   // a release with a Linux tar.gz holding Game/<program> and a data file
   const publish = (tag, text, pad = 0) => {
     const src = path.join(files, tag, 'Game'); fs.mkdirSync(src, { recursive: true });
-    fs.writeFileSync(path.join(src, 'Game'), '#!/bin/sh\n' + text + ' '.repeat(pad)); // pad: big enough to be found without a catalogue program name fs.writeFileSync(path.join(src, 'assets.dat'), text);
+    fs.writeFileSync(path.join(src, 'Game'), '#!/bin/sh\n' + text + ' '.repeat(pad)); fs.writeFileSync(path.join(src, 'assets.dat'), text); // pad: big enough to be found without a catalogue program name
     const tar = path.join(files, tag, 'Game-Linux-x64.tar.gz');
     execFileSync('tar', ['-czf', tar, '-C', path.join(files, tag), 'Game']);
     releases.unshift({ tag_name: tag, published_at: '2026-10-0' + releases.length, prerelease: false, draft: false, assets: [{ name: 'Game-Linux-x64.tar.gz', browser_download_url: 'file://' + tar, size: fs.statSync(tar).size }] });
