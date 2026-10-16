@@ -168,6 +168,23 @@ function saveDirs(e, rec, home = os.homedir()) {
   return [...new Set((e?.saves || []).flatMap((p) => savePaths(p, rec, home)).map((p) => sandboxed(path.normalize(p).replace(/(.)\/+$/, '$1'), rec, home)))];
 }
 
+// 0.9.69 (agreed plan 7.1 #13): a recomp from a link or found automatically has no save notes. Its backups take what
+// it wrote beside itself (anything at its folder's top that isn't one of its release's own files) and the folders
+// in ~/.config and ~/.local/share named after it (its program, project or name). Backups only: Save Sync stays with
+// the catalogue's known save places, so nothing guessed is ever uploaded.
+const squash = (t) => String(t || '').toLowerCase().replace(/\.(appimage|exe|x86_64)$/i, '').replace(/[^a-z0-9]/g, '');
+function guessSaves(e, rec, home = os.homedir()) {
+  if (!rec?.dir) return [];
+  const out = [], own = new Set((rec.files || []).map((f) => String(f).split('/')[0]));
+  if (own.size) for (const n of (() => { try { return fs.readdirSync(rec.dir); } catch { return []; } })()) if (!own.has(n) && !n.startsWith('.')) out.push(path.join(rec.dir, n));
+  const names = new Set([rec.program && path.basename(rec.program), e?.repo && e.repo.split('/').pop(), e?.name].map(squash).filter((x) => x.length >= 3));
+  for (const base of [path.join(home, '.config'), path.join(home, '.local/share')]) for (const n of (() => { try { return fs.readdirSync(base); } catch { return []; } })()) if (names.has(squash(n))) out.push(path.join(base, n));
+  // nothing big: a game's own files (an extracted disc, an ISO) put beside it would be copied on every update
+  const small = (p) => { let n = 0, left = 20000; const walk = (x) => { if (--left < 0 || n > SAVE_CAP) return; let st; try { st = fs.lstatSync(x); } catch { return; } if (st.isDirectory()) { for (const c of (() => { try { return fs.readdirSync(x); } catch { return []; } })()) walk(path.join(x, c)); } else n += st.size; }; walk(p); return left >= 0 && n <= SAVE_CAP; };
+  return [...new Set(out)].filter(small).slice(0, 20);
+}
+const SAVE_CAP = 256 * 1024 * 1024;
+
 // ---------------------------------------------------------------- PCGamingWiki
 // sections of the list as console keys (the page's own headings)
 const WIKI_SECTIONS = [[/^arcade$/i, 'arcade'], [/nintendo entertainment system|famicom$/i, 'nes'], [/super nintendo/i, 'snes'], [/nintendo 64/i, 'n64'], [/game boy advance/i, 'gba'], [/game boy/i, 'gbc'], [/gamecube/i, 'gamecube'], [/nintendo ds/i, 'nds'], [/wii/i, 'wii'], [/genesis|mega drive/i, 'genesis'], [/playstation 4/i, 'ps4'], [/playstation 2/i, 'ps2'], [/^playstation$/i, 'psx'], [/xbox 360/i, 'xbox360']];
@@ -397,8 +414,11 @@ function createRecomps(ctx) {
       ids.add(e.id); if (e.repo) repos.add(e.repo.toLowerCase());
       // a place with no rule Cartridge can follow (a patcher, a mod folder inside another game): you put it in place
       // yourself, then press It's Set Up (0.9.68)
-      const setup = e.setup?.how === 'place' && !e.setup.to ? { ...e.setup, how: 'manual' } : e.setup;
-      out.push({ ...e, setup, from });
+      let setup = e.setup?.how === 'place' && !e.setup.to ? { ...e.setup, how: 'manual' } : e.setup, needs = e.needs;
+      // 0.9.69: a recomp from a link or found automatically: nothing says what it needs, so it's set up when you say
+      // so (open it, follow its own steps, It's Set Up), never counted as ready the moment it's installed
+      if ((from === 'link' || from === 'found') && !needs) { needs = { what: `Your own copy of ${e.games?.[0]?.title || 'the game'}, if it asks for one. Open it and follow its own steps.`, files: 'any' }; setup = { how: 'picker' }; }
+      out.push({ ...e, setup, needs, from });
     };
     for (const e of base.entries || []) add(e, 'list');
     for (const e of readJson(F('recomps-found.json'), [])) add(e, 'found');
@@ -524,7 +544,7 @@ function createRecomps(ctx) {
   // ---- saves: backed up before an update or removal, checked after (owner: updates must never lose saves)
   function backupSaves(id, why, { keep } = {}) {
     const e = byId(id), rec = installs[id];
-    const dirs = saveDirs(e, rec).filter(exists);
+    const dirs = (e?.saves?.length ? saveDirs(e, rec) : ['link', 'found'].includes(e?.from) ? guessSaves(e, rec) : []).filter(exists); // 0.9.69: guessed for link recomps
     if (!dirs.length) return null;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-'), to = path.join(dataDir, 'recomp-backups', id, stamp);
     const meta = { id, why, at: Date.now(), tag: rec?.tag || null, items: [] };
@@ -912,4 +932,4 @@ function createRecomps(ctx) {
   return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
 }
 
-module.exports = { fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };
+module.exports = { guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };

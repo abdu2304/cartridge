@@ -88,9 +88,9 @@ function fakeWorld(entries, extra = {}) {
     return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
   };
   // a release with a Linux tar.gz holding Game/<program> and a data file
-  const publish = (tag, text) => {
+  const publish = (tag, text, pad = 0) => {
     const src = path.join(files, tag, 'Game'); fs.mkdirSync(src, { recursive: true });
-    fs.writeFileSync(path.join(src, 'Game'), '#!/bin/sh\n' + text); fs.writeFileSync(path.join(src, 'assets.dat'), text);
+    fs.writeFileSync(path.join(src, 'Game'), '#!/bin/sh\n' + text + ' '.repeat(pad)); // pad: big enough to be found without a catalogue program name fs.writeFileSync(path.join(src, 'assets.dat'), text);
     const tar = path.join(files, tag, 'Game-Linux-x64.tar.gz');
     execFileSync('tar', ['-czf', tar, '-C', path.join(files, tag), 'Game']);
     releases.unshift({ tag_name: tag, published_at: '2026-10-0' + releases.length, prerelease: false, draft: false, assets: [{ name: 'Game-Linux-x64.tar.gz', browser_download_url: 'file://' + tar, size: fs.statSync(tar).size }] });
@@ -423,4 +423,24 @@ test('save backups put back: the saves there now backed up first, the backup res
   assert.ok(after.some((b) => b.stamp === oldest.stamp), 'the backup put back is kept');
   assert.strictEqual(after[0].why, 'before restore');
   assert.throws(() => w.eng.restoreBackup('b', '../x'), /isn’t there/);
+});
+
+test('a recomp from a link: set up when you say so, saves guessed for backups only, nothing big', async () => {
+  const w = fakeWorld([]);
+  const r = w.eng.addLink({ repo: 'github:o/game', console: 'n64', title: 'Game', name: 'game' });
+  w.publish('v1', 'x', 600 * 1024);
+  // the fake release's own files: Game and assets.dat
+  await w.eng.install(r.id);
+  const e = w.eng.list().entries.find((x) => x.id === r.id);
+  assert.deepStrictEqual([e.setup.how, !!e.needs, e.installed.ready], ['picker', true, false], 'not ready until It’s Set Up');
+  w.eng.markDone(r.id);
+  assert.strictEqual(w.eng.list().entries.find((x) => x.id === r.id).installed.ready, true);
+  const rec = w.eng.record(r.id);
+  fs.mkdirSync(path.join(rec.dir, 'saves')); fs.writeFileSync(path.join(rec.dir, 'saves', 's.sav'), 'mine');
+  fs.writeFileSync(path.join(rec.dir, 'config.ini'), 'x=1');
+  const big = path.join(rec.dir, 'gamefiles'); fs.mkdirSync(big); fs.writeFileSync(path.join(big, 'disc.iso'), Buffer.alloc(1)); fs.truncateSync(path.join(big, 'disc.iso'), 300 * 1024 * 1024);
+  const cfg = path.join(w.home, '.config', 'Game'); fs.mkdirSync(cfg, { recursive: true }); fs.writeFileSync(path.join(cfg, 'save.dat'), 'x');
+  const got = R.guessSaves(w.eng.byId(r.id), rec, w.home).map((p) => path.relative(w.d, p)).sort();
+  assert.deepStrictEqual(got, [path.relative(w.d, path.join(rec.dir, 'config.ini')), path.relative(w.d, path.join(rec.dir, 'saves')), path.relative(w.d, cfg)].sort());
+  assert.deepStrictEqual(w.eng.saveDirs(r.id), [], 'Save Sync never gets guessed folders');
 });

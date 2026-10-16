@@ -5169,6 +5169,21 @@ const handlers = {
   },
   'recomps:refresh': () => recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }),
   // from a link (not in the list): what it is first, then added with the console and game you say
+  // Check It for a recomp link (0.9.69, agreed plan 7.1 #16): the project, its newest release and the build Cartridge
+  // would take, before anything is added or downloaded
+  'recomps:preview': async ({ link }) => {
+    const C = require('./customEmu'), R = require('./recomps'), gh = C.repoOf(link);
+    const gl = !gh && /^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([\w.-]+)\/([\w.-]+)/i.exec(String(link || ''));
+    if (!gh && !gl) throw new Error('That isn’t a GitHub or GitLab project link. It looks like github.com/owner/project.');
+    const repo = gh ? 'github:' + gh : `gitlab:${gl[1]}/${gl[2].replace(/\.git$/i, '')}`, path2 = repo.split(':')[1];
+    const H = { headers: { 'User-Agent': 'Cartridge', Accept: 'application/json' }, signal: AbortSignal.timeout(15000) };
+    const [rel, info] = await Promise.all([
+      R.releaseOf({ repo }, { fetchImpl: webFetch }).catch((e) => ({ error: e.message })),
+      webFetch(gh ? `https://api.github.com/repos/${path2}` : `https://gitlab.com/api/v4/projects/${encodeURIComponent(path2)}`, H).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    ]);
+    const b = rel && !rel.error ? R.pickBuild(rel.assets, {}) : null;
+    return { repo, tag: rel?.tag || null, date: rel?.date || null, error: rel?.error || null, file: b?.asset?.name || null, size: b?.asset?.size || 0, kind: b?.kind || null, stars: info ? info.stargazers_count ?? info.star_count ?? null : null, description: info?.description || '', fork: !!(info?.fork || info?.forked_from_project), known: !!recomps().catalogue().entries.find((e) => e.repo?.toLowerCase() === repo.toLowerCase()) };
+  },
   'recomps:addLink': async ({ link, console: con, title, description }) => {
     const C = require('./customEmu'), gh = C.repoOf(link);
     const gl = !gh && /^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([\w.-]+)\/([\w.-]+)/i.exec(String(link || ''));
