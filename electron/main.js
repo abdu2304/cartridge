@@ -2404,24 +2404,11 @@ let patchMine = loadJson(PATCHES_FILE, {});
 // a PS3 game's serial: from its install record, its PARAM.SFO, else its name
 function ps3Serial(romId, where) {
   if (installs[romId]?.serial) return installs[romId].serial;
-  for (const f of [path.join(where || '', 'PS3_GAME', 'PARAM.SFO'), path.join(where || '', 'PARAM.SFO')]) { const s = patchesMod.sfoAt(f).TITLE_ID; if (s) return s; }
-  const r = romIndexMain().get(Number(romId));
-  // disc games too (0.9.3 L): a folder with the game folder inside, an ISO (PS3_DISC.SFB), "BLUS-30443" names
-  try { const s = steamMgr.serialOf(r || {}, where || ''); if (s) return s; } catch {}
-  // 0.9.15: an ISO read properly (PS3_GAME/PARAM.SFO anywhere in the image, any serial prefix),
-  // and a downloaded .pkg not installed yet (its content ID)
-  const files = (() => { try { return fs.statSync(where).isDirectory() ? fs.readdirSync(where).map((n) => path.join(where, n)) : [where]; } catch { return []; } })();
-  for (const f of files.filter((x) => /\.(iso|chd)$/i.test(x))) { const b = patchesMod.isoFile(f, ['PS3_GAME', 'PARAM.SFO']); const id = b && patchesMod.parseSfo(b).TITLE_ID; if (id) return id; }
-  for (const f of files.filter((x) => /\.pkg$/i.test(x))) { const i = pkgInst.pkgInfo(f); if (i?.titleId && /^[A-Z]{4}\d{5}$/.test(i.titleId)) return i.titleId; }
-  // 0.9.18: the game folder one or two levels down ("Game/Game [BLUS30443]/PS3_GAME"), then RPCS3's
-  // own game list (config/games.yml: "BLUS30443: /path/to/game/"), which knows every game it has booted
-  const deep = (d, n) => { for (const e of (() => { try { return fs.readdirSync(d, { withFileTypes: true }); } catch { return []; } })()) {
-    if (!e.isDirectory()) continue;
-    const p = path.join(d, e.name), s = patchesMod.sfoAt(path.join(p, 'PS3_GAME', 'PARAM.SFO')).TITLE_ID;
-    if (s) return s;
-    if (n > 1) { const r = deep(p, n - 1); if (r) return r; }
-  } return null; };
-  if (where) { const s = deep(where, 2); if (s) return s; }
+  const s = require('./fileIds').ps3FileSerial(romIndexMain().get(Number(romId)) || {}, where); // PARAM.SFO, name, ISO, .pkg, folders below
+  return s || ps3SerialListed(where);
+}
+// 0.9.18: RPCS3's own game list (config/games.yml: "BLUS30443: /path/to/game/") knows every game it has booted
+function ps3SerialListed(where) {
   const want = where && (() => { try { return fs.realpathSync(where); } catch { return where; } })().replace(/\/+$/, '');
   for (const d of patchesMod.rpcs3Dirs()) {
     let text = ''; try { text = fs.readFileSync(path.join(d.root, 'games.yml'), 'utf8'); } catch { continue; }
@@ -2490,8 +2477,7 @@ function dolphinPatchState(romId) {
 function ppssppPatchState(romId, r) {
   const where = installedMap[romId], file = mainFile(where);
   if (!file) return { emu: 'ppsspp', why: 'Download the game first.' };
-  let id = /\.(iso|cso|zso|chd)$/i.test(file) ? (() => { const b = patchesMod.isoFile(file, ['PSP_GAME', 'PARAM.SFO']); return b ? patchesMod.parseSfo(b).DISC_ID : null; })() : /\.pbp$/i.test(file) ? require('./discImage').pbpDiscId(file) : null;
-  id = id || (`${r?.fs_name || ''} ${r?.name || ''} ${path.basename(file)}`.match(/\b([A-Z]{4})-?(\d{5})\b/) || []).slice(1).join('') || null;
+  const id = require('./fileIds').pspSerial(r, file);
   if (!id) return { emu: 'ppsspp', why: 'Cartridge couldn’t find this game’s ID (ULUS10041 and so on) in its name or its ISO.' };
   const ph = patchHome(romId, 'ppsspp'), dirs = cheatsMod.ppssppDirs();
   const dir = (ph.pick && dirs.find((d) => d.flatpak === !!ph.flatpak)) || dirs[0];
@@ -2525,11 +2511,24 @@ function gameFileIds(r, where) {
   if (/\b(3ds|n3ds)\b/i.test(slugs) && /\.(3ds|cci|cia|cxi)$/i.test(file)) return [A.n3dsTitleId(file)];
   return [];
 }
+// the same reading in a worker thread (0.9.68, owner: the app dimmed about 30 s after start and the controller went):
+// a Switch NSP's NCA headers or a PS2 CHD's hunks no longer hold the main thread. Install records and RPCS3's games.yml
+// (main's own records, small) are read here
+let idReader = null;
+const idReaderNow = () => (idReader = idReader || require('./fileIds').createReader({ log }));
+async function gameFileIdsAsync(r, where) {
+  const slugs = `${r.platform_slug} ${r.platform_fs_slug}`;
+  if (/ps3/i.test(slugs) && installs[r.id]?.serial) return [installs[r.id].serial];
+  const ids = (await idReaderNow().readIds({ slugs, where, fsName: r.fs_name || '', name: r.name || '', emulationRoot: config.emulationRoot || '' })).filter(Boolean);
+  if (/ps3/i.test(slugs) && !ids.length) { const s = ps3SerialListed(where); if (s) ids.push(s); }
+  return ids;
+}
 const identity = require('./gameId').createIdentity({
   file: path.join(USER_DATA, 'game-ids.json'),
   roms: () => [...romIndexMain().values()],
   whereOf: (id) => { const w = installedMap[id]; return w && w !== MARKED ? w : ''; },
   extract: gameFileIds,
+  extractAsync: (r, where) => gameFileIdsAsync(r, where), // 0.9.68: read in a worker thread
   log,
   lazy: true, // 0.9.60: read in the background a game at a time, never all at once on the main thread
   busy: () => !!(gameFocus.away || runOn),
@@ -3457,6 +3456,7 @@ const steamMgr = require('./steamManager')({
   USER_DATA, log, PLATFORM_MAP, getConfig: () => config, saveConfig: () => saveConfig(), broadcast: (c, d) => broadcast(c, d), getLibrary: () => library,
   installed: () => installedMap, MARKED, markedPath: (r) => marks[r.id]?.path || null,
   romById: (id) => romIndexMain().get(id) || null,
+  readSerial: (rom, file) => idReaderNow().readIds({ kind: 'ps3serial', where: file, fsName: rom.fs_name || '', name: rom.name || '' }).then((a) => a[0] || null), // 0.9.68: in a worker
   artFor: (id) => artOverrides[id] || null,
   fetchImage: async (src) => asPng(await fetchImage(src)),
   // the sharp background Cartridge itself shows for a game (0.9.16: Steam gets the same one)
@@ -3579,6 +3579,7 @@ async function renameDevice(name) {
 async function syncPlay() {
   if (playSyncing) return playSyncing;
   playSyncing = (async () => {
+    await steamMgr.warmSerials().catch(() => {});
     const local = (() => { try { return steamMgr.playtime(); } catch { return {}; } })();
     const devId = await rommDevice();
     // send what's new since last time
@@ -3733,6 +3734,7 @@ async function uploadFile({ path: f, platformId }) {
 const handlers08 = {
   // local play time plus where each game was last played (this device or another one in RomM)
   'play:stats': async () => {
+    await steamMgr.warmSerials().catch(() => {});
     if (Date.now() - playSyncAt > 10 * 60e3 && config.configured) { const p = syncPlay(); if (!playSyncAt) await Promise.race([p, new Promise((r) => setTimeout(r, 4000))]); }
     const out = playStats(), me = deviceName();
     try { notePlayDays(out); } catch (e) { log('play days', e.message); }
@@ -4079,7 +4081,8 @@ const handlers09 = {
   'shadv:runs': () => { noteShadRun(); return loadJson(SHAD_RUNS_FILE, []); },
   'steam:setShadVersion': ({ romId, path: p }) => { const m = ((config.steam ||= {}).shadVersions ||= {}); if (p) m[romId] = p; else delete m[romId]; saveConfig(); return true; },
   // frame generation (0.9.17): what's installed, the picks, and Cartridge's games in Steam with theirs
-  'steam:frameGen': () => {
+  'steam:frameGen': async () => {
+    await steamMgr.warmSerials().catch(() => {});
     const fg = require('./frameGen'), conf = (config.steam ||= {}).frameGen || {};
     const ov = steamMgr.overview();
     const games = ov.games.filter((g) => g.inSteam && g.ours).map((g) => ({ romId: g.romId, name: g.name, console: g.console, own: (conf.games || {})[g.romId] || null, uses: fg.choiceFor(conf, g.romId, g.console) }));
@@ -5124,7 +5127,17 @@ const handlers = {
     }
     return out;
   },
-  'recomps:setGame': ({ id, file, force }) => recomps().setGame(id, file, { force }),
+  'recomps:setGame': async ({ id, file, force }) => {
+    const R = recomps(), r = await R.setGame(id, file, { force });
+    // a one-off setup command (Doom64EX's -wadgen, WiiCompiled's install): run now, watched until its done file is there
+    if (r.ok && r.run) {
+      const rec = R.record(id);
+      if (rec.kind === 'windows') { r.note = 'Start it once through Steam to finish setting up.'; return r; }
+      await startRecomp(id, rec, r.run);
+      setTimeout(() => recompSetupWatch(id), 4000);
+    }
+    return r;
+  },
   'recomps:done': ({ id }) => recomps().markDone(id),
   // Add to Steam: queued and applied straight away when Steam can be changed while it runs; otherwise it waits for
   // Apply in Settings → Steam (Steam restarts for that), and the screen says so
@@ -5151,16 +5164,7 @@ const handlers = {
       if (!sc) throw new Error(`${e.name} is a Windows build, so it runs through Proton: add it to Steam first, then open it.`);
       return steamMgr.runAppid(sc.appid);
     }
-    const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
-    const runLog = path.join(USER_DATA, 'emulator-runs', `recomp-${id}.log`);
-    let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
-    const extra = (rec.args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
-    const p = require('child_process').spawn(rec.program, extra, { cwd: path.dirname(rec.program), env, detached: true, stdio: ['ignore', fd, fd] });
-    if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
-    return await new Promise((ok, bad) => {
-      p.once('error', (er) => bad(new Error(er.code === 'EACCES' ? 'It isn’t allowed to run (its file isn’t executable).' : `It didn’t start: ${er.message}`)));
-      p.once('spawn', () => { log('recomp opened', id); if (isGamescope()) { broadcast('background', { away: true }); p.once('exit', () => { broadcast('background', { away: false }); refocus(); }); } p.unref(); ok({ via: 'direct' }); });
-    });
+    return startRecomp(id, rec, R.launchArgs(id));
   },
   'recomps:refresh': () => recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }),
   // from a link (not in the list): what it is first, then added with the console and game you say
@@ -5746,7 +5750,7 @@ const handlers = {
     if (!res.length) throw new Error('Add Cartridge to Steam first (Add a Non-Steam Game), then try again.');
     return res;
   },
-  'steam:overview': () => steamMgr.overview(),
+  'steam:overview': async () => { await steamMgr.warmSerials().catch(() => {}); return steamMgr.overview(); },
   'steam:preview': () => steamMgr.preview(),
   'steam:apply': (o) => steamMgr.apply(o || {}),
   'steam:undo': () => steamMgr.undo(),
@@ -5807,7 +5811,8 @@ const handlers = {
   // which metadata keys are set (never the keys themselves)
   'romm:localKeys': () => { const k = require('./rommLocal').keysOf(require('./rommLocal').readEnv(path.join(USER_DATA, 'romm-local.env'))); return { igdb: !!(k.igdbId && k.igdbSecret), ss: !!(k.ssUser && k.ssPass) }; },
   // Welcome's scan (0.9.16): games already in Steam that Cartridge didn't add, per console (C7 take over)
-  'setup:steamTheirs': () => {
+  'setup:steamTheirs': async () => {
+    await steamMgr.warmSerials().catch(() => {});
     let o; try { o = steamMgr.overview(); } catch { return { total: 0, consoles: [] }; }
     const by = {};
     for (const g of o.games || []) if (g.inSteam && !g.ours && g.file && g.appid) by[g.console] = (by[g.console] || 0) + 1;
@@ -5849,7 +5854,7 @@ const handlers = {
   'steam:addToCollections': ({ romId, names }) => steamMgr.addRomToCollections(Number(romId), names || []),
   // HowLongToBeat times when RomM has none: name plus release year, cached in hltb.json
   'hltb:lookup': ({ name, year }) => hltbSvc.forGame({ name: String(name || ''), year: Number(year) || null }),
-  'steam:played': () => { try { return steamMgr.played(); } catch { return {}; } },
+  'steam:played': async () => { await steamMgr.warmSerials().catch(() => {}); try { return steamMgr.played(); } catch { return {}; } },
   'steam:setConfig': (patch) => { config.steam = { ...(config.steam || {}), ...patch }; saveConfig(); return config.steam; },
   'steam:setPath': ({ romId, path: p }) => { if (!isDir(p) && !fs.existsSync(p)) throw new Error('That folder does not exist'); marks[romId] = { ...(marks[romId] || { at: Date.now() }), path: p }; saveMarks(); return true; },
   'app:startGame': () => { const g = startGame; startGame = null; return g; },
@@ -6052,6 +6057,17 @@ function healthLine() {
   } catch {}
 }
 const loopDelay = require('perf_hooks').monitorEventLoopDelay({ resolution: 20 });
+// 0.9.68 (owner: the app dims, comes back by itself, and the controller is gone): in Game Mode a main thread that stops
+// answering for seconds makes Steam dim the window and take the pad; when it answers again the page may have lost focus
+// and Steam may keep the pad. A stall over 2 s is logged and followed by the steps that bring the pad back after a game:
+// refocus (until the page has focus) and, when gamescope doesn't name Cartridge, Steam asked to show it
+let beatAt = Date.now();
+setInterval(() => {
+  const now = Date.now(), gap = now - beatAt - 500; beatAt = now;
+  if (gap < 2000) return;
+  log('main thread stalled', gap, 'ms');
+  if (isGamescope() && !gameFocus.away && !runOn && win && !win.isDestroyed()) { refocus(); setTimeout(steamFront, 1500); }
+}, 500).unref?.();
 loopDelay.enable();
 setTimeout(() => { log('main thread: longest stall in the first minute', Math.round(loopDelay.max / 1e6), 'ms'); loopDelay.reset(); setInterval(() => { const ms = Math.round(loopDelay.max / 1e6); if (ms > 500) log('main thread: stall of', ms, 'ms in the last minute'); loopDelay.reset(); healthLine(); }, 60000).unref?.(); }, 60000);
 handlers['perf:sample'] = () => {
@@ -6185,6 +6201,20 @@ function emulationFolders() {
 let recompsEng = null;
 // 0.9.67 (agreed plan 7.1 #10): the recomp's own building on its first starts, as a background job with a measured bar:
 // bytes written in its folders, against the finished size when the catalogue knows it; done when its done file appears
+// a Linux recomp started from its own folder, with the arguments given (0.9.68: one place for Open and a one-off
+// setup run; Open used to leave out the catalogue's own arguments, PGR4's GPU options and WiiCompiled's launch-base)
+function startRecomp(id, rec, args) {
+  const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+  const runLog = path.join(USER_DATA, 'emulator-runs', `recomp-${id}.log`);
+  let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
+  const extra = (args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
+  const p = require('child_process').spawn(rec.program, extra, { cwd: path.dirname(rec.program), env, detached: true, stdio: ['ignore', fd, fd] });
+  if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
+  return new Promise((ok, bad) => {
+    p.once('error', (er) => bad(new Error(er.code === 'EACCES' ? 'It isn’t allowed to run (its file isn’t executable).' : `It didn’t start: ${er.message}`)));
+    p.once('spawn', () => { log('recomp opened', id, args ? 'with arguments' : ''); if (isGamescope()) { broadcast('background', { away: true }); p.once('exit', () => { broadcast('background', { away: false }); refocus(); }); } p.unref(); ok({ via: 'direct' }); });
+  });
+}
 async function recompSetupWatch(id) {
   const R = recomps(), e = R.byId(id), key = 'recompsetup:' + id;
   if (!e || R.ready(id)) return;
@@ -6268,11 +6298,17 @@ function ssUnits(opts) {
   return out;
 }
 // installed recomps handed to the trophy reader (0.9.65): the ones that record achievements show in Achievements
+let recompTroSig = '[]';
 function recompTrophies() {
   try {
     const R = recomps(), items = [];
     for (const e of R.catalogue().entries) { const rec = R.record(e.id); if (rec?.dir) items.push({ id: e.id, name: e.name, game: e.games?.[0]?.title || e.name, program: rec.program, dir: rec.dir, flatpak: rec.flatpak || null, ach: e.achievements && typeof e.achievements === 'object' ? e.achievements : null }); }
     require('./trophies').setRecomps(items);
+    // 0.9.68: the trophy service started knowing no recomps; it reads every trophy file again (on the main thread)
+    // only when the installed recomps changed, not 25 s after every start
+    const sig = JSON.stringify(items);
+    if (sig === recompTroSig) return;
+    recompTroSig = sig;
     trophySvc.redetect?.()?.catch?.(() => {});
   } catch (er) { log('recomp achievements', er.message); }
 }
@@ -6285,7 +6321,7 @@ function recompShortcutSpec(id) {
   const R = recomps(), e = R.byId(id), rec = R.record(id);
   if (!e || !rec) throw new Error('Install it first.');
   const romIds = require('./recomps').matchRoms(e, libraryRoms());
-  return { id, name: e.name, exe: rec.program, start: path.dirname(rec.program), args: rec.args || e.args || '', game: e.games?.[0]?.title || e.name, artRomId: romIds[0] ?? null };
+  return { id, name: e.name, exe: rec.program, start: path.dirname(rec.program), args: R.launchArgs(id), game: e.games?.[0]?.title || e.name, artRomId: romIds[0] ?? null };
 }
 
 // Get Emulators' list, as rows per console (sync: the installer's fresh check uses it)

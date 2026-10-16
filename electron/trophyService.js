@@ -183,6 +183,7 @@ module.exports = function createTrophyService(ctx) {
       const dirs = dirsOf(id).map((d) => d.dir);
       if (!dirs.length) continue;
       for (const g of T.readSource(id, dirs)) next.set(keyOf(g), g);
+      await new Promise((r) => setTimeout(r, 0)); // 0.9.68: a turn between emulators, never every trophy file in one go
     }
     games = next;
     // live pop-ups: anything unlocked since the last read

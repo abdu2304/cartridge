@@ -1,10 +1,10 @@
 > **Read first (owner, 6 Oct 2026):** Plain and Glass are two separate modes, never merged. One Style setting (Plain or Glass) covers the whole app; design every element for both, and never let a change for one leak into the other. Details in CLAUDE.md.
 
-# Handover: everything from 0.9.55 to 0.9.67
+# Handover: everything from 0.9.55 to 0.9.68
 
 To the Claude on the next account, from the Claude on this one.
 
-Three handovers come before this one: `docs/HANDOVER-0.9.3-to-0.9.21.md`, `docs/HANDOVER-0.9.22-to-0.9.37.md` and `docs/HANDOVER-0.9.38-to-0.9.54.md`. Everything in them about the owner, the process and the do-not-break rules still holds unless this document says otherwise. This one picks up at 0.9.55 (7 October 2026) and runs to 0.9.67 (14 October 2026): **13 releases**. The file keeps its old name so links to it still work. Part 7 holds the plans the owner agreed for recomps and Online Play, with every decision and the reason behind it; both shipped (Parts 11, 12 and 13), and what is still missing from those plans is listed in Part 9.
+Three handovers come before this one: `docs/HANDOVER-0.9.3-to-0.9.21.md`, `docs/HANDOVER-0.9.22-to-0.9.37.md` and `docs/HANDOVER-0.9.38-to-0.9.54.md`. Everything in them about the owner, the process and the do-not-break rules still holds unless this document says otherwise. This one picks up at 0.9.55 (7 October 2026) and runs to 0.9.68 (16 October 2026): **14 releases**. 0.9.68 was made on another account after a catch-up (Part 15). The file keeps its old name so links to it still work. Part 7 holds the plans the owner agreed for recomps and Online Play, with every decision and the reason behind it; both shipped (Parts 11, 12 and 13), and what is still missing from those plans is listed in Part 9.
 
 **The owner asked for this document to be kept up to date after every update from now on.** When you finish an update, add a Part for it at the end, add it to Part 4 (releases), Part 5 (code map) and Part 6 (subsystems), add what broke to Part 8, move what's done out of Part 9 and add what's new there, and update Part 1. Then read the whole file once more, top to bottom, against the session: in 0.9.65 and 0.9.66 only new Parts were added at the end and Parts 1 to 9 went stale until the owner asked (Part 8). Keep the same level of detail: what changed, why, what was found, how it was checked, what the owner must test.
 
@@ -22,10 +22,10 @@ The repo is public. Nothing private is in this document. Keep it that way.
 
 ## Part 1. Where things stand right now
 
-- **Latest release:** v0.9.67 "Cartridge 0.9.67 · Follow Through" (14 Oct 2026; Part 14). Before it v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). PRs: v0.9.63 #82, v0.9.64 #83, v0.9.65 #84, v0.9.66 #85, handover catch-ups #86 and #87 (docs only), v0.9.67 the PR after them.
+- **Latest release:** v0.9.68 "Cartridge 0.9.68 · Set Up Right" (16 Oct 2026; Part 15): the freeze fix, the Steam card and recomps setting themselves up (made 14 Oct, unreleased until then) plus a full debugging pass. Before it v0.9.67 "Cartridge 0.9.67 · Follow Through" (14 Oct 2026; Part 14). Before it v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). PRs: v0.9.63 #82, v0.9.64 #83, v0.9.65 #84, v0.9.66 #85, handover catch-ups #86 and #87 (docs only), v0.9.67 #88, v0.9.68 the PR after it.
 - **Branch:** `claude/relaxed-fermat-30pigp`, merged into `main` by a PR for every release (merge commit, not squash). After a merge, reset the branch to `main` (`git fetch origin main && git checkout -B claude/relaxed-fermat-30pigp origin/main`) before new work.
-- **package.json:** `version` = `versionName` = 0.9.67, `releaseName` "Cartridge 0.9.67". The lockfile's version field is stale and always was; leave it.
-- **Tests:** 347 pass at 0.9.67 (343 at 0.9.66) (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink, recomps, onlinePlay (fake RPCN server inside); saveSync and gameSettings grew a lot.
+- **package.json:** `version` = `versionName` = 0.9.68, `releaseName` "Cartridge 0.9.68". The lockfile's version field is stale and always was; leave it.
+- **Tests:** 354 pass at 0.9.68 (347 at 0.9.67, 343 at 0.9.66; fileIds added and recomps grown in 0.9.68) (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink, recomps, onlinePlay (fake RPCN server inside); saveSync and gameSettings grew a lot.
 - **Before every release:** `npm test`, `npx vite build`, the launch check (`CARTRIDGE_SMOKE=1 HOME=$(mktemp -d) xvfb-run -a node_modules/electron/dist/electron . --no-sandbox` must print `SMOKE OK`), `npm run audit:ui` (focus and contrast in six looks, clipping, the tour twice; all zero at 0.9.63 to 0.9.67; it takes about 15 minutes, so run it in the background). Never rebuild `dist` while the audit runs: it reads `dist` and crashes mid-run.
 - **Standing instruction:** when an update is finished, built and launch-checked, open the PR and merge it without asking. A version change on `main` publishes the release to every user.
 
@@ -35,10 +35,11 @@ The repo is public. Nothing private is in this document. Keep it that way.
 1. ~~0.9.65 · Recomps~~ and ~~0.9.66 · Online Play~~: both shipped together as 0.9.65 (Parts 11 and 12).
 2. ~~The six things agreed but not done in 0.9.65~~: shipped as 0.9.66 (Part 13).
 3. ~~The three Part 7 items left after 0.9.66~~: shipped as 0.9.67 with two bug fixes (Part 14). Everything still not done, checked three times, is in Part 9.
-4. Owner device tests (end of Parts 11 to 14), then whatever the owner picks from Part 9's list.
-5. Keep this handover updated after each.
+4. ~~A full debugging pass~~ (owner, on another account after a catch-up): shipped as 0.9.68 (Part 15).
+5. Owner device tests (end of Parts 11 to 15), then whatever the owner picks from Part 9's list. The owner said on 14 Oct they were sending more bugs; none had arrived by 0.9.68.
+6. Keep this handover updated after each.
 
-**Waiting on the owner:** device tests listed in Part 9 (from 0.9.63 to 0.9.66); KytyPS5 log after 0.9.63 if it still fails; the Unit 13 freeze test with frame generation off; which of Part 9's not-done items to build next (they built items 1 to 3 of the old list as 0.9.67 and asked for a triple check of the rest).
+**Waiting on the owner:** the 0.9.68 tests (end of Part 15: Place recomps, Zelda 64's own wizard, Game Mode start with no dimming); device tests listed in Part 9 (from 0.9.63 to 0.9.66); KytyPS5 log after 0.9.63 if it still fails; the Unit 13 freeze test with frame generation off; which of Part 9's not-done items to build next (they built items 1 to 3 of the old list as 0.9.67 and asked for a triple check of the rest).
 
 ---
 
@@ -95,6 +96,7 @@ Everything in the earlier handovers still applies. New in this stretch:
 | 0.9.64 | Forks and Links | forks under their parent with versions, Link to Its Project, fork-aware settings and patches, GitHub search, send from phone, Windows builds through Proton |
 | 0.9.65 | Recomps and Online Play | 96 recomps (Steam card, install, updates with saves kept, Roll Back, own Steam shortcuts, Save Sync, achievements), Online Play for ten emulators with a re-check after every emulator update, KytyPS5 hidden without a Linux build, Download More Files (Parts 11 and 12) |
 | 0.9.67 | Follow Through | recomp setup watched as a background job with a measured bar, Online Play reports settings an update renamed, files parsed before and read back after every Online Play write; fixed: recomp save notes read as real paths (Proton, Flatpak), It's Set Up shown when needed (Part 14) |
+| 0.9.68 | Set Up Right | freeze about 30 s after start (game IDs in a worker, memoised lookups), recomp Place setup by real paths (`setup.to`), recomp launch and one-off setup arguments, picker recomps set themselves up, the Steam card's controller (Part 15) |
 | 0.9.66 | Loose Ends | RPCN accounts made in Cartridge, ShadNet sign-up in its own window, RPCS3 Repair before Online Play writes, Online Play on emulator pages, recomp project details, link guesses, recomp updates started once before they're kept (Part 13) |
 
 ---
@@ -109,6 +111,7 @@ Everything in the earlier handovers still applies. New in this stretch:
 - **Speed and diagnostics:** `src/imageWorker.js` (pictures in a window worker), main `imgWork`, `healthLine`, `slowSteps`, `keepEmuLog`, `SHARED` (in-flight answers shared), `progRunning`.
 - **Shared UI bits:** `.seg.strip` (styles.css + `strip()` in `src/motion.js`), `src/gameSuggest.js`.
 - **Recomps (0.9.65 to 0.9.67):** `electron/recomps.js` (engine, `details`, `guessFromText`, `readmePicture`, `plainNotes`, `watchSetup`, `savePaths`/`saveDirs`), `electron/recomps.json` (catalogue) built by `tools/recomps/build.js` (record in `docs/recomps.md`), `electron/recompAchievements.js`, main `recomps:*` and `trialRun`, steamManager recomp shortcuts, `src/components/SteamTile.vue`, `Recomps.vue`, `RecompSheet.vue`, `src/views/RecompsView.vue`.
+- **Game IDs off the main thread (0.9.68):** `electron/fileIds.js` (readers with nothing from main's state, `createReader`), `electron/idWorker.js`; `gameId` `extractAsync`; `steamManager.warmSerials`. Memos in `steamManager` (`candMemo`, `binMemo`) and `trophies.emulationRoots` (`rootsMemo`).
 - **Online Play (0.9.65, 0.9.66):** `electron/onlinePlay.js` (engine), `electron/onlineAdapters.js` (one adapter per emulator, with its source), `electron/onlineFormats.js` (one-key writers), `electron/sha3.js` (pure SHA3/PBKDF2), `electron/rpcnClient.js` (RPCN accounts), main `online:*`, `src/components/OnlinePlay.vue`, the Online Play rows in Game.vue and EmuGet.vue.
 
 ---
@@ -120,6 +123,7 @@ Rule (docs/design-rules.md 10b, pinned in test/designRules.test.js): nothing hea
 - **0.9.55:** `flatpak list` with execFileSync held the main thread for seconds in Game Mode; gamescope dimmed the window and the controller went. Now Flatpak's folders are read directly (`detect.flatpakApps`), the login shell's PATH is read in the background.
 - **0.9.60:** picture shrinking (nativeImage) on the main thread took 25 to 120 ms each: moved to a Worker in the window (`src/imageWorker.js`, `imgWork`). Game IDs read lazily (`gameId` `lazy`, `warm`).
 - **0.9.63 (from the owner's log):** Save Sync blocked ~18 s every 30 minutes. Cause: `syncUnit` with `opts.remotes` never really awaited, so every save of every emulator was read and md5'd in one synchronous loop. Fix: `hashUnitAsync` with an md5 cache keyed by path, size and date (`save-hashes.json`), files read with `fs.promises`, and `breathe()` (setImmediate) between saves. Measured on 400 saves: one 0.9 s block before (far longer on the owner's external drive), longest block 10 ms after, later runs 0.15 s total. Also a ~600 ms stall every minute: the trophy watcher stat'd every trophy file every 8 s synchronously; now `pollSigAsync`.
+- **0.9.68 (owner: "after like 30 seconds ish the app dims ... if it comes back I lose controller support"):** game IDs were read on the main thread a game at a time (a Switch NSP or PS2 CHD can take seconds); the ID cache never saved during a read-through; Steam matching asked the disk for every game's real path and read up to 1 MB of every PS3/PSP/Vita game on each call; recomp trophies were re-read 25 s after every start. Then the debugging pass found that `candidates()` (every emulator for a console), `findBin` and `emulationRoots` checked dozens of paths on disk on every ask, and `forksAll` asks for about 60 consoles at once: memoised (4 s / 10 s / 10 s). Measured with a main-process CPU profile in a fake Game Mode home: stalls over 200 ms went from 4 (worst 510 ms) to 2 (worst 230 ms); the 14 Oct work had taken the worst from about 2,500 ms to about 300 ms. A watchdog logs `main thread stalled N ms` and brings the pad back in Game Mode. Not confirmed on a device yet.
 - **Diagnostics added (0.9.63):** `health:` log lines (every 5 minutes, every minute while a game runs: Cartridge's memory and CPU, system free memory, load), `slow steps` lines naming any step over 250 ms, failed background jobs and emulator installs logged with their reason, network errors naming the host, Vita3K's log copied every 30 s while a Vita game runs (`emulator-runs/vita3k-last.log`).
 
 ### 6.2 Saves
@@ -216,6 +220,8 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 - **`pkill -f <pattern>` matched my own shell** and killed the command; kill by PID.
 - **Free text in a data file used as a path (0.9.65, found 0.9.67):** the recomp catalogue's `saves` were research notes ("X in the working directory", "Documents/Y inside the Proton prefix"), and `expandPath` joined the whole sentence onto the recomp folder. Backups found nothing; Save Sync listed folders named like sentences. Found only by the third audit. When a data file holds text written by people (or research agents), parse it with a reader that rejects anything that isn't a path, and test the reader against every value in the file (test/recomps.test.js does now).
 - **A button whose condition was the state it was meant to create (0.9.65, found 0.9.67):** "It's Set Up" showed only when the recomp was already set up. Check every button's `v-if` against the state it changes.
+- **The same mistake twice (found in 0.9.68):** 0.9.67 fixed recomp save notes read as paths, but the same catalogue's `setup.place` notes were still joined onto the folder as a file name (Ship of Harkinian's copy was linked as "the ROM in the same folder as soh.appimage ..."). When one field of a data file turns out to be prose, check every other field of that file the same way (0.9.68 checked `place`, `done`, `arg`, `args`, `program`: two more bugs, a one-off setup command kept as launch arguments and the program's own name passed as its first argument).
+- **Arguments: one source.** Open, the Steam shortcut and the update trial each built a recomp's command line differently (Open left the catalogue's own `args` out). Since 0.9.68 all three use `launchArgs(id)`.
 - **"Done" checks need several independent passes:** after 0.9.65 my own check found six gaps, after 0.9.66 four; the 0.9.67 audit by two separate read-only agents (one sweeping every plan, handover and log, one trying to prove each item wrong) found about twenty more, including the two bugs above. Do the same before calling a stretch finished.
 
 ---
@@ -237,6 +243,8 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 **Everything promised and not done yet (14 Oct 2026, checked three times: my pass through Part 7, a read-only agent sweeping every handover, plan, options file, CLAUDE.md and the session log, and a second agent trying to prove each item wrong; file:line evidence was in their reports).**
 
 *Recomps (Part 7.1):*
+
+0. **Fixed in 0.9.68 (Part 15):** Place setup, launch and setup arguments, Quest 64's done note. The picker items below still stand; picker recomps now set themselves up with no Set Up step (owner, 14 Oct), so item 3 (copy the path) only matters for recomps whose own picker Cartridge opens.
 1. **No off switch for the daily catalogue refresh (7.1 #5).** The plan said it "runs on by default", which implies one. It's always scheduled (main.js `recomps-refresh`). Only a manual Check for New exists.
 2. **Automatic finds aren't checked enough (7.1 #6).** `addFound` checks forks and stars only on the GitHub-search path, never that the project has a release with a Linux or Windows build. PCGamingWiki rows that already link a project are added with no checks at all. "Not a fork unless the original is gone" isn't handled.
 3. **Picker path not copied (7.1 #8).** The path is shown in a confirm box "ready to paste", but it isn't put on the clipboard. `clip:write` exists; RecompSheet doesn't call it.
@@ -472,4 +480,39 @@ The owner: "Okay do updates 1-3 but please make sure to triple Check everything 
 3. Update a recomp with saves; afterwards the save is still there (backups go to Cartridge's `recomp-backups/<id>/`, which no screen shows yet: Part 9 item 13).
 4. Save Sync with a recomp save.
 5. Online Play after an emulator update.
+
+## Part 15. 0.9.68 · Set Up Right (16 Oct 2026)
+
+Made on another account. The owner had worked on 0.9.38 to 0.9.67 elsewhere, asked for a full catch-up, then: "Can you do full debugging of what we have so far and patch it in an update". It ships the three commits of 14 Oct that were never released (the freeze fix, the Steam card, picker recomps setting themselves up; SESSION-LOG 14 Oct) with what the debugging found.
+
+**Found and fixed:**
+1. **Recomp Place setup linked your copy under a sentence.** 21 of the 27 Place entries had research notes in `setup.place`; `setGame` joined the whole note onto the recomp folder. Reproduced: Ship of Harkinian's copy became a link named "the ROM in the same folder as soh.appimage (9.2.3); newer builds ask with a file picker". Fix:
+   - `setup.to` written as paths for 24 entries (`file`: exact name or `x/` folder keeping the name; `dir`: the folder a picked folder's contents go into; `names`: disc files in order). Paths are relative to the program's folder (its working directory), `~/` in home.
+   - `placePlan`/`linkCopy`/`unlinkCopy`: never over a file, a .cue or .m3u brings the files it names, the previous copy's links go first and come back if the new copy can't be placed.
+   - The three with no rule (LADX HD's patcher, Half-Life: Decay, reLCS) are `how: 'manual'`: the page says what to do; It's Set Up where there's no done file.
+   - `repairOld()`: links made by 0.9.65 to 0.9.67 are removed (only links to your copy) and your copy placed by the rule, once per install.
+   - `checkGame` takes a file or a folder as the rule says; RecompSheet offers Pick a File and/or Pick a Folder.
+   - `tools/recomps/build.js` refuses `to` and `done` values that aren't paths; `test/recomps.test.js` plans every Place entry in the catalogue.
+2. **Open left out the catalogue's own arguments** (PGR4's GPU options, WiiCompiled's `launch-base`), and a list of arguments became "-game,decay" in the Steam shortcut. Fix: `argString`, `launchArgs(id)` used by Open (`startRecomp` in main.js), the Steam shortcut spec and the update trial.
+3. **One-off setup commands were kept as launch arguments** (WiiCompiled ran its installer on every start) and passed the program's own name as their first argument (Doom64EX, WiiCompiled). Fix: `setupTpl` drops the name; a path setup with a `done` file is a run started once (`run`, main starts it and the setup watch), never stored.
+4. **Done files:** relative ones are looked for beside the program too (`doneAt`); Quest 64's done note (a sentence) removed, so it uses It's Set Up.
+5. **Stalls:** `candidates()` 4 s memo (key: the scan's time and the Steam settings), `findBin` and `emulationRoots` 10 s (Part 6.1).
+6. **Recomp page:** a failed release check no longer says "Checking its newest release" for good; a manual recomp with a done file doesn't ask for It's Set Up.
+
+**Checked and found fine:** Zelda 64's done file (v1.2.2 ships no portable.txt; config.cpp uses ~/.config/Zelda64Recompiled); every `call()` channel, pop-up type and page exists; ESLint `no-undef` over electron/ and src/ finds nothing (one harmless prop and ref both named `tab` in GameAddons.vue; 41 unused names, dead code); nothing blocking left in code that runs on its own (the remaining execFileSync calls are `command -v` checks or fallbacks); 36 handlers called in the real app on a fake home all answer; the worker's modules don't need Electron.
+
+**How it was tested in the container** (scripts in the session scratchpad, not in the repo):
+- The real app through Playwright `_electron` in a fake Deck home: EmuDeck layout, a Steam account, `XDG_CURRENT_DESKTOP=gamescope` and `SteamGameId` with a fake `xprop`, against a fake RomM (earlier sessions' mock with N64 games added so recomps match). Crawl of every tab and Settings section, recomp pages opened, handlers called.
+- A main-process hook passed with `electron -r hook.js .` (NODE_OPTIONS `--require` doesn't load): CPU profile for 60 s and, for each event-loop stall over 200 ms, the functions holding it.
+- Real recomp installs (Ship of Harkinian 9.2.3, Zelda 64: Recompiled v1.2.2) through the engine in Node: the container's proxy blocks GitHub's API and release pages for other repositories (403/404), but `releases/download/` files and `git clone`/`ls-remote` work, so the release answer was stubbed with the real file names.
+- `npm test` (354), `npx vite build`, `npm run audit:ui` (all zero), launch check.
+
+**Not verified:** a recomp really finding its placed copy (needs a real ROM and a GPU); Doom64EX's and WiiCompiled's one-off runs (Doom64EX has no builds); the stall fix on a Deck.
+
+**Owner device tests:**
+1. Ship of Harkinian: Set Up With Your Game, then Open; it should make oot.o2r and show as set up.
+2. Perfect Dark or Sonic 3 A.I.R.: the same.
+3. Zelda 64: Recompiled: Open, follow its own wizard; it should show as set up once it has your ROM.
+4. Start in Game Mode and wait a minute: no dimming. If it dims, send the log (`main thread stalled`, `main thread: longest stall`).
+5. The Steam card in Consoles at 1280x800 and on the TV.
 

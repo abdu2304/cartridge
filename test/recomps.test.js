@@ -148,7 +148,7 @@ test('install, update with saves kept and checked, Roll Back, remove', async () 
 
 test('a game placed by link; a wrong copy refused unless used anyway; path setups pass it to the program', async () => {
   const z = Buffer.alloc(32, 7), md5 = crypto.createHash('md5').update(z).digest('hex');
-  const placed = { id: 'p', name: 'Placed', games: [{ title: 'P', console: 'gba' }], repo: 'github:o/p', builds: 'linux', program: 'Game', needs: { what: 'P (USA)', ext: ['gba'], md5: [md5] }, setup: { how: 'place', place: 'baserom.gba' }, done: 'baserom.gba' };
+  const placed = { id: 'p', name: 'Placed', games: [{ title: 'P', console: 'gba' }], repo: 'github:o/p', builds: 'linux', program: 'Game', needs: { what: 'P (USA)', ext: ['gba'], md5: [md5] }, setup: { how: 'place', place: 'baserom.gba', to: { file: 'baserom.gba' } }, done: 'baserom.gba' };
   const byPath = { id: 'q', name: 'ByPath', games: [{ title: 'Q', console: 'snes' }], repo: 'github:o/q', builds: 'linux', program: 'Game', needs: { what: 'Q', ext: ['sfc'] }, setup: { how: 'path', arg: '--rom {FILE}' } };
   const w = fakeWorld([placed, byPath]);
   w.publish('v1', 'x');
@@ -297,4 +297,107 @@ test('save notes read as paths: sentences, Proton prefixes, Flatpak sandboxes, p
   assert.deepStrictEqual(R.saveDirs({ saves: ['~/.config/UnleashedRecomp/save', '~/.local/share/skate3 (x; $XDG_DATA_HOME/skate3)'] }, { dir: '/E/x', flatpak: 'io.x.App' }, '/H'), ['/H/.var/app/io.x.App/config/UnleashedRecomp/save', '/H/.var/app/io.x.App/data/skate3']);
   // every note in the shipped catalogue gives only real paths (no sentence taken as a folder name)
   for (const e of require('../electron/recomps.json').entries) for (const p of R.saveDirs(e, { dir: '/E/x', kind: e.builds === 'windows' ? 'windows' : 'linux' }, '/H')) assert.doesNotMatch(p, /\s(in|the|and|beside|inside|relative|when|or)\s|[()<>*%]/, `${e.id}: ${p}`);
+});
+
+
+test('a game file goes into an argument template quoted once, with Z: once for Windows builds', () => {
+  const { fileArg } = require('../electron/recomps');
+  assert.strictEqual(fileArg('-rom {FILE}', '/g/a b.nes', false), '-rom "/g/a b.nes"');
+  assert.strictEqual(fileArg('--run "{FILE}"', '/g/c.cue', false), '--run "/g/c.cue"');
+  assert.strictEqual(fileArg('"Z:{FILE}"', '/g/r.iso', true), '"Z:/g/r.iso"');
+  assert.strictEqual(fileArg('--game_data_root "{FILE}"', '/g/d', true), '--game_data_root "Z:/g/d"');
+  assert.strictEqual(fileArg('{FILE}', '/g/x', false), '"/g/x"');
+});
+
+test('place rules: every Place entry in the catalogue has paths Cartridge can follow, or is set up by hand', () => {
+  const cat = require('../electron/recomps.json');
+  const P = /^(~\/|\$XDG_(DATA|CONFIG)_HOME\/|\/)?[\w.\-\[\]()!'/ ]+$/;
+  const rec = { dir: '/r/x', program: '/r/x/bin/game', kind: 'linux' };
+  for (const e of cat.entries) {
+    if (e.done) assert.match(e.done, P, `${e.id} done is a path`);
+    if (e.setup?.how !== 'place') continue;
+    const to = e.setup.to;
+    if (!to) continue; // set up by hand (It's Set Up)
+    for (const k of ['file', 'dir']) if (to[k] != null) assert.match(to[k], P, `${e.id} to.${k}`);
+    const isDir = !to.file;
+    const plan = R.placePlan(e, rec, isDir ? fs.mkdtempSync(path.join(os.tmpdir(), 'cart-pl-')) : '/games/My Game.' + (e.needs?.ext?.[0] || 'bin'), isDir);
+    if (isDir) { assert.ok(plan.why === 'That folder is empty.', `${e.id} folder plan`); continue; }
+    for (const l of plan.links) {
+      assert.ok(!/\s(the|in|beside|next|or|and)\s/i.test(l.to), `${e.id} links under a sentence: ${l.to}`);
+      assert.ok(l.to.startsWith('/r/x/bin/') || l.to.startsWith(os.homedir()), `${e.id} beside the program or in home: ${l.to}`);
+    }
+  }
+  // the 0.9.67 bug: Ship of Harkinian's note was taken as a file name
+  const soh = cat.entries.find((e) => e.id === 'shipofharkinian');
+  assert.deepStrictEqual(R.placePlan(soh, rec, '/games/oot.z64', false).links, [{ from: '/games/oot.z64', to: '/r/x/bin/oot.z64' }]);
+});
+
+test('place: a cue brings its tracks, folders go in by content, disc files take their names, old sentence links are put right', async () => {
+  const cueE = { id: 'w', name: 'W', games: [{ title: 'W', console: 'psx' }], repo: 'github:o/w', builds: 'linux', program: 'Game', needs: { what: 'W', files: 'disc', ext: ['cue', 'bin'] }, setup: { how: 'place', place: 'words', to: { file: 'diskimages/', dir: 'diskimages' } } };
+  const dirE = { id: 'a', name: 'A', games: [{ title: 'A', console: 'xbox360' }], repo: 'github:o/a', builds: 'linux', program: 'Game', needs: { what: 'A', files: 'folder' }, setup: { how: 'place', place: 'assets/ next to it', to: { dir: 'assets' } }, done: 'assets/default.xex' };
+  const discE = { id: 'r', name: 'R', games: [{ title: 'R', console: 'psx' }], repo: 'github:o/r', builds: 'linux', program: 'Game', needs: { what: 'R', files: 'several', ext: ['bin'] }, setup: { how: 'place', place: 'install/...', to: { file: 'install/', names: ['CD1.bin', 'CD2.bin'] } } };
+  const sohE = { id: 's', name: 'S', games: [{ title: 'S', console: 'n64' }], repo: 'github:o/s', builds: 'linux', program: 'Game', needs: { what: 'S', ext: ['z64'] }, setup: { how: 'place', place: 'the ROM in the same folder as soh.appimage', to: { file: './' } }, done: 'oot.o2r' };
+  const handE = { id: 'h', name: 'H', games: [{ title: 'H', console: 'gbc' }], repo: 'github:o/h', builds: 'linux', program: 'Game', needs: { what: 'H', files: 'folder' }, setup: { how: 'place', place: 'the patcher in the root folder' } };
+  const w = fakeWorld([cueE, dirE, discE, sohE, handE]);
+  w.publish('v1', 'x');
+  for (const id of ['w', 'a', 'r', 's', 'h']) await w.eng.install(id);
+  const at = (id, ...p) => path.join(w.eng.record(id).dir, ...p);
+  // a .cue and the tracks it names
+  const g = path.join(w.d, 'g'); fs.mkdirSync(g);
+  fs.writeFileSync(path.join(g, 'W.cue'), 'FILE "W (Track 1).bin" BINARY\n  TRACK 01 MODE2/2352\nFILE "W (Track 2).bin" BINARY\n  TRACK 02 AUDIO\n');
+  fs.writeFileSync(path.join(g, 'W (Track 1).bin'), '1'); fs.writeFileSync(path.join(g, 'W (Track 2).bin'), '2');
+  const r1 = await w.eng.setGame('w', path.join(g, 'W.cue'));
+  assert.ok(r1.ok, r1.why);
+  assert.deepStrictEqual(fs.readdirSync(at('w', 'diskimages')).sort(), ['W (Track 1).bin', 'W (Track 2).bin', 'W.cue']);
+  // a folder's contents into assets/, never over a file that's there
+  const gd = path.join(w.d, 'game'); fs.mkdirSync(gd); fs.writeFileSync(path.join(gd, 'default.xex'), 'x');
+  const r2 = await w.eng.setGame('a', gd);
+  assert.ok(r2.ok, r2.why);
+  assert.strictEqual(fs.realpathSync(at('a', 'assets', 'default.xex')), fs.realpathSync(path.join(gd, 'default.xex')));
+  assert.strictEqual(w.eng.list().entries.find((e) => e.id === 'a').installed.ready, true);
+  assert.strictEqual((await w.eng.setGame('a', path.join(gd, 'default.xex'))).ok, false, 'a file refused where only a folder goes');
+  // disc files named as it reads them, disc 1 first
+  const dd = path.join(w.d, 'discs'); fs.mkdirSync(dd);
+  fs.writeFileSync(path.join(dd, 'Driver 2 (Disc 2).bin'), '2'); fs.writeFileSync(path.join(dd, 'Driver 2 (Disc 1).bin'), '1');
+  assert.ok((await w.eng.setGame('r', path.join(dd, 'Driver 2 (Disc 1).bin'))).ok);
+  assert.strictEqual(fs.readFileSync(at('r', 'install', 'CD1.bin'), 'utf8'), '1');
+  assert.strictEqual(fs.readFileSync(at('r', 'install', 'CD2.bin'), 'utf8'), '2');
+  // no rule: set up by hand, with It's Set Up
+  const h = w.eng.list().entries.find((e) => e.id === 'h');
+  assert.strictEqual(h.setup.how, 'manual');
+  assert.strictEqual(h.installed.ready, false);
+  w.eng.markDone('h');
+  assert.strictEqual(w.eng.list().entries.find((e) => e.id === 'h').installed.ready, true);
+  // a 0.9.67 install: the copy linked under a file named like the note is moved to where the rule says
+  const rom = path.join(w.d, 'oot.z64'); fs.writeFileSync(rom, 'rom');
+  const recs = JSON.parse(fs.readFileSync(path.join(w.data, 'recomp-installs.json'), 'utf8'));
+  const bad = at('s', 'the ROM in the same folder as soh.appimage');
+  fs.symlinkSync(rom, bad);
+  recs.s.game = { file: rom, how: 'place', placed: bad }; recs.s.setupDone = true;
+  fs.writeFileSync(path.join(w.data, 'recomp-installs.json'), JSON.stringify(recs));
+  w.eng.reload();
+  const s = w.eng.list().entries.find((e) => e.id === 's');
+  assert.ok(!fs.existsSync(bad) && !fs.lstatSync(bad, { throwIfNoEntry: false }), 'the sentence link is gone');
+  assert.strictEqual(fs.realpathSync(at('s', 'oot.z64')), fs.realpathSync(rom));
+  assert.strictEqual(s.installed.ready, false, 'not ready until it has made oot.o2r');
+  fs.writeFileSync(at('s', 'oot.o2r'), 'o2r');
+  assert.strictEqual(w.eng.list().entries.find((e) => e.id === 's').installed.ready, true);
+});
+
+test('launch arguments: the catalogue\'s own come first; a one-off setup command runs once and is never kept', async () => {
+  assert.strictEqual(R.argString(['-game', 'decay']), '-game decay');
+  assert.strictEqual(R.argString(['--root', 'My Games']), '--root "My Games"');
+  assert.strictEqual(R.setupTpl({ program: 'doom64ex', setup: { arg: 'doom64ex -wadgen {FILE}' } }), '-wadgen {FILE}');
+  assert.strictEqual(R.setupTpl({ program: 'x', setup: { arg: '--rom {FILE}' } }), '--rom {FILE}');
+  const once = { id: 'o', name: 'O', games: [{ title: 'O', console: 'wii' }], repo: 'github:o/o', builds: 'linux', program: 'Game', args: ['launch-base'], needs: { what: 'O', ext: ['iso'] }, setup: { how: 'path', arg: 'Game install --game {FILE}' }, done: '~/.local/share/O/state.json' };
+  const every = { id: 'e', name: 'E', games: [{ title: 'E', console: 'psx' }], repo: 'github:o/e', builds: 'linux', program: 'Game', args: '--fast', needs: { what: 'E', ext: ['cue'] }, setup: { how: 'path', arg: '-cue "{FILE}"' } };
+  const w = fakeWorld([once, every]);
+  w.publish('v1', 'x');
+  await w.eng.install('o'); await w.eng.install('e');
+  const iso = path.join(w.d, 'o.iso'), cue = path.join(w.d, 'e.cue'); fs.writeFileSync(iso, 'i'); fs.writeFileSync(cue, 'c');
+  const r = await w.eng.setGame('o', iso);
+  assert.strictEqual(r.run, `install --game "${iso}"`);
+  assert.strictEqual(w.eng.launchArgs('o'), 'launch-base', 'play starts it the normal way');
+  await w.eng.setGame('e', cue);
+  assert.strictEqual(w.eng.launchArgs('e'), `--fast -cue "${cue}"`);
 });

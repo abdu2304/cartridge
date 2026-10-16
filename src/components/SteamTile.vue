@@ -2,22 +2,36 @@
   <!-- The Steam card in Consoles (0.9.65, owner): Steam's logo where a console's goes, Valve where Sony or Sega goes,
        Steam's colours, the Steam Controller as its picture, Cartridge's own font. It holds recomps, grouped inside by
        the console each game came from. Same build as SysTile, so Plain, Glass, Light and OLED treat it the same way. -->
-  <button class="systile steamtile" data-focus data-key="sys-steam" :style="{ '--sys-a': '#2a475e', '--sys-b': '#171a21' }" @click="$emit('open')" @focus="$emit('focused')">
+  <button class="systile steamtile" data-focus data-key="sys-steam" :style="{ '--sys-a': '#1a9fff', '--sys-b': '#1b2a63' }" @click="$emit('open')" @focus="$emit('focused')">
     <div class="sys-clip"><div class="glyph wide"><svg viewBox="0 0 300 200" role="img" aria-label="Steam Controller">
+      <!-- 0.9.68 (owner: "looks like shit and not like others"): drawn filled and lit like RomM's console pictures, a white
+           Steam Controller with shaded grips, two round trackpads, stick, face buttons and the Steam button -->
       <defs>
-        <linearGradient id="stc-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4a5260" /><stop offset="1" stop-color="#1c2027" /></linearGradient>
-        <radialGradient id="stc-pad" cx="0.45" cy="0.4" r="0.7"><stop offset="0" stop-color="#2b3039" /><stop offset="1" stop-color="#0d0f13" /></radialGradient>
+        <linearGradient id="stc-body" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" /><stop offset="0.55" stop-color="#e9edf2" /><stop offset="1" stop-color="#b9c1cc" /></linearGradient>
+        <linearGradient id="stc-edge" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.9" /><stop offset="1" stop-color="#8d96a3" stop-opacity="0.6" /></linearGradient>
+        <radialGradient id="stc-pad" cx="0.4" cy="0.35" r="0.75"><stop offset="0" stop-color="#d6dbe2" /><stop offset="0.7" stop-color="#b3bbc6" /><stop offset="1" stop-color="#959eab" /></radialGradient>
+        <radialGradient id="stc-btn" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stop-color="#5b6370" /><stop offset="1" stop-color="#262a31" /></radialGradient>
+        <radialGradient id="stc-shade" cx="0.5" cy="0.15" r="0.9"><stop offset="0.55" stop-color="#000" stop-opacity="0" /><stop offset="1" stop-color="#1c2b4a" stop-opacity="0.35" /></radialGradient>
       </defs>
-      <path d="M44 74C42 44 70 30 104 32h92c34-2 62 12 60 42l10 70c4 34-24 48-46 30l-28-24h-84l-28 24c-22 18-50 4-46-30z" fill="url(#stc-body)" stroke="#646c7a" stroke-width="2" />
-      <circle cx="98" cy="86" r="34" fill="url(#stc-pad)" stroke="#5a616d" stroke-width="2" />
-      <circle cx="202" cy="86" r="34" fill="url(#stc-pad)" stroke="#5a616d" stroke-width="2" />
-      <circle cx="98" cy="86" r="16" fill="none" stroke="#3a404b" stroke-width="1.5" />
-      <circle cx="202" cy="86" r="16" fill="none" stroke="#3a404b" stroke-width="1.5" />
-      <circle cx="122" cy="134" r="14" fill="#171a20" stroke="#5a616d" stroke-width="2" />
-      <circle cx="122" cy="134" r="8" fill="#2a2f38" />
-      <g fill="#2f3540" stroke="#6d7584" stroke-width="1.2"><circle cx="186" cy="124" r="6" /><circle cx="174" cy="136" r="6" /><circle cx="198" cy="136" r="6" /><circle cx="186" cy="148" r="6" /></g>
-      <circle cx="150" cy="60" r="10" fill="#151820" stroke="#66c0f4" stroke-width="2" />
-      <circle cx="150" cy="60" r="3.5" fill="#66c0f4" />
+      <path d="M58 58C64 40 86 32 110 34h80c24-2 46 6 52 24l22 92c6 26-12 42-32 36-12-4-20-14-28-26l-14-20h-80l-14 20c-8 12-16 22-28 26-20 6-38-10-32-36z" fill="url(#stc-body)" />
+      <path d="M58 58C64 40 86 32 110 34h80c24-2 46 6 52 24l22 92c6 26-12 42-32 36-12-4-20-14-28-26l-14-20h-80l-14 20c-8 12-16 22-28 26-20 6-38-10-32-36z" fill="url(#stc-shade)" stroke="url(#stc-edge)" stroke-width="2" />
+      <circle cx="104" cy="82" r="33" fill="#8c95a2" opacity="0.5" />
+      <circle cx="104" cy="81" r="30" fill="url(#stc-pad)" />
+      <circle cx="104" cy="81" r="19" fill="none" stroke="#a2abb7" stroke-width="1.2" />
+      <path d="M104 70v22M93 81h22" stroke="#9aa3af" stroke-width="3" stroke-linecap="round" />
+      <circle cx="196" cy="82" r="33" fill="#8c95a2" opacity="0.5" />
+      <circle cx="196" cy="81" r="30" fill="url(#stc-pad)" />
+      <circle cx="196" cy="81" r="19" fill="none" stroke="#a2abb7" stroke-width="1.2" />
+      <circle cx="120" cy="122" r="14" fill="#a6aeba" />
+      <circle cx="120" cy="121" r="11" fill="url(#stc-btn)" />
+      <circle cx="120" cy="121" r="5.5" fill="#3a404a" stroke="#6b7380" stroke-width="1" />
+      <g fill="url(#stc-btn)"><circle cx="181" cy="108" r="6" /><circle cx="171" cy="118" r="6" /><circle cx="191" cy="118" r="6" /><circle cx="181" cy="128" r="6" /></g>
+      <g fill="#ffffff" opacity="0.35"><circle cx="179.3" cy="106.3" r="1.8" /><circle cx="169.3" cy="116.3" r="1.8" /><circle cx="189.3" cy="116.3" r="1.8" /><circle cx="179.3" cy="126.3" r="1.8" /></g>
+      <path d="M134 60l-7 5 7 5zM166 60l7 5-7 5z" fill="#6b7380" />
+      <circle cx="150" cy="65" r="10" fill="#2c323b" />
+      <circle cx="150" cy="65" r="7.5" fill="none" stroke="#66c0f4" stroke-width="1.6" />
+      <circle cx="152.5" cy="62.5" r="2.4" fill="#66c0f4" />
+      <circle cx="146.5" cy="68.5" r="1.6" fill="#66c0f4" />
     </svg></div></div>
     <div class="sys-top steam-top">
       <svg class="steam-mark" viewBox="0 0 24 24" aria-hidden="true"><path :d="STEAM" /></svg>

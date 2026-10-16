@@ -1,17 +1,23 @@
-## Cartridge 0.9.67 · Follow Through
-
-### New
-- **See a recomp set itself up.** Many recomps build their own files from your copy of the game the first time they start (Ship of Harkinian makes its game file, others copy your ROM in). When you open one that isn't set up yet, Cartridge now shows **Setting itself up** with how much it has written, on the recomp's page and under Downloads → In the Background. It marks the recomp as set up as soon as its finished file appears. If the recomp closes before then, Cartridge says so, and opening it again carries on.
-- **Checking your copy runs in the background.** Checking a large game file against the version a recomp needs now carries on under Downloads if you leave the page.
+## Cartridge 0.9.68 · Set Up Right
 
 ### Changed
-- **Online Play spots renamed settings after an emulator update.** When an update renames or moves a setting Online Play uses, Cartridge now says so in Online Play instead of writing the old name back. This covers PPSSPP, PCSX2, RetroArch, RPCS3, shadPS4, Ryujinx and Eden, which rewrite their whole settings file.
-- **Online Play checks every file before and after changing it.** RPCS3's and shadPS4's settings must still read correctly after Cartridge's change before anything is written. After writing, Cartridge reads them back and checks again that RPCS3 can load its settings. If anything is wrong, every file goes back exactly as it was and Cartridge says why.
+- **Recomps with their own setup set themselves up.** Recomps that ask for your game in their own menu or setup wizard (Zelda 64: Recompiled and most N64 recomps) no longer have a Set Up With Your Game step in Cartridge. Open starts them, and you follow their own steps the first time. Cartridge sees when they're set up, or you press It's Set Up for the ones it can't see.
+- **The Steam card's controller is drawn like the console pictures.** On the Steam card in Consoles, the Steam Controller is now a lit, shaded drawing on Steam blue, like the other consoles' pictures. It used to be a dark outline.
 
 ### Fixed
-- **Recomp saves are found where they really are.** Many recomps' save locations are described in words ("pokeemerald.sav in the working directory", "Documents/svr07 inside the Proton prefix"). Cartridge took the whole sentence as a folder name, so it backed up nothing before updates and Save Sync missed those saves. Now Cartridge reads the real paths out of them:
-  - files beside the recomp;
-  - folders in your home;
-  - for Windows recomps in Steam, the folders inside their own Proton prefix;
-  - for Flatpak recomps (Unleashed Recompiled), the folders inside the Flatpak's own space.
-- **"It's Set Up" appears when it's needed.** For recomps that ask for your game themselves and have no file Cartridge can watch for, the button only showed once the recomp was already set up, so they stayed "Needed". It now shows after you've given it your game.
+- **No more dimming about 30 seconds after start.** Cartridge read every game's ID (Switch files, PS2 discs) and matched Steam games on its main thread. On a large library this froze it for seconds. In Game Mode, Steam then dimmed the window and took the controller.
+  - Game IDs are now read in the background, and what was read is saved every 2 seconds, so a closed app doesn't start over.
+  - Steam matching remembers where each game really is.
+  - Emulator lookups are kept for a few seconds instead of being checked on disk again for every console.
+  - If the app still stalls for over 2 seconds in Game Mode, it brings the controller back afterwards, as it does after a game.
+- **Ship of Harkinian and other recomps that need your copy put in place.** Cartridge linked your copy under a file named after its own setup note ("the ROM in the same folder as soh.appimage ..."), so the recomp never found it. Your copy now goes exactly where each recomp looks:
+  - beside the program;
+  - into its data folder in your home;
+  - under the name it expects (Perfect Dark's data/pd.ntsc-final.z64, REDRIVER2's two discs);
+  - for a disc image, a .cue file brings its tracks with it, and a folder of game files goes in by its contents.
+
+  Recomps set up before this update are put right by themselves. The few that Cartridge can't place (a patcher, a mod inside another game) say what to do and have an It's Set Up button.
+- **Recomps start with their own options.** Open left out the options a recomp's project says it needs, such as PGR4's graphics options and WiiCompiled's normal start. Setup steps that should run once (Doom64EX making its game file, WiiCompiled installing your game) now run once, instead of every time you played.
+- **Recomp updates are checked the way they're played.** The quick start after an update now uses the same options as playing.
+- **Recomp page.** It says when Cartridge couldn't check for a newer release, instead of "Checking its newest release" for good.
+- **Game files quoted once.** Recomp options that already quoted the game's file got doubled quotes, and Windows builds got "Z:" twice.

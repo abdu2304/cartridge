@@ -222,13 +222,76 @@ function hashFile(file, { n64 = false } = {}) {
   });
 }
 // does this file fit what the recomp needs? -> { ok, why, warn }
+// the game put into an argument template: quoted once, Z: once for Windows builds, whether or not the template
+// already quotes it ("{FILE}", "Z:{FILE}" gave ""/path"" and "Z:"Z:/path"" before 0.9.68)
+function fileArg(tpl, file, win) {
+  return String(tpl).replace(/"?(Z:)?\{FILE\}"?/g, (m, z) => `"${z || win ? 'Z:' : ''}${file}"`);
+}
+// the catalogue's own launch arguments as one command line: a string as written, or a list (Half-Life: Decay's
+// ["-game", "decay"], which `${}` turned into "-game,decay")
+function argString(a) {
+  return Array.isArray(a) ? a.map((x) => (/[\s"]/.test(String(x)) ? `"${String(x).replace(/"/g, '')}"` : String(x))).join(' ') : String(a || '').trim();
+}
+// a setup template written with the program's name first ("doom64ex -wadgen {FILE}"): the name comes off, as the
+// program is started by its path (0.9.65 to 0.9.67 passed the name to it as its first argument)
+function setupTpl(e) {
+  const t = String(e?.setup?.arg || '').trim(), first = t.split(/\s+/)[0] || '', prog = path.basename(String(e?.program || ''));
+  return prog && first.toLowerCase() === prog.toLowerCase() ? t.slice(first.length).trim() : t;
+}
+// the files a .cue or .m3u names beside it (a disc image's tracks, a multi-disc list), which go wherever it goes
+function companions(file) {
+  if (!/\.(cue|m3u)$/i.test(file)) return [];
+  let txt = ''; try { txt = fs.readFileSync(file, 'utf8').slice(0, 64 * 1024); } catch { return []; }
+  const names = /\.cue$/i.test(file) ? [...txt.matchAll(/^\s*FILE\s+"?([^"\r\n]+?)"?\s+\w+\s*$/gim)].map((m) => m[1]) : txt.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  return [...new Set(names.map((n) => path.join(path.dirname(file), n)))].filter((p) => p !== file && fs.existsSync(p));
+}
+// where your copy goes for a "place" recomp (0.9.68). Read from the catalogue's setup.to, written as paths; never from
+// setup.place, which is the research note in words (0.9.65 to 0.9.67 linked your copy under a file named like the
+// sentence: Ship of Harkinian got "the ROM in the same folder as soh.appimage ..." beside it and never found it).
+//   to.file   where a picked file goes: "x/" is a folder (the file keeps its name), anything else is the exact name
+//   to.dir    the folder a picked folder's contents go into (made when missing)
+//   to.names  names for the disc files, in order (REDRIVER2 reads install/Driver2CD1.bin and Driver2CD2.bin)
+// Relative paths are beside the program (its working folder), ~/ and $XDG_ paths in your home. A .cue or .m3u
+// brings the files it names. Returns { links: [{ from, to }] } or { why }.
+function placePlan(e, rec, file, isDir) {
+  const to = e?.setup?.to;
+  if (!to) return { why: `Cartridge doesn’t know where ${e?.name || 'it'} looks for your copy. ${e?.setup?.place ? 'Its notes say: ' + e.setup.place : ''}`.trim() };
+  const base = rec.flatpak ? rec.dir : path.dirname(rec.program);
+  const at = (p) => expandPath(String(p).replace(/\/+$/, '') || '.', base);
+  const want = (n) => !e.needs?.ext?.length || e.needs.ext.map((x) => String(x).toLowerCase()).includes(path.extname(n).slice(1).toLowerCase());
+  const sorted = (dir) => { try { return fs.readdirSync(dir).filter((n) => !n.startsWith('.')).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })); } catch { return []; } };
+  let links;
+  if (isDir) {
+    if (!to.dir) return { why: `${e.name} takes a file here, not a folder: ${e.needs?.what || ''}`.trim() };
+    const into = at(to.dir);
+    const ents = to.names ? sorted(file).filter(want).slice(0, to.names.length) : sorted(file);
+    if (!ents.length) return { why: 'That folder is empty.' };
+    links = ents.map((n, i) => ({ from: path.join(file, n), to: path.join(into, to.names ? to.names[i] : n) }));
+  } else {
+    if (!to.file) return { why: `${e.name} needs the game as a folder: ${e.needs?.what || ''}`.trim() };
+    const folder = /\/$/.test(to.file), dest = at(to.file);
+    if (to.names) {
+      // the disc files beside the one picked (same ending), disc 1 first
+      const ext = path.extname(file).toLowerCase(), all = sorted(path.dirname(file)).filter((n) => path.extname(n).toLowerCase() === ext).slice(0, to.names.length);
+      const into = folder ? dest : path.dirname(dest);
+      links = all.map((n, i) => ({ from: path.join(path.dirname(file), n), to: path.join(into, to.names[i]) }));
+    } else {
+      const main = folder ? path.join(dest, path.basename(file)) : dest;
+      links = [{ from: file, to: main }, ...companions(file).map((f) => ({ from: f, to: path.join(path.dirname(main), path.basename(f)) }))];
+    }
+  }
+  return { links };
+}
 async function checkGame(e, file) {
   const need = e?.needs;
   if (!need) return { ok: true };
   const st = await fsp.stat(file).catch(() => null);
   if (!st) return { ok: false, why: 'That file isn’t there any more.' };
-  if (need.files === 'folder' && !st.isDirectory()) return { ok: false, why: `${e.name} needs the game as a folder: ${need.what}` };
-  if (need.files !== 'folder' && st.isDirectory()) return { ok: false, why: `${e.name} needs a file, not a folder: ${need.what}` };
+  // a place recomp's own rule says which it takes (0.9.68: AC6 takes its .iso or an assets/ folder)
+  const to = e.setup?.how === 'place' ? e.setup.to : null;
+  const takesDir = to ? !!to.dir : need.files === 'folder', takesFile = to ? !!to.file : need.files !== 'folder';
+  if (!takesFile && !st.isDirectory()) return { ok: false, why: `${e.name} needs the game as a folder: ${need.what}` };
+  if (!takesDir && st.isDirectory()) return { ok: false, why: `${e.name} needs a file, not a folder: ${need.what}` };
   if (st.isDirectory()) return { ok: true };
   const ext = path.extname(file).slice(1).toLowerCase();
   if (need.ext?.length && !need.ext.map((x) => String(x).toLowerCase()).includes(ext)) {
@@ -332,7 +395,10 @@ function createRecomps(ctx) {
     const add = (e, from) => {
       if (!e?.id || ids.has(e.id) || (e.repo && repos.has(e.repo.toLowerCase()))) return;
       ids.add(e.id); if (e.repo) repos.add(e.repo.toLowerCase());
-      out.push({ ...e, from });
+      // a place with no rule Cartridge can follow (a patcher, a mod folder inside another game): you put it in place
+      // yourself, then press It's Set Up (0.9.68)
+      const setup = e.setup?.how === 'place' && !e.setup.to ? { ...e.setup, how: 'manual' } : e.setup;
+      out.push({ ...e, setup, from });
     };
     for (const e of base.entries || []) add(e, 'list');
     for (const e of readJson(F('recomps-found.json'), [])) add(e, 'found');
@@ -359,11 +425,73 @@ function createRecomps(ctx) {
   function readyOf(e, rec) {
     if (!rec || !exists(rec.program)) return false;
     if (!e?.needs) return true;
-    if (e.done) { const d = expandPath(e.done, rec.dir); return !!d && exists(d); }
+    if (e.done) return doneAt(e, rec).some(exists);
     return !!rec.setupDone;
+  }
+  // the done file: a relative one is beside the program (its working folder, where Ship of Harkinian writes oot.o2r)
+  // or in the install folder; 0.9.67 looked only in the install folder, which isn't the program's for nested builds
+  function doneAt(e, rec) {
+    if (!e?.done || !rec) return [];
+    if (/^(~|\$XDG_|\/)/.test(e.done)) return [expandPath(e.done, rec.dir)].filter(Boolean);
+    return [...new Set([...(rec.flatpak ? [] : [path.join(path.dirname(rec.program), e.done)]), path.join(rec.dir, e.done)])];
+  }
+  // what it's started with: the catalogue's own arguments, then the game when its setup passes it every time
+  function launchArgs(id) {
+    const e = byId(id), rec = installs[id];
+    return [argString(e?.args), rec?.args || ''].filter(Boolean).join(' ');
+  }
+  // 0.9.65 to 0.9.67 placed your copy under a link named like the catalogue's note, and kept a one-off setup command
+  // (WiiCompiled's "install --game", Doom64EX's "-wadgen") as the launch arguments. Put right once per install: the
+  // old link goes (only a link to your copy), your copy is placed where the rule says, the setup command comes off.
+  let repaired = false;
+  function repairOld() {
+    if (repaired) return; repaired = true;
+    let changed = false;
+    for (const [id, rec] of Object.entries(installs)) {
+      const e = byId(id);
+      if (!e || !rec?.game) continue;
+      if (e.setup?.how === 'path' && e.done && rec.args) { delete rec.args; changed = true; log('recomp setup arguments taken off', id); }
+      if (rec.game.how !== 'place' || rec.game.links || !rec.game.placed) continue;
+      try {
+        const st = fs.lstatSync(rec.game.placed, { throwIfNoEntry: false });
+        if (st?.isSymbolicLink() && path.resolve(path.dirname(rec.game.placed), fs.readlinkSync(rec.game.placed)) === path.resolve(rec.game.file)) fs.unlinkSync(rec.game.placed);
+      } catch {}
+      delete rec.game.placed; rec.setupDone = false; changed = true;
+      if (e.setup?.to && exists(rec.game.file)) {
+        const r = linkCopy(e, rec, rec.game.file);
+        if (r.ok) { rec.game.links = r.links; rec.setupDone = true; log('recomp copy placed again', id, r.links.length); }
+        else log('recomp copy not placed again', id, r.why);
+      }
+    }
+    if (changed) saveInstalls();
+  }
+  // links your copy (and the files it names) where the rule says: never over a file, only links Cartridge made go
+  function linkCopy(e, rec, file) {
+    let isDir = false; try { isDir = fs.statSync(file).isDirectory(); } catch { return { ok: false, why: 'That file isn’t there any more.' }; }
+    const plan = placePlan(e, rec, file, isDir);
+    if (plan.why) return { ok: false, why: plan.why };
+    for (const l of plan.links) {
+      const st = fs.lstatSync(l.to, { throwIfNoEntry: false });
+      if (!st) continue;
+      const same = (() => { try { return fs.realpathSync(l.to) === fs.realpathSync(l.from); } catch { return false; } })();
+      if (!same) return { ok: false, why: `${l.to.replace(os.homedir(), '~')} is already there. Cartridge leaves it as it is.` };
+    }
+    for (const l of plan.links) {
+      if (fs.lstatSync(l.to, { throwIfNoEntry: false })) continue;
+      fs.mkdirSync(path.dirname(l.to), { recursive: true });
+      fs.symlinkSync(l.from, l.to);
+    }
+    return { ok: true, links: plan.links.map((l) => l.to) };
+  }
+  // the links made for your previous copy, before another is placed (only links to that copy)
+  function unlinkCopy(rec) {
+    for (const t of rec.game?.links || []) {
+      try { const st = fs.lstatSync(t, { throwIfNoEntry: false }); if (st?.isSymbolicLink()) fs.unlinkSync(t); } catch {}
+    }
   }
   // everything the screens show, in one go
   function list({ roms = [] } = {}) {
+    repairOld();
     const out = [];
     for (const e of catalogue().entries) {
       const rec = installs[e.id] || null;
@@ -520,7 +648,7 @@ function createRecomps(ctx) {
     // can't start at all (missing libraries, a crash in the first seconds) goes back to the release that worked
     if (prev && prev.tag && kind === 'linux' && ctx.trialRun) {
       onProgress({ step: 'trial', pct: null });
-      const t = await ctx.trialRun({ program, args: prev.args || '', cwd: path.dirname(program), ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message }));
+      const t = await ctx.trialRun({ program, args: launchArgs(id), cwd: path.dirname(program), ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message }));
       if (t?.failed) {
         log('recomp update did not start, back to', prev.tag, id, t.why);
         try {
@@ -590,30 +718,34 @@ function createRecomps(ctx) {
     if (!e || !rec) throw new Error('Install it first.');
     const chk = await checkGame(e, file);
     if (!chk.ok && !(force && chk.wrong)) return { ok: false, why: chk.why, wrong: !!chk.wrong };
-    const how = e.setup?.how || 'none';
+    const how = e.setup?.how || 'none', prev = rec.game || null;
     rec.game = { file, at: Date.now(), checked: chk.ok, how };
-    let note = '', args = null;
-    if (how === 'place' && e.setup?.place) {
-      const want = expandPath(e.setup.place, rec.dir);
-      const target = /\/$/.test(e.setup.place) || (exists(want) && fs.statSync(want).isDirectory()) ? path.join(want, path.basename(file)) : want;
-      fs.mkdirSync(path.dirname(target), { recursive: true });
-      if (exists(target) || fs.lstatSync(target, { throwIfNoEntry: false })) {
-        const same = (() => { try { return fs.realpathSync(target) === fs.realpathSync(file); } catch { return false; } })();
-        if (!same) return { ok: false, why: `${target.replace(os.homedir(), '~')} is already there. Cartridge leaves it as it is.` };
-      } else fs.symlinkSync(file, target);
-      rec.game.placed = target;
-      note = `Linked as ${target.replace(os.homedir(), '~')}.`;
+    let note = '', args = null, run = null;
+    if (how === 'place') {
+      // the previous copy's links go first (a new copy usually takes the same name); it comes back if this one can't
+      unlinkCopy({ game: prev });
+      const r = linkCopy(e, rec, file);
+      if (!r.ok) {
+        rec.game = prev;
+        if (prev?.links && exists(prev.file)) { const back = linkCopy(e, rec, prev.file); if (back.ok) prev.links = back.links; }
+        saveInstalls();
+        return { ok: false, why: r.why };
+      }
+      rec.game.links = r.links;
+      note = r.links.length === 1 ? `Linked as ${r.links[0].replace(os.homedir(), '~')}.` : `Linked ${r.links.length} files in ${path.dirname(r.links[0]).replace(os.homedir(), '~')}.`;
     } else if (how === 'path' && e.setup?.arg) {
-      args = e.setup.arg.replace(/\{FILE\}/g, rec.kind === 'windows' ? `"Z:${file}"` : `"${file}"`);
-      rec.args = args;
-      note = 'Cartridge starts it with your game.';
+      args = fileArg(setupTpl(e), file, rec.kind === 'windows');
+      // with a done file the command is a one-off setup run (Doom64EX makes its WAD, WiiCompiled installs the game),
+      // started now; without one the game is passed every time it starts
+      if (e.done) { run = args; args = null; delete rec.args; note = 'It sets itself up with your game now.'; }
+      else { rec.args = args; note = 'Cartridge starts it with your game.'; }
     } else if (how === 'picker') {
       note = rec.kind === 'windows' ? `When it asks for the game, paste this: Z:${file.replace(/\//g, '\\')}` : `When it asks for the game, pick: ${file}`;
     }
-    if (how !== 'picker') rec.setupDone = true;
+    if (how === 'place' || (how === 'path' && !run)) rec.setupDone = true;
     saveInstalls();
     log('recomp game set', id, how, chk.ok ? 'checked' : 'used anyway');
-    return { ok: true, how, note, args, checked: chk.ok, path: rec.kind === 'windows' ? 'Z:' + file.replace(/\//g, '\\') : file };
+    return { ok: true, how, note, args, run, checked: chk.ok, path: rec.kind === 'windows' ? 'Z:' + file.replace(/\//g, '\\') : file };
   }
   function markDone(id) { const rec = installs[id]; if (!rec) return false; rec.setupDone = true; saveInstalls(); return true; }
   function setAppid(id, appid) { const rec = installs[id]; if (rec) { rec.appid = appid >>> 0; saveInstalls(); } }
@@ -685,9 +817,8 @@ function createRecomps(ctx) {
     if (!e || !rec || !e.done || readyOf(e, rec) || watching.has(id)) return { watched: false };
     watching.add(id);
     try {
-      const doneAt = e.done ? expandPath(e.done, rec.dir) : null;
       // the folders it builds into: its own, and the done file's folder when that is elsewhere (~/.config/<Name>)
-      const dirs = [rec.dir, ...(doneAt && !doneAt.startsWith(rec.dir + path.sep) ? [path.dirname(doneAt)] : [])];
+      const dirs = [...new Set([rec.dir, ...doneAt(e, rec).filter((d) => !d.startsWith(rec.dir + path.sep)).map((d) => path.dirname(d))])];
       const base = await bytesIn(dirs), start = Date.now();
       let gone = 0;
       for (;;) {
@@ -758,8 +889,8 @@ function createRecomps(ctx) {
     return n;
   }
   const record = (id) => installs[id] || null;
-  const reload = () => { cat = null; installs = readJson(F('recomp-installs.json'), {}); };
-  return { catalogue, byId, details, ready, watchSetup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
+  const reload = () => { cat = null; repaired = false; installs = readJson(F('recomp-installs.json'), {}); };
+  return { catalogue, byId, details, ready, watchSetup, launchArgs, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
 }
 
-module.exports = { savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };
+module.exports = { fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };

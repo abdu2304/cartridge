@@ -419,11 +419,33 @@ module.exports = function createSteamManager(ctx) {
   // kept only once the login shell has answered (it's asked in the background, never waited for)
   const binsNow = () => { const d = detect.extraBinDirs(HOME); if (detect.loginPathKnown()) extraBins = d; return d; };
   const BIN_DIRS = () => [...new Set([...(process.env.PATH || '').split(':'), '/usr/bin', '/usr/local/bin', '/usr/games', '/app/bin', path.join(HOME, '.local/bin'), '/var/lib/flatpak/exports/bin', ...(extraBins || binsNow())].filter((d) => d && d.startsWith('/') && !d.includes('/tmp/.mount_')))];
-  const findBin = (names) => { for (const d of BIN_DIRS()) for (const n of names || []) { const f = path.join(d, n); if (exists(f) && !isDir(f)) return f; } return null; };
+  // looked up once per 10 s per set of names (0.9.68: every console asked for every emulator's program names in every
+  // bin folder, the largest part of what was left of the stalls)
+  const binMemo = new Map();
+  const findBin = (names) => {
+    const k = (names || []).join('\0'), hit = binMemo.get(k);
+    if (hit && Date.now() - hit.at < 10000) return hit.val;
+    let val = null;
+    out: for (const d of BIN_DIRS()) for (const n of names || []) { const f = path.join(d, n); if (exists(f) && !isDir(f)) { val = f; break out; } }
+    binMemo.set(k, { at: Date.now(), val });
+    return val;
+  };
   const kindOf = (key) => (key === 'ps4' ? 'eboot' : key === 'wiiu' ? 'rpx' : 'path');
   // Every emulator for this console that is installed here: [{ id, label, t }]. Each copy is listed
   // (someone can have both the Flatpak and an AppImage); the first copy keeps the plain id.
+  // 0.9.68: a short memo. One screen asks for many consoles at once (forksAll walks every console, Settings and the
+  // game page ask again), and every ask checked dozens of paths on disk on the main thread: 200 to 500 ms stalls
+  // on a near-empty test home, far more on a Deck's SD card. The memo holds 4 s and starts again whenever the scan
+  // or your choices change (the scan's time and the Steam settings are in its key).
+  const candMemo = new Map();
   function candidates(key) {
+    const sig = `${found?.at || 0}:${JSON.stringify(cfg())}`, hit = candMemo.get(key);
+    if (hit && hit.sig === sig && Date.now() - hit.at < 4000) return hit.val;
+    const val = candidatesNow(key);
+    candMemo.set(key, { sig, at: Date.now(), val });
+    return val;
+  }
+  function candidatesNow(key) {
     const L = launchersDirs(), out = [];
     // An EmuDeck launcher is often a wrapper: dolphin-emu.sh runs the Dolphin Flatpak, pcsx2-qt.sh the
     // AppImage in ~/Applications. Then that copy is the same install and is not listed again.
@@ -573,28 +595,7 @@ module.exports = function createSteamManager(ctx) {
       .flatMap((h) => [path.join(h, 'Applications/Vita3K/Vita3K'), path.join(h, 'Applications/Vita3K/Vita3K.AppImage')]).find((p) => exists(p) && works(p));
     return own ? { exe: own, args: [], from: 'EmuDeck Vita3K' } : null;
   }
-  function serialOf(rom, p) {
-    const tag = String(rom.fs_name || '') + ' ' + String(rom.name || '') + ' ' + path.basename(p || '');
-    const named = CS.nameSerial(tag); // "BLUS30443" or "BLUS-30443" in a name
-    if (named) return named;
-    // a folder game: PS3_GAME/PARAM.SFO holds the serial
-    // (also one folder down: a download folder holding the game folder)
-    const sfos = [path.join(p, 'PS3_GAME', 'PARAM.SFO'), path.join(p, 'PARAM.SFO'), path.join(p, 'sce_sys', 'param.sfo')];
-    if (isDir(p)) for (const n of ls(p)) if (isDir(path.join(p, n))) sfos.push(path.join(p, n, 'PS3_GAME', 'PARAM.SFO'), path.join(p, n, 'sce_sys', 'param.sfo'));
-    for (const f of sfos) {
-      try { const s = CS.anySerial(fs.readFileSync(f).toString('latin1')); if (s) return s; } catch {}
-    }
-    // an ISO inside a folder
-    if (isDir(p)) { const iso = ls(p).find((n) => /\.iso$/i.test(n)); if (iso) p = path.join(p, iso); }
-    // a disc image: look for the serial near the start of the ISO (PS3_DISC.SFB / PARAM.SFO)
-    try {
-      const fd = fs.openSync(p, 'r'); const b = Buffer.alloc(1024 * 1024);
-      fs.readSync(fd, b, 0, b.length, 0); fs.closeSync(fd);
-      const s = CS.ps3Disc(b.toString('latin1')); // NPUA, NPEB and the rest too (0.9.15)
-      if (s) return s;
-    } catch {}
-    return null;
-  }
+  const serialOf = (rom, p) => require('./fileIds').ps3SerialOf(rom, p); // moved to fileIds.js (0.9.68): read in a worker too
   // Vita title ID (PCSE00000): from the name, else from the start of the .pkg/.vpk (its content ID)
   function vitaTitleId(rom, file) {
     const named = CS.vitaName(String(rom.fs_name || '') + ' ' + String(rom.name || '') + ' ' + path.basename(file || ''));
@@ -849,7 +850,15 @@ module.exports = function createSteamManager(ctx) {
 
   // ---------------------------------------------------------------- library view
   const SHORT = { ps2: 'PS2', ps3: 'PS3', ps4: 'PS4', psx: 'PS1', psp: 'PSP', psvita: 'Vita', gc: 'GameCube', wii: 'Wii', wiiu: 'Wii U', switch: 'Switch', n3ds: '3DS', nds: 'DS', n64: 'N64', snes: 'SNES', nes: 'NES', gba: 'GBA', gb: 'Game Boy', gbc: 'GBC', xbox: 'Xbox', xbox360: 'Xbox 360', dreamcast: 'Dreamcast', genesis: 'Genesis', megadrive: 'Mega Drive', saturn: 'Saturn' };
-  const normPath = (p) => real(String(p || '')).replace(/\/+$/, '');
+  // 0.9.68 (owner: the app dims, then no controller): every installed game's real path was asked of the disk on each
+  // Steam match (play time, last played, collections), thousands of lstat calls on the main thread; asked once per 5 min
+  let realMemo = new Map(), realAt = Date.now();
+  const normPath = (p) => {
+    if (Date.now() - realAt > 300000) { realMemo = new Map(); realAt = Date.now(); }
+    const k = String(p || ''); let v = realMemo.get(k);
+    if (v === undefined) { v = real(k).replace(/\/+$/, ''); realMemo.set(k, v); }
+    return v;
+  };
   function installedGames() {
     const lib = ctx.getLibrary();
     const inst = ctx.installed();
@@ -876,6 +885,24 @@ module.exports = function createSteamManager(ctx) {
     if (!s && g.file && ['ps3', 'psp', 'psvita'].includes(g.key)) { try { s = serialOf(g.rom, g.file) || null; } catch {} }
     serialCache.set(k, s);
     return s;
+  }
+  // 0.9.68: the serials read from the games themselves (up to 1 MB of each PS3/PSP/Vita game) are read before matching,
+  // through ctx.readSerial (a worker thread in the app), so gameSerial finds them cached instead of reading on the
+  // main thread. One run at a time; cheap once every game is known.
+  let warmingSerials = null;
+  function warmSerials() {
+    if (!ctx.readSerial) return Promise.resolve();
+    if (warmingSerials) return warmingSerials;
+    warmingSerials = (async () => {
+      for (const g of installedGames()) {
+        if (!g.file || !['ps3', 'psp', 'psvita'].includes(g.key)) continue;
+        const k = g.rom.id + '|' + g.file;
+        if (serialCache.has(k) || CS.plainSerial(String(g.rom.fs_name + ' ' + path.basename(g.file)))) continue;
+        let s = null; try { s = (await ctx.readSerial(g.rom, g.file)) || null; } catch {}
+        serialCache.set(k, s);
+      }
+    })().finally(() => { warmingSerials = null; });
+    return warmingSerials;
   }
   // a game added live whose shortcut Steam hasn't saved to disk yet
   function liveHit(g) {
@@ -1179,6 +1206,7 @@ module.exports = function createSteamManager(ctx) {
   }
   function listBackups() { return ls(BACKUP_DIR).filter((f) => /^shortcuts\.vdf\.\d/.test(f)).sort().reverse(); }
   async function apply({ restart = true } = {}) {
+    await warmSerials(); // 0.9.68: serials read off the main thread first
     const p = plan();
     if (!p.entries.length && !p.removing.length) throw new Error('Nothing to apply');
     const f = files(p.account);
@@ -1334,6 +1362,7 @@ module.exports = function createSteamManager(ctx) {
   // put in a collection live are in Steam's memory long before its collections file is written, so the file alone
   // reported them missing
   async function verifyCollections() {
+    await warmSerials(); // 0.9.68: serials read off the main thread first
     const env = environment();
     if (!env.account) return null;
     const { list: cols } = await colsNow(env);
@@ -1668,6 +1697,7 @@ module.exports = function createSteamManager(ctx) {
   const inCol = (col) => new Set((col?.added || []).map((x) => Number(x) >>> 0));
   // one console: its collection and each of its games in Steam, in it or not
   async function consoleCollection(key) {
+    await warmSerials(); // 0.9.68: serials read off the main thread first
     const env = environment();
     if (!env.account) throw new Error('Steam was not found.');
     const { list, live: isLive } = await colsNow(env);
@@ -1680,6 +1710,7 @@ module.exports = function createSteamManager(ctx) {
   // puts games in their console's collection: all missing ones, or only some consoles / appids. auto: never restarts
   // Steam (only with its interface reachable), for the check Cartridge runs by itself
   async function fillCollections({ keys = null, appids = null, auto = false } = {}) {
+    await warmSerials(); // 0.9.68: serials read off the main thread first
     const env = environment();
     if (!env.account) throw new Error('Steam was not found.');
     const { list, live: isLive } = await colsNow(env);
@@ -1737,6 +1768,7 @@ module.exports = function createSteamManager(ctx) {
   // 0.9.32 (owner: redesign, a deleted collection still showed): read from Steam itself when its interface is
   // reachable (what Steam shows now), else from its files with the local changes; `source` says which
   async function collectionsReview() {
+    await warmSerials(); // 0.9.68: serials read off the main thread first
     const env = environment();
     if (!env.account) throw new Error('Steam was not found.');
     const c = cfg(), pending = c.pendingRenames || {};
@@ -1941,7 +1973,7 @@ module.exports = function createSteamManager(ctx) {
     },
     liveInfo: async () => { const env = environment(); if (!env.account) return { on: false, flag: false }; return { on: await live.available(env.account.root), flag: live.flagOn(env.account.root) }; },
     liveEnable: () => { const env = environment(); if (!env.account) throw new Error('Steam was not found.'); fs.writeFileSync(path.join(env.account.root, live.FLAG), ''); return true; },
-    installedEmulators, addRomToCollections, onDownloaded, onDeleted, lastStatus, writeScript, startupReport, forRom, fixCollections, played, playtime, steamRoots, refreshArt,
+    installedEmulators, addRomToCollections, onDownloaded, onDeleted, lastStatus, writeScript, startupReport, forRom, fixCollections, played, playtime, warmSerials, steamRoots, refreshArt,
     play, scanEmulators, rpcs3Command, vita3kCommand, setupOverview, confirm, markFork, useFile, health, healthFix, movedEmulators, setupReport, syncConsoleCollections, fillCollections, consoleCollection, collectionsReview, collectionsApply, forksAll, frontRunning, preflight: (key) => preflight(key, templateFor(key)),
     candidatesFor: (key) => az(candidates(key).map((c) => ({ id: c.id, label: c.label, sub: shortPath(c.t.how === 'flatpak' ? c.t.from : c.t.exe), fork: !!c.fork }))),
     // one game's own Target, Start in and Launch options (console page, 0.9.15); null goes back

@@ -45,7 +45,9 @@ const READERS = 2; // 2: PS4 (0.9.59)
 function createIdentity(ctx) {
   let cache = null, dirty = false, saveT = null;
   const load = () => { if (cache) return cache; try { cache = JSON.parse(fs.readFileSync(ctx.file, 'utf8')) || {}; } catch { cache = {}; } return cache; };
-  const save = () => { dirty = true; clearTimeout(saveT); saveT = setTimeout(() => { if (!dirty || !ctx.file) return; dirty = false; try { fs.writeFileSync(ctx.file, JSON.stringify(cache)); } catch {} }, 2000); saveT.unref?.(); };
+  // 0.9.68: at most every 2 s, not 2 s after the last read: while games were being read one after another the timer kept
+  // moving, so nothing was saved until every game was read, and an app closed midway read them all again next start
+  const save = () => { dirty = true; if (saveT) return; saveT = setTimeout(() => { saveT = null; if (!dirty || !ctx.file) return; dirty = false; fs.promises.writeFile(ctx.file, JSON.stringify(cache)).catch(() => {}); }, 2000); saveT.unref?.(); };
   // IDs read from the game itself, once per file version.
   // 0.9.60 (owner: no controller for 15 seconds at start): reading means decrypting Switch files and opening CHDs, which
   // held the main thread; with ctx.lazy a game not read yet is queued for warm() and answers [] for now. Whatever needs
@@ -58,10 +60,26 @@ function createIdentity(ctx) {
     if (c[k]) return c[k];
     if (!now) { queue.set(where, rom); warm(); return []; }
     let ids = [];
-    try { ids = [...new Set((ctx.extract(rom, where) || []).filter(Boolean).map(up))]; } catch (e) { ctx.log?.('game id read failed', where, e.message); }
+    try { ids = ctx.extract(rom, where) || []; } catch (e) { ctx.log?.('game id read failed', where, e.message); }
+    return keep(where, k, ids);
+  }
+  function keep(where, k, ids) {
+    const c = load();
+    ids = [...new Set(ids.filter(Boolean).map(up))];
     for (const old of Object.keys(c)) if (old.startsWith(where + ':') && old !== k) delete c[old]; // the file changed: forget its old IDs
     c[k] = ids; save();
     return ids;
+  }
+  // 0.9.68 (owner: the app dims about 30 s after start): with ctx.extractAsync the reading happens in a worker
+  // thread (fileIds.js), so a big Switch or PS2 file never holds the main thread
+  async function fileIdsAsync(rom, where) {
+    if (!ctx.extractAsync) return fileIds(rom, where, { now: true });
+    let st; try { st = await fs.promises.stat(where); } catch { return []; }
+    const k = `${where}:${st.size}:${Math.round(st.mtimeMs)}:${READERS}`;
+    if (load()[k]) return load()[k];
+    let ids = [];
+    try { ids = (await ctx.extractAsync(rom, where)) || []; } catch (e) { ctx.log?.('game id read failed', where, e.message); }
+    return keep(where, k, ids);
   }
   const nameIds = (rom, where) => cide.parse([rom.fs_name, rom.name, ...(rom.files || []).map((f) => f.file_name), where ? where.split('/').pop() : ''].join(' '));
   function idsOf(rom) {
@@ -105,7 +123,7 @@ function createIdentity(ctx) {
         if (!queue.size) break;
         const [where, rom] = queue.entries().next().value;
         queue.delete(where);
-        fileIds(rom, where, { now: true });
+        await fileIdsAsync(rom, where);
         memo.delete(rom.id);
       }
     })().finally(() => { warming = null; });

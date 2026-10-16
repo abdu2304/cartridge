@@ -21,7 +21,7 @@
         <details v-if="det?.notes" class="rcs-notes small"><summary data-focus tabindex="0">Release Notes · {{ det.tag }}</summary><p>{{ det.notes }}</p></details>
         <div class="rcs-facts small">
           <div><b>Needs</b><span>{{ e.needs ? e.needs.what : 'Nothing more: it plays once it’s installed.' }}</span></div>
-          <div v-if="e.needs"><b>Setup</b><span>{{ HOW[e.setup?.how] || HOW.picker }}</span></div>
+          <div v-if="e.needs"><b>Setup</b><span>{{ howText }}</span></div>
           <div><b>Build</b><span>{{ buildText }}</span></div>
           <div v-if="e.installed"><b>Here</b><span class="mono">{{ short(e.installed.dir) }}</span></div>
           <div v-if="e.installed?.game"><b>Your Copy</b><span class="mono">{{ short(e.installed.game.file) }}{{ e.installed.game.checked === false ? ' (used anyway)' : '' }}</span></div>
@@ -38,8 +38,8 @@
           </template>
           <template v-else>
             <button v-if="e.update" class="lrow" data-focus data-key="rc-update" :disabled="!!job" @click="install"><Icon name="mdiUpdate" :size="24" /><span class="l-mid"><b>Update to {{ e.latest.tag }}</b><span class="l-sub">Your saves are backed up first, and this version is kept so you can go back</span></span></button>
-            <button v-if="e.needs" class="lrow" data-focus data-key="rc-game" @click="setUp"><Icon name="mdiGamepadVariantOutline" :size="24" /><span class="l-mid"><b>{{ e.installed.ready ? 'Change Your Copy' : 'Set Up With Your Game' }}</b><span class="l-sub">{{ e.installed.game ? short(e.installed.game.file) : 'Not set yet' }}</span></span><span v-if="!e.installed.ready" class="l-end"><span class="status warn">Needed</span></span></button>
-            <button v-if="!e.installed.ready && e.installed.game && e.setup?.how === 'picker' && !e.done" class="lrow" data-focus @click="markDone"><Icon name="mdiCheckCircleOutline" :size="24" /><span class="l-mid"><b>It’s Set Up</b><span class="l-sub">Press once it has your game</span></span></button>
+            <button v-if="e.needs && !OWN.includes(e.setup?.how)" class="lrow" data-focus data-key="rc-game" @click="setUp"><Icon name="mdiGamepadVariantOutline" :size="24" /><span class="l-mid"><b>{{ e.installed.ready ? 'Change Your Copy' : 'Set Up With Your Game' }}</b><span class="l-sub">{{ e.installed.game ? short(e.installed.game.file) : 'Not set yet' }}</span></span><span v-if="!e.installed.ready" class="l-end"><span class="status warn">Needed</span></span></button>
+            <button v-if="!e.installed.ready && OWN.includes(e.setup?.how) && !e.done" class="lrow" data-focus @click="markDone"><Icon name="mdiCheckCircleOutline" :size="24" /><span class="l-mid"><b>It’s Set Up</b><span class="l-sub">Press once it has your game</span></span></button>
             <button class="lrow" data-focus data-key="rc-steam" :disabled="!!e.installed.steam" @click="toSteam"><Icon name="mdiSteam" :size="24" /><span class="l-mid"><b>{{ e.installed.steam ? 'In Steam' : 'Add to Steam' }}</b><span class="l-sub">{{ e.installed.steam ? 'In your Recomps collection' : 'Its own shortcut, in a Recomps collection, apart from the emulated game' }}</span></span></button>
             <button class="lrow" data-focus data-key="rc-open" @click="openIt"><Icon name="mdiPlay" :size="24" /><span class="l-mid"><b>{{ e.installed.kind === 'windows' ? 'Open Through Steam' : 'Open' }}</b><span class="l-sub">{{ e.installed.kind === 'windows' ? 'A Windows build: Proton runs it, as it will in play' : 'Start it here' }}</span></span></button>
             <button v-if="!e.update" class="lrow" data-focus :disabled="checking" @click="check"><Icon name="mdiRefresh" :size="24" :class="{ spin: checking }" /><span class="l-mid"><b>Check for Updates</b><span class="l-sub">{{ e.installed.tag }}{{ e.latest?.at ? ' · checked ' + ago(e.latest.at) : '' }}</span></span></button>
@@ -65,7 +65,15 @@ import Icon from './Icon.vue';
 
 const props = defineProps({ id: String });
 const el = ref(null), e = ref(null), det = ref(null), picBad = ref(false), kept = ref([]), why = ref(''), checking = ref(false), consoles = ref({});
-const HOW = { place: 'Cartridge links your copy where it looks for it (nothing is copied).', path: 'Cartridge starts it with your copy.', picker: 'It asks for your copy itself the first time; Cartridge shows you the exact path to give it.', none: 'Nothing to set up.' };
+const HOW = { place: 'Cartridge links your copy where it looks for it (nothing is copied).', path: 'Cartridge starts it with your copy.', picker: 'It sets itself up: open it and follow its own steps the first time.', none: 'Nothing to set up.' };
+// set up without Cartridge handing it your copy: its own steps (picker), or by hand where no rule fits (manual, 0.9.68)
+const OWN = ['picker', 'manual'];
+const howText = computed(() => {
+  const x = e.value, how = x?.setup?.how;
+  if (how === 'manual') return `Put your copy in place yourself${x.setup.place ? ': ' + x.setup.place : ''}.${x.done ? ' Cartridge sees when it’s set up.' : ' Then press It’s Set Up.'}`;
+  if (how === 'path' && x.done) return 'Cartridge runs its setup with your copy once.';
+  return HOW[how] || HOW.picker;
+});
 const short = (p) => String(p || '').replace(store.info?.home || '\0', '~');
 const job = computed(() => bgJob('recomp:' + props.id));
 const setupJob = computed(() => bgJob('recompset:' + props.id) || bgJob('recompsetup:' + props.id));
@@ -82,7 +90,7 @@ const buildText = computed(() => {
 });
 const latestText = computed(() => {
   const l = e.value?.latest;
-  if (!l) return 'Checking its newest release…';
+  if (!l) return why.value ? 'Couldn’t check its newest release' : 'Checking its newest release…'; // 0.9.68: a failed check said "Checking" for good
   if (l.none === 'nobuild') return 'Its newest release has no Linux or Windows build';
   if (l.none) return 'No releases yet';
   return `${l.tag} · ${l.kind === 'windows' ? 'Windows build, through Proton' : 'Linux build'}`;
@@ -127,9 +135,13 @@ async function check() {
 async function setUp() {
   why.value = '';
   const lib = await call('recomps:gameFiles', { id: props.id }).catch(() => []);
-  const v = await choose({ title: 'Which Copy?', message: e.value.needs?.what || '', options: [...lib.map((g) => ({ label: g.name, sub: short(g.file), value: g.file, icon: 'mdiGamepadVariant', raw: true })), { label: 'Pick a File', sub: 'Anywhere on this device', value: '__pick', icon: 'mdiFolderOpenOutline' }] });
+  // a file, a folder, or either: what its rule takes (0.9.68: folder games had only a file picker)
+  const to = e.value.setup?.how === 'place' ? e.value.setup.to : null;
+  const takesDir = to ? !!to.dir : e.value.needs?.files === 'folder', takesFile = to ? !!to.file : e.value.needs?.files !== 'folder';
+  const v = await choose({ title: 'Which Copy?', message: e.value.needs?.what || '', options: [...lib.map((g) => ({ label: g.name, sub: short(g.file), value: g.file, icon: 'mdiGamepadVariant', raw: true })), ...(takesFile ? [{ label: 'Pick a File', sub: 'Anywhere on this device', value: '__pick', icon: 'mdiFileOutline' }] : []), ...(takesDir ? [{ label: 'Pick a Folder', sub: 'The folder holding the game’s files', value: '__dir', icon: 'mdiFolderOpenOutline' }] : [])] });
   let file = v;
   if (v === '__pick') file = await pickFolder({ title: 'Your Copy of the Game', subtitle: e.value.needs?.what || '', start: store.info?.home, hidden: true, files: e.value.needs?.ext?.length ? e.value.needs.ext : '*' });
+  else if (v === '__dir') file = await pickFolder({ title: 'Your Copy of the Game', subtitle: e.value.needs?.what || '', start: store.info?.home, hidden: true });
   reopen();
   if (!file) return;
   let r = await call('recomps:setGame', { id: props.id, file }).catch((er) => ({ ok: false, why: er.message }));
