@@ -3367,7 +3367,7 @@ function createWindow() {
     // recomps (0.9.65): recomp/<console> in every Emulation folder once, and the catalogue, PCGamingWiki and installed
     // recomps' releases checked once a day, silently (owner: "without consuming many resources")
     scheduler.add('recomp-folders', { once: true, firstAfter: 25000, deferWhilePlaying: true, run: async () => { try { recomps().ensureFolders(); } catch (e) { log('recomp folders', e.message); } recompTrophies(); } });
-    scheduler.add('recomps-refresh', { every: 24 * 3600e3, firstAfter: 5 * 60000, deferWhilePlaying: true, run: async () => { const r = await recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }); log('recomps refreshed', JSON.stringify(r)); } });
+    scheduler.add('recomps-refresh', { every: 24 * 3600e3, firstAfter: 5 * 60000, deferWhilePlaying: true, run: async () => { if (config.recomps?.daily === false) return; /* 0.9.69: Settings → Recomps, Check Every Day */ const r = await recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }); log('recomps refreshed', JSON.stringify(r)); } });
     scheduler.add('bios-check', { once: true, firstAfter: 45000, deferWhilePlaying: true, run: () => biosSetup({ install: true }).catch(() => {}) }); // 0.9.38: firmware too, when an emulator lacks it
   }
   win.webContents.once('did-finish-load', () => log('ui loaded', Date.now() - startedAt + 'ms', 'window=' + win.getContentSize().join('x'), 'zoom=' + currentZoom()));
@@ -5126,6 +5126,15 @@ const handlers = {
       }
       out.push({ romId: rid, name: romName(rid), file });
     }
+    return out;
+  },
+  // 0.9.69 (agreed plan 7.1 #9): your library's copies checked before installing, so a wrong version is said before a
+  // download. Only when the catalogue lists file types or hashes; [] when there's nothing to check against
+  'recomps:checkCopies': async ({ id }) => {
+    const R = recomps(), e = R.byId(id), M = require('./recomps');
+    if (!e?.needs || !(e.needs.ext?.length || e.needs.md5?.length || e.needs.sha1?.length)) return [];
+    const out = [];
+    for (const g of handlers['recomps:gameFiles']({ id }).slice(0, 4)) { const c = await M.checkGame(e, g.file).catch((er) => ({ ok: false, why: er.message })); out.push({ name: g.name, file: g.file, ok: !!c.ok, why: c.why || '' }); }
     return out;
   },
   'recomps:setGame': async ({ id, file, force }) => {

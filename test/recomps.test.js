@@ -84,7 +84,8 @@ function fakeWorld(entries, extra = {}) {
   fs.writeFileSync(path.join(d, 'shipped.json'), JSON.stringify({ updated: '2026-10-09', entries }));
   const releases = [];
   const fetchImpl = async (url) => {
-    if (/api\.github\.com\/repos\/.*\/releases/.test(url)) return { ok: true, status: 200, json: async () => releases };
+    if (/api\.github\.com\/repos\/.*\/releases/.test(url)) return { ok: true, status: 200, json: async () => (/\/nobuild\//.test(url) ? [] : releases) };
+    if (/api\.github\.com\/repos\/[^/]+\/[^/]+$/.test(url)) return { ok: true, status: 200, json: async () => ({ fork: /\/a-fork$/.test(url), stargazers_count: 5 }) }; // project info
     return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
   };
   // a release with a Linux tar.gz holding Game/<program> and a data file
@@ -169,7 +170,9 @@ test('a game placed by link; a wrong copy refused unless used anyway; path setup
 
 test('the daily refresh adds projects new on PCGamingWiki, quietly, once', async () => {
   const w = fakeWorld([{ id: 'u', name: 'Unleashed Recompiled', games: [{ title: 'Sonic Unleashed', console: 'xbox360' }], repo: 'github:hedge-dev/UnleashedRecomp' }]);
-  const rows = R.parseWikitext(['=== Xbox 360 ===', '{|', '|-', '| Sonic Unleashed || [https://github.com/hedge-dev/UnleashedRecomp x]', '|-', '| Skate 3 || [https://github.com/mchughalex/skate3recomp Skate 3 Recomp]', '|}'].join('\n'));
+  const rows = R.parseWikitext(['=== Xbox 360 ===', '{|', '|-', '| Sonic Unleashed || [https://github.com/hedge-dev/UnleashedRecomp x]', '|-', '| Skate 3 || [https://github.com/mchughalex/skate3recomp Skate 3 Recomp]', '|-', '| Halo || [https://github.com/someone/a-fork Halo fork]', '|-', '| Fable || [https://github.com/nobuild/fable Fable]', '|}'].join('\n'));
+  w.publish('v1', 'x'); // a release with a Linux build
+  // 0.9.69: a fork and a project with no usable build are left out
   assert.strictEqual(await w.eng.addFound(rows, { search: null }), 1);
   assert.strictEqual(await w.eng.addFound(rows, { search: null }), 0);
   const e = w.eng.catalogue().entries.find((x) => x.repo === 'github:mchughalex/skate3recomp');

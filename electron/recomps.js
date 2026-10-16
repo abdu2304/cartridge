@@ -658,7 +658,11 @@ function createRecomps(ctx) {
         saveInstalls();
         latest[id] = { tag: rel.tag, date: rel.date, kind: 'flatpak', name: b.asset.name, at: Date.now(), channel: ch }; writeJson(F('recomp-latest.json'), latest);
         log('recomp', prev ? 'updated' : 'installed', id, rel.tag, 'flatpak', appId);
-        return { tag: rel.tag, kind: 'flatpak', program: '/usr/bin/flatpak', dir: dest, updated: !!prev, programMoved: false, restored: checkSaves(meta).restored, backedUp: !!meta };
+        // 0.9.69: an update is started once here too; Flatpak keeps no earlier version for Cartridge to go back to, so a
+        // start that fails is said plainly (its own data is untouched)
+        let t = null;
+        if (prev?.tag && ctx.trialRun) { onProgress({ step: 'trial', pct: null }); t = await ctx.trialRun({ program: '/usr/bin/flatpak', args: `run ${appId}`, cwd: dest, ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message })); }
+        return { tag: rel.tag, kind: 'flatpak', program: '/usr/bin/flatpak', dir: dest, updated: !!prev, programMoved: false, restored: checkSaves(meta).restored, backedUp: !!meta, ...(t ? (t.failed ? { started: false, why: t.why } : { started: true }) : {}) };
       }
       // a Linux archive with no Linux program but a Windows one inside is a Windows build after all
       const C = require('./customEmu');
@@ -907,10 +911,22 @@ function createRecomps(ctx) {
   }
   // rows from the wiki that name a project the catalogue lacks: added quietly, marked found. A row without a project
   // link is looked up on GitHub only when one well-starred, non-fork project names the port (no guesses).
-  async function addFound(rows, { search = ctx.search } = {}) {
+  // 0.9.69 (agreed plan 7.1 #6): a project is only added when its newest release has a Linux or Windows build and it
+  // isn't a fork (GitHub says so); a few are looked at each day and the rest wait for the next refresh
+  async function vet(repo) {
+    const r = repoOf(repo); if (!r) return false;
+    const f = ctx.fetchImpl || require('./webFetch');
+    if (r.host === 'github') {
+      const info = await f(`https://api.github.com/repos/${r.repo}`, { headers: { 'User-Agent': 'Cartridge', Accept: 'application/json' }, signal: AbortSignal.timeout(15000) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
+      if (!info || info.fork) return false;
+    }
+    const rel = await releaseOf({ repo }, { fetchImpl: ctx.fetchImpl }).catch(() => null);
+    return !!(rel && pickBuild(rel.assets, {}));
+  }
+  async function addFound(rows, { search = ctx.search, maxVet = 6 } = {}) {
     const known = new Set(catalogue().entries.flatMap((e) => [e.repo?.toLowerCase(), ...(e.games || []).map((g) => g.console + ':' + norm(e.name))]).filter(Boolean));
     const found = readJson(F('recomps-found.json'), []);
-    let n = 0, looked = 0;
+    let n = 0, looked = 0, vetted = 0;
     for (const row of rows) {
       let repo = row.links.map(repoFromLink).find(Boolean);
       if (!repo && search && looked < 5 && row.port.length > 3) {
@@ -920,6 +936,9 @@ function createRecomps(ctx) {
         if (ok.length === 1 || (ok.length > 1 && ok[0].stars >= ok[1].stars * 4)) repo = 'github:' + ok[0].repo;
       }
       if (!repo || known.has(repo.toLowerCase()) || known.has(row.console + ':' + norm(row.port))) continue;
+      if (vetted >= maxVet) break;
+      vetted++;
+      if (!(await vet(repo).catch(() => false))) { log('recomps: not added (no usable build, or a fork)', repo); known.add(repo.toLowerCase()); continue; }
       known.add(repo.toLowerCase());
       found.push({ id: 'found-' + slugId(repo.split(':')[1].replace('/', '-')), name: row.port, games: [{ title: row.game.replace(/\s*\([^)]*\)\s*$/, ''), console: row.console }], origin: 'recomp', repo, builds: 'linux', needs: null, setup: { how: 'picker' }, saves: [], description: '', auto: true, at: Date.now() });
       n++;

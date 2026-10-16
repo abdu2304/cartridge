@@ -7,6 +7,8 @@
       <button class="btn small" data-focus :disabled="refreshing" @click="refresh"><Icon name="mdiSync" :size="18" :class="{ spin: refreshing }" />Check for New</button>
     </div>
     <p v-if="data" class="muted small rc-note">{{ note }}</p>
+    <!-- 0.9.69 (agreed plan): the daily look for new recomps can be turned off; Check for New still works -->
+    <Toggle v-if="data" :model-value="store.config.recomps?.daily !== false" label="Check for New Recomps Every Day" desc="Once a day, quietly: Cartridge’s own list, then PCGamingWiki for projects with a Linux or Windows build. Check for New still works when this is off." @update:model-value="(v) => saveConfig({ recomps: { ...(store.config.recomps || {}), daily: v } })" />
     <div v-if="!data" class="muted small"><Icon name="mdiSync" :size="16" class="spin" /> Reading the list…</div>
     <template v-else>
       <div v-if="!groups.length" class="muted small rc-empty">{{ filter === 'mine' ? 'No recomps installed yet. Pick one from All.' : filter === 'yours' ? 'None of the games in your library has a recomp in the list yet.' : 'The list is empty.' }}</div>
@@ -39,7 +41,8 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { store, call, toast, openModal, choose, askText, romById, cover, bgJob } from '../store.js';
+import { store, call, toast, openModal, choose, askText, romById, cover, bgJob, saveConfig } from '../store.js';
+import Toggle from './Toggle.vue';
 import Icon from './Icon.vue';
 import PIcon from './PIcon.vue';
 import LinkInput from './LinkInput.vue';

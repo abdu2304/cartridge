@@ -118,11 +118,21 @@ onBeforeUnmount(() => { off?.(); layer?.pop(); });
 
 async function install() {
   why.value = '';
+  // 0.9.69 (agreed plan): your library's copy checked before a first install, so a wrong version is said before the download
+  if (!e.value.installed && e.value.roms?.length) {
+    const cs = await call('recomps:checkCopies', { id: props.id }).catch(() => []);
+    if (cs.length && !cs.some((c) => c.ok)) {
+      const go = await confirm('Your Copy May Not Work', `${cs[0].why}\n\nYou can install it anyway and use another copy later.`, 'Install Anyway');
+      reopen();
+      if (!go) return;
+    }
+  }
   try {
     const r = await call('recomps:install', { id: props.id });
     // 0.9.66: the new release is started once; one that can't run here goes back to the one that worked
     if (r.rolledBack) { why.value = `${r.newTag} couldn’t start here (${r.why}), so ${e.value.name} went back to ${r.tag}. Your saves are as they were.`; toast(`${r.newTag} couldn’t start, kept ${r.tag}`, 'error', 6000); }
     else if (r.rollBackFailed) why.value = `${r.tag} couldn’t start here (${r.why}), and going back failed: ${r.rollBackFailed}. Use Roll Back.`;
+    else if (r.started === false) why.value = `${r.tag} is installed but couldn’t start here (${r.why}). Flatpak keeps no earlier version to go back to.`;
     else toast(r.already ? 'Already the newest' : r.updated ? `Updated to ${r.tag}${r.started ? ', started once to check' : ''}${r.restored ? ', saves put back' : ''}` : `${e.value.name} is installed`, 'ok', 3000, 'mdiCheck');
   } catch (er) { why.value = er.message; }
   load();
