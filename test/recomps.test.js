@@ -401,3 +401,26 @@ test('launch arguments: the catalogue\'s own come first; a one-off setup command
   await w.eng.setGame('e', cue);
   assert.strictEqual(w.eng.launchArgs('e'), `--fast -cue "${cue}"`);
 });
+
+test('save backups put back: the saves there now backed up first, the backup restored kept even at the limit', async () => {
+  const entry = { id: 'b', name: 'B', games: [{ title: 'B', console: 'n64' }], repo: 'github:o/b', builds: 'linux', program: 'Game', saves: ['saves'], needs: null, setup: { how: 'none' } };
+  const w = fakeWorld([entry]);
+  w.publish('v1', 'x');
+  await w.eng.install('b');
+  const dir = w.eng.record('b').dir, sav = path.join(dir, 'saves', 'slot.sav');
+  fs.mkdirSync(path.dirname(sav)); fs.writeFileSync(sav, 'first');
+  w.eng.backupSaves('b', 'update');
+  for (let i = 0; i < 9; i++) { fs.writeFileSync(sav, 'later ' + i); await new Promise((r) => setTimeout(r, 2)); w.eng.backupSaves('b', 'update'); }
+  const list = w.eng.backups('b');
+  assert.strictEqual(list.length, 10);
+  const oldest = list[list.length - 1];
+  assert.strictEqual(oldest.files, 1);
+  fs.writeFileSync(sav, 'now');
+  const r = w.eng.restoreBackup('b', oldest.stamp);
+  assert.deepStrictEqual([r.files, r.savedFirst], [1, true]);
+  assert.strictEqual(fs.readFileSync(sav, 'utf8'), 'first');
+  const after = w.eng.backups('b');
+  assert.ok(after.some((b) => b.stamp === oldest.stamp), 'the backup put back is kept');
+  assert.strictEqual(after[0].why, 'before restore');
+  assert.throws(() => w.eng.restoreBackup('b', '../x'), /isn’t there/);
+});

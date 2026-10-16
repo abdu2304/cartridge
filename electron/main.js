@@ -5100,6 +5100,7 @@ const handlers = {
   'recomps:dropVersion': ({ id, tag }) => recomps().dropVersion(id, tag),
   'recomps:channel': ({ id, channel }) => recomps().setChannel(id, channel),
   'recomps:backups': ({ id }) => recomps().backups(id),
+  'recomps:restore': ({ id, stamp }) => recomps().restoreBackup(id, stamp), // 0.9.69
   'recomps:remove': async ({ id, steam }) => {
     const r = await recomps().remove(id);
     recompTrophies();

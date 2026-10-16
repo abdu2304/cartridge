@@ -522,7 +522,7 @@ function createRecomps(ctx) {
     return latest[id];
   }
   // ---- saves: backed up before an update or removal, checked after (owner: updates must never lose saves)
-  function backupSaves(id, why) {
+  function backupSaves(id, why, { keep } = {}) {
     const e = byId(id), rec = installs[id];
     const dirs = saveDirs(e, rec).filter(exists);
     if (!dirs.length) return null;
@@ -532,7 +532,7 @@ function createRecomps(ctx) {
     fs.writeFileSync(path.join(to, 'backup.json'), JSON.stringify(meta, null, 1));
     // ten backups per recomp are kept, the oldest go
     const all = (() => { try { return fs.readdirSync(path.dirname(to)).sort(); } catch { return []; } })();
-    for (const old of all.slice(0, Math.max(0, all.length - 10))) fs.rmSync(path.join(path.dirname(to), old), { recursive: true, force: true });
+    for (const old of all.slice(0, Math.max(0, all.length - 10))) if (old !== keep) fs.rmSync(path.join(path.dirname(to), old), { recursive: true, force: true }); // keep: the one being restored (0.9.69)
     log('recomp saves backed up', id, why, meta.items.length, 'place(s)');
     return meta;
   }
@@ -553,7 +553,26 @@ function createRecomps(ctx) {
   }
   function backups(id) {
     const d = path.join(dataDir, 'recomp-backups', id);
-    return (() => { try { return fs.readdirSync(d); } catch { return []; } })().sort().reverse().map((n) => { const m = readJson(path.join(d, n, 'backup.json'), null); return m && { stamp: n, at: m.at, why: m.why, tag: m.tag, places: m.items.length }; }).filter(Boolean);
+    return (() => { try { return fs.readdirSync(d); } catch { return []; } })().sort().reverse().map((n) => { const m = readJson(path.join(d, n, 'backup.json'), null); return m && { stamp: n, at: m.at, why: m.why, tag: m.tag, places: m.items.length, files: m.items.reduce((a, it) => a + (it.files || 0), 0) }; }).filter(Boolean);
+  }
+  // a backup put back (0.9.69): never while the recomp runs; the saves there now are backed up first, so a restore can
+  // itself be undone. Files in the backup replace the same files; files made since are left where they are.
+  function restoreBackup(id, stamp) {
+    const rec = installs[id], e = byId(id);
+    if (!/^[\w-]+$/.test(String(stamp || ''))) throw new Error('That backup isn’t there.');
+    const d = path.join(dataDir, 'recomp-backups', id, stamp), meta = readJson(path.join(d, 'backup.json'), null);
+    if (!meta?.items?.length) throw new Error('That backup isn’t there.');
+    if (rec && exists(rec.program) && ctx.isRunning(rec.flatpak || rec.program)) throw new Error(`Close ${e?.name || 'it'} first.`);
+    const before = backupSaves(id, 'before restore', { keep: stamp });
+    let files = 0;
+    for (const it of meta.items) {
+      if (!exists(it.copy)) continue;
+      fs.mkdirSync(path.dirname(it.from), { recursive: true });
+      fs.cpSync(it.copy, it.from, { recursive: true, force: true });
+      files += countFiles(it.copy);
+    }
+    log('recomp saves restored', id, stamp, files, 'file(s)');
+    return { files, places: meta.items.length, savedFirst: !!before };
   }
   // ---- install or update: download, unpack, keep the release it replaces, put the new one where the old one is
   async function install(id, { channel, onProgress = () => {}, signal } = {}) {
@@ -890,7 +909,7 @@ function createRecomps(ctx) {
   }
   const record = (id) => installs[id] || null;
   const reload = () => { cat = null; repaired = false; installs = readJson(F('recomp-installs.json'), {}); };
-  return { catalogue, byId, details, ready, watchSetup, launchArgs, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
+  return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
 }
 
 module.exports = { fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };

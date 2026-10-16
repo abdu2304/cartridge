@@ -44,6 +44,7 @@
             <button class="lrow" data-focus data-key="rc-open" @click="openIt"><Icon name="mdiPlay" :size="24" /><span class="l-mid"><b>{{ e.installed.kind === 'windows' ? 'Open Through Steam' : 'Open' }}</b><span class="l-sub">{{ e.installed.kind === 'windows' ? 'A Windows build: Proton runs it, as it will in play' : 'Start it here' }}</span></span></button>
             <button v-if="!e.update" class="lrow" data-focus :disabled="checking" @click="check"><Icon name="mdiRefresh" :size="24" :class="{ spin: checking }" /><span class="l-mid"><b>Check for Updates</b><span class="l-sub">{{ e.installed.tag }}{{ e.latest?.at ? ' · checked ' + ago(e.latest.at) : '' }}</span></span></button>
             <button class="lrow" data-focus @click="channel"><Icon name="mdiSourceBranch" :size="24" /><span class="l-mid"><b>Updates: {{ e.installed.channel === 'pre' ? 'Pre-releases' : 'Stable' }}</b><span class="l-sub">Which releases it updates to. Never automatic.</span></span></button>
+            <button v-if="saveBaks.length" class="lrow" data-focus @click="restore"><Icon name="mdiContentSaveMoveOutline" :size="24" /><span class="l-mid"><b>Save Backups</b><span class="l-sub">{{ saveBaks.length }} kept, newest {{ ago(saveBaks[0].at) }}. Put one back</span></span></button>
             <button v-if="kept.length" class="lrow" data-focus @click="versions"><Icon name="mdiHistory" :size="24" /><span class="l-mid"><b>Roll Back</b><span class="l-sub">{{ kept.length }} earlier {{ kept.length === 1 ? 'version' : 'versions' }} kept</span></span></button>
             <button class="lrow" data-focus @click="remove"><Icon name="mdiDeleteOutline" :size="24" /><span class="l-mid"><b>Remove</b><span class="l-sub">Saves backed up first, the folder goes to the Trash</span></span></button>
           </template>
@@ -64,7 +65,7 @@ import { pushLayer, focusFirst } from '../nav.js';
 import Icon from './Icon.vue';
 
 const props = defineProps({ id: String });
-const el = ref(null), e = ref(null), det = ref(null), picBad = ref(false), kept = ref([]), why = ref(''), checking = ref(false), consoles = ref({});
+const el = ref(null), e = ref(null), det = ref(null), picBad = ref(false), kept = ref([]), saveBaks = ref([]), why = ref(''), checking = ref(false), consoles = ref({});
 const HOW = { place: 'Cartridge links your copy where it looks for it (nothing is copied).', path: 'Cartridge starts it with your copy.', picker: 'It sets itself up: open it and follow its own steps the first time.', none: 'Nothing to set up.' };
 // set up without Cartridge handing it your copy: its own steps (picker), or by hand where no rule fits (manual, 0.9.68)
 const OWN = ['picker', 'manual'];
@@ -102,6 +103,7 @@ async function load() {
   consoles.value = l?.consoles || {};
   e.value = l?.entries.find((x) => x.id === props.id) || null;
   if (e.value?.installed) kept.value = (await call('recomps:versions', { id: props.id }).catch(() => ({ kept: [] }))).kept;
+  saveBaks.value = e.value ? (await call('recomps:backups', { id: props.id }).catch(() => [])) || [] : []; // 0.9.69: the backups made before updates, switches and removals
   if (e.value && !e.value.installed && !e.value.latest && canGet.value) call('recomps:check', { id: props.id }).then(load).catch((er) => (why.value = er.message));
   if (e.value?.repo && !det.value) call('recomps:details', { id: props.id }).then((d) => { det.value = d; }).catch(() => {});
 }
@@ -173,6 +175,18 @@ async function channel() {
   const v = await choose({ title: 'Which Releases?', options: [{ label: 'Stable', sub: 'Its normal releases', value: 'stable' }, { label: 'Pre-releases', sub: 'Test builds as they come out', value: 'pre' }] });
   reopen();
   if (v) { await call('recomps:channel', { id: props.id, channel: v }); load(); }
+}
+// a save backup put back (0.9.69): made before every update, version switch, removal and restore
+const WHY = { update: 'Before an update', 'switch version': 'Before a version switch', remove: 'Before it was removed', 'before restore': 'Before a restore', test: 'Backup' };
+async function restore() {
+  const v = await choose({ title: 'Save Backups', message: 'Pick one to put back. The saves there now are backed up first, so you can go back.', options: saveBaks.value.map((b) => ({ label: new Date(b.at).toLocaleString(), sub: `${WHY[b.why] || 'Backup'}${b.tag ? ' · ' + b.tag : ''} · ${b.files} ${b.files === 1 ? 'file' : 'files'}`, value: b.stamp, icon: 'mdiContentSaveOutline', raw: true })) });
+  reopen();
+  if (!v) return;
+  const ok = await confirm('Put This Backup Back?', 'Its save files replace the ones there now. Files made since stay where they are.', 'Put It Back');
+  reopen();
+  if (!ok) return;
+  try { const r = await call('recomps:restore', { id: props.id, stamp: v }); toast(`${r.files} save ${r.files === 1 ? 'file' : 'files'} put back`, 'ok', 3000, 'mdiCheck'); } catch (er) { why.value = er.message; }
+  load();
 }
 async function versions() {
   const v = await choose({ title: 'Roll Back', message: `In use: ${e.value.installed.tag}. Saves are backed up before switching.`, options: kept.value.map((k) => ({ label: k.tag, sub: `Kept ${ago(k.at)}`, value: k.tag, icon: 'mdiHistory', raw: true })) });
