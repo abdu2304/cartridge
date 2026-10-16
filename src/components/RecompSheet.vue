@@ -58,8 +58,8 @@
 <script setup>
 // One recomp (0.9.65): what it is and needs, then everything to do with it. Nested pop-ups (the picker, the folder
 // browser, confirmations) save this sheet's resolve and reopen it, as the single pop-up slot needs.
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { store, call, toast, closeModal, openModal, choose, confirm, romById, cover, bgJob, ago, pickFolder } from '../store.js';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { store, call, toast, closeModal, choose, confirm, romById, cover, bgJob, ago, pickFolder } from '../store.js';
 import { pushLayer, focusFirst } from '../nav.js';
 import Icon from './Icon.vue';
 

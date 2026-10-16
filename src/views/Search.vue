@@ -12,12 +12,10 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, nextTick } from 'vue';
+import { computed, ref } from 'vue';
 import { store, go, allRoms, download, setBg, backdropOf, romById, visible } from '../store.js';
 import { useView } from '../useView.js';
-import { focusFirst } from '../nav.js';
-import Icon from '../components/Icon.vue';
-import Btn from '../components/Btn.vue';
+
 import GameCard from '../components/GameCard.vue';
 
 const LIMIT = 150;

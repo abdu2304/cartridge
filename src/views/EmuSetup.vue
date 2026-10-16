@@ -87,7 +87,7 @@
 
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref, nextTick } from 'vue';
-import { call, toast, go, choose, confirm, askText, pickFolder, store, romsOf, visiblePlatforms, openModal, saveConfig, openTour } from '../store.js';
+import { call, toast, go, choose, confirm, askText, pickFolder, store, romsOf, visiblePlatforms, saveConfig, openTour } from '../store.js';
 import { addGame } from '../steam.js';
 import { useView } from '../useView.js';
 import { ensureFocus } from '../nav.js';

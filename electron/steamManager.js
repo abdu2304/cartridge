@@ -13,7 +13,6 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const crypto = require('crypto');
 const { spawn, execFileSync } = require('child_process');
 const CS = require('./cide').steam; // every ID rule Steam uses lives in CIDE (0.9.52), unchanged
 const { parseVdf, shortcutId, steamRunning } = require('./steamArt');
@@ -544,20 +543,6 @@ module.exports = function createSteamManager(ctx) {
     // EmuDeck's own first, then RetroDECK, then the rest; forks last (C4, C5)
     return [...retrodeck, ...(RA_FIRST.has(key) ? [...ras, ...out] : [...out, ...ras]), ...forksOut];
   }
-  // SRM parsers whose ROM folder (or title) is this console, with SRM's variables turned into ours
-  function srmFor(key) {
-    const out = [];
-    for (const c of found?.srm || []) {
-      const folder = path.basename(String(c.romDir).replace(/\/+$/, ''));
-      const k = folder ? consoleKey(folderSlug(folder)) : null;
-      if (k !== key) continue;
-      let args = c.args.replace(/\$\{filePath\}/g, '{ROM}').replace(/\$\{fileDir\}/g, '{DIR}').replace(/\$\{fileName\}/g, '{NAME}');
-      if (/\$\{/.test(args) || !/\{ROM\}|\{DIR\}|\{NAME\}/.test(args) || !exists(c.exe)) continue; // something we can't fill in
-      out.push({ ...c, args });
-    }
-    return out;
-  }
-  function findTemplate(key) { return candidates(key)[0]?.t || null; }
   // ---------------------------------------------------------------- per-game details
   const pkgSeen = new Map();
   const hasPs3Pkg = (file) => { if (!file) return false; if (!pkgSeen.has(file)) { let n = 0; try { n = require('./pkgInstall').packagesIn(file).pkgs.length; } catch {} pkgSeen.set(file, n > 0); } return pkgSeen.get(file); };

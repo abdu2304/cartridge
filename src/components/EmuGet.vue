@@ -157,7 +157,6 @@ import { focusFirst } from '../nav.js';
 import Icon from './Icon.vue';
 import EmuIcon from './EmuIcon.vue';
 import PIcon from './PIcon.vue';
-import TextField from './TextField.vue';
 import LinkInput from './LinkInput.vue';
 
 const props = defineProps({ flow: Boolean, updates: Boolean });

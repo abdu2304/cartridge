@@ -201,7 +201,6 @@ module.exports = function createTrophyService(ctx) {
     if (changed || !syncState.at) queueSync(changed ? 3000 : 8000);
   }
   // Polling is a handful of stat calls: each unlock file plus each root folder
-  const safeLs = (d) => { try { return fs.readdirSync(d).slice(0, 400); } catch { return []; } };
   // 0.9.63 (owner's log: a ~600 ms stall every minute): the same signature, read without holding the main thread
   // (hundreds of stat calls every 8 s, on an external drive). Folders found once a minute, files stat'd in parallel.
   let dirsAt = 0, dirsMemo = [];
@@ -311,7 +310,6 @@ module.exports = function createTrophyService(ctx) {
     const notes = listOf(await api(`/api/roms/${romId}/notes`, { query: { tags: NOTE_TAG } }));
     return notes.filter((n) => n && String(n.title || '').startsWith('Cartridge troph') && (meId == null || n.user_id == null || n.user_id === meId)).map((n) => ({ id: n.id, title: n.title, data: parseAny(n.content) })).filter((n) => n.data);
   }
-  async function notesFor(romId) { return (await notesAll(romId)).filter(isTrophyNote); }
 
   // ---- trophy pictures: small copies stored as extra private notes, so other devices can show them
   const ICON_REMOTE = path.join(USER_DATA, 'trophyicons', 'remote');
