@@ -381,8 +381,9 @@ import { timing } from '../motion.js';
 // Hold A (or press and hold) to arrange. Controller: A picks a tile up and the D-pad moves it, X resizes
 // (the D-pad moves a corner, LB/RB pick the corner), Y removes, B is done. Touch and mouse: drag a tile
 // to move it, drag an edge or a corner to resize. Saved in config.ui.start.
-import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
-import { store, heroArt, call, go, tab, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour } from '../store.js';
+import { computed, ref, reactive, onMounted, onBeforeUnmount, onBeforeUpdate, onUpdated, nextTick, watch } from 'vue';
+import { gsapOn, load as loadGsap, ready as gsapReady, EASE } from '../gsapEngine.js';
+import { store, heroArt, call, go, tab, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour, plural } from '../store.js';
 import { useView } from '../useView.js';
 import { recommend } from '../recs.js';
 import { ensureFocus, input, pushLayer, focusFirst, rumble } from '../nav.js';
@@ -566,7 +567,7 @@ function whenText(r) {
   const mins = store.play[r.id]?.min || 0;
   if (!t) return mins ? playtimeText(mins) + ' played' : 'Not started';
   const m = Math.round((Date.now() - t) / 6e4);
-  const ago = m < 1 ? 'just now' : m < 60 ? `${m} minutes ago` : m < 1440 ? `${Math.round(m / 60)} hours ago` : m < 2880 ? 'yesterday' : `${Math.round(m / 1440)} days ago`;
+  const ago = m < 1 ? 'just now' : m < 60 ? `${plural(m, 'minute')} ago` : m < 1440 ? `${plural(Math.round(m / 60), 'hour')} ago` : m < 2880 ? 'yesterday' : `${Math.round(m / 1440)} days ago`;
   return `Played ${ago}${mins ? ' · ' + playtimeText(mins) : ''}`;
 }
 const rows = computed(() => ({
@@ -866,8 +867,8 @@ async function resetLayout() {
 async function pickGame() {
   for (;;) {
     const from = await choose({ sheet: true, title: 'Pin a Game', options: [
-      ...(playing.value.length ? [{ heading: 'Recently Played', label: 'Recently Played', value: '__recent', icon: 'mdiHistory', sub: `${Math.min(30, playing.value.length)} games` }] : []),
-      ...consolesAZ.value.map((p, i) => ({ heading: i === 0 ? 'Consoles' : undefined, label: p.display_name, value: p.id, sub: `${p.rom_count} games`, raw: true })),
+      ...(playing.value.length ? [{ heading: 'Recently Played', label: 'Recently Played', value: '__recent', icon: 'mdiHistory', sub: plural(Math.min(30, playing.value.length), 'game') }] : []),
+      ...consolesAZ.value.map((p, i) => ({ heading: i === 0 ? 'Consoles' : undefined, label: p.display_name, value: p.id, sub: plural(p.rom_count, 'game'), raw: true })),
     ] });
     if (!from) return null;
     const list = from === '__recent' ? playing.value.slice(0, 30) : roms.value.filter((r) => r.platform_id === from).sort((a, b) => a.name.localeCompare(b.name));
@@ -889,7 +890,7 @@ async function addTile() {
     if (!id) return nextTick(() => focusKey('st-add'));
     t.romId = id;
   } else if (type === 'console') {
-    const id = await choose({ sheet: true, title: 'Pin a console', options: consolesAZ.value.map((p) => ({ label: p.display_name, value: p.id, sub: `${p.rom_count} games`, raw: true })) });
+    const id = await choose({ sheet: true, title: 'Pin a console', options: consolesAZ.value.map((p) => ({ label: p.display_name, value: p.id, sub: plural(p.rom_count, 'game'), raw: true })) });
     if (!id) return nextTick(() => focusKey('st-add'));
     t.platformId = id;
   } else if (CONFIG[type] && !(await configure(t))) return nextTick(() => focusKey('st-add'));
@@ -970,7 +971,7 @@ const CONFIG = {
   },
 };
 async function pickConsole(t) {
-  const id = await choose({ sheet: true, title: 'Which Console', options: consolesAZ.value.map((p) => ({ label: p.display_name, value: p.id, sub: `${p.rom_count} games`, raw: true, selected: t.platformId === p.id })) });
+  const id = await choose({ sheet: true, title: 'Which Console', options: consolesAZ.value.map((p) => ({ label: p.display_name, value: p.id, sub: plural(p.rom_count, 'game'), raw: true, selected: t.platformId === p.id })) });
   if (!id) return false;
   t.platformId = id; delete sel[t.id];
   return true;
@@ -1279,6 +1280,12 @@ onMounted(async () => {
 onBeforeUnmount(() => { store.forceHints = false; clearInterval(clockT); clearInterval(spotT); clearInterval(rollT); clearInterval(spaceT); clearTimeout(pressT); ro?.disconnect(); if (editing.value) { settle(tiles.value); save(); } });
 watch(() => store.trophyVer, loadAch);
 watch(() => store.play, loadWeek);
+// 0.9.70 GSAP test switch (src/gsapEngine.js): while arranging, the tiles that move are flown by GSAP Flip from where
+// they were to where Vue put them (their CSS transitions are off then); the held tile still follows the finger
+let flipState = null;
+watch(() => editing.value, (v) => { if (v && gsapOn()) loadGsap().catch(() => {}); });
+onBeforeUpdate(() => { const G = editing.value && gsapOn() ? gsapReady() : null; flipState = G && el.value ? G.Flip.getState(el.value.querySelectorAll('.st-tile:not(.held)')) : null; });
+onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G && st) G.Flip.from(st, { duration: 0.42, ease: EASE, simple: true }); });
 </script>
 
 <style scoped>
@@ -1337,6 +1344,7 @@ watch(() => store.play, loadWeek);
 .editing .st-face { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
 .editing .st-tile:not(.held):not(.picked) .st-face { transform: scale(0.975); }
 .editing .st-tile:focus .st-face, .editing .st-tile:focus-visible .st-face { box-shadow: var(--ring); transform: none; }
+:global(body.motion-gsap .start.editing .st-tile:not(.held)) { transition: opacity var(--fade-in); }
 .st-tile.held { z-index: 5; transition: width var(--glide), height var(--glide); }
 .st-tile.held .st-face, .st-tile.picked .st-face { transform: scale(1.035) rotate(-0.6deg); box-shadow: var(--ring), 0 30px 70px rgba(0, 0, 0, 0.6); }
 .st-tile.picked { z-index: 5; }

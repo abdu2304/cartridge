@@ -8,6 +8,7 @@
 //   moves; the governor below slows or stops the rest while you're idle or a game is in front.
 // Parts: 0 the ticker, 1 spring curves for CSS, 2 springs for script, 3 shared element flights, 4 sliding pills,
 // 5 the governor.
+import { gsapOn, load, EASE } from './gsapEngine.js';
 
 // ---------- 0. one frame loop (0.9.47): every script-driven motion registers here, so there is at most one
 // requestAnimationFrame, it stops when nothing moves, and it never runs while Cartridge is in the background
@@ -147,6 +148,13 @@ export function morph(fromEl, change, toSel, nextTick) {
       return true;
     };
     running = { end };
+    // 0.9.70 test switch: the same flight on GSAP's ticker and curve (src/gsapEngine.js), the target still read every frame
+    const G = gsapOn() ? await load().catch(() => null) : null;
+    if (G && alive) {
+      const o = { p: 0 }, tw = G.gsap.to(o, { p: 1, duration: dur * 0.75, ease: EASE, onUpdate: () => { const c = to.isConnected ? to.getBoundingClientRect() : b; if (c.width >= 8 && c.height >= 8) { const p = o.p, x = a.left + (c.left - a.left) * p, y = a.top + (c.top - a.top) * p, wd = a.width + (c.width - a.width) * p, ht = a.height + (c.height - a.height) * p; Object.assign(fly.style, { left: c.left + 'px', top: c.top + 'px', width: c.width + 'px', height: c.height + 'px', transform: `translate(${x - c.left}px, ${y - c.top}px) scale(${wd / c.width}, ${ht / c.height})` }); } }, onComplete: () => { end(); dispatchEvent(new Event('cae-settle')); } });
+      stop = () => tw.kill();
+      return;
+    }
     stop = frame(step);
   })();
 }

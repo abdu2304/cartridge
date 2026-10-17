@@ -2,7 +2,7 @@
   <!-- The opening (0.9.52, owner: "a really nice animation of welcome to Cartridge", on CAE, not jarring). Once, on a new
        install and when the welcome starts over. The mark draws itself, fills, the light behind it blooms, "Welcome to"
        and the name rise letter by letter, then everything lifts away to the first card. Any press skips it. -->
-  <div class="wi" :class="{ out }" @pointerdown="$emit('done')">
+  <div class="wi" :class="{ out, gs: gs }" ref="root" @pointerdown="$emit('done')">
     <div class="wi-bloom" />
     <div class="wi-lock">
       <svg class="wi-mark" :viewBox="MARK.viewBox" aria-hidden="true">
@@ -17,11 +17,31 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 import { MARK } from '../brand.js';
+import { gsapOn, load, EASE } from '../gsapEngine.js';
 const emit = defineEmits(['done']);
-const out = ref(false);
-let t1, t2;
-onMounted(() => { t1 = setTimeout(() => { out.value = true; }, 2350); t2 = setTimeout(() => emit('done'), 2850); });
-onBeforeUnmount(() => { clearTimeout(t1); clearTimeout(t2); });
+const out = ref(false), gs = ref(false), root = ref(null);
+let t1, t2, tl = null;
+// 0.9.70 GSAP test switch: the same opening as one GSAP timeline (same order and timings as the CSS below)
+async function viaGsap() {
+  const G = await load().catch(() => null); if (!G || !root.value) return false;
+  gs.value = true;
+  const q = (s) => root.value.querySelectorAll(s), { gsap } = G;
+  tl = gsap.timeline({ onComplete: () => emit('done') })
+    .fromTo(q('.wi-draw'), { strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.9, ease: 'power2.inOut' }, 0)
+    .fromTo(q('.wi-bloom'), { opacity: 0, scale: 0.55 }, { opacity: 0.55, scale: 1, duration: 1.4, ease: 'power2.out' }, 0.2)
+    .fromTo(q('.wi-mark'), { scale: 0.92 }, { scale: 1, duration: 0.5, ease: EASE }, 0.5)
+    .fromTo(q('.wi-fill'), { opacity: 0 }, { opacity: 1, duration: 0.42 }, 0.62)
+    .fromTo(q('.wi-eyebrow'), { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: EASE }, 0.9)
+    .fromTo(q('.wi-name span'), { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.5, ease: EASE, stagger: 0.035 }, 1.1)
+    .to(q('.wi-lock'), { y: -24, scale: 0.97, opacity: 0, duration: 0.5, ease: EASE }, 2.35)
+    .to(q('.wi-bloom'), { opacity: 0, duration: 0.42 }, 2.35);
+  return true;
+}
+onMounted(async () => {
+  if (gsapOn() && await viaGsap()) return;
+  t1 = setTimeout(() => { out.value = true; }, 2350); t2 = setTimeout(() => emit('done'), 2850);
+});
+onBeforeUnmount(() => { clearTimeout(t1); clearTimeout(t2); tl?.kill(); });
 </script>
 <style scoped>
 /* every timing is CAE's (docs/cae.md): the draw and the bloom on --move-slow, arrivals on the heavy spring, letters a
@@ -37,6 +57,8 @@ onBeforeUnmount(() => { clearTimeout(t1); clearTimeout(t2); });
 .wi-eyebrow { margin-top: 30px; font: 600 var(--t-md, 18px) / 1 var(--body, Inter, sans-serif); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.6); opacity: 0; transform: translateY(10px); animation: wi-rise var(--spring-soft-d) var(--spring-soft) 0.95s forwards; }
 .wi-name { display: flex; margin-top: 10px; font: 800 clamp(48px, 8vw, 96px) / 1 var(--display, Archivo, sans-serif); font-stretch: 100%; letter-spacing: -0.03em; color: #f4f3ef; }
 .wi-name span { display: inline-block; opacity: 0; transform: translateY(18px); animation: wi-rise var(--spring-soft-d) var(--spring-soft) forwards; animation-delay: calc(1.1s + var(--i) * var(--stagger)); }
+/* the GSAP timeline sets these itself */
+.wi.gs :is(.wi-mark, .wi-draw, .wi-fill, .wi-eyebrow, .wi-name span, .wi-bloom) { animation: none; }
 @keyframes wi-draw { to { stroke-dashoffset: 0; } }
 @keyframes wi-fade { to { opacity: 1; } }
 @keyframes wi-settle { to { transform: scale(1); } }

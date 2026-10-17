@@ -1,0 +1,266 @@
+{
+ "schema": 1,
+ "id": "iss",
+ "name": "inFAMOUS Second Son",
+ "by": "HayatoG, on the core of the ports of The Last Guardian and Gravity Rush 2",
+ "repo": "github:HayatoG/iss_pc",
+ "licence": "GPL-2.0-or-later",
+ "about": "Playable and in development: the original code runs natively, the PS4 system is reimplemented and the GPU is translated to Vulkan. Performance is still uneven (20 to 30 FPS on an RTX 2060) and some image faults are known.",
+ "verified": {
+  "on": "2026-10-17",
+  "release": "v2026.10.17-1898d44",
+  "played": false
+ },
+ "game": {
+  "console": "ps4",
+  "title": "inFAMOUS Second Son",
+  "ids": [
+   "CUSA00223"
+  ],
+  "kind": "folder",
+  "has": [
+   "eboot.bin",
+   "sce_module/libc.prx",
+   "sce_module/libSceFios2.prx"
+  ],
+  "version": {
+   "want": "01.07",
+   "soft": false,
+   "update": true,
+   "why": "It needs the 1.00 game with update 1.07 on top. Cartridge puts the update over the game for you when the update is on this device."
+  }
+ },
+ "builds": [
+  {
+   "os": "linux",
+   "asset": "^infamous-linux-x86_64\\.tar\\.gz$",
+   "program": "inFAMOUS Second Son",
+   "args": [
+    "--play"
+   ],
+   "files": {
+    "app": {
+     "path": "{config}/infamous-launcher/settings.json",
+     "format": "json"
+    }
+   }
+  },
+  {
+   "os": "windows",
+   "asset": "^infamous-windows-x86_64\\.zip$",
+   "program": "inFAMOUS Second Son.exe",
+   "args": [
+    "--play"
+   ],
+   "files": {
+    "app": {
+     "path": "{appdata}/infamous-launcher/settings.json",
+     "format": "json"
+    }
+   }
+  }
+ ],
+ "env": {
+  "ISS_GAME_DIR": "{game}"
+ },
+ "app": {
+  "game_dir": "{game}",
+  "close_on_play": true
+ },
+ "keep": [
+  "user",
+  "out"
+ ],
+ "saves": [
+  "{dir}/user/savedata"
+ ],
+ "settings": [
+  {
+   "id": "display_mode",
+   "tab": "Display",
+   "label": "Display mode",
+   "type": "choice",
+   "def": "Windowed",
+   "at": [
+    "app",
+    "display_mode"
+   ],
+   "options": [
+    [
+     "Windowed",
+     "Windowed"
+    ],
+    [
+     "Borderless",
+     "Borderless"
+    ],
+    [
+     "Fullscreen",
+     "Fullscreen"
+    ]
+   ]
+  },
+  {
+   "id": "vsync",
+   "tab": "Display",
+   "label": "VSync",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "vsync"
+   ]
+  },
+  {
+   "id": "show_fps",
+   "tab": "Display",
+   "label": "Show the FPS counter",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "show_fps"
+   ]
+  },
+  {
+   "id": "game_language",
+   "tab": "Game",
+   "label": "Game language",
+   "type": "choice",
+   "def": "auto",
+   "at": [
+    "app",
+    "game_language"
+   ],
+   "options": [
+    [
+     "auto",
+     "As your system"
+    ],
+    [
+     "en",
+     "English"
+    ],
+    [
+     "pt_BR",
+     "Português (Brasil)"
+    ],
+    [
+     "es_LA",
+     "Español (Latinoamérica)"
+    ],
+    [
+     "fr_CA",
+     "Français (Canada)"
+    ],
+    [
+     "tr",
+     "Türkçe"
+    ],
+    [
+     "ru",
+     "Русский"
+    ]
+   ]
+  },
+  {
+   "id": "stick_deadzone",
+   "tab": "Controls",
+   "label": "Stick dead zone",
+   "type": "number",
+   "def": 10,
+   "at": [
+    "app",
+    "stick_deadzone"
+   ],
+   "num": {
+    "min": 0,
+    "max": 50,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "vram_budget_mb",
+   "tab": "Performance",
+   "label": "Video memory budget",
+   "type": "number",
+   "def": 3500,
+   "at": [
+    "app",
+    "vram_budget_mb"
+   ],
+   "num": {
+    "min": 1500,
+    "max": 24000,
+    "unit": "MB"
+   },
+   "desc": "5600 ran out of video memory loading the first level on a 6 GB card."
+  },
+  {
+   "id": "precompile_shaders",
+   "tab": "Performance",
+   "label": "Prepare the shader list before the game starts",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "precompile_shaders"
+   ]
+  },
+  {
+   "id": "gpu_readbacks",
+   "tab": "Advanced",
+   "label": "GPU readbacks",
+   "type": "choice",
+   "def": "2",
+   "at": [
+    "app",
+    "gpu_readbacks"
+   ],
+   "options": [
+    [
+     "2",
+     "Precise (smoke and particles need it)"
+    ],
+    [
+     "0",
+     "Fast"
+    ]
+   ]
+  },
+  {
+   "id": "eager_readback",
+   "tab": "Advanced",
+   "label": "Read ahead of the game",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "eager_readback"
+   ],
+   "desc": "On made smoke and glow flicker in precise mode."
+  },
+  {
+   "id": "write_merge",
+   "tab": "Advanced",
+   "label": "Write into GPU memory without waiting",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "write_merge"
+   ]
+  },
+  {
+   "id": "deferred_readback",
+   "tab": "Advanced",
+   "label": "The game waits for its own GPU reads",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "deferred_readback"
+   ]
+  }
+ ]
+}

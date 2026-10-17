@@ -469,7 +469,7 @@
 // A replay starts from the current settings: done steps show a green check, nothing is reset, and
 // leaving halfway keeps everything as it was.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { store, call, saveConfig, toast, tab, confirm, choose, pickFolder, loadLibrary, activeTabs, openTour } from '../store.js';
+import { store, call, saveConfig, toast, tab, confirm, choose, pickFolder, loadLibrary, activeTabs, openTour, plural } from '../store.js';
 import { focusFirst, input } from '../nav.js';
 import { useView } from '../useView.js';
 import Logo from '../components/Logo.vue';
@@ -591,7 +591,7 @@ async function pickGamesFolder() {
 }
 async function goLocal() {
   await saveConfig({ localOnly: true, configured: true });
-  try { const r = await call('library:sync'); await loadLibrary(); toast(`${r?.total || 0} games found on this device`, 'ok', 3000, 'mdiFolderPlayOutline'); } catch (e) { toast(e.message, 'error', 5000); }
+  try { const r = await call('library:sync'); await loadLibrary(); toast(`${plural(r?.total || 0, 'game')} found on this device`, 'ok', 3000, 'mdiFolderPlayOutline'); } catch (e) { toast(e.message, 'error', 5000); }
   next();
 }
 const intro = ref(false);

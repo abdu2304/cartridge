@@ -3,7 +3,7 @@
     <div v-if="!base" class="center"><div class="spinner" /></div>
     <template v-else>
       <section class="g-banner">
-        <img v-if="banner.src" class="g-banner-img" :class="{ blur: banner.blur }" :src="banner.src" @error="bannerFail = true" />
+        <img v-if="banner.src" :key="banner.src" class="g-banner-img" alt="" :class="{ blur: banner.blur }" :src="banner.src" @error="(e) => (bannerFail ? (e.target.style.visibility = 'hidden') : (bannerFail = true))" /><!-- 0.9.70 playtest: when the cover fails too, no broken-picture icon -->
         <div class="g-banner-shade" />
         <div class="g-banner-logo"><GameLogo :logo="store.config.ui.logos !== false ? logoOf(base) : null" :name="base.name" cls="g-title" :area="40000" :max-w="560" :max-h="150" /></div>
       </section>
@@ -118,7 +118,7 @@
           <template v-if="shots.length">
             <div class="shelf-title" style="margin-top: 22px"><Icon name="mdiImageMultipleOutline" :size="20" />Screenshots</div>
             <div class="shelf shots" data-hscroll>
-              <button v-for="(s, i) in shots" :key="s" class="shot" data-focus @click="viewer = i"><img :src="img(s)" loading="lazy" /></button>
+              <button v-for="(s, i) in shots" :key="s" class="shot" data-focus :aria-label="`Screenshot ${i + 1}`" @click="viewer = i"><img :src="img(s)" loading="lazy" alt="" @error="(e) => (e.target.style.visibility = 'hidden')" /></button>
             </div>
           </template>
           <template v-if="detail?.sibling_roms?.length">
@@ -157,7 +157,7 @@
 import { similarTo } from '../recs.js';
 import { addGame, removeGame, applyChanges, pickEmulator, pickCollections, pickFrameGen } from '../steam.js';
 import { computed, onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue';
-import { store, heroArt, call, img, go, cover, bytes, year, rating, toast, confirm, download, downloadMore, downloadFor, romById, platformById, isNew, setBg, logoOf, resetLogos, artFor, choose, openModal, allRoms, visible, isFavourite, addToCollection, playOf, playtimeText, ago, askText, saveConfig, backdropOf, wantSharp, bgJob, playGame, saveSyncOn } from '../store.js';
+import { store, heroArt, call, img, go, cover, bytes, year, rating, toast, confirm, download, downloadMore, downloadFor, romById, platformById, isNew, setBg, logoOf, resetLogos, artFor, choose, openModal, allRoms, visible, isFavourite, addToCollection, playOf, playtimeText, ago, askText, saveConfig, backdropOf, wantSharp, bgJob, playGame, saveSyncOn, plural } from '../store.js';
 import { pinToStart } from '../startTiles.js';
 import { useView } from '../useView.js';
 import { ensureFocus, focusFirst } from '../nav.js';
@@ -584,7 +584,7 @@ async function olderVersions(x) {
   const t = [...times.values()].find((y) => y.at === at);
   if (!t) return;
   if (!(await confirm('Put this version back?', 'Close the emulator first. The save it replaces is kept as an older version too, so this can be undone.', 'Restore'))) return;
-  try { const r = await call('syncsaves:restore', { id: x.synced.id, files: t.files }); const errs = Object.keys(r || {}).length; toast(errs ? `${errs} files couldn't be restored` : 'Restored', errs ? 'error' : 'ok', 3500, 'mdiHistory'); } catch (e) { toast(e.message, 'error', 5000); }
+  try { const r = await call('syncsaves:restore', { id: x.synced.id, files: t.files }); const errs = Object.keys(r || {}).length; toast(errs ? `${plural(errs, 'file')} couldn't be restored` : 'Restored', errs ? 'error' : 'ok', 3500, 'mdiHistory'); } catch (e) { toast(e.message, 'error', 5000); }
 }
 async function more() {
   const has = artFor(props.romId);
@@ -656,7 +656,10 @@ async function more() {
     { label: 'Timeline', sub: 'Added, downloaded, played, trophies', value: 'timeline', icon: 'mdiTimelineClockOutline' },
     { label: 'Pin to Start', sub: 'A tile of its own on Start', value: 'pin', icon: 'mdiPinOutline' },
     // 0.9.65: a native PC port of this game (a recomp), each its own sheet
-    ...rcs.map((r) => ({ label: `Recomp: ${r.name}`, sub: r.installed ? (r.installed.ready ? `Installed ${r.installed.tag}` : 'Installed, needs your game') : 'A native PC port of this game', value: 'recomp:' + r.id, icon: 'mdiRocketLaunchOutline', raw: true })),
+    // 0.9.70: a Cartridge Verified port says where it is in its setup; one from a link stays as it was
+    ...rcs.map((r) => (r.from === 'verified'
+      ? { label: `PC Port: ${r.name}`, sub: { play: 'Cartridge Verified · ready to play', update: 'Cartridge Verified · an update is out', game: 'Cartridge Verified · installed, needs your copy', setup: 'Cartridge Verified · finish setting up', broken: 'Cartridge Verified · needs repairing' }[r.state] || 'Cartridge Verified · a native PC port, set up for you', value: 'verified:' + r.id, icon: 'mdiCheckDecagramOutline', raw: true }
+      : { label: `Recomp: ${r.name}`, sub: r.installed ? (r.installed.ready ? `Installed ${r.installed.tag}` : 'Installed, needs your game') : 'A native PC port of this game', value: 'recomp:' + r.id, icon: 'mdiRocketLaunchOutline', raw: true })),
     // 0.9.38 (owner): About belongs with the game, last, under Pin to Start (it was in Options)
     { label: 'About', sub: 'Console, ID, version, and what’s installed for it', value: 'about', icon: 'mdiInformationOutline' },
   ];
@@ -737,6 +740,7 @@ async function more() {
   if (v === 'pkg') { await installPkg(); return; }
   if (v === 'patches') { await openModal('gameaddons', { romId: Number(props.romId), name: base.value.name, tab: 'patches' }); return; }
   if (typeof v === 'string' && v.startsWith('recomp:')) { await openModal('recomp', { id: v.slice(7) }); return; }
+  if (typeof v === 'string' && v.startsWith('verified:')) { await openModal('verified', { id: v.slice(9) }); return; }
   if (v === 'redownload') { await redownload(); return; }
   if (v === 'morefiles') { await downloadMore(base.value, moreFiles.have); return; }
   if (v === 'ps3check') {

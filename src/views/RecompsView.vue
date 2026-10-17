@@ -1,6 +1,6 @@
 <template>
   <div class="view" data-scroll ref="el">
-    <!-- the Steam card's page (0.9.65): recomps grouped by the console each game came from -->
+    <!-- the Steam card's page (0.9.65): recomps, Cartridge Verified first (0.9.70) -->
     <header class="lib-head">
       <div>
         <div class="eyebrow">Steam</div>

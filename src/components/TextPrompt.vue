@@ -12,7 +12,7 @@
         <button v-for="g in suggestions" :key="g.kind + g.v" type="button" class="btn small sg" :class="g.kind" data-focus @click="pick(g)"><Icon v-if="g.kind === 'title'" name="mdiGamepadVariantOutline" :size="15" /><span>{{ g.v }}</span></button>
         <span v-if="!suggestions.length" class="sg-empty">Game names show up here as you type</span>
       </div>
-      <p class="prompt-tip"><Icon name="mdiKeyboardOutline" :size="16" />Type with any keyboard. In Game Mode, press <b>Steam + X</b> for the Steam keyboard.</p>
+      <p class="prompt-tip"><Icon name="mdiKeyboardOutline" :size="16" /><span>Type with any keyboard. In Game Mode, press <b>Steam + X</b> for the Steam keyboard.</span></p>
       <div class="prompt-actions">
         <button type="button" class="btn" data-focus @click="closeModal(null)"><Icon name="mdiClose" :size="18" />Cancel</button>
         <button type="submit" class="btn primary" data-focus><Icon name="mdiCheck" :size="18" />Done</button>
@@ -68,7 +68,8 @@ onBeforeUnmount(() => layer?.pop?.());
 .prompt-input { width: 100%; font: inherit; font-size: var(--t-lg); color: var(--text); background: var(--s2); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: var(--r-md); padding: 14px 16px; outline: none; }
 .prompt-input:focus { border-color: var(--primary-l); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 45%, transparent); }
 .prompt-field .reveal { position: absolute; right: 96px; background: none; border: 0; color: var(--muted); padding: 8px; border-radius: var(--r-sm); }
-.prompt-tip { margin: 0; color: var(--muted); font-size: var(--t-sm); display: flex; align-items: center; gap: 8px; }
+.prompt-tip { margin: 0; color: var(--muted); font-size: var(--t-sm); display: flex; align-items: flex-start; gap: 8px; } /* 0.9.70: the words are one item, so "Steam + X" stays in the sentence */
+.prompt-tip > svg { flex: none; margin-top: 2px; }
 .prompt-sugg { display: flex; flex-wrap: wrap; gap: 8px; min-height: 40px; align-items: center; }
 .prompt-sugg .sg { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; text-align: left; }
 .prompt-sugg .sg span { overflow-wrap: anywhere; }

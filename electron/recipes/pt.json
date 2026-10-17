@@ -1,0 +1,472 @@
+{
+ "schema": 1,
+ "id": "pt",
+ "name": "P.T.",
+ "by": "LoreanXavier (Hallway Engine)",
+ "repo": "github:LoreanXavier/pt-pc",
+ "licence": "MIT",
+ "about": "A native PC port of the 2014 teaser, rebuilt in C++ on its own engine, reading every level, sound and cutscene from your copy. The whole teaser, voice part included, with photo mode, upscalers and ray-traced extras.",
+ "verified": {
+  "on": "2026-10-17",
+  "release": "v1.0.5",
+  "played": false
+ },
+ "game": {
+  "console": "ps4",
+  "title": "P.T.",
+  "ids": [
+   "CUSA01127",
+   "CUSA01114",
+   "CUSA01098"
+  ],
+  "kind": "folder-or-pkg",
+  "has": [],
+  "why": "The US release CUSA01127 is the tested one; the European and Japanese ones install with a note."
+ },
+ "builds": [
+  {
+   "os": "linux",
+   "asset": "^P\\.T\\.PC\\.Port\\.Setup-linux$",
+   "installer": [
+    "--install",
+    "{game}",
+    "{dir}/game",
+    "{result}"
+   ],
+   "program": "game/pt",
+   "args": [],
+   "files": {
+    "ini": {
+     "path": "{dir}/game/data/pt.ini",
+     "format": "ini"
+    }
+   }
+  }
+ ],
+ "keep": [
+  "game"
+ ],
+ "saves": [
+  "{dir}/game/data"
+ ],
+ "settings": [
+  {
+   "id": "fullscreen",
+   "tab": "Display",
+   "label": "Window",
+   "type": "choice",
+   "def": "0",
+   "at": [
+    "ini",
+    [
+     "display",
+     "fullscreen"
+    ]
+   ],
+   "options": [
+    [
+     "0",
+     "Window"
+    ],
+    [
+     "1",
+     "Borderless fullscreen"
+    ],
+    [
+     "2",
+     "Exclusive fullscreen"
+    ]
+   ]
+  },
+  {
+   "id": "vsync",
+   "tab": "Display",
+   "label": "VSync",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    [
+     "display",
+     "vsync"
+    ]
+   ]
+  },
+  {
+   "id": "fps_limit",
+   "tab": "Display",
+   "label": "Frame rate limit",
+   "type": "number",
+   "def": "0",
+   "at": [
+    "ini",
+    [
+     "display",
+     "fps_limit"
+    ]
+   ],
+   "num": {
+    "min": 0,
+    "max": 1000
+   },
+   "desc": "0 for no limit. Menus and the paused game stay at 60 or less."
+  },
+  {
+   "id": "letterbox",
+   "tab": "Display",
+   "label": "Black bars (not in the original)",
+   "type": "choice",
+   "def": "0",
+   "at": [
+    "ini",
+    [
+     "display",
+     "letterbox"
+    ]
+   ],
+   "options": [
+    [
+     "0",
+     "Off"
+    ],
+    [
+     "1",
+     "2.39:1"
+    ],
+    [
+     "2",
+     "1.85:1"
+    ]
+   ]
+  },
+  {
+   "id": "pause_on_focus_loss",
+   "tab": "Display",
+   "label": "Pause when the window goes to the background",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    [
+     "display",
+     "pause_on_focus_loss"
+    ]
+   ]
+  },
+  {
+   "id": "anisotropy",
+   "tab": "Graphics",
+   "label": "Anisotropic filtering",
+   "type": "choice",
+   "def": "0",
+   "at": [
+    "ini",
+    [
+     "graphics",
+     "anisotropy"
+    ]
+   ],
+   "options": [
+    [
+     "0",
+     "Original (trilinear)"
+    ],
+    [
+     "2",
+     "2x"
+    ],
+    [
+     "4",
+     "4x"
+    ],
+    [
+     "8",
+     "8x"
+    ],
+    [
+     "16",
+     "16x"
+    ]
+   ]
+  },
+  {
+   "id": "enhanced_textures",
+   "tab": "Graphics",
+   "label": "Enhanced textures",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    [
+     "graphics",
+     "enhanced_textures"
+    ]
+   ],
+   "desc": "Upscaled once from your own files with Real-ESRGAN and kept on disk."
+  },
+  {
+   "id": "ray_quality",
+   "tab": "Graphics",
+   "label": "Ray quality",
+   "type": "choice",
+   "def": "0",
+   "at": [
+    "ini",
+    [
+     "graphics",
+     "ray_quality"
+    ]
+   ],
+   "options": [
+    [
+     "0",
+     "Balanced"
+    ],
+    [
+     "1",
+     "High"
+    ],
+    [
+     "3",
+     "Ultra"
+    ],
+    [
+     "4",
+     "Path traced"
+    ]
+   ]
+  },
+  {
+   "id": "rt_shadows",
+   "tab": "Graphics",
+   "label": "Ray-traced shadows",
+   "type": "choice",
+   "def": "0",
+   "at": [
+    "ini",
+    [
+     "raytracing",
+     "shadows"
+    ]
+   ],
+   "options": [
+    [
+     "0",
+     "Off (shadow maps)"
+    ],
+    [
+     "1",
+     "Sharp"
+    ],
+    [
+     "2",
+     "Soft"
+    ]
+   ],
+   "desc": "Needs a graphics card with Vulkan ray queries."
+  },
+  {
+   "id": "rt_ao",
+   "tab": "Graphics",
+   "label": "Ray-traced ambient occlusion",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    [
+     "raytracing",
+     "ambient_occlusion"
+    ]
+   ]
+  },
+  {
+   "id": "rt_reflections",
+   "tab": "Graphics",
+   "label": "Ray-traced floor reflections",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    [
+     "raytracing",
+     "reflections"
+    ]
+   ]
+  },
+  {
+   "id": "mouse_sensitivity",
+   "tab": "Controls",
+   "label": "Mouse sensitivity",
+   "type": "number",
+   "def": "1",
+   "at": [
+    "ini",
+    [
+     "input",
+     "mouse_sensitivity"
+    ]
+   ],
+   "num": {
+    "min": 0.1,
+    "max": 10,
+    "decimals": 2
+   }
+  },
+  {
+   "id": "gamepad_sensitivity",
+   "tab": "Controls",
+   "label": "Controller turn speed",
+   "type": "number",
+   "def": "1",
+   "at": [
+    "ini",
+    [
+     "input",
+     "gamepad_sensitivity"
+    ]
+   ],
+   "num": {
+    "min": 0.1,
+    "max": 4,
+    "decimals": 2
+   }
+  },
+  {
+   "id": "rumble",
+   "tab": "Controls",
+   "label": "Vibration",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    [
+     "input",
+     "rumble"
+    ]
+   ]
+  },
+  {
+   "id": "prompt_style",
+   "tab": "Controls",
+   "label": "Button prompts",
+   "type": "choice",
+   "def": "0",
+   "at": [
+    "ini",
+    [
+     "input",
+     "prompt_style"
+    ]
+   ],
+   "options": [
+    [
+     "0",
+     "Follow the controller in use"
+    ],
+    [
+     "1",
+     "PlayStation"
+    ],
+    [
+     "2",
+     "Xbox"
+    ],
+    [
+     "3",
+     "Nintendo"
+    ],
+    [
+     "4",
+     "Steam"
+    ]
+   ]
+  },
+  {
+   "id": "voice_key",
+   "tab": "Controls",
+   "label": "Key that stands in for the spoken word",
+   "type": "text",
+   "def": "",
+   "at": [
+    "ini",
+    [
+     "voice",
+     "key"
+    ]
+   ],
+   "quote": true,
+   "desc": "For the part that needs a microphone. An SDL key name such as J; empty to use the microphone."
+  },
+  {
+   "id": "third_person",
+   "tab": "Extras",
+   "label": "Third person view (experimental)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    [
+     "camera",
+     "third_person"
+    ]
+   ]
+  },
+  {
+   "id": "sound_captions",
+   "tab": "Extras",
+   "label": "Sound captions",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    [
+     "accessibility",
+     "sound_captions"
+    ]
+   ]
+  },
+  {
+   "id": "speedrun",
+   "tab": "Extras",
+   "label": "Speedrun timer",
+   "type": "choice",
+   "def": "0",
+   "at": [
+    "ini",
+    [
+     "extras",
+     "speedrun"
+    ]
+   ],
+   "options": [
+    [
+     "0",
+     "Off"
+    ],
+    [
+     "1",
+     "Real time"
+    ],
+    [
+     "2",
+     "Game time"
+    ]
+   ]
+  },
+  {
+   "id": "check_updates",
+   "tab": "Advanced",
+   "label": "Let the game look for updates itself",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    [
+     "network",
+     "check_updates"
+    ]
+   ],
+   "desc": "Cartridge already updates it."
+  }
+ ]
+}

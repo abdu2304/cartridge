@@ -1,0 +1,83 @@
+/* Made by tools/tokens/gen.js from src/tokens.js. Change the tokens there, not here. */
+/* Glass, dark colours (Cartridge, OLED and your own) */
+body.elements-glass {
+  --lg-ob: color-mix(in srgb, rgb(var(--lg-tint)) 5%, rgb(4, 5, 8));
+  --lg-fill: color-mix(in srgb, var(--lg-ob) 84%, transparent);
+  --lg-fill-hover: color-mix(in srgb, var(--lg-ob) 92%, transparent);
+  --lg-pane: color-mix(in srgb, var(--lg-ob) 90%, transparent);
+  --lg-blur: blur(28px) saturate(1.3) contrast(1.05) brightness(0.85);
+  --lg-rim-grad: linear-gradient(var(--lg-angle, 135deg), rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.14) 22%, rgba(255, 255, 255, 0.04) 50%, rgba(0, 0, 0, 0.3) 78%, rgba(0, 0, 0, 0.45) 100%);
+  --lg-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.45), inset -1px 0 0 rgba(0, 0, 0, 0.3);
+  --lg-drop: 0 4px 8px rgba(0, 0, 0, 0.5);
+  --lg-drop-deep: 0 4px 8px rgba(0, 0, 0, 0.5), 0 20px 40px rgba(0, 0, 0, 0.65);
+  --lg-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 40%, rgba(0, 0, 0, 0.25) 100%), linear-gradient(166deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 36%, rgba(255, 255, 255, 0) 36.4%);
+  --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.12'/%3E%3C/svg%3E");
+  --lg-lit: rgb(var(--lg-hi));
+  --lg-lit-rim: linear-gradient(var(--lg-angle, 135deg), #fff 0%, rgba(255, 255, 255, 0.55) 30%, rgba(255, 255, 255, 0.3) 55%, rgba(255, 255, 255, 0.9) 100%);
+  --lg-lit-glow: 0 0 0 1px rgba(255, 255, 255, 0.35), 0 4px 10px rgba(0, 0, 0, 0.5);
+  --lg-on-lit: var(--lg-on-hi);
+  --lg-sel: var(--sel-bg);
+  --chip-bg: rgba(255, 255, 255, 0.14);
+  --kb-sleek-bg: rgba(14, 16, 22, 0.72);
+}
+/* Glass in Light */
+body.elements-glass.theme-light {
+  --lg-fill: rgba(255, 255, 255, 0.42);
+  --lg-fill-hover: rgba(255, 255, 255, 0.62);
+  --lg-pane: rgba(250, 250, 251, 0.62);
+  --lg-blur: blur(22px) saturate(1.7) brightness(1.04);
+  --lg-rim-grad: linear-gradient(var(--lg-angle, 135deg), #fff 0%, rgba(255, 255, 255, 0.7) 24%, rgba(0, 0, 0, 0.06) 50%, rgba(255, 255, 255, 0.6) 76%, #fff 100%);
+  --lg-bevel: inset 0 1px 1px #fff, inset 0 -1px 2px rgba(30, 30, 45, 0.12), inset 0 0 0 3px rgba(255, 255, 255, 0.25);
+  --lg-drop: 0 16px 40px -18px rgba(30, 30, 45, 0.32), 0 1px 3px rgba(30, 30, 45, 0.1);
+  --lg-drop-deep: var(--lg-drop);
+  --lg-gloss: linear-gradient(166deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.2) 36%, rgba(255, 255, 255, 0) 36.4%);
+  --lg-lit: rgba(var(--lg-hi), 0.96);
+  --lg-lit-rim: linear-gradient(var(--lg-angle, 135deg), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.12) 40%, rgba(255, 255, 255, 0.5));
+  --lg-lit-glow: 0 10px 26px -12px rgba(30, 30, 45, 0.5);
+  --lg-on-lit: var(--lg-on-hi);
+  --lg-sel: rgba(255, 255, 255, 0.85);
+}
+/* Glass with Light Effects (no blur, so fills are firmer) */
+body.elements-glass.light-fx {
+  --lg-fill: color-mix(in srgb, var(--lg-ob) 88%, transparent);
+  --lg-fill-hover: color-mix(in srgb, var(--lg-ob) 94%, transparent);
+  --lg-pane: color-mix(in srgb, var(--lg-ob) 96%, transparent);
+}
+/* Glass with Light Effects in Light */
+body.elements-glass.light-fx.theme-light {
+  --lg-fill: rgba(250, 250, 251, 0.88);
+  --lg-fill-hover: #fff;
+  --lg-pane: rgba(250, 250, 251, 0.97);
+}
+/* Glass with blur allowed */
+body.elements-glass:not(.light-fx) {
+  --chip-blur: blur(6px);
+  --kb-sleek-blur: blur(28px) saturate(1.3);
+}
+/* Glass when the system asks for less see-through */
+@media (prefers-reduced-transparency: reduce) {
+body.elements-glass {
+  --lg-fill: color-mix(in srgb, var(--lg-ob) 94%, transparent);
+  --lg-pane: color-mix(in srgb, var(--lg-ob) 98%, transparent);
+  --lg-lit: rgb(var(--lg-hi));
+}
+}
+/* Glass when the system asks for more contrast */
+@media (prefers-contrast: more) {
+body.elements-glass {
+  --lg-rim-grad: linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75));
+}
+}
+/* Glass in Light when the system asks for more contrast */
+@media (prefers-contrast: more) {
+body.elements-glass.theme-light {
+  --lg-rim-grad: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5));
+}
+}
+/* Plain, dark colours (Light and OLED have their own rules in styles.css) */
+body.style-plain:not(.theme-light):not(.theme-oled) {
+  --pl-edge: inset 0 0 0 1px rgba(255, 255, 255, 0.055);
+  --pl-top: inset 0 1px 0 rgba(255, 255, 255, 0.075);
+  --pl-raise: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 14px -6px rgba(0, 0, 0, 0.4);
+  --pl-sink: inset 0 1px 3px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.035);
+}

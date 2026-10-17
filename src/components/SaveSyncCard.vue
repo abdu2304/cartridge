@@ -69,7 +69,7 @@
 </template>
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { store, call, toast, choose, ago, romById, consoleName, go, openModal, cover } from '../store.js';
+import { store, call, toast, choose, ago, romById, consoleName, go, openModal, cover, plural } from '../store.js';
 import Icon from './Icon.vue';
 
 const emit = defineEmits(['advanced']);
@@ -101,7 +101,7 @@ const short = (p) => String(p || '').replace(store.info?.home || '\0', '~');
 const sub = computed(() => {
   const s = st.value; if (!s) return '';
   if (s.on && s.held) return 'Away from your server · saves are kept here until it can be reached';
-  if (s.on) return s.last ? `Last synced ${ago(s.last.at)} · ${s.saved} saves kept in step` : 'The first sync starts in a moment';
+  if (s.on) return s.last ? `Last synced ${ago(s.last.at)} · ${plural(s.saved, 'save')} kept in step` : 'The first sync starts in a moment';
   if (s.syncthing) return 'A device uses Cartridge Save Sync or Syncthing for saves, never both. Change it in Advanced.';
   return 'Keep your saves on your own RomM server and bring them to every device you play on.';
 });

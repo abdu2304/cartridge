@@ -232,7 +232,7 @@ async function setConsoleCols(v) {
   if (!(await confirm('Sort the games already in Steam?', 'Puts each console’s games that are in Steam (Cartridge’s and your own shortcuts) into its collection now.', 'Sort them'))) return;
   try {
     const r = await call('steam:consoleCollections');
-    toast(r.count ? (r.live ? `${r.count} games sorted into console collections` : `${r.count} games will be sorted when Steam restarts`) : 'They were already in their console collections', 'ok', 4000, 'mdiSteam');
+    toast(r.count ? (r.live ? `${plural(r.count, 'game')} sorted into console collections` : `${plural(r.count, 'game')} will be sorted when Steam restarts`) : 'They were already in their console collections', 'ok', 4000, 'mdiSteam');
   } catch (e) { toast(e.message, 'error'); }
 }
 async function apply() { if (await applyChanges()) load(); }
@@ -244,7 +244,7 @@ async function undo() {
   try { await call('steam:undo'); toast('Steam is closing to undo the change.', 'info', 5000, 'mdiSteam'); } catch (e) { toast(e.message, 'error'); }
 }
 async function removeAll() {
-  if (!(await confirm(`Remove ${ov.value.ours} games from Steam?`, 'Only shortcuts Cartridge added. Your other shortcuts and your game files stay as they are.', 'Remove', true))) return;
+  if (!(await confirm(`Remove ${plural(ov.value.ours, 'game')} from Steam?`, 'Only shortcuts Cartridge added. Your other shortcuts and your game files stay as they are.', 'Remove', true))) return;
   steam.queue = await call('steam:removeAll');
   await apply();
 }

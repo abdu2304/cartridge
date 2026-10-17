@@ -1,5 +1,5 @@
 // The Plain/Glass rule as a check (0.9.48, owner: "Plain and Glass are two separate modes, never merged"). Reads every
-// style rule in src/styles.css and the components' <style> blocks and reports:
+// style rule in src/styles.css, src/tokens.css and the components' <style> blocks and reports:
 // - a Liquid Glass token (var(--lg-...)) used by a selector that isn't limited to Glass (body.elements-glass, .lg-*,
 //   .dock-glass), which would put glass into Plain;
 // - a Plain token (var(--pl-...)) used outside body.style-plain;
@@ -38,7 +38,7 @@ function check(file, css) {
   return out;
 }
 function run() {
-  const files = ['src/styles.css', ...['src/components', 'src/views'].flatMap((d) => fs.readdirSync(path.join(ROOT, d)).filter((f) => f.endsWith('.vue')).map((f) => `${d}/${f}`))];
+  const files = ['src/styles.css', 'src/tokens.css', ...['src/components', 'src/views'].flatMap((d) => fs.readdirSync(path.join(ROOT, d)).filter((f) => f.endsWith('.vue')).map((f) => `${d}/${f}`))];
   const out = [];
   for (const f of files) {
     let css = fs.readFileSync(path.join(ROOT, f), 'utf8');

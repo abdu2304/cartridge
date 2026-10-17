@@ -53,7 +53,7 @@
       </div>
       <h2>Nothing downloading</h2>
       <p class="muted">Highlight any game and press <Btn b="X" /> to pull it from your server.</p>
-      <button class="btn primary" data-focus @click="tab('library')"><Icon name="mdiViewGridOutline" />Browse library</button>
+      <button class="btn primary" data-focus @click="tab('library')"><Icon name="mdiViewGridOutline" />Browse Library</button>
     </div>
 
     <section v-if="current.length" class="now">

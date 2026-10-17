@@ -1,0 +1,587 @@
+{
+ "schema": 1,
+ "id": "uncharted",
+ "name": "Uncharted: The Nathan Drake Collection",
+ "by": "Supermedo (Mohammed Albarghouthi), on bbport and shadPS4’s renderer",
+ "repo": "github:Supermedo/uncharted_pc",
+ "licence": "GPL-2.0-or-later",
+ "about": "Uncharted 1, 2 and 3 from the PS4 collection, with the original game code running natively and the graphics translated to Vulkan. 60 or 120 FPS, TAA, FSR or DLSS and frame generation.",
+ "verified": {
+  "on": "2026-10-17",
+  "release": "v0.3.3",
+  "played": false
+ },
+ "game": {
+  "console": "ps4",
+  "title": "Uncharted: The Nathan Drake Collection",
+  "ids": [
+   "CUSA02343",
+   "CUSA02320"
+  ],
+  "kind": "folder",
+  "has": [
+   "eboot.bin",
+   "sce_sys/param.sfo"
+  ],
+  "why": "The collection’s folder holds all three games (eboot.bin, big2-ps4_Shipping.elf and big3-ps4_Shipping.elf)."
+ },
+ "builds": [
+  {
+   "os": "windows",
+   "asset": "^uncharted-windows\\.zip$",
+   "program": "Uncharted.exe",
+   "args": [
+    "--play"
+   ],
+   "files": {
+    "app": {
+     "path": "{appdata}/uncharted-launcher/settings.json",
+     "format": "json"
+    },
+    "ini": {
+     "path": "{dir}/bbport.ini",
+     "format": "flat"
+    }
+   }
+  }
+ ],
+ "app": {
+  "game_dir": "{game}",
+  "check_updates": false,
+  "close_on_play": true
+ },
+ "play": [
+  {
+   "id": "u1",
+   "name": "Uncharted 1: Drake's Fortune",
+   "sub": "Uncharted 1 · 2007",
+   "needs": "eboot.bin",
+   "app": {
+    "start": "u1"
+   }
+  },
+  {
+   "id": "u2",
+   "name": "Uncharted 2: Among Thieves",
+   "sub": "Uncharted 2 · 2009",
+   "needs": "big2-ps4_Shipping.elf",
+   "app": {
+    "start": "u2"
+   }
+  },
+  {
+   "id": "u3",
+   "name": "Uncharted 3: Drake's Deception",
+   "sub": "Uncharted 3 · 2011",
+   "needs": "big3-ps4_Shipping.elf",
+   "app": {
+    "start": "u3"
+   }
+  }
+ ],
+ "keep": [
+  "user",
+  "out",
+  "art",
+  "bbport.ini",
+  "input.ini",
+  "last_run.log"
+ ],
+ "saves": [
+  "{dir}/user/savedata"
+ ],
+ "settings": [
+  {
+   "id": "frame_rate",
+   "tab": "Display",
+   "label": "Frame rate",
+   "type": "choice",
+   "def": "60",
+   "at": [
+    "app",
+    "frame_rate"
+   ],
+   "options": [
+    [
+     "60",
+     "60 FPS (as on PS4)"
+    ],
+    [
+     "120",
+     "120 FPS"
+    ],
+    [
+     "144",
+     "144 FPS (experimental)"
+    ],
+    [
+     "165",
+     "165 FPS (experimental)"
+    ],
+    [
+     "240",
+     "240 FPS (experimental)"
+    ]
+   ],
+   "desc": "The games time gameplay with the real clock; cutscenes keep 60 FPS at every setting."
+  },
+  {
+   "id": "fullscreen",
+   "tab": "Display",
+   "label": "Fullscreen",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "fullscreen"
+   ]
+  },
+  {
+   "id": "window_size",
+   "tab": "Display",
+   "label": "Window size",
+   "type": "choice",
+   "def": "1920x1080",
+   "at": [
+    "app",
+    "window_size"
+   ],
+   "options": [
+    [
+     "1280x720",
+     "1280 × 720"
+    ],
+    [
+     "1600x900",
+     "1600 × 900"
+    ],
+    [
+     "1920x1080",
+     "1920 × 1080 (the games' own)"
+    ],
+    [
+     "2560x1440",
+     "2560 × 1440"
+    ],
+    [
+     "3840x2160",
+     "3840 × 2160 (4K)"
+    ]
+   ],
+   "desc": "The games draw at 1920 × 1080; the window gets that picture scaled to its size."
+  },
+  {
+   "id": "present_mode",
+   "tab": "Display",
+   "label": "Presentation",
+   "type": "choice",
+   "def": "Mailbox",
+   "at": [
+    "app",
+    "present_mode"
+   ],
+   "options": [
+    [
+     "Mailbox",
+     "Mailbox (low latency, no tearing)"
+    ],
+    [
+     "Fifo",
+     "FIFO (VSync)"
+    ],
+    [
+     "FifoRelaxed",
+     "FIFO Relaxed"
+    ],
+    [
+     "Immediate",
+     "Immediate (tearing)"
+    ]
+   ]
+  },
+  {
+   "id": "show_fps",
+   "tab": "Display",
+   "label": "Show the FPS counter",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "show_fps"
+   ]
+  },
+  {
+   "id": "scaler",
+   "tab": "Graphics",
+   "label": "Scaling",
+   "type": "choice",
+   "def": "fsr1",
+   "at": [
+    "app",
+    "scaler"
+   ],
+   "options": [
+    [
+     "fsr1",
+     "FSR 1 (AMD FidelityFX, sharp)"
+    ],
+    [
+     "bilinear",
+     "Smooth (bilinear)"
+    ]
+   ]
+  },
+  {
+   "id": "sharpening",
+   "tab": "Graphics",
+   "label": "Sharpening",
+   "type": "choice",
+   "def": "500",
+   "at": [
+    "app",
+    "sharpening"
+   ],
+   "options": [
+    [
+     "off",
+     "Off"
+    ],
+    [
+     "1000",
+     "Low"
+    ],
+    [
+     "500",
+     "Medium"
+    ],
+    [
+     "250",
+     "High"
+    ],
+    [
+     "0",
+     "Maximum"
+    ]
+   ]
+  },
+  {
+   "id": "anti_aliasing",
+   "tab": "Graphics",
+   "label": "Anti-aliasing",
+   "type": "choice",
+   "def": "off",
+   "at": [
+    "app",
+    "anti_aliasing"
+   ],
+   "options": [
+    [
+     "off",
+     "Off (the game's own)"
+    ],
+    [
+     "taa",
+     "TAA"
+    ],
+    [
+     "fsr3",
+     "AMD FSR 3.1 (Native AA)"
+    ],
+    [
+     "fsr4",
+     "AMD FSR 4 (Native AA)"
+    ],
+    [
+     "dlss",
+     "NVIDIA DLSS (DLAA, GeForce RTX)"
+    ],
+    [
+     "fsr411",
+     "AMD FSR 4.1.1 (Native AA)"
+    ]
+   ],
+   "desc": "Replaces the games’ own edge smoothing. FSR 4.1.1 needs its assets beside the port."
+  },
+  {
+   "id": "aa_sharpness",
+   "tab": "Graphics",
+   "label": "Anti-aliasing sharpness",
+   "type": "choice",
+   "def": "0.2",
+   "at": [
+    "app",
+    "aa_sharpness"
+   ],
+   "options": [
+    [
+     "0",
+     "Off"
+    ],
+    [
+     "0.2",
+     "Low"
+    ],
+    [
+     "0.4",
+     "Medium"
+    ],
+    [
+     "0.7",
+     "High"
+    ]
+   ]
+  },
+  {
+   "id": "frame_generation",
+   "tab": "Graphics",
+   "label": "Frame generation",
+   "type": "choice",
+   "def": "off",
+   "at": [
+    "app",
+    "frame_generation"
+   ],
+   "options": [
+    [
+     "off",
+     "Off"
+    ],
+    [
+     "fsr3",
+     "AMD FSR 3 Frame Generation (any GPU)"
+    ],
+    [
+     "dlss",
+     "NVIDIA DLSS Frame Generation (GeForce RTX 40/50)"
+    ]
+   ]
+  },
+  {
+   "id": "frame_gen_multiplier",
+   "tab": "Graphics",
+   "label": "Frame generation multiplier",
+   "type": "choice",
+   "def": "2",
+   "at": [
+    "app",
+    "frame_gen_multiplier"
+   ],
+   "options": [
+    [
+     "2",
+     "2× (one generated frame)"
+    ],
+    [
+     "3",
+     "3× (DLSS on GeForce RTX 50)"
+    ],
+    [
+     "4",
+     "4× (DLSS on GeForce RTX 50)"
+    ]
+   ]
+  },
+  {
+   "id": "language",
+   "tab": "Game",
+   "label": "Console language",
+   "type": "choice",
+   "def": "1",
+   "at": [
+    "app",
+    "language"
+   ],
+   "options": [
+    [
+     "1",
+     "English (United States)"
+    ],
+    [
+     "18",
+     "English (United Kingdom)"
+    ],
+    [
+     "2",
+     "French"
+    ],
+    [
+     "22",
+     "French (Canada)"
+    ],
+    [
+     "4",
+     "German"
+    ],
+    [
+     "5",
+     "Italian"
+    ],
+    [
+     "3",
+     "Spanish"
+    ],
+    [
+     "20",
+     "Spanish (Latin America)"
+    ],
+    [
+     "7",
+     "Portuguese"
+    ],
+    [
+     "17",
+     "Portuguese (Brazil)"
+    ],
+    [
+     "6",
+     "Dutch"
+    ],
+    [
+     "8",
+     "Russian"
+    ],
+    [
+     "16",
+     "Polish"
+    ],
+    [
+     "19",
+     "Turkish"
+    ],
+    [
+     "21",
+     "Arabic"
+    ],
+    [
+     "0",
+     "Japanese"
+    ],
+    [
+     "9",
+     "Korean"
+    ],
+    [
+     "11",
+     "Chinese (Simplified)"
+    ],
+    [
+     "10",
+     "Chinese (Traditional)"
+    ],
+    [
+     "12",
+     "Finnish"
+    ],
+    [
+     "13",
+     "Swedish"
+    ],
+    [
+     "14",
+     "Danish"
+    ],
+    [
+     "15",
+     "Norwegian"
+    ]
+   ]
+  },
+  {
+   "id": "player_name",
+   "tab": "Game",
+   "label": "Player name",
+   "type": "text",
+   "def": "",
+   "at": [
+    "app",
+    "player_name"
+   ]
+  },
+  {
+   "id": "pad_invert_y",
+   "tab": "Controls",
+   "label": "Invert the controller’s camera",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "pad_invert_y"
+   ]
+  },
+  {
+   "id": "mouse_look",
+   "tab": "Controls",
+   "label": "Mouse look",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "mouse_look"
+   ]
+  },
+  {
+   "id": "mouse_sensitivity",
+   "tab": "Controls",
+   "label": "Mouse sensitivity",
+   "type": "choice",
+   "def": "1.0",
+   "at": [
+    "app",
+    "mouse_sensitivity"
+   ],
+   "options": [
+    [
+     "0.25",
+     "0.25"
+    ],
+    [
+     "0.5",
+     "0.5"
+    ],
+    [
+     "0.75",
+     "0.75"
+    ],
+    [
+     "1.0",
+     "1.0 (default)"
+    ],
+    [
+     "1.25",
+     "1.25"
+    ],
+    [
+     "1.5",
+     "1.5"
+    ],
+    [
+     "2.0",
+     "2.0"
+    ],
+    [
+     "2.5",
+     "2.5"
+    ],
+    [
+     "3.0",
+     "3.0"
+    ],
+    [
+     "4.0",
+     "4.0"
+    ]
+   ]
+  },
+  {
+   "id": "mouse_invert_y",
+   "tab": "Controls",
+   "label": "Invert the mouse",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "mouse_invert_y"
+   ]
+  }
+ ]
+}

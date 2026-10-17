@@ -65,7 +65,7 @@
           <template v-for="f in L?.folders || s.folders" :key="f.id">
             <button class="lrow" data-focus :data-key="'sf-' + f.id" @click="toggle(f)">
               <Icon :name="f.saves ? 'mdiContentSaveOutline' : f.textures ? 'mdiTextureBox' : 'mdiFolderOutline'" :size="22" />
-              <div class="l-mid"><b>{{ f.label || f.id }}</b><span class="l-sub mono">{{ short(f.path) }}{{ f.saves ? ` · ${f.saves} saves` : f.textures ? ' · textures' : '' }}</span></div>
+              <div class="l-mid"><b>{{ f.label || f.id }}</b><span class="l-sub mono">{{ short(f.path) }}{{ f.saves ? ` · ${plural(f.saves, 'save')}` : f.textures ? ' · textures' : '' }}</span></div>
               <span v-if="f.paused" class="status">Paused</span>
               <span v-else-if="f.done != null" class="status" :class="f.done >= 100 ? 'ok' : 'warn'">{{ f.done >= 100 ? 'Up to Date' : f.done + '%' }}</span>
               <Icon :name="open === f.id ? 'mdiChevronUp' : 'mdiChevronDown'" :size="22" />
@@ -135,7 +135,7 @@
           <template v-for="f in R.folders" :key="f.id">
             <button class="lrow" data-focus :data-key="'sv-' + f.id" @click="toggle(f, true)">
               <Icon :name="f.saves ? 'mdiContentSaveOutline' : f.textures ? 'mdiTextureBox' : 'mdiFolderOutline'" :size="22" />
-              <div class="l-mid"><b>{{ f.label }}</b><span class="l-sub">Shared with {{ f.devices }} {{ f.devices === 1 ? 'device' : 'devices' }}{{ f.saves ? ` · ${f.saves} saves` : f.textures ? ' · textures' : '' }}</span></div>
+              <div class="l-mid"><b>{{ f.label }}</b><span class="l-sub">Shared with {{ f.devices }} {{ f.devices === 1 ? 'device' : 'devices' }}{{ f.saves ? ` · ${plural(f.saves, 'save')}` : f.textures ? ' · textures' : '' }}</span></div>
               <span v-if="f.paused" class="status">Paused</span>
               <span v-else-if="f.done != null" class="status" :class="f.done >= 100 ? 'ok' : 'warn'">{{ f.done >= 100 ? 'Up to Date' : f.done + '%' }}</span>
               <Icon :name="open === 'srv:' + f.id ? 'mdiChevronUp' : 'mdiChevronDown'" :size="22" />
@@ -212,7 +212,7 @@
 // Settings → Syncthing (0.9.19 card, own tab 0.9.21; 0.9.23, owner: a proper integration with its logo,
 // a main server, which games have saves and textures synced). Read only, see electron/syncthing.js
 import { ref, computed, onMounted, watch } from 'vue';
-import { store, call, ago, bytes, toast, go, confirm, romById, cover } from '../store.js';
+import { store, call, ago, bytes, toast, go, confirm, romById, cover, plural } from '../store.js';
 import Icon from './Icon.vue';
 import TextField from './TextField.vue';
 import SyncthingLogo from './SyncthingLogo.vue';

@@ -1,0 +1,633 @@
+{
+ "schema": 1,
+ "id": "gow3",
+ "name": "God of War III Remastered",
+ "by": "FelipePrado0, on bbport and shadPS4",
+ "repo": "github:FelipePrado0/gow3_pc",
+ "licence": "GPL-2.0-or-later",
+ "about": "The PS4 remaster running natively, with its patches applied automatically: the texture fix, skippable videos and 120 FPS on by default, render resolution and engine frame rate.",
+ "verified": {
+  "on": "2026-10-17",
+  "release": "windows-v2.4.1",
+  "played": false
+ },
+ "game": {
+  "console": "ps4",
+  "title": "God of War III Remastered",
+  "ids": [
+   "CUSA01623",
+   "CUSA01715"
+  ],
+  "kind": "folder",
+  "has": [
+   "eboot.bin",
+   "sce_sys/param.sfo",
+   "sce_module/libc.prx",
+   "sce_module/libSceFios2.prx"
+  ],
+  "why": "Tested with CUSA01623 and CUSA01715, versions 01.00 and 01.02."
+ },
+ "builds": [
+  {
+   "os": "linux",
+   "asset": "^gow3-x86_64\\.AppImage$",
+   "program": "gow3-x86_64.AppImage",
+   "args": [
+    "--play"
+   ],
+   "note": "The Linux build is marked experimental by its author; Steam Deck rendering problems were reported in older AppImages.",
+   "files": {
+    "app": {
+     "path": "{config}/gow3-launcher/settings.json",
+     "format": "json"
+    },
+    "ini": {
+     "path": "{data}/gow3/gow3.ini",
+     "format": "flat"
+    }
+   }
+  },
+  {
+   "os": "windows",
+   "asset": "^gow3-windows\\.zip$",
+   "program": "God of War III.exe",
+   "args": [
+    "--play"
+   ],
+   "files": {
+    "app": {
+     "path": "{appdata}/gow3-launcher/settings.json",
+     "format": "json"
+    },
+    "ini": {
+     "path": "{dir}/gow3.ini",
+     "format": "flat"
+    }
+   }
+  }
+ ],
+ "app": {
+  "game_dir": "{game}",
+  "check_updates": false,
+  "close_on_play": true
+ },
+ "keep": [
+  "user",
+  "out",
+  "mods",
+  "gow3.ini",
+  "mods.json",
+  "mods_presets.json",
+  "patches.json",
+  "last_run.log"
+ ],
+ "saves": {
+  "linux": [
+   "{data}/gow3/user/savedata"
+  ],
+  "windows": [
+   "{dir}/user/savedata"
+  ]
+ },
+ "shadps4Saves": "CUSA01623",
+ "settings": [
+  {
+   "id": "display_mode",
+   "tab": "Display",
+   "label": "Display mode",
+   "type": "choice",
+   "def": "windowed",
+   "at": [
+    "ini",
+    "display_mode"
+   ],
+   "options": [
+    [
+     "windowed",
+     "Windowed"
+    ],
+    [
+     "borderless",
+     "Borderless"
+    ],
+    [
+     "fullscreen",
+     "Fullscreen"
+    ]
+   ]
+  },
+  {
+   "id": "vsync",
+   "tab": "Display",
+   "label": "VSync",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "vsync"
+   ],
+   "desc": "Off allows tearing for the lowest latency."
+  },
+  {
+   "id": "hdr",
+   "tab": "Display",
+   "label": "Allow HDR output",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "hdr"
+   ]
+  },
+  {
+   "id": "show_fps",
+   "tab": "Display",
+   "label": "Show performance overlay",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "show_fps"
+   ]
+  },
+  {
+   "id": "fps_limit",
+   "tab": "Performance",
+   "label": "Frame rate limit",
+   "type": "choice",
+   "def": "0",
+   "at": [
+    "ini",
+    "fps_limit"
+   ],
+   "options": [
+    [
+     "30",
+     "30"
+    ],
+    [
+     "60",
+     "60"
+    ],
+    [
+     "120",
+     "120"
+    ],
+    [
+     "240",
+     "240"
+    ],
+    [
+     "0",
+     "Unlimited"
+    ]
+   ]
+  },
+  {
+   "id": "engine_fps",
+   "tab": "Performance",
+   "label": "Engine frame rate",
+   "type": "choice",
+   "def": "120",
+   "at": [
+    "ini",
+    "engine_fps"
+   ],
+   "options": [
+    [
+     "60",
+     "60 (original)"
+    ],
+    [
+     "120",
+     "120"
+    ],
+    [
+     "240",
+     "240"
+    ]
+   ],
+   "desc": "The highest frame rate the game itself runs at (a game patch)."
+  },
+  {
+   "id": "render_resolution",
+   "tab": "Performance",
+   "label": "Render resolution",
+   "type": "choice",
+   "def": "native",
+   "at": [
+    "ini",
+    "render_resolution"
+   ],
+   "options": [
+    [
+     "native",
+     "Native · 1920 × 1080"
+    ],
+    [
+     "480p",
+     "480p · 854 × 480"
+    ],
+    [
+     "720p",
+     "720p · 1280 × 720"
+    ],
+    [
+     "1440p",
+     "1440p · 2560 × 1440"
+    ],
+    [
+     "1800p",
+     "1800p · 3200 × 1800"
+    ],
+    [
+     "4K",
+     "4K · 3840 × 2160"
+    ],
+    [
+     "2560x1080",
+     "2560 × 1080 (beta)"
+    ],
+    [
+     "3440x1440",
+     "3440 × 1440 (beta)"
+    ],
+    [
+     "3840x1600",
+     "3840 × 1600 (beta)"
+    ],
+    [
+     "5120x1440",
+     "5120 × 1440 (beta)"
+    ],
+    [
+     "1920x1200",
+     "1920 × 1200 (beta)"
+    ],
+    [
+     "2560x1600",
+     "2560 × 1600 (beta)"
+    ]
+   ],
+   "desc": "The size the game draws at; higher is sharper and slower."
+  },
+  {
+   "id": "frames_queued",
+   "tab": "Performance",
+   "label": "Frames queued",
+   "type": "choice",
+   "def": "1",
+   "at": [
+    "ini",
+    "frames_queued"
+   ],
+   "options": [
+    [
+     "1",
+     "1 (lowest latency)"
+    ],
+    [
+     "2",
+     "2"
+    ],
+    [
+     "0",
+     "Unlimited"
+    ]
+   ]
+  },
+  {
+   "id": "anisotropy",
+   "tab": "Performance",
+   "label": "Anisotropic filtering",
+   "type": "choice",
+   "def": "0",
+   "at": [
+    "ini",
+    "anisotropy"
+   ],
+   "options": [
+    [
+     "0",
+     "Game default"
+    ],
+    [
+     "2",
+     "2x"
+    ],
+    [
+     "4",
+     "4x"
+    ],
+    [
+     "8",
+     "8x"
+    ],
+    [
+     "16",
+     "16x"
+    ]
+   ]
+  },
+  {
+   "id": "async_shaders",
+   "tab": "Performance",
+   "label": "Compile new shaders in the background",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "async_shaders"
+   ]
+  },
+  {
+   "id": "background_warmup",
+   "tab": "Performance",
+   "label": "Load the shader cache in the background",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "background_warmup"
+   ]
+  },
+  {
+   "id": "parallel_warmup",
+   "tab": "Performance",
+   "label": "Fast shader cache loading (parallel)",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "parallel_warmup"
+   ]
+  },
+  {
+   "id": "cheat_double_jumps",
+   "tab": "Game",
+   "label": "Infinite double jumps",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "cheat_double_jumps"
+   ]
+  },
+  {
+   "id": "cheat_very_hard",
+   "tab": "Game",
+   "label": "Unlock Very Hard",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "cheat_very_hard"
+   ]
+  },
+  {
+   "id": "language",
+   "tab": "Game",
+   "label": "Language",
+   "type": "choice",
+   "def": "1",
+   "at": [
+    "app",
+    "language"
+   ],
+   "options": [
+    [
+     "1",
+     "English"
+    ],
+    [
+     "8",
+     "Russian"
+    ],
+    [
+     "0",
+     "Japanese"
+    ],
+    [
+     "2",
+     "French"
+    ],
+    [
+     "3",
+     "Spanish"
+    ],
+    [
+     "4",
+     "German"
+    ],
+    [
+     "5",
+     "Italian"
+    ]
+   ]
+  },
+  {
+   "id": "glyph_style",
+   "tab": "Controls",
+   "label": "In-game button icons",
+   "type": "choice",
+   "def": "off",
+   "at": [
+    "app",
+    "glyph_style"
+   ],
+   "options": [
+    [
+     "off",
+     "Original (default)"
+    ],
+    [
+     "auto",
+     "Match my controller"
+    ],
+    [
+     "xbox",
+     "Xbox"
+    ],
+    [
+     "nintendo",
+     "Nintendo"
+    ]
+   ]
+  },
+  {
+   "id": "vibration",
+   "tab": "Controls",
+   "label": "Vibration",
+   "type": "number",
+   "def": "100",
+   "at": [
+    "ini",
+    "vibration"
+   ],
+   "num": {
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "stale_readback",
+   "tab": "Advanced",
+   "label": "Game reads GPU data without waiting",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "stale_readback"
+   ]
+  },
+  {
+   "id": "deferred_readback",
+   "tab": "Advanced",
+   "label": "Deferred GPU readbacks",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "deferred_readback"
+   ]
+  },
+  {
+   "id": "partial_height_views",
+   "tab": "Advanced",
+   "label": "Fast screen effects",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "partial_height_views"
+   ]
+  },
+  {
+   "id": "draw_pipe",
+   "tab": "Advanced",
+   "label": "Two-stage GPU pipeline",
+   "type": "choice",
+   "def": "",
+   "at": [
+    "app",
+    "draw_pipe"
+   ],
+   "options": [
+    [
+     "",
+     "Auto (8+ threads)"
+    ],
+    [
+     "1",
+     "On"
+    ],
+    [
+     "0",
+     "Off (more stable)"
+    ]
+   ]
+  },
+  {
+   "id": "readbacks",
+   "tab": "Advanced",
+   "label": "GPU readbacks",
+   "type": "choice",
+   "def": "",
+   "at": [
+    "app",
+    "readbacks"
+   ],
+   "options": [
+    [
+     "",
+     "Relaxed (default)"
+    ],
+    [
+     "0",
+     "Off"
+    ],
+    [
+     "2",
+     "Precise"
+    ]
+   ]
+  },
+  {
+   "id": "no_msaa",
+   "tab": "Advanced",
+   "label": "Game multisampling",
+   "type": "choice",
+   "def": "",
+   "at": [
+    "app",
+    "no_msaa"
+   ],
+   "options": [
+    [
+     "",
+     "Automatic"
+    ],
+    [
+     "1",
+     "Off (fixes black lines)"
+    ],
+    [
+     "0",
+     "On"
+    ]
+   ]
+  },
+  {
+   "id": "stream_memory",
+   "tab": "Advanced",
+   "label": "Stream buffer memory",
+   "type": "choice",
+   "def": "cached",
+   "at": [
+    "app",
+    "stream_memory"
+   ],
+   "options": [
+    [
+     "cached",
+     "System RAM (cached, default)"
+    ],
+    [
+     "host",
+     "System RAM (uncached)"
+    ],
+    [
+     "device",
+     "GPU memory (previous behavior)"
+    ]
+   ]
+  },
+  {
+   "id": "video_backend",
+   "tab": "Advanced",
+   "label": "Video backend (Linux)",
+   "type": "choice",
+   "def": "auto",
+   "at": [
+    "app",
+    "video_backend"
+   ],
+   "options": [
+    [
+     "auto",
+     "Automatic"
+    ],
+    [
+     "wayland",
+     "Wayland"
+    ],
+    [
+     "x11",
+     "X11 (XWayland)"
+    ]
+   ],
+   "os": "linux"
+  }
+ ]
+}

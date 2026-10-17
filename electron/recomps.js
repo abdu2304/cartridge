@@ -3,10 +3,10 @@
 // static recompilation, decompilation or a rebuild from scratch (Zelda 64: Recompiled, Ship of Harkinian, Unleashed
 // Recompiled). Each needs the player's own copy of the game, never an emulator.
 //
-// The catalogue (electron/recomps.json) was built from PCGamingWiki's "List of unofficial ports" (the owner's saved
-// page, every link checked; its status notes ignored as the owner asked), with the projects behind entries that had
-// no link found on GitHub. A copy is fetched from Cartridge's repository once a day so new entries arrive without an
-// app update, and PCGamingWiki's page is read too: projects new there are added silently, marked found.
+// Since 0.9.70 (owner: a curated list, "Cartridge Verified") the list is the recipes in electron/recipes/ (one per
+// game, docs/recipes.md), read once a day from Cartridge's repository so new ports arrive without an app update.
+// Verified ports are installed, given the player's copy, configured and started by Cartridge (recipes.js); recomps
+// added from a GitHub link and ones kept from the old catalogue are Unverified and set themselves up.
 //
 // What Cartridge does with one: download its build (Linux first, Windows through Proton only when there is no Linux
 // build, never Android, macOS or ARM), put it in <Emulation>/recomp/<console>/<name>, hand it the game file the way
@@ -14,7 +14,7 @@
 // own shortcut in a "Recomps" collection. Updates are never automatic: saves are backed up first, the release it
 // replaces is kept beside it (forkVersions.js) for Roll Back, and saves are checked afterwards.
 //
-// The pure parts (matching, picking a build, the wiki parser, save paths, hashes) are exported for
+// The pure parts (matching, picking a build, save paths, hashes) are exported for
 // test/recomps.test.js; the engine takes its outside world through ctx.
 const fs = require('fs');
 const fsp = fs.promises;
@@ -73,6 +73,8 @@ const rx = (s) => { try { return s ? new RegExp(s, 'i') : null; } catch { return
 function pickBuild(assets, e = {}) {
   const C = require('./customEmu'), list = (assets || []).filter((a) => !NOT_FILE.test(a.name));
   const lr = rx(e.linuxAsset), wr = rx(e.windowsAsset);
+  // a Cartridge Verified recipe (0.9.70) names its file exactly: that file or none, never a guess
+  if (e.strict) { const a = lr ? list.find((x) => lr.test(x.name)) : wr ? list.find((x) => wr.test(x.name)) : null; return a ? { asset: a, kind: lr ? 'linux' : 'windows' } : null; }
   if (e.builds !== 'windows') {
     const a = (lr && list.find((x) => lr.test(x.name))) || C.pickAsset(list) || (!lr && C.pickArchive(list));
     if (a) return { asset: a, kind: 'linux' };
@@ -185,31 +187,6 @@ function guessSaves(e, rec, home = os.homedir()) {
 }
 const SAVE_CAP = 256 * 1024 * 1024;
 
-// ---------------------------------------------------------------- PCGamingWiki
-// sections of the list as console keys (the page's own headings)
-const WIKI_SECTIONS = [[/^arcade$/i, 'arcade'], [/nintendo entertainment system|famicom$/i, 'nes'], [/super nintendo/i, 'snes'], [/nintendo 64/i, 'n64'], [/game boy advance/i, 'gba'], [/game boy/i, 'gbc'], [/gamecube/i, 'gamecube'], [/nintendo ds/i, 'nds'], [/wii/i, 'wii'], [/genesis|mega drive/i, 'genesis'], [/playstation 4/i, 'ps4'], [/playstation 2/i, 'ps2'], [/^playstation$/i, 'psx'], [/xbox 360/i, 'xbox360']];
-// the page's wikitext (action=raw) as rows: { console, game, port, links } for the console sections only
-function parseWikitext(text) {
-  const rows = [];
-  let con = null;
-  for (const block of String(text || '').split(/\n(?=={2,}|\|-)/)) {
-    const h = /^={2,}\s*(.*?)\s*={2,}/.exec(block);
-    if (h) { const name = h[1].replace(/\[\[|\]\]|'''?/g, '').trim(); const hit = WIKI_SECTIONS.find(([re]) => re.test(name)); con = hit ? hit[1] : /^(windows|dos|pc-98|mac|phone|engines|references|multiplatform|nintendo|sega|sony|microsoft)$/i.test(name) ? (/^(nintendo|sega|sony|microsoft|multiplatform)$/i.test(name) ? con : null) : con; continue; }
-    if (!con || !/^\|-/.test(block)) continue;
-    const cells = block.replace(/^\|-[^\n]*\n?/, '').split(/\n\||\|\|/).map((c) => c.replace(/^\|/, '').trim()).filter((c, i) => c || i);
-    if (cells.length < 2) continue;
-    const text2 = (c) => String(c || '').replace(/\{\{[^}]*\}\}/g, '').replace(/\[\[(?:[^\]|]*\|)?([^\]]*)\]\]/g, '$1').replace(/\[(https?:\S+)\s+([^\]]*)\]/g, '$2').replace(/<[^>]+>/g, '').replace(/'''?/g, '').trim();
-    const links = [...String(cells[1]).matchAll(/https?:\/\/[^\s\]|}]+/g)].map((m) => m[0]);
-    rows.push({ console: con, game: text2(cells[0]), port: text2(cells[1]), links });
-  }
-  return rows.filter((r) => r.game && r.port);
-}
-// a GitHub or GitLab project named in a link -> "github:owner/name"
-function repoFromLink(u) {
-  const m = /^https?:\/\/(?:www\.)?(github|gitlab)\.com\/([\w.-]+)\/([\w.-]+)/i.exec(String(u || ''));
-  if (!m || /^(topics|orgs|search|sponsors|users|explore|groups)$/i.test(m[2])) return null;
-  return `${m[1].toLowerCase()}:${m[2]}/${m[3].replace(/\.git$/i, '')}`;
-}
 const slugId = (s) => String(s || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'recomp';
 
 // ---------------------------------------------------------------- hashes (in a worker: a disc image can be gigabytes)
@@ -397,17 +374,17 @@ function createRecomps(ctx) {
   const F = (n) => path.join(dataDir, n);
   const readJson = (f, d) => { try { return JSON.parse(fs.readFileSync(f, 'utf8')); } catch { return d; } };
   const writeJson = (f, v) => { try { fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f + '.tmp', JSON.stringify(v, null, 1)); fs.renameSync(f + '.tmp', f); } catch (e) { log('recomps: write', path.basename(f), e.message); } };
-  const SHIPPED = ctx.shipped || path.join(__dirname, 'recomps.json'); // ctx.shipped: tests
+  const RC = require('./recipes');
   let installs = readJson(F('recomp-installs.json'), {});
   let latest = readJson(F('recomp-latest.json'), {});
   const saveInstalls = () => writeJson(F('recomp-installs.json'), installs);
   let cat = null;
-  // the catalogue: the copy from Cartridge's repository when it's newer than the one shipped, then entries found on
-  // PCGamingWiki since, then recomps you added from a link. Same id or same project: the earlier source wins.
+  // the catalogue (0.9.70, owner: "remove all the games and make them Cartridge verified"): the verified recipes
+  // (electron/recipes, a newer copy of any of them from Cartridge's repository), then recomps you added from a link.
+  // ctx.shipped is a plain list for the tests. A recomp installed from the old list (0.9.65 to 0.9.69) stays, as one
+  // from a link: Unverified, set up as it was.
   function catalogue() {
     if (cat) return cat;
-    const shipped = readJson(SHIPPED, { entries: [] }), fetched = readJson(F('recomps.json'), null);
-    const base = fetched && String(fetched.updated || '') > String(shipped.updated || '') ? fetched : shipped;
     const out = [], ids = new Set(), repos = new Set();
     const add = (e, from) => {
       if (!e?.id || ids.has(e.id) || (e.repo && repos.has(e.repo.toLowerCase()))) return;
@@ -415,16 +392,26 @@ function createRecomps(ctx) {
       // a place with no rule Cartridge can follow (a patcher, a mod folder inside another game): you put it in place
       // yourself, then press It's Set Up (0.9.68)
       let setup = e.setup?.how === 'place' && !e.setup.to ? { ...e.setup, how: 'manual' } : e.setup, needs = e.needs;
-      // 0.9.69: a recomp from a link or found automatically: nothing says what it needs, so it's set up when you say
-      // so (open it, follow its own steps, It's Set Up), never counted as ready the moment it's installed
+      // 0.9.69: a recomp from a link: nothing says what it needs, so it's set up when you say so (open it, follow its
+      // own steps, It's Set Up), never counted as ready the moment it's installed
       if ((from === 'link' || from === 'found') && !needs) { needs = { what: `Your own copy of ${e.games?.[0]?.title || 'the game'}, if it asks for one. Open it and follow its own steps.`, files: 'any' }; setup = { how: 'picker' }; }
       out.push({ ...e, setup, needs, from });
     };
-    for (const e of base.entries || []) add(e, 'list');
-    for (const e of readJson(F('recomps-found.json'), [])) add(e, 'found');
+    for (const r of RC.load({ dir: ctx.recipesDir, fetched: readJson(F('recipes-fetched.json'), []), log })) add(verifiedEntry(r), 'verified');
+    if (ctx.shipped) for (const e of readJson(ctx.shipped, { entries: [] }).entries || []) add(e, 'list');
     for (const e of readJson(F('recomps-mine.json'), [])) add(e, 'link');
-    cat = { updated: base.updated || '', entries: out };
+    // installed from the old list: kept as from a link, under the name of its folder
+    for (const [id, rec] of Object.entries(installs)) {
+      if (ids.has(id) || !rec?.dir) continue;
+      const name = path.basename(rec.dir), con = path.basename(path.dirname(rec.dir));
+      add({ id, name, games: [{ title: name, console: CONSOLES[con] ? con : 'other' }], origin: 'recomp', repo: rec.repo || null, builds: rec.kind === 'windows' ? 'windows' : 'linux', needs: null, setup: { how: 'none' }, saves: [], kept: true }, 'kept');
+    }
+    cat = { updated: '', entries: out };
     return cat;
+  }
+  // a recipe as a catalogue entry: everything the screens and the engine read, the recipe itself beside it
+  function verifiedEntry(r) {
+    return { id: r.id, name: r.name, games: [{ console: r.game.console, title: r.game.title, also: r.game.also || [] }], origin: 'port', repo: r.repo, description: r.about || '', by: r.by || '', license: r.licence || null, verified: r.verified || null, recipe: r, needs: { what: r.game.why || `Your own copy of ${r.game.title}.`, files: 'folder' }, setup: { how: 'verified' }, saves: [] };
   }
   const byId = (id) => catalogue().entries.find((e) => e.id === id) || null;
   const folderName = (e) => String(e.name || e.id).replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) || e.id;
@@ -444,6 +431,8 @@ function createRecomps(ctx) {
   // installed and set up? A recomp that names a file made by its setup is ready once that file is there
   function readyOf(e, rec) {
     if (!rec || !exists(rec.program)) return false;
+    // verified: its copy picked and checked, and every start script written
+    if (e?.from === 'verified') return !!(rec.game?.path && rec.starts?.length && rec.starts.every((st) => exists(st.script)));
     if (!e?.needs) return true;
     if (e.done) return doneAt(e, rec).some(exists);
     return !!rec.setupDone;
@@ -523,15 +512,33 @@ function createRecomps(ctx) {
         installed: rec ? { tag: rec.tag, kind: rec.kind, dir: rec.dir, program: rec.program, channel: rec.channel || 'stable', at: rec.at, game: rec.game || null, ready: readyOf(e, rec), here: exists(rec.program), appid: rec.appid || null } : null,
         latest: lt && { tag: lt.tag, date: lt.date, kind: lt.kind, at: lt.at, none: lt.none || null },
         update: !!(rec && lt?.tag && rec.tag && lt.tag !== rec.tag && !lt.none),
+        ...(e.from === 'verified' ? verifiedInfo(e, rec, lt) : {}),
       });
     }
     return { updated: catalogue().updated, consoles: CONSOLES, entries: out };
+  }
+  // what the screens show for a verified game: who made it, when Cartridge checked it, its builds, your copy, and the
+  // one state that decides the main button: get, game (pick your copy), setup, play, update, broken
+  function verifiedInfo(e, rec, lt) {
+    const r = e.recipe, build = buildOf(e, rec);
+    const here = !!rec && (exists(rec.program) || !!rec.installer);
+    const ready = readyOf(e, rec);
+    const state = !rec ? 'get' : !here ? 'broken' : !rec.game?.path ? 'game' : !ready ? 'setup' : rec.tag && lt?.tag && lt.tag !== rec.tag && !lt.none ? 'update' : 'play';
+    return {
+      verified: r.verified || null, by: r.by || '', about: r.about || '', licence: r.licence || null,
+      builds: r.builds.map((b) => ({ os: b.os, note: b.note || '' })), build: rec?.build || null, buildNote: build?.note || '',
+      wants: { title: r.game.title, ids: r.game.ids || [], version: r.game.version || null, why: r.game.why || '', pkg: r.game.kind === 'folder-or-pkg' },
+      copy: rec?.game || null, starts: (rec?.starts || []).map((st) => ({ id: st.id, name: st.name, sub: st.sub })), plays: (r.play || []).map((p) => ({ id: p.id, name: p.name, sub: p.sub || '' })),
+      settingsCount: RC.settingsFor(r, build || RC.chooseBuild(r, { runner: true })).length, changed: Object.keys(rec?.settings || {}).length,
+      runner: rec?.runner || null, installNotes: rec?.installNotes || [], state,
+    };
   }
   // the newest release this device can use (remembered for the screens; a check is reused for 6 hours)
   async function check(id, { force = false, channel } = {}) {
     const e = byId(id);
     if (!e) throw new Error('That recomp isn’t in the list.');
     const ch = channel || installs[id]?.channel || 'stable';
+    if (e.from === 'verified') return checkVerified(e, ch, force);
     const old = latest[id];
     if (!force && old && old.channel === ch && Date.now() - old.at < 6 * 3600e3) return old;
     if (!repoOf(e.repo)) { latest[id] = { at: Date.now(), channel: ch, none: e.builds === 'site' ? 'site' : 'source' }; writeJson(F('recomp-latest.json'), latest); return latest[id]; }
@@ -541,10 +548,20 @@ function createRecomps(ctx) {
     writeJson(F('recomp-latest.json'), latest);
     return latest[id];
   }
+  async function checkVerified(e, ch, force) {
+    const old = latest[e.id];
+    if (!force && old && Date.now() - old.at < 6 * 3600e3) return old;
+    const eUse = verifiedCheckEntry(e, installs[e.id]);
+    const rel = await releaseOf(eUse, { fetchImpl: ctx.fetchImpl });
+    const b = rel && pickBuild(rel.assets, eUse);
+    latest[e.id] = b ? { tag: rel.tag, date: rel.date, kind: b.kind, name: b.asset.name, url: b.asset.url, size: b.asset.size || 0, at: Date.now(), channel: ch } : { at: Date.now(), channel: ch, none: rel ? 'nobuild' : 'norelease', tag: rel?.tag || null };
+    writeJson(F('recomp-latest.json'), latest);
+    return latest[e.id];
+  }
   // ---- saves: backed up before an update or removal, checked after (owner: updates must never lose saves)
   function backupSaves(id, why, { keep } = {}) {
     const e = byId(id), rec = installs[id];
-    const dirs = (e?.saves?.length ? saveDirs(e, rec) : ['link', 'found'].includes(e?.from) ? guessSaves(e, rec) : []).filter(exists); // 0.9.69: guessed for link recomps
+    const dirs = (e?.from === 'verified' ? verifiedSaves(e, rec) : e?.saves?.length ? saveDirs(e, rec) : ['link', 'found', 'kept'].includes(e?.from) ? guessSaves(e, rec) : []).filter(exists); // 0.9.69: guessed for link recomps
     if (!dirs.length) return null;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-'), to = path.join(dataDir, 'recomp-backups', id, stamp);
     const meta = { id, why, at: Date.now(), tag: rec?.tag || null, items: [] };
@@ -595,9 +612,11 @@ function createRecomps(ctx) {
     return { files, places: meta.items.length, savedFirst: !!before };
   }
   // ---- install or update: download, unpack, keep the release it replaces, put the new one where the old one is
-  async function install(id, { channel, onProgress = () => {}, signal } = {}) {
-    const e = byId(id);
-    if (!e) throw new Error('That recomp isn’t in the list.');
+  async function install(id, { channel, onProgress = () => {}, signal, build: pickOs, _e } = {}) {
+    const e0 = byId(id);
+    if (!e0) throw new Error('That recomp isn’t in the list.');
+    if (e0.from === 'verified' && !_e) return installVerified(e0, { channel, onProgress, signal, pickOs });
+    const e = _e || e0;
     if (!repoOf(e.repo)) throw new Error(e.builds === 'site' ? `${e.name} is downloaded from its own site, not GitHub. Open its page.` : `${e.name} doesn’t publish builds: it has to be built from its source.`);
     const prev = installs[id] || null;
     if (prev && exists(prev.program) && ctx.isRunning(prev.flatpak || prev.program)) throw new Error(`Close ${e.name} first.`);
@@ -888,20 +907,11 @@ function createRecomps(ctx) {
     writeJson(F('recomps-mine.json'), mine); cat = null;
     return { id, known: false };
   }
-  // ---- the daily refresh (silent): the catalogue from Cartridge's repository, then PCGamingWiki's page for projects
-  // the catalogue doesn't have yet, then the newest release of each installed recomp
+  // ---- the daily refresh (silent): newer recipes from Cartridge's repository, then the newest release of each
+  // installed recomp (0.9.70: PCGamingWiki is no longer searched; the list is curated)
   async function refresh({ playing = () => false } = {}) {
-    const res = { catalogue: false, found: 0, checked: 0 };
-    const f = ctx.fetchImpl || require('./webFetch');
-    try {
-      const r = await f(ctx.catalogueUrl, { headers: { 'User-Agent': 'Cartridge' }, signal: AbortSignal.timeout(20000) });
-      if (r.ok) { const j = await r.json(); if (Array.isArray(j?.entries) && String(j.updated || '') > String(catalogue().updated || '')) { writeJson(F('recomps.json'), j); cat = null; res.catalogue = true; } }
-    } catch (e) { log('recomps: catalogue refresh', e.message); }
-    if (playing()) return res;
-    try {
-      const r = await f('https://www.pcgamingwiki.com/w/index.php?title=List_of_unofficial_ports&action=raw', { headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) Cartridge' }, signal: AbortSignal.timeout(25000) });
-      if (r.ok) res.found = await addFound(parseWikitext(await r.text()));
-    } catch (e) { log('recomps: PCGamingWiki', e.message); }
+    const res = { recipes: 0, checked: 0 };
+    try { res.recipes = await refreshRecipes(); } catch (e) { log('recomps: recipes refresh', e.message); }
     for (const id of Object.keys(installs)) {
       if (playing()) break;
       try { await check(id, { force: true }); res.checked++; } catch (e) { log('recomps: check', id, e.message); }
@@ -909,46 +919,191 @@ function createRecomps(ctx) {
     ensureFolders();
     return res;
   }
-  // rows from the wiki that name a project the catalogue lacks: added quietly, marked found. A row without a project
-  // link is looked up on GitHub only when one well-starred, non-fork project names the port (no guesses).
-  // 0.9.69 (agreed plan 7.1 #6): a project is only added when its newest release has a Linux or Windows build and it
-  // isn't a fork (GitHub says so); a few are looked at each day and the rest wait for the next refresh
-  async function vet(repo) {
-    const r = repoOf(repo); if (!r) return false;
-    const f = ctx.fetchImpl || require('./webFetch');
-    if (r.host === 'github') {
-      const info = await f(`https://api.github.com/repos/${r.repo}`, { headers: { 'User-Agent': 'Cartridge', Accept: 'application/json' }, signal: AbortSignal.timeout(15000) }).then((x) => (x.ok ? x.json() : null)).catch(() => null);
-      if (!info || info.fork) return false;
-    }
-    const rel = await releaseOf({ repo }, { fetchImpl: ctx.fetchImpl }).catch(() => null);
-    return !!(rel && pickBuild(rel.assets, {}));
+  // ================================================================ Cartridge Verified (0.9.70)
+  // the build to use (yours, else Linux, else Windows through Proton), what Proton runner there is, and the recipe's
+  // files and start scripts written from your settings. Every step says what it needs in plain words.
+  const recipeOf = (e) => (e?.from === 'verified' ? e.recipe : null);
+  const buildOf = (e, rec) => recipeOf(e)?.builds.find((b) => b.os === rec?.build) || null;
+  const readText = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return null; } };
+  function writeFileSafe(p, text, mode) {
+    fs.mkdirSync(path.dirname(p), { recursive: true });
+    fs.writeFileSync(p + '.cartridge-tmp', text);
+    if (mode) fs.chmodSync(p + '.cartridge-tmp', mode);
+    fs.renameSync(p + '.cartridge-tmp', p);
   }
-  async function addFound(rows, { search = ctx.search, maxVet = 6 } = {}) {
-    const known = new Set(catalogue().entries.flatMap((e) => [e.repo?.toLowerCase(), ...(e.games || []).map((g) => g.console + ':' + norm(e.name))]).filter(Boolean));
-    const found = readJson(F('recomps-found.json'), []);
-    let n = 0, looked = 0, vetted = 0;
-    for (const row of rows) {
-      let repo = row.links.map(repoFromLink).find(Boolean);
-      if (!repo && search && looked < 5 && row.port.length > 3) {
-        looked++;
-        const hits = await search(`${row.port}`).catch(() => []);
-        const ok = hits.filter((h) => !h.fork && h.stars >= 25 && norm(h.repo.split('/')[1]).replace(/ /g, '').includes(norm(row.port).replace(/ /g, '').slice(0, 10)));
-        if (ok.length === 1 || (ok.length > 1 && ok[0].stars >= ok[1].stars * 4)) repo = 'github:' + ok[0].repo;
-      }
-      if (!repo || known.has(repo.toLowerCase()) || known.has(row.console + ':' + norm(row.port))) continue;
-      if (vetted >= maxVet) break;
-      vetted++;
-      if (!(await vet(repo).catch(() => false))) { log('recomps: not added (no usable build, or a fork)', repo); known.add(repo.toLowerCase()); continue; }
-      known.add(repo.toLowerCase());
-      found.push({ id: 'found-' + slugId(repo.split(':')[1].replace('/', '-')), name: row.port, games: [{ title: row.game.replace(/\s*\([^)]*\)\s*$/, ''), console: row.console }], origin: 'recomp', repo, builds: 'linux', needs: null, setup: { how: 'picker' }, saves: [], description: '', auto: true, at: Date.now() });
-      n++;
+  async function installVerified(e, { channel, onProgress = () => {}, signal, pickOs } = {}) {
+    const r = e.recipe, prev = installs[e.id] || null;
+    const runner = ctx.runner ? await ctx.runner() : null;
+    const build = RC.chooseBuild(r, { pick: pickOs || prev?.build, runner });
+    if (!build) throw new Error(`${r.name}’s port is a Windows build, and there’s no Proton here to run it. Installing Steam brings Proton (or install umu-launcher), then try again.`);
+    // the port's own installer (P.T.): downloaded and kept; it runs with your copy in the game step
+    if (build.installer) {
+      const eUse = { ...e, builds: 'linux', linuxAsset: build.asset, strict: true };
+      onProgress({ step: 'check', pct: null });
+      const rel = await releaseOf(eUse, { fetchImpl: ctx.fetchImpl });
+      const b = rel && pickBuild(rel.assets, eUse);
+      if (!b) throw new Error(`${r.name}’s newest release doesn’t have its Linux installer under the name Cartridge’s recipe knows. The recipe needs an update: tell Cartridge’s author.`);
+      if (prev?.tag === rel.tag && exists(prev.installer)) return { already: true, tag: rel.tag };
+      const dest = prev?.dir || homeDir(e), setup = path.join(dest, '.cartridge', 'setup-' + String(rel.tag).replace(/[^\w.-]+/g, '_'));
+      fs.mkdirSync(path.dirname(setup), { recursive: true });
+      let got = 0;
+      await ctx.download(b.asset.url, setup + '.part', (n) => { got += n; onProgress({ step: 'download', pct: b.asset.size ? Math.min(99, Math.floor((got / b.asset.size) * 100)) : null, got }); }, signal);
+      fs.renameSync(setup + '.part', setup); fs.chmodSync(setup, 0o755);
+      if (prev?.installer && prev.installer !== setup) fs.rmSync(prev.installer, { force: true });
+      installs[e.id] = { ...(prev || {}), id: e.id, repo: e.repo, dir: dest, program: path.join(dest, build.program), kind: 'linux', build: build.os, installer: setup, installedTag: prev?.installedTag || null, tag: rel.tag, date: rel.date, files: [], channel: 'stable', at: Date.now(), asset: b.asset.name };
+      saveInstalls();
+      latest[e.id] = { tag: rel.tag, date: rel.date, kind: 'linux', name: b.asset.name, at: Date.now(), channel: 'stable' }; writeJson(F('recomp-latest.json'), latest);
+      log('verified installer downloaded', e.id, rel.tag);
+      const out = { tag: rel.tag, kind: 'linux', build: build.os, dir: dest, updated: !!prev };
+      if (installs[e.id].game?.path) Object.assign(out, await configure(e.id, { onProgress }));
+      return out;
     }
-    if (n) { writeJson(F('recomps-found.json'), found); cat = null; log('recomps: found', n, 'new on PCGamingWiki'); }
-    return n;
+    const eUse = { ...e, builds: build.os, linuxAsset: build.os === 'linux' ? build.asset : null, windowsAsset: build.os === 'windows' ? build.asset : null, program: build.program, strict: true };
+    const res = await install(e.id, { channel, onProgress, signal, _e: eUse });
+    if (installs[e.id]) { installs[e.id].build = build.os; saveInstalls(); }
+    if (installs[e.id]?.game?.path) Object.assign(res, await configure(e.id, { onProgress }));
+    return { ...res, build: build.os };
+  }
+  // the update check for a verified recipe uses its own file for the build in use
+  function verifiedCheckEntry(e, rec) {
+    const b = RC.chooseBuild(e.recipe, { pick: rec?.build, runner: true });
+    return b ? { ...e, builds: b.os, linuxAsset: b.os === 'linux' ? b.asset : null, windowsAsset: b.os === 'windows' ? b.asset : null, strict: true } : e;
+  }
+  // your copy for it: checked (the files it needs, its title ID and version); an update it needs is laid over it as
+  // links when the update is on this device; then everything is written
+  async function setVerifiedGame(id, dir, { candidates = [], onProgress = () => {} } = {}) {
+    const e = byId(id), r = recipeOf(e), rec = installs[id];
+    if (!r) throw new Error('That isn’t a Cartridge Verified game.');
+    const sfo = require('./saves').sfo;
+    const chk = RC.checkGame(r, dir, { sfo });
+    let use = dir, update = null;
+    if (!chk.ok && chk.needsUpdate) {
+      const u = RC.findUpdate(r, dir, candidates, { sfo });
+      if (!u || RC.verCmp(u.version, chk.needsUpdate) < 0) return { ok: false, problems: chk.problems, needsUpdate: chk.needsUpdate, why: `${r.name} needs update ${chk.needsUpdate}. ${u ? `The update on this device is ${u.version}.` : 'Put the update’s folder (its dump, with sce_sys inside) beside the game, or download it from your library, then pick the game again.'}` };
+      if (!rec) return { ok: false, why: 'Install it first.' };
+      onProgress({ step: 'view' });
+      use = await buildView(rec, dir, u.dir);
+      update = u;
+      const again = RC.checkGame(r, use, { sfo });
+      if (!again.ok) return { ok: false, problems: again.problems, why: again.problems.join(' ') };
+      chk.notes.push(`Update ${u.version} is laid over it (links, nothing copied).`);
+    } else if (!chk.ok) return { ok: false, problems: chk.problems, why: chk.problems.join(' ') };
+    if (!rec) return { ok: true, check: chk, notInstalled: true };
+    rec.game = { path: use, source: dir, update: update?.dir || null, id: chk.id || null, version: update?.version || chk.version || null, notes: chk.notes, at: Date.now() };
+    saveInstalls();
+    const done = await configure(id, { onProgress });
+    return { ok: true, notes: chk.notes, ...done };
+  }
+  // base and update as one folder of links, inside the install (rebuilt when either changes)
+  async function buildView(rec, base, update) {
+    const view = path.join(rec.dir, '.cartridge', 'game');
+    fs.rmSync(view, { recursive: true, force: true });
+    const FV = require('./forkVersions');
+    let n = 0;
+    for (const l of RC.viewPlan(base, update, { list: (d) => FV.filesOf(d) })) {
+      const to = path.join(view, l.rel);
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.symlinkSync(l.from, to);
+      if (++n % 500 === 0) await new Promise((ok) => setImmediate(ok));
+    }
+    log('verified game view', rec.id, n, 'files');
+    return view;
+  }
+  // everything written from the recipe and your settings: the port's installer when it has one, Cartridge's Proton
+  // prefix for a Windows build, the port's settings files and the start scripts
+  async function configure(id, { onProgress = () => {} } = {}) {
+    const e = byId(id), r = recipeOf(e), rec = installs[id];
+    if (!r || !rec) throw new Error('Install it first.');
+    const build = buildOf(e, rec);
+    if (!build) throw new Error(`${r.name}’s recipe has no ${rec.build || ''} build any more. Install it again.`);
+    if (!rec.game?.path) return { ready: false, needsGame: true };
+    if (ctx.isRunning(rec.program)) throw new Error(`Close ${r.name} first.`);
+    const runner = build.os === 'windows' ? (ctx.runner ? await ctx.runner() : null) : null;
+    if (build.os === 'windows' && !runner) throw new Error(`${r.name}’s port is a Windows build, and there’s no Proton here to run it.`);
+    const vars = RC.varsFor(r, build, rec);
+    // the installer, with your copy (again after an update of the installer, or for another copy)
+    if (build.installer && (rec.installedTag !== rec.tag || rec.installedFrom !== rec.game.path || !exists(rec.program))) {
+      onProgress({ step: 'installer', pct: null });
+      fs.mkdirSync(rec.dir, { recursive: true });
+      try { fs.rmSync(vars.result, { force: true }); } catch {}
+      const args = build.installer.map((a) => RC.expand(a, { ...vars, game: rec.game.path }));
+      await ctx.runProgram(rec.installer, args, { cwd: rec.dir, timeoutMs: 40 * 60e3 });
+      const res = readText(vars.result) || '';
+      if (!/^PASS\b/.test(res)) throw new Error(`${r.name}’s installer didn’t finish: ${(res.split('\n').find((l) => l.trim()) || 'it gave no answer').slice(0, 200)}`);
+      rec.installedTag = rec.tag; rec.installedFrom = rec.game.path; rec.installNotes = res.split('\n').filter((l) => /^note:/.test(l)).map((l) => l.slice(5).trim());
+      saveInstalls();
+    }
+    // a Windows build: Cartridge's own Proton prefix, made by Proton itself before settings go into it
+    if (build.os === 'windows' && !exists(path.join(vars.prefix, 'pfx', 'drive_c'))) {
+      onProgress({ step: 'prefix', pct: null });
+      fs.mkdirSync(vars.prefix, { recursive: true });
+      const c = RC.prefixCommand(runner, vars);
+      await ctx.runProgram(c.cmd, c.args, { env: c.env, cwd: rec.dir, timeoutMs: 5 * 60e3 }).catch((er) => log('verified prefix', id, er.message));
+      if (!exists(path.join(vars.prefix, 'pfx', 'drive_c'))) throw new Error(`Proton couldn’t make ${r.name}’s Windows folder (its prefix). Start a Windows game in Steam once, then try again.`);
+    }
+    // the first time: what you chose in the port's own launcher before is kept
+    if (!rec.settings) { rec.settings = RC.readBack(r, build, rec, { read: readText }); saveInstalls(); }
+    const out = RC.render(r, build, rec, RC.effective(r, build, rec.settings), { read: readText });
+    for (const f of out.files) writeFileSafe(f.path, f.text);
+    rec.starts = out.starts.map((st) => { writeFileSafe(st.script, RC.script(r, build, rec, st, runner, out.vars), 0o755); return { id: st.id, name: st.name, sub: st.sub, script: st.script }; });
+    rec.runner = runner ? runner.kind : null;
+    saveInstalls();
+    log('verified set up', id, build.os, rec.starts.length, 'start(s)', runner ? runner.kind : '');
+    return { ready: readyOf(e, rec), starts: rec.starts.length, runner: rec.runner };
+  }
+  // the settings as Game Settings shows them: yours where you changed one, else the port's own
+  function settings(id) {
+    const e = byId(id), r = recipeOf(e), rec = installs[id];
+    if (!r) throw new Error('That isn’t a Cartridge Verified game.');
+    const build = buildOf(e, rec) || RC.chooseBuild(r, { runner: true });
+    const mine = rec?.settings || {};
+    return {
+      name: r.name, version: rec?.tag || null, port: true,
+      items: RC.settingsFor(r, build).map((s) => ({ id: s.id, label: s.label, tab: s.tab, desc: s.desc || '', type: s.type === 'text' ? 'text' : s.type, num: s.type === 'number' ? s.num || { min: -1e9, max: 1e9 } : null, options: s.type === 'bool' ? [{ value: true, label: 'On' }, { value: false, label: 'Off' }] : (s.options || []).map(([v, l]) => ({ value: v, label: l })), base: s.def, game: mine[s.id] != null ? mine[s.id] : null })),
+    };
+  }
+  async function setSettings(id, changes = []) {
+    const e = byId(id), r = recipeOf(e), rec = installs[id];
+    if (!r || !rec) throw new Error('Install it first.');
+    const build = buildOf(e, rec);
+    const by = new Map(RC.settingsFor(r, build).map((s) => [s.id, s]));
+    const next = { ...(rec.settings || {}) };
+    for (const c of changes) {
+      const s = by.get(c.id);
+      if (!s) continue;
+      let v = c.value;
+      if (s.type === 'bool' && v != null) v = v === true || v === 'true';
+      if (s.type === 'number' && v != null && typeof s.def === 'number') v = Number(v);
+      const bad = RC.check(s, v);
+      if (bad) throw new Error(bad);
+      if (v == null || String(v) === String(s.def)) delete next[c.id]; else next[c.id] = v;
+    }
+    rec.settings = next; saveInstalls();
+    if (rec.game?.path) await configure(id);
+    return settings(id);
+  }
+  // a verified game's save folders on this device (the recipe's, per build)
+  function verifiedSaves(e, rec) {
+    const r = recipeOf(e), build = buildOf(e, rec);
+    if (!r || !rec || !build) return [];
+    const list = Array.isArray(r.saves) ? r.saves : r.saves?.[build.os] || [];
+    const v = RC.varsFor(r, build, rec);
+    return list.map((t) => RC.expand(t, v));
+  }
+  // the newer recipes in Cartridge's repository (the owner adds and fixes them there): kept when they pass the checks
+  async function refreshRecipes() {
+    const f = ctx.fetchImpl || require('./webFetch');
+    if (!ctx.recipesUrl) return 0;
+    const r = await f(ctx.recipesUrl, { headers: { 'User-Agent': 'Cartridge' }, signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`The recipes answered ${r.status}.`);
+    const j = await r.json();
+    const ok = (Array.isArray(j) ? j : []).filter((x) => !RC.validate(x).length);
+    writeJson(F('recipes-fetched.json'), ok); cat = null;
+    return ok.length;
   }
   const record = (id) => installs[id] || null;
   const reload = () => { cat = null; repaired = false; installs = readJson(F('recomp-installs.json'), {}); };
-  return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, addFound, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => saveDirs(byId(id), installs[id]), homeDir, reload };
+  return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : saveDirs(e, installs[id]); }, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes };
 }
 
-module.exports = { guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, parseWikitext, repoFromLink, slugId, hashFile, checkGame, createRecomps };
+module.exports = { guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
