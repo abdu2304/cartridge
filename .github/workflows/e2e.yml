@@ -56,5 +56,7 @@ jobs:
         run: npx playwright-core install --with-deps chromium
       - name: UI audits
         run: node tools/ui-audit/run.js
+      - name: Settings, row by row
+        run: node tools/ui-audit/rows.js
       - name: Controller playtest
         run: node tools/ui-audit/playtest.js

@@ -615,7 +615,7 @@
             <div class="card-s glass">
               <div class="kv"><span>Game Mode</span><span>{{ store.info.gamescope ? 'Yes (gamescope)' : 'No (desktop)' }}</span></div>
               <div class="kv"><span>Controller</span><span>{{ padInfo?.name || input.padName || 'Press any button' }}</span></div>
-              <div class="kv"><span>Data</span><span class="mono">{{ store.info.userData }}</span></div>
+              <div class="kv"><span>Data</span><span class="mono">{{ store.info.userData || 'Not known yet' }}</span></div>
             </div>
             <button class="lrow" data-focus @click="openModal('licenses')"><Icon name="mdiScaleBalance" :size="22" /><span class="l-mid"><b>Licences and Acknowledgements</b><span class="l-sub">The open source projects, emulators and services Cartridge is built on, and their licences</span></span><span class="l-end"><Icon name="mdiChevronRight" :size="20" /></span></button>
             <div class="row"><button class="btn danger" data-focus @click="call('app:quit')"><Icon name="mdiPower" />Quit Cartridge</button></div>
