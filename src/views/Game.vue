@@ -709,7 +709,7 @@ async function more() {
   }
   if (v === 'steamapply') { await applyChanges(); return; }
   if (v === 'gameemu') { await pickGameEmu(); return; }
-  if (v === 'online') { store.settingsSection = 'online'; go('settings'); return; }
+  if (v === 'online') { store.settingsSection = 'online'; store.settingsDirect = true; go('settings'); return; }
   if (v === 'gamesettings') { openModal('gamesettings', { romId: Number(props.romId), name: base.value.name }); return; }
   if (v === 'shadver') {
     const sv = await call('steam:shadVersions', { romId: Number(props.romId) }).catch(() => null);

@@ -177,6 +177,17 @@
             <div v-else class="st-sub st-quiet">Nothing downloading</div>
           </template>
 
+          <!-- Saves (0.9.71): Cartridge Save Sync's last run and anything waiting on you; Syncthing or off says so -->
+          <template v-else-if="t.type === 'saves'">
+            <div class="st-label">Saves</div>
+            <template v-if="saves?.on">
+              <div v-if="saves.waiting" class="st-num"><span class="st-big tnum st-warn">{{ saves.waiting }}</span><span class="st-unit">{{ saves.waiting === 1 ? 'needs you' : 'need you' }}</span></div>
+              <div v-else class="st-num"><span class="st-big tnum">{{ saves.saved }}</span><span class="st-unit">{{ saves.saved === 1 ? 'save' : 'saves' }}</span></div>
+              <div class="st-sub">{{ saves.busy ? 'Syncing now' : saves.held ? 'Waiting for your server' : saves.at ? 'Synced ' + ago(saves.at) : 'Not synced yet' }}</div>
+            </template>
+            <div v-else class="st-sub st-quiet">{{ saves?.syncthing ? 'Syncthing keeps your saves in step' : 'Saves aren’t synced. Turn on Cartridge Save Sync' }}</div>
+          </template>
+
           <!-- Surprise me -->
           <!-- 0.9.23 (owner: redesign Surprise me): three games fanned like cards; reaching the tile deals
                again, and A opens the one in front -->
@@ -383,7 +394,7 @@ import { timing } from '../motion.js';
 // to move it, drag an edge or a corner to resize. Saved in config.ui.start.
 import { computed, ref, reactive, onMounted, onBeforeUnmount, onBeforeUpdate, onUpdated, nextTick, watch } from 'vue';
 import { gsapOn, load as loadGsap, ready as gsapReady, EASE } from '../gsapEngine.js';
-import { store, heroArt, call, go, tab, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour, plural } from '../store.js';
+import { store, heroArt, call, go, tab, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour, plural, ago } from '../store.js';
 import { useView } from '../useView.js';
 import { recommend } from '../recs.js';
 import { ensureFocus, input, pushLayer, focusFirst, rumble } from '../nav.js';
@@ -770,6 +781,16 @@ const stats = computed(() => ({
   device: roms.value.filter((r) => store.installed[r.id]).length,
   hours: Math.round(Object.values(store.play || {}).reduce((n, p) => n + (p?.min || 0), 0) / 60),
 }));
+// saves (0.9.71): read when Start shows and every minute while it does
+const saves = ref(null);
+async function loadSaves() {
+  if (!tiles.value.some((t) => t.type === 'saves')) return;
+  try { const s = await call('savesync:status'); saves.value = { on: s.on, syncthing: !!s.syncthing, busy: s.busy, held: !!s.held, saved: s.saved || 0, at: s.last?.at || 0, waiting: (s.last?.conflicts || []).length }; } catch {}
+}
+onMounted(loadSaves);
+watch(() => tiles.value.some((t) => t.type === 'saves'), (v) => v && loadSaves()); // just added from the widget sheet
+const savesT = setInterval(loadSaves, 60000);
+onBeforeUnmount(() => clearInterval(savesT));
 // downloads
 const activeDl = computed(() => store.downloads.filter((d) => d.status === 'downloading' || d.status === 'queued'));
 const dlPct = computed(() => { const t = activeDl.value.reduce((s, d) => s + (d.total || 0), 0), r = activeDl.value.reduce((s, d) => s + (d.received || 0), 0); return t ? Math.floor((r / t) * 100) : 0; });
@@ -787,10 +808,11 @@ function openTile(t, ev) {
     store.homeLists = { ...(store.homeLists || {}), 'start-most': { id: 'start-most', name: 'Most Played', icon: 'mdiChartBar', rom_ids: most.map((r) => r.id), auto: true, ordered: true, description: 'From Start' } };
     return go('collection', { collectionId: 'start-most' });
   }
-  if (T === 'storage') { store.settingsSection = 'storage'; return go('settings'); }
+  if (T === 'storage') { store.settingsSection = 'storage'; store.settingsDirect = true; return go('settings'); }
   if (T === 'consoles') return tab('consoles');
   if (T === 'trophies') { const a = achView(t)[0]; return a ? a.open() : tab('achievements'); }
   if (T === 'downloads') return tab('downloads');
+  if (T === 'saves') { store.settingsSection = 'syncthing'; store.settingsDirect = true; return go('settings'); }
   if (T === 'surprise') { const r = deck.value[0]; if (r) go('game', { romId: r.id }); return; }
   if (T === 'daily') return daily.value && go('game', { romId: daily.value.id });
   if (T === 'stats') return tab('library');
@@ -1444,12 +1466,14 @@ onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G
 /* ---- 0.9.23 Start overhaul (owner: more and better widgets, styled like the clock, a calm Tailwind-like
    feel inside the design language). Every info widget gets its own quiet light from one corner and a
    hairline edge, so the board reads as a set of objects rather than flat boxes. */
-.t-week .st-face, .t-storage .st-face, .t-downloads .st-face, .t-trophies .st-face, .t-stats .st-face, .t-surprise .st-face, .t-consoles .st-face, .t-html .st-face {
+.t-week .st-face, .t-storage .st-face, .t-downloads .st-face, .t-saves .st-face, .t-trophies .st-face, .t-stats .st-face, .t-surprise .st-face, .t-consoles .st-face, .t-html .st-face {
   background: radial-gradient(120% 100% at 100% 0%, var(--glow, rgba(255, 255, 255, 0.06)), transparent 62%), linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 40%), var(--s1);
   box-shadow: var(--weight-edge), var(--weight); }
 .t-week { --glow: rgba(120, 150, 255, 0.16); }
 .t-storage { --glow: rgba(80, 210, 190, 0.14); }
 .t-downloads { --glow: rgba(90, 170, 255, 0.16); }
+.t-saves { --glow: rgba(110, 220, 160, 0.14); }
+.st-warn { color: var(--gold, #ffcf5c); }
 .t-trophies { --glow: rgba(255, 196, 80, 0.16); }
 .t-stats { --glow: rgba(186, 140, 255, 0.16); }
 .t-surprise { --glow: rgba(255, 120, 190, 0.16); }

@@ -47,6 +47,7 @@ export const store = reactive({
   play: {}, // romId -> { min, last, src }: play time from Steam and RetroArch (0.8)
   issues: 0, // things waiting in Settings → Emulators → Issues (0.9.3)
   homeLists: {}, // a Home row opened with Show all (0.9.3)
+  settingsDirect: false, // 0.9.71: open Settings on store.settingsSection, not its hub of cards
   settingsSpot: null, // the Settings row a sub-screen was opened from (0.9.3 L)
   settingsPage: null, // and the page it was on in its section (Emulators, Look & Feel), 0.9.44
   sharp: {}, // rom id -> sharp SteamGridDB background url (0.9.3 K)
@@ -405,7 +406,7 @@ async function roomFor(rom, p, root = null) {
       { label: 'Cancel', value: null, icon: 'mdiClose' },
     ],
   });
-  if (v === 'storage') { store.settingsSection = 'storage'; tab('settings'); }
+  if (v === 'storage') { store.settingsSection = 'storage'; store.settingsDirect = true; tab('settings'); }
   return v === 'go';
 }
 
