@@ -92,7 +92,8 @@ async function until(fn, ms = 15000, step = 150) { const t = Date.now(); while (
     // 5. every main tab and every Settings section opens without a script error
     for (const tab of ['start', 'home', 'consoles', 'achievements', 'downloads', 'settings']) await page.click(`[data-tab="${tab}"]`).then(() => wait(500)).catch(() => {});
     const secs = await page.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key));
-    for (const k of secs) await page.click(`[data-key="${k}"]`).then(() => wait(300)).catch(() => {});
+    // Settings opens on its hub of cards (0.9.71): back to it between sections
+    for (const k of secs) { await page.evaluate(() => document.querySelector('.hub-back')?.click()); await wait(200); await page.click(`[data-key="${k}"]`).then(() => wait(300)).catch(() => {}); }
     check('every tab and Settings section opens', secs.length >= 8 && !errors.length, `${secs.length} sections${errors.length ? ' · ' + errors.slice(0, 3).join(' | ') : ''}`);
     // 5b. recomps answer through their own module (0.9.71 split): the five verified ports listed, their settings readable
     const rl = await page.evaluate(() => window.cart.call('recomps:list').then((r) => r.data || r));

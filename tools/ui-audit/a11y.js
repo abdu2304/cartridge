@@ -30,7 +30,7 @@ async function run(width = 1280, height = 800) {
   const scan = async (label) => { await p.waitForTimeout(600); const r = await p.evaluate(SCAN); for (const k of Object.keys(res)) for (const x of r[k]) res[k].add(`${label} | ${x}`); };
   for (const t of TABS) { await p.click(`[data-tab="${t}"]`).catch(() => {}); await scan(t); }
   await p.click('[data-tab="settings"]').catch(() => {}); await p.waitForTimeout(600);
-  for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key))) { await p.click(`[data-key="${k}"]`).catch(() => {}); await scan('settings ' + k); }
+  for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key))) { await p.evaluate(() => document.querySelector(".hub-back")?.click()); await p.waitForTimeout(200); await p.click(`[data-key="${k}"]`).catch(() => {}); await scan('settings ' + k); }
   await p.click('[data-tab="library"]').catch(() => {}); await p.waitForTimeout(800); await p.locator('.card').first().click().catch(() => {}); await scan('game page');
   await p.click('[data-tab="consoles"]').catch(() => {}); await p.waitForTimeout(500);
   await p.click('[data-key="sys-steam"]').catch(() => {}); await scan('recomps page');

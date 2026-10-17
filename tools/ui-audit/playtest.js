@@ -79,6 +79,7 @@ async function run() {
     await p.click('[data-tab="settings"]').catch(() => {}); await p.waitForTimeout(500);
     const secs = await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key));
     for (const s of secs) {
+      await p.evaluate(() => document.querySelector(".hub-back")?.click()); await p.waitForTimeout(200);
       await p.click(`[data-key="${s}"]`).catch(() => {}); await p.waitForTimeout(300);
       await press('ArrowRight'); await walk(who, 20);
       for (const k of ['e', 'e', 'q']) { const w = await press(k, 300); check(who, w, (k === 'e' ? 'RB' : 'LB') + ' in ' + s); }
