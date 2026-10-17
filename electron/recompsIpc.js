@@ -53,10 +53,11 @@ module.exports = function recompsIpc(m) {
       // 0.9.66: the new release of an update started once, for a few seconds, then closed. It fails only when it can't
       // run at all here: missing libraries (127/126, "error while loading shared libraries"), a crash signal, or (once
       // set up) a non-zero exit straight away. Never during a game.
-      trialRun: ({ program, args, cwd, ready }) => new Promise((resolve) => {
+      // argv/env (0.9.71): a Windows build through Proton, the runner's command and its environment
+      trialRun: ({ program, args, argv, env: more, cwd, ready }) => new Promise((resolve) => {
         if (m.gameFocus.away || m.runOn) return resolve({ skipped: 'playing' });
-        const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
-        const extra = (args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
+        const env = { ...process.env, ...(more || {}) }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+        const extra = argv || (args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
         let out = '', done = false, p;
         const end = (r) => { if (done) return; done = true; clearTimeout(t); try { process.kill(-p.pid, 'SIGTERM'); } catch {} setTimeout(() => { try { process.kill(-p.pid, 'SIGKILL'); } catch {} }, 1500); if (isGamescope()) { broadcast('background', { away: false }); refocus(); } log('recomp trial', program, JSON.stringify(r)); resolve(r); };
         try { p = require('child_process').spawn(program, extra, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return resolve({ failed: true, why: e.message }); }

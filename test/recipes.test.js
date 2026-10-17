@@ -276,3 +276,12 @@ test('a draft from draft.js never loads: TODO fields and the todo list are refus
   assert.ok(bad.includes('todo list still there') && bad.includes('by is TODO') && bad.includes('game.title is TODO'), bad.join(', '));
   assert.deepStrictEqual(RC.validate(ok), []);
 });
+
+test('a Windows update is started once through the runner, in the port’s own prefix', () => {
+  const pre = '/g/bb/.cartridge/proton';
+  const u = RC.runCommand({ kind: 'umu', umu: '/usr/bin/umu-run', proton: '/s/GE-Proton9' }, '/g/bb/game.exe', ['-x'], pre);
+  assert.deepStrictEqual([u.cmd, u.args, u.env.WINEPREFIX, u.env.PROTONPATH], ['/usr/bin/umu-run', ['/g/bb/game.exe', '-x'], pre + '/pfx', '/s/GE-Proton9']);
+  const s = RC.runCommand({ kind: 'sniper', proton: '/s/Proton', sniper: '/s/sniper', steam: '/s' }, '/g/bb/game.exe', [], pre);
+  assert.deepStrictEqual([s.cmd, s.args], ['/s/sniper/_v2-entry-point', ['--verb=run', '--', '/s/Proton/proton', 'run', '/g/bb/game.exe']]);
+  assert.strictEqual(s.env.STEAM_COMPAT_DATA_PATH, pre);
+});

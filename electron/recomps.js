@@ -718,9 +718,14 @@ function createRecomps(ctx) {
     saveInstalls();
     // 0.9.66 (agreed plan): after an update the new release is started once before Steam's shortcut follows it. One that
     // can't start at all (missing libraries, a crash in the first seconds) goes back to the release that worked
-    if (prev && prev.tag && kind === 'linux' && ctx.trialRun) {
+    // 0.9.71: Windows builds too, through the Proton runner, when the port already has its own prefix (a verified port's
+    // .cartridge/proton): an update never makes a new prefix just to try a start
+    const winTrial = prev && prev.tag && kind === 'windows' && ctx.trialRun && ctx.runner && exists(path.join(RC.prefixOf({ dir: dest }), 'pfx')) ? await ctx.runner().catch(() => null) : null;
+    if (prev && prev.tag && ((kind === 'linux' && ctx.trialRun) || winTrial)) {
       onProgress({ step: 'trial', pct: null });
-      const t = await ctx.trialRun({ program, args: launchArgs(id), cwd: path.dirname(program), ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message }));
+      const argList = (launchArgs(id) || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
+      const run = winTrial ? RC.runCommand(winTrial, program, argList, RC.prefixOf({ dir: dest })) : null;
+      const t = await ctx.trialRun(run ? { program: run.cmd, argv: run.args, env: run.env, cwd: path.dirname(program), ready: readyOf(e, prev) } : { program, args: launchArgs(id), cwd: path.dirname(program), ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message }));
       if (t?.failed) {
         log('recomp update did not start, back to', prev.tag, id, t.why);
         try {
@@ -733,7 +738,7 @@ function createRecomps(ctx) {
     }
     latest[id] = { tag: rel.tag, date: rel.date, kind, name: b.asset.name, at: Date.now(), channel: ch }; writeJson(F('recomp-latest.json'), latest);
     log('recomp', prev ? 'updated' : 'installed', id, rel.tag, kind, program);
-    return { tag: rel.tag, kind, program, dir: dest, updated: !!prev, programMoved: !!(prev && prev.program !== program), started: prev && kind === 'linux' && ctx.trialRun ? true : undefined, restored: saves.restored, backedUp: !!meta };
+    return { tag: rel.tag, kind, program, dir: dest, updated: !!prev, programMoved: !!(prev && prev.program !== program), started: prev && ((kind === 'linux' && ctx.trialRun) || winTrial) ? true : undefined, restored: saves.restored, backedUp: !!meta };
   }
   function versions(id) {
     const rec = installs[id];

@@ -248,6 +248,14 @@ function prefixCommand(runner, vars) {
   return runner.sniper ? { cmd: path.join(runner.sniper, '_v2-entry-point'), args: ['--verb=run', '--', ...proton], env } : { cmd: proton[0], args: proton.slice(1), env };
 }
 
+// a Windows program started with the same runner (0.9.71: an update's trial start, as Linux builds get since 0.9.66)
+function runCommand(runner, program, args, prefix) {
+  if (runner.kind === 'umu') return { cmd: runner.umu, args: [program, ...args], env: { WINEPREFIX: path.join(prefix, 'pfx'), GAMEID: '0', STORE: 'none', ...(runner.proton ? { PROTONPATH: runner.proton } : {}) } };
+  const proton = [path.join(runner.proton, 'proton'), 'run', program, ...args];
+  const env = { STEAM_COMPAT_DATA_PATH: prefix, STEAM_COMPAT_CLIENT_INSTALL_PATH: runner.steam || '' };
+  return runner.sniper ? { cmd: path.join(runner.sniper, '_v2-entry-point'), args: ['--verb=run', '--', ...proton], env } : { cmd: proton[0], args: proton.slice(1), env };
+}
+
 // ---- your copy: a dump folder (eboot.bin, sce_sys/param.sfo), its title ID and version, and what's missing
 const verNum = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
 const verCmp = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
@@ -293,4 +301,4 @@ function viewPlan(base, update, { list }) {
   return [...plan].map(([rel, from]) => ({ rel, from }));
 }
 
-module.exports = { achievementsOf, outputLog, SHIPPED, validate, load, chooseBuild, winPath, varsFor, expand, settingsFor, effective, typed, untyped, check, render, readBack, flat, script, prefixCommand, checkGame, findUpdate, viewPlan, verCmp, prefixOf };
+module.exports = { achievementsOf, outputLog, SHIPPED, validate, load, chooseBuild, winPath, varsFor, expand, settingsFor, effective, typed, untyped, check, render, readBack, flat, script, prefixCommand, runCommand, checkGame, findUpdate, viewPlan, verCmp, prefixOf };
