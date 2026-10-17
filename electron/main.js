@@ -3241,18 +3241,20 @@ let autoUpdater = null;
 let VERSION_NAME = null;
 try { VERSION_NAME = require('../package.json').versionName || null; } catch {}
 const versionName = () => VERSION_NAME || app.getVersion();
-const nameOf = (i) => String(i?.releaseName || '').replace(/^Cartridge\s+/i, '').trim() || i?.version;
+const nameOf = (i) => (UC.channelOf(i?.version) !== 'stable' && UC.channelOf(i?.version) ? UC.nameOf('v' + i.version) : String(i?.releaseName || '').replace(/^Cartridge\s+/i, '').trim() || i?.version);
+const UC = require('./updateChannels');
 function setupUpdater() {
   if (!app.isPackaged || !process.env.APPIMAGE) return; // only the real AppImage can replace itself
   try { ({ autoUpdater } = require('electron-updater')); } catch { return; }
   autoUpdater.autoDownload = !config.updateHold; // after a roll back, no automatic update until the user asks (0.9.17)
   autoUpdater.autoInstallOnAppQuit = true;
+  UC.apply(autoUpdater, config.updateChannel, { switched: !!config.updateSwitched }); // 0.9.71: Stable, Beta or Nightly
   const set = (s) => { updateState = s; broadcast('update', { ...s, supported: true }); };
   autoUpdater.on('checking-for-update', () => set({ state: 'checking' }));
   autoUpdater.on('update-available', (i) => set({ state: 'downloading', version: nameOf(i), percent: 0 }));
   autoUpdater.on('download-progress', (p) => set({ ...updateState, state: 'downloading', percent: Math.round(p.percent) }));
   autoUpdater.on('update-not-available', () => set({ state: 'current', version: versionName() }));
-  autoUpdater.on('update-downloaded', (i) => set({ state: 'ready', version: nameOf(i) }));
+  autoUpdater.on('update-downloaded', (i) => { set({ state: 'ready', version: nameOf(i) }); if (config.updateSwitched) { delete config.updateSwitched; saveConfig(); } });
   autoUpdater.on('error', (e) => set({ state: 'error', error: String(e?.message || e).slice(0, 200) }));
   const check = () => autoUpdater.checkForUpdates().catch(() => {});
   setTimeout(check, 8000);
@@ -5918,23 +5920,34 @@ const handlers = {
     const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH']) delete env[k];
     try { require('child_process').spawn('xdg-open', ['steam://open/keyboard?Mode=0'], { detached: true, stdio: 'ignore', env }).on('error', () => {}).unref(); return true; } catch { return false; }
   },
-  'update:get': () => ({ ...updateState, current: versionName(), supported: !!autoUpdater }),
+  'update:get': () => ({ ...updateState, current: versionName(), supported: !!autoUpdater, channel: UC.pick(config.updateChannel), channels: UC.CHANNELS }),
+  // 0.9.71: switch channel and look at once; going from Nightly or Beta to Stable may install a lower number, once
+  'update:setChannel': async ({ channel }) => {
+    const c = UC.pick(channel);
+    if (c === UC.pick(config.updateChannel)) return { channel: c };
+    config.updateChannel = c; config.updateSwitched = true; delete config.updateHold; saveConfig();
+    log('update channel', c);
+    if (!autoUpdater) return { channel: c };
+    UC.apply(autoUpdater, c, { switched: true }); autoUpdater.autoDownload = true;
+    autoUpdater.checkForUpdates().catch(() => {});
+    return { channel: c };
+  },
   'update:check': async () => { if (!autoUpdater) throw new Error('Updates work in the AppImage build only'); if (config.updateHold) { delete config.updateHold; saveConfig(); autoUpdater.autoDownload = true; } await autoUpdater.checkForUpdates(); return updateState; },
   'update:install': () => { if (updateState.state === 'ready') autoUpdater.quitAndInstall(true, true); },
   // Roll back (0.9.17): Cartridge's earlier releases on GitHub, and one of them in place of this AppImage
   'update:releases': async () => {
-    const r = await webFetch('https://api.github.com/repos/abdu2304/cartridge/releases?per_page=20', { headers: { 'User-Agent': 'Cartridge', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(20000) }).catch(() => null);
-    if (r?.ok) return (await r.json()).filter((x) => !x.draft && (x.assets || []).some((a) => a.name === 'Cartridge-x86_64.AppImage')).map((x) => ({ tag: x.tag_name, name: String(x.name || x.tag_name).replace(/^Cartridge\s+/i, ''), date: x.published_at, current: x.tag_name === 'v' + app.getVersion() }));
+    const r = await webFetch('https://api.github.com/repos/abdu2304/cartridge/releases?per_page=60', { headers: { 'User-Agent': 'Cartridge', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(20000) }).catch(() => null);
+    if (r?.ok) return UC.list(await r.json(), app.getVersion());
     // GitHub's API limit: the releases page instead
     const p = await webFetch('https://github.com/abdu2304/cartridge/releases', { headers: { 'User-Agent': 'Mozilla/5.0 Cartridge' }, signal: AbortSignal.timeout(20000) });
     if (!p.ok) throw new Error(`GitHub answered ${p.status}. Try again in a while.`);
-    const tags = [...new Set([...(await p.text()).matchAll(/\/abdu2304\/cartridge\/releases\/tag\/(v[\d.]+)/g)].map((m) => m[1]))];
-    return tags.map((t) => ({ tag: t, name: t.slice(1), date: '', current: t === 'v' + app.getVersion() }));
+    const tags = [...new Set([...(await p.text()).matchAll(/\/abdu2304\/cartridge\/releases\/tag\/(v[\w.-]+)/g)].map((m) => m[1]))].filter(UC.validTag);
+    return tags.map((t) => ({ tag: t, channel: UC.channelOf(t), name: UC.nameOf(t), date: '', current: t === 'v' + app.getVersion() }));
   },
   'update:rollback': async ({ tag }) => {
     const file = process.env.APPIMAGE;
     if (!file || !app.isPackaged) throw new Error('Rolling back works in the AppImage only.');
-    if (!/^v\d+(\.\d+){1,3}$/.test(tag || '')) throw new Error('That isn’t a Cartridge release.');
+    if (!UC.validTag(tag)) throw new Error('That isn’t a Cartridge release.');
     const tmp = file + '.cartridge-new';
     let got = 0;
     await downloadTo(`https://github.com/abdu2304/cartridge/releases/download/${tag}/Cartridge-x86_64.AppImage`, tmp, { abort: new AbortController() }, (n) => { got += n; broadcast('update', { ...updateState, state: 'rollback', got }); }, { plain: true });

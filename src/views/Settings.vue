@@ -418,11 +418,13 @@
               <button class="btn" :class="{ primary: store.update.state !== 'ready' }" data-focus :disabled="['checking', 'downloading'].includes(store.update.state)" @click="checkUpdates"><Icon name="mdiCloudDownloadOutline" />Check for updates</button>
             </div>
             <p class="muted small">New versions come from the GitHub Releases page. They download in the background and replace this AppImage in place, so your Steam shortcut and settings stay as they are.</p>
+            <div class="row"><span class="lbl">Update Channel</span><div class="seg"><button v-for="(c, k) in CHANNELS" :key="k" data-focus :class="{ on: chan === k }" @click="setChannel(k)">{{ c.label }}</button></div></div>
+            <p class="muted small" style="margin-top: -6px">{{ CHANNELS[chan].what }}</p>
             <button class="lrow" data-focus @click="openModal('whatsnew')"><Icon name="mdiNewspaperVariantOutline" :size="22" /><span class="l-mid"><b>What’s New</b><span class="l-sub">Every version’s changes, newest first</span></span><span class="l-end"><Icon name="mdiChevronRight" :size="20" /></span></button>
             <ChangelogCard />
-            <div class="subh">Roll back</div>
-            <p class="muted small" style="margin-top: -6px">Go back to an earlier version if this one gives you trouble. Your settings stay. Automatic updates pause until you press Check for updates.</p>
-            <div class="row"><button class="btn" data-focus :disabled="rollBusy" @click="rollBack"><Icon name="mdiHistory" :class="{ spin: rollBusy }" />{{ rollBusy ? 'Working…' : 'Choose an earlier version' }}</button></div>
+            <div class="subh">Other Versions</div>
+            <p class="muted small" style="margin-top: -6px">Install any stable, beta or nightly version in place of this one, for example to go back if this one gives you trouble. Your settings stay. Automatic updates pause until you press Check for updates.</p>
+            <div class="row"><button class="btn" data-focus :disabled="rollBusy" @click="rollBack"><Icon name="mdiHistory" :class="{ spin: rollBusy }" />{{ rollBusy ? 'Working…' : 'Choose a Version' }}</button></div>
           </template>
 
           <OnlinePlay v-else-if="sec === 'online'" />
@@ -710,7 +712,7 @@ const SEARCH = [
   ['Logos, SteamGridDB key', 'Look & Feel · Metadata', 'ui', 'meta'], ['Idle screen', 'Look & Feel · Motion and Sound', 'ui', 'motion'], ['Sounds', 'Look & Feel · Motion and Sound', 'ui', 'motion'], ['Rumble', 'Look & Feel · Motion and Sound', 'ui', 'motion'], ['Reduced motion, effects', 'Look & Feel · Motion and Sound', 'ui', 'motion'],
   ['Button icons, controller', 'Controls', 'controls'], ['Touch and mouse', 'Controls', 'controls'], ['On-screen keyboard', 'Controls', 'controls'], ['Tabs in the Dock, open on', 'Controls', 'controls'], ['Controller test', 'Controls', 'controls'],
   ['Downloads at once, speed limit', 'Downloads and Updates', 'dlup', 'downloads'], ['Multi-disc folders', 'Downloads and Updates', 'dlup', 'downloads'],
-  ['Check for updates', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'], ['Roll back to an earlier version', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'], ['What’s New', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'],
+  ['Check for updates', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'], ['Choose a version (roll back, beta, nightly)', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'], ['Update channel (Stable, Beta, Nightly)', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'], ['What’s New', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'],
   ['Device name', 'Help and About', 'about'], ['Take the tour', 'Help and About', 'about'], ['Run the welcome again', 'Help and About', 'about'], ['Report a problem', 'Help and About', 'about'], ['Performance overlay', 'Help and About', 'about'], ['GSAP motion (test)', 'Help and About', 'about'], ['Licences', 'Help and About', 'about'], ['Quit Cartridge', 'Help and About', 'about'],
 ];
 async function searchSettings() {
@@ -1298,15 +1300,27 @@ async function rollBack() {
   let list = [];
   try { list = await call('update:releases'); } catch (e) { rollBusy.value = false; return toast(e.message, 'error', 5000); }
   rollBusy.value = false;
-  const older = list.filter((x) => !x.current).slice(0, 12);
-  if (!older.length) return toast('No earlier versions were found.', 'info', 3000);
-  const tag = await choose({ sheet: true, title: 'Roll back to', options: older.map((x) => ({ label: x.name, sub: x.date ? new Date(x.date).toLocaleDateString() : x.tag, value: x.tag, icon: 'mdiHistory', raw: true })) });
+  const others = list.filter((x) => !x.current);
+  if (!others.length) return toast('No other versions were found.', 'info', 3000);
+  // one tab per channel, newest first; the channel you're on opens first
+  const opt = (x) => ({ label: x.name, sub: x.date ? new Date(x.date).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : x.tag, value: x.tag, icon: 'mdiHistory', raw: true });
+  const tabs = Object.keys(CHANNELS).map((k) => ({ k, label: CHANNELS[k].label, options: others.filter((x) => x.channel === k).slice(0, 15).map(opt) })).filter((t) => t.options.length);
+  const tag = await choose({ title: 'Choose a Version', tabs, tab: Math.max(0, tabs.findIndex((t) => t.k === chan.value)) });
   if (!tag) return;
-  if (!(await confirm(`Roll back to ${tag.slice(1)}?`, 'Cartridge downloads that version, puts it in place of this one and restarts. Your settings and games stay.', 'Roll back'))) return;
+  const pickName = others.find((x) => x.tag === tag)?.name || tag.slice(1);
+  if (!(await confirm(`Install ${pickName}?`, 'Cartridge downloads that version, puts it in place of this one and restarts. Your settings and games stay. Your update channel doesn’t change.', 'Install'))) return;
   rollBusy.value = true;
   try { await call('update:rollback', { tag }); toast('Restarting…', 'ok', 3000, 'mdiHistory'); } catch (e) { toast(e.message, 'error', 6000); rollBusy.value = false; }
 }
 async function checkUpdates() { try { await call('update:check'); } catch (e) { toast(e.message, 'info', 4000); } }
+// update channels (0.9.71)
+const CHANNELS = { stable: { label: 'Stable', what: 'Finished releases. Recommended.' }, beta: { label: 'Beta', what: 'The next release a few days early, to try before everyone else. You get stable releases too.' }, nightly: { label: 'Nightly', what: 'Built every night from the newest work. Can be broken: Choose a Version below always takes you back.' } };
+const chan = computed(() => (CHANNELS[store.update.channel] ? store.update.channel : 'stable'));
+async function setChannel(k) {
+  if (k === chan.value) return;
+  if (k !== 'stable' && !(await confirm(`Switch to ${CHANNELS[k].label}?`, `${CHANNELS[k].what} Cartridge looks for the newest ${CHANNELS[k].label.toLowerCase()} version now.`, 'Switch'))) return;
+  try { await call('update:setChannel', { channel: k }); store.update = { ...store.update, channel: k }; toast(`Update channel: ${CHANNELS[k].label}`, 'ok', 3000, 'mdiSourceBranch'); } catch (e) { toast(e.message, 'error', 5000); }
+}
 async function setPointer(v) { await saveConfig({ ui: { pointer: v } }); setPointerPref(v === 'auto' && store.info?.gamescope ? 'touch' : v); }
 // is Cartridge itself in Steam (null until known)
 const selfAdded = ref(null);

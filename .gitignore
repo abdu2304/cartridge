@@ -5,3 +5,4 @@ release/
 .DS_Store
 .ui-audit/
 tools/brand/out/
+release-notes-nightly.md

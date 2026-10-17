@@ -474,7 +474,7 @@ rd.on('delete-progress', ({ romId, pct }) => {
 });
 rd.on('update', (u) => {
   if (u.state === 'ready' && store.update.state !== 'ready') toast(`Cartridge ${u.version} is ready. Restart from the Quick Menu to update.`, 'ok', 6000, 'mdiUpdate');
-  store.update = u;
+  store.update = { ...store.update, ...u }; // keeps the channel (0.9.71)
 });
 call('update:get').then((u) => { store.update = u; }).catch(() => {});
 rd.on('installed-changed', ({ romId, path }) => {
