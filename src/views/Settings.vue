@@ -1,23 +1,22 @@
 <template>
   <div class="set-view" ref="el">
-    <!-- 0.9.71 (owner's option board, layout B): a hub of section cards, each with its state at a glance. A opens a
-         section across the whole screen with its pages as tabs; B comes back here. -->
-    <section v-if="hub" class="set-hub" data-scroll data-zone>
-      <header class="hub-head"><h1>Settings</h1><button class="btn hub-find" data-focus @click="searchSettings"><Icon name="mdiMagnify" :size="20" />Find a Setting<Btn b="Y" class="hub-y" /></button></header>
-      <div class="hub-grid">
-        <button v-for="s in sections" :key="s.id" class="hub-card glass" data-focus :data-key="'sec-' + s.id" :data-autofocus="sec === s.id ? '' : undefined" @click="(e) => pick(s.id, e)">
-          <span class="hub-ic"><Icon :name="s.icon" :size="26" /></span>
-          <b>{{ s.label }}</b>
-          <span class="hub-st">{{ statusOf(s.id) }}</span>
-        </button>
-      </div>
-    </section>
-    <section v-else class="pane" data-scroll data-zone ref="paneEl">
+    <!-- 0.9.72 (owner: "return to how the menus looked before but more polished"): the list of sections on the left
+         again, each with the one line that says where it stands (from 0.9.71's cards), the page beside it -->
+    <nav class="rail" data-scroll>
+      <div class="eyebrow rail-title">Settings</div>
+      <button class="rail-item rail-find" data-focus @click="searchSettings"><Icon name="mdiMagnify" :size="20" /><span class="rail-t"><b>Find a Setting</b></span><Btn b="Y" class="rail-y" /></button>
+      <button v-for="s in sections" :key="s.id" class="rail-item" :class="{ on: sec === s.id }" data-focus :data-key="'sec-' + s.id" :data-autofocus="sec === s.id ? '' : undefined" @focus="sec = s.id" @click="(e) => pick(s.id, e)">
+        <SyncthingLogo v-if="s.id === 'syncthing'" :size="20" mono class="rail-st" /><Icon v-else :name="s.icon" :size="20" />
+        <span class="rail-t"><b>{{ s.label }}</b><small>{{ statusOf(s.id) }}</small></span>
+        <span v-if="s.id === 'emu' && issues?.length" class="rail-n">{{ issues.length }}</span>
+      </button>
+    </nav>
+    <section class="pane" data-scroll data-zone ref="paneEl">
       <!-- the old page goes at once, so a quick press to the right always lands on the new one (A13) -->
       <Transition name="fadeup">
         <div :key="sec" class="pane-in">
           <!-- every section opens the same way (0.9.49): its name, one short line, then its pages if it has them -->
-          <header class="sec-head"><button class="btn hub-back" data-focus @click="toHub"><Btn b="B" class="hub-b" /><Icon name="mdiViewGridOutline" :size="18" />All Settings</button><h1>{{ sections.find((x) => x.id === sec)?.label }}</h1><p v-if="lead" class="sec-lead">{{ lead }}</p></header>
+          <header class="sec-head"><h1>{{ sections.find((x) => x.id === sec)?.label }}</h1><p v-if="lead" class="sec-lead">{{ lead }}</p></header>
           <div v-if="sec === 'library'" class="lookpages"><Btn b="LB" /><div class="seg"><button v-for="p in LIB_PAGES" :key="p.v" data-focus :data-key="'lib-' + p.v" :class="{ on: libPage === p.v }" @click="libPage = p.v">{{ p.l }}</button></div><Btn b="RB" /></div>
           <div v-if="sec === 'dlup'" class="lookpages"><Btn b="LB" /><div class="seg"><button v-for="p in DLUP_PAGES" :key="p.v" data-focus :data-key="'dlup-' + p.v" :class="{ on: dlupPage === p.v }" @click="dlupPage = p.v">{{ p.l }}</button></div><Btn b="RB" /></div>
           <!-- one RomM tab (0.9.3 G1): connection, library and sync, upload -->
@@ -667,10 +666,7 @@ const paneEl = ref(null), syncRef = ref(null), steamRef = ref(null);
 const OLD_SEC = { folders: ['emu'], conn: ['library', 'server'], sync: ['library', 'server'], romm: ['library', 'server'], storage: ['library', 'folders'], dl: ['dlup', 'downloads'], updates: ['dlup', 'updates'] };
 const startSec = OLD_SEC[store.settingsSection] || [store.settingsSection || 'library'];
 const sec = ref(startSec[0]);
-// the hub shows when Settings is opened from the Dock; a screen asking for a section (store.settingsDirect, a
-// sub-screen's Back, Find a Setting) opens that section straight away
-const hub = ref(!store.settingsDirect && !store.settingsSpot);
-store.settingsDirect = false;
+store.settingsDirect = false; // 0.9.71's hub asked for it; the list always opens on the section asked for
 const sections = [
   { id: 'library', label: 'Library', icon: 'mdiBookshelf', lead: 'Your RomM server, your games folders and the space they use.' },
   { id: 'emu', label: 'Emulators', icon: 'mdiGamepadVariantOutline', lead: 'Get, update and set up emulators, and add-ons for your games.' },
@@ -684,7 +680,7 @@ const sections = [
   { id: 'about', label: 'Help and About', icon: 'mdiInformationOutline', lead: 'The tour, the welcome, reporting a problem, and this device.' },
 ];
 const lead = computed(() => sections.find((x) => x.id === sec.value)?.lead || '');
-// each hub card's one line: where that section stands, from what Cartridge already knows (nothing is asked for it)
+// each section's one line under its name: where that section stands, from what Cartridge already knows (nothing is asked for it)
 function statusOf(id) {
   const c = store.config, u = c.ui || {};
   const games = (store.lib?.platforms || []).reduce((n, p) => n + (p.rom_count || 0), 0);
@@ -700,7 +696,7 @@ function statusOf(id) {
   if (id === 'about') return `Cartridge ${store.info?.versionName || ''}`.trim();
   return '';
 }
-// the Emulators card counts what needs looking at once the hub has settled
+// Emulators counts what needs looking at once Settings has settled
 onMounted(() => setTimeout(() => { if (!issues.value) loadIssues(); }, 700));
 // pages in Library and Downloads and Updates
 const LIB_PAGES = [{ v: 'folders', l: 'Games and Storage' }, { v: 'server', l: 'RomM Server' }]; // 0.9.60 (owner): games first
@@ -771,7 +767,7 @@ async function searchSettings() {
   const pick = hits.length === 1 ? hits[0] : await choose({ sheet: true, title: `Settings for “${q}”`, options: hits.map((h, i) => ({ label: h[0], sub: h[1], value: i, icon: sections.find((x) => x.id === h[2])?.icon, raw: true })) }).then((i) => (i == null ? null : hits[i]));
   if (!pick) return;
   const [w, , id, page] = pick;
-  sec.value = id; hub.value = false;
+  sec.value = id;
   await nextTick();
   if (page) { if (id === 'library') libPage.value = page; else if (id === 'dlup') dlupPage.value = page; else if (id === 'emu') setEmuPage(page); else if (id === 'ui') setLookPage(page); }
   await nextTick(); await new Promise((r) => setTimeout(r, 120));
@@ -1047,9 +1043,17 @@ const folderList = computed(() => (store.libVersion, showAll.value ? supported.v
 
 // D-pad (0.9.23, owner): right from the list of sections goes to the first item on the right; left at the
 // left edge of the right side goes back to its section in the list (not the top of the list)
-function toHub() { hub.value = true; nextTick(() => focusFirst(el.value, `[data-key="sec-${sec.value}"]`)); }
+function railRight() { if (!document.activeElement?.closest('.rail')) return false; enter(); }
+function paneLeft() {
+  const cur = document.activeElement;
+  if (!cur?.closest('.pane') || !paneEl.value) return false;
+  const c = cur.getBoundingClientRect();
+  const more = [...paneEl.value.querySelectorAll('[data-focus]')].some((e) => { if (e === cur || e.disabled) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.right <= c.left + 4 && r.bottom > c.top && r.top < c.bottom; });
+  if (more) return false;
+  focusFirst(el.value, `[data-key="sec-${sec.value}"]`);
+}
 function stepSync(d) { stView.value = ''; stepPages(SYNC_PAGES, syncPage, 'sync', d); }
-useView({ back: () => { if (hub.value) return false; if (sec.value === 'syncthing' && syncPage.value === 'syncthing' && stView.value) { closeSt(); return; } toHub(); }, lb: () => hub.value ? false : (sec.value === 'emu' ? stepEmu(-1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', -1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', -1) : sec.value === 'syncthing' ? stepSync(-1) : sec.value === 'steam' ? steamRef.value?.step(-1) : stepLook(-1)), rb: () => hub.value ? false : (sec.value === 'emu' ? stepEmu(1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', 1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', 1) : sec.value === 'syncthing' ? stepSync(1) : sec.value === 'steam' ? steamRef.value?.step(1) : stepLook(1)), y: () => searchSettings() },
+useView({ right: railRight, left: paneLeft, back: () => { if (sec.value === 'syncthing' && syncPage.value === 'syncthing' && stView.value && !document.activeElement?.closest('.rail')) { closeSt(); return; } if (!document.activeElement?.closest('.rail')) { focusFirst(el.value, `[data-key="sec-${sec.value}"]`); return; } return false; }, lb: () => (sec.value === 'emu' ? stepEmu(-1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', -1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', -1) : sec.value === 'syncthing' ? stepSync(-1) : sec.value === 'steam' ? steamRef.value?.step(-1) : stepLook(-1)), rb: () => (sec.value === 'emu' ? stepEmu(1) : sec.value === 'library' ? stepPages(LIB_PAGES, libPage, 'lib', 1) : sec.value === 'dlup' ? stepPages(DLUP_PAGES, dlupPage, 'dlup', 1) : sec.value === 'syncthing' ? stepSync(1) : sec.value === 'steam' ? steamRef.value?.step(1) : stepLook(1)), y: () => searchSettings() },
   [{ b: 'A', label: 'Select' }, { b: 'B', label: 'Back' }, { b: 'Y', label: 'Find a Setting' }, { b: 'LT+RT', label: 'Tabs' }]);
 // Settings → Emulators → Issues
 const issues = ref(null);
@@ -1140,21 +1144,21 @@ async function fixIssue(i) {
 watch(sec, (v) => { store.settingsSection = v; if (v === 'emu') { loadIssues(); loadBios(); } }, { immediate: true });
 
 
-// a section that loads its rows (Online Play, Steam) has only All Settings at first: wait for its rows a moment
-// before falling back to it (0.9.72 playtest: focus stayed on All Settings)
-function enter(tries = 12) {
-  const f = [...(paneEl.value?.querySelectorAll('[data-focus]') || [])].find((x) => !x.closest('.hub-back') && x.offsetParent);
+// into the page: a section that loads its rows (Online Play, Steam) has none at first, so wait a moment for them, as
+// long as focus hasn't moved on meanwhile (0.9.72 playtest)
+function enter(tries = 12, from = document.activeElement) {
+  const f = [...(paneEl.value?.querySelectorAll('[data-focus]') || [])].find((x) => x.offsetParent);
   if (f) { f.focus({ preventScroll: true }); f.scrollIntoView({ block: 'nearest' }); return; }
-  if (tries > 0 && paneEl.value) { setTimeout(() => { if (!paneEl.value?.contains(document.activeElement) || document.activeElement?.closest('.hub-back')) enter(tries - 1); }, 120); if (tries === 12) focusFirst(paneEl.value); return; }
-  focusFirst(paneEl.value);
+  if (tries > 0 && paneEl.value) setTimeout(() => { const a = document.activeElement; if (a === from || a === document.body) enter(tries - 1, from); }, 120);
 }
 // a press on a section: with a controller or keys it was already focused (and chosen), so A goes in; a tap or click
 // chooses it (0.9.49, owner: tapping the left list did nothing; a touch never moves focus, so @focus never ran)
 // a tap or click also moves focus there (0.9.51, owner: touch didn't light the list like the controller does): the
 // white stays on what you picked, never on the last thing the controller was on
-function pick(id) {
-  sec.value = id; hub.value = false;
-  nextTick(enter);
+function pick(id, e) {
+  if (input.mode !== 'pad') e?.currentTarget?.focus?.({ preventScroll: true });
+  if (sec.value !== id) { sec.value = id; if (input.mode === 'pad') nextTick(() => enter()); return; }
+  enter();
 }
 async function setMode(mode) { await saveConfig({ server: { mode } }); reconnect(); }
 async function reconnect() {
@@ -1261,7 +1265,7 @@ const mediaSizes = [{ v: 'compact', l: 'Compact' }, { v: 'large', l: 'Medium' },
 const EMU_PAGES = [{ v: 'emus', l: 'Emulators' }, { v: 'recomps', l: 'Recomps' }, { v: 'addons', l: 'Game Add-ons' }, { v: 'overview', l: 'Setup and Health' }, { v: 'folders', l: 'Console Folders' }, { v: 'links', l: 'Linked Folders' }];
 // a fork's Manage sheet asks for Linked Folders (0.9.33)
 // another page inside Settings asks for a section (0.9.66: an emulator's Online Play row)
-watch(() => store.settingsWant, (v) => { if (!v) return; store.settingsWant = null; sec.value = v; hub.value = false; nextTick(() => { if (input.mode === 'pad') enter(); }); });
+watch(() => store.settingsWant, (v) => { if (!v) return; store.settingsWant = null; sec.value = v; nextTick(() => { if (input.mode === 'pad') enter(); }); });
 watch(() => store.emuPageWant, (v) => { if (!v) return; store.emuPageWant = null; setEmuPage(v); nextTick(() => focusFirst(paneEl.value, `[data-key="emup-${v}"]`)); });
 // 0.9.44 (owner: Emulators opened on Setup and Health): every section opens on its first page; coming back from a
 // screen opened here returns to the page it was opened from (store.settingsSpot.page)
@@ -1430,21 +1434,26 @@ onMounted(() => {
 
 <style scoped>
 .style-seg { align-self: flex-start; } /* two choices: as wide as they are, not the whole page */
-.set-view { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr; gap: 10px; padding: 16px 36px 0; animation: viewIn var(--fade-in); }
-/* the hub (0.9.71): cards fill the width in up to four columns, each says where that section stands */
-.set-hub { overflow-y: auto; padding: 6px 12px 60px; }
-.hub-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s-3); justify-content: space-between; margin: 4px 0 var(--s-4); }
-.hub-head h1 { font-size: var(--t-2xl); font-weight: 700; margin: 0; }
-.hub-y { margin-left: 4px; }
-body:not(.pad-mode) .hub-y, body:not(.pad-mode) .hub-b { display: none; }
-.hub-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: var(--s-3); }
-.hub-card { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: var(--s-4); border-radius: var(--r-lg); text-align: left; min-height: 140px; transition: transform var(--spring-snappy-d) var(--spring-snappy), background var(--tint); }
-.hub-card b { font-family: var(--display); font-size: var(--t-lg); }
-.hub-ic { color: var(--muted); margin-bottom: 4px; display: flex; }
-.hub-st { color: var(--text-2, var(--muted)); font-size: var(--t-sm); overflow-wrap: anywhere; }
-.hub-card:focus-visible, .pad-mode .hub-card:focus { background: var(--focus); color: var(--on-focus); }
-.hub-card:is(:focus-visible, :focus) :is(.hub-ic, .hub-st) { color: var(--on-focus-dim); }
-.hub-back { align-self: flex-start; margin-bottom: var(--s-2); }
+.set-view { position: absolute; inset: 0; display: grid; grid-template-columns: minmax(250px, 300px) 1fr; gap: 10px; padding: 16px 36px 0; animation: viewIn var(--fade-in); }
+/* the list of sections (back in 0.9.72, owner: "how the menus looked before but more polished"): name and the one line
+   saying where that section stands; the open one has the chosen fill, focus the usual white */
+.rail { display: flex; flex-direction: column; gap: 2px; padding: 10px 4px 60px; overflow-y: auto; scrollbar-width: none; min-height: 0; }
+.rail-title { padding: 0 14px 10px; }
+.rail-item { flex: none; display: grid; grid-template-columns: 20px 1fr auto; align-items: center; column-gap: 14px; padding: 10px 14px; border-radius: var(--r-md); text-align: left; color: var(--muted); transition: background var(--tint), color var(--tint); }
+.rail-t { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.rail-t b { font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.rail-t small { font-size: var(--t-xs); color: var(--text-2, var(--muted)); overflow-wrap: anywhere; line-height: 1.3; }
+.rail-n { min-width: 22px; padding: 1px 7px; border-radius: 999px; background: var(--s2); color: var(--text); font-size: var(--t-xs); font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; }
+.rail-find { margin-bottom: 8px; }
+.rail-find .rail-t b { font-weight: 500; color: var(--text-2, var(--muted)); }
+body:not(.pad-mode) .rail-y { display: none; }
+.rail-item.on { color: var(--on-sel); background: var(--sel-bg); box-shadow: var(--sel-ring); } /* the open section: chosen, the softer fill (docs/design-rules.md 6) */
+.rail-item.on :is(.rail-t b) { color: var(--on-sel); }
+.rail-item:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; }
+.rail-item:focus .rail-t b { color: var(--on-focus); }
+.rail-item:focus :is(.rail-t small) { color: var(--on-focus-dim); }
+.rail-item:focus .rail-n { background: var(--on-focus); color: var(--focus); }
+.rail-st { color: inherit !important; }
 .pane .sec-head { display: flex; flex-direction: column; }
 .sync-lock { display: flex; align-items: center; gap: 8px; margin: 0 0 var(--s-2); }
 /* Syncthing's parts as cards (0.9.58) */
@@ -1460,14 +1469,14 @@ body:not(.pad-mode) .hub-y, body:not(.pad-mode) .hub-b { display: none; }
 .st-hub-card:is(:focus-visible, :focus) :is(.muted, .st-hub-go) { color: var(--on-focus-dim); }
 .st-back { margin-bottom: var(--s-3); }
 .ss-choice-anchor { height: 0; outline: none; }
-.pane { overflow-y: auto; padding: 6px 12px 60px; }
+.pane { overflow-y: auto; padding: 6px 12px 60px 24px; }
 .ga-cons { display: flex; gap: 8px; overflow-x: auto; padding: 8px 6px 10px; margin: 0 -6px; scrollbar-width: none; } /* room for a selected chip (0.9.28: it was cut off) */
 .ga-con { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; background: var(--s1); box-shadow: var(--weight-edge); font-weight: 600; font-size: var(--t-sm); }
 .ga-con em { font-style: normal; color: var(--muted); font-weight: 500; }
 .ga-con.on { background: var(--sel-bg); box-shadow: var(--sel-ring); color: var(--on-sel); }
 .ga-con:focus-visible, .pad-mode .ga-con:focus { background: var(--focus); color: var(--on-focus); box-shadow: none; outline: none; } /* the standard highlight: white fill, dark text, no ring */
 .pad-mode .ga-con:focus em { color: var(--on-focus-dim); }
-.pane-in { display: flex; flex-direction: column; gap: 16px; max-width: 960px; margin: 0 auto; }
+.pane-in { display: flex; flex-direction: column; gap: 16px; max-width: 860px; }
 .pane h1 { font-size: var(--t-2xl); font-weight: 700; margin: 4px 0 6px; }
 .card-s { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
 .kv { display: flex; gap: 16px; font-size: var(--t-sm); min-width: 0; }

@@ -7,6 +7,10 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 17 Oct 2026 · 0.9.73 · Settings, As Before
+
+**Asked (photo of the cards):** "return to how the menus looked before but more polished". The rail is back with a status line under each section; the cards are gone. Handover Part 20.
+
 ## 17 Oct 2026 · 0.9.72 · Played and Fixed
 
 **Asked:** host a playtest with about ten playtesters (UI, UX, recomps, Online Play, saves, emulator setup, Steam, smoothness), recomps the main focus, compile their points into fixes and fix them.
