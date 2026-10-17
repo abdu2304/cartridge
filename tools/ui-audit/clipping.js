@@ -88,6 +88,9 @@ async function pages(width, height) {
   // 0.9.65: the Steam card's Recomps page and one recomp's sheet
   await p.click('[data-key="sys-steam"]').catch(() => {}); await scan('recomps page');
   await p.evaluate(() => { window.__cartStore?.openModal?.('recomp', { id: 'zelda64recomp' }); }).catch(() => {}); await scan('pop-up recomp'); await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {});
+  // 0.9.70: Cartridge Verified, ready with three games, needing your copy, and a port's settings
+  for (const id of ['uncharted', 'iss', 'pt']) { await p.evaluate((x) => { window.__cartStore?.openModal?.('verified', { id: x }); }, id).catch(() => {}); await scan('pop-up verified ' + id); await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {}); }
+  await p.evaluate(() => { window.__cartStore?.openModal?.('gamesettings', { recomp: 'uncharted', name: 'Uncharted: The Nathan Drake Collection' }); }).catch(() => {}); await scan('pop-up port settings'); await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {});
   await p.click('[data-tab="consoles"]').catch(() => {}); await p.waitForTimeout(400);
   for (const [type, props] of [['savelocations', {}], ['folderview', { path: '/home/u/.config/PCSX2/memcards' }]]) { await p.evaluate(([t, pr]) => { window.__cartStore?.openModal?.(t, pr); }, [type, props]).catch(() => {}); await scan('pop-up ' + type); await p.evaluate(() => window.__cartStore?.closeModal?.(null)).catch(() => {}); }
   await browser.close();

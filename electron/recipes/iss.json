@@ -2,7 +2,7 @@
  "schema": 1,
  "id": "iss",
  "name": "inFAMOUS Second Son",
- "by": "HayatoG, on the core of the The Last Guardian and Gravity Rush 2 ports",
+ "by": "HayatoG, on the core of the ports of The Last Guardian and Gravity Rush 2",
  "repo": "github:HayatoG/iss_pc",
  "licence": "GPL-2.0-or-later",
  "about": "Playable and in development: the original code runs natively, the PS4 system is reimplemented and the GPU is translated to Vulkan. Performance is still uneven (20 to 30 FPS on an RTX 2060) and some image faults are known.",

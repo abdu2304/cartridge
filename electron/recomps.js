@@ -971,7 +971,7 @@ function createRecomps(ctx) {
   }
   // your copy for it: checked (the files it needs, its title ID and version); an update it needs is laid over it as
   // links when the update is on this device; then everything is written
-  async function setVerifiedGame(id, dir, { candidates = [] } = {}) {
+  async function setVerifiedGame(id, dir, { candidates = [], onProgress = () => {} } = {}) {
     const e = byId(id), r = recipeOf(e), rec = installs[id];
     if (!r) throw new Error('That isn’t a Cartridge Verified game.');
     const sfo = require('./saves').sfo;
@@ -981,6 +981,7 @@ function createRecomps(ctx) {
       const u = RC.findUpdate(r, dir, candidates, { sfo });
       if (!u || RC.verCmp(u.version, chk.needsUpdate) < 0) return { ok: false, problems: chk.problems, needsUpdate: chk.needsUpdate, why: `${r.name} needs update ${chk.needsUpdate}. ${u ? `The update on this device is ${u.version}.` : 'Put the update’s folder (its dump, with sce_sys inside) beside the game, or download it from your library, then pick the game again.'}` };
       if (!rec) return { ok: false, why: 'Install it first.' };
+      onProgress({ step: 'view' });
       use = await buildView(rec, dir, u.dir);
       update = u;
       const again = RC.checkGame(r, use, { sfo });
@@ -990,7 +991,7 @@ function createRecomps(ctx) {
     if (!rec) return { ok: true, check: chk, notInstalled: true };
     rec.game = { path: use, source: dir, update: update?.dir || null, id: chk.id || null, version: update?.version || chk.version || null, notes: chk.notes, at: Date.now() };
     saveInstalls();
-    const done = await configure(id);
+    const done = await configure(id, { onProgress });
     return { ok: true, notes: chk.notes, ...done };
   }
   // base and update as one folder of links, inside the install (rebuilt when either changes)

@@ -80,6 +80,7 @@
     <GameAbout v-else-if="store.modal?.type === 'gameabout'" v-bind="store.modal.props" />
     <FilePick v-else-if="store.modal?.type === 'filepick'" v-bind="store.modal.props" />
     <RecompSheet v-else-if="store.modal?.type === 'recomp'" v-bind="store.modal.props" />
+    <VerifiedSheet v-else-if="store.modal?.type === 'verified'" v-bind="store.modal.props" />
     <ConsoleCollection v-else-if="store.modal?.type === 'consolecol'" v-bind="store.modal.props" />
     <LinkSetup v-else-if="store.modal?.type === 'linksetup'" v-bind="store.modal.props" />
     <SaveGame v-else-if="store.modal?.type === 'savegame'" :key="'sg' + store.modal.props.romId" v-bind="store.modal.props" />
@@ -145,6 +146,7 @@ import GameTimeline from './components/GameTimeline.vue';
 import GameAbout from './components/GameAbout.vue';
 import FilePick from './components/FilePick.vue';
 import RecompSheet from './components/RecompSheet.vue';
+import VerifiedSheet from './components/VerifiedSheet.vue';
 import ConsoleCollection from './components/ConsoleCollection.vue';
 import LinkSetup from './components/LinkSetup.vue';
 import SaveGame from './components/SaveGame.vue';

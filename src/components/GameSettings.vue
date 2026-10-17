@@ -4,9 +4,10 @@
       <div class="gs-head">
         <img v-if="art" class="gs-cover" :src="art" />
         <div style="min-width: 0">
-          <div class="eyebrow">{{ d?.name ? d.name + (d.version ? ' ' + d.version : '') + ' · ' : '' }}Game Settings</div>
+          <div class="eyebrow">{{ recomp ? 'PC Port' + (d?.version ? ' ' + d.version : '') + ' · Settings' : (d?.name ? d.name + (d.version ? ' ' + d.version : '') + ' · ' : '') + 'Game Settings' }}</div>
           <h2>{{ name }}</h2>
-          <p class="muted small">Only for this game, saved in {{ d?.name || 'the emulator' }}’s own per-game settings. Anything left on “{{ d?.name || 'Emulator' }}’s own” follows your normal settings.</p>
+          <p v-if="recomp" class="muted small">Every setting of the port’s own launcher, saved in its own files. Anything left on “Port’s own” is its default. Changes apply the next time it starts.</p>
+          <p v-else class="muted small">Only for this game, saved in {{ d?.name || 'the emulator' }}’s own per-game settings. Anything left on “{{ d?.name || 'Emulator' }}’s own” follows your normal settings.</p>
         </div>
       </div>
       <div v-if="!d" class="muted"><Icon name="mdiSync" :size="16" class="spin" /> Reading its settings…</div>
@@ -24,17 +25,17 @@
         </button>
         <div v-if="tab === 'Steam' && !fg" class="lrow" data-focus tabindex="0"><span class="l-mid"><b>Frame Generation</b><span class="l-sub">{{ fgWhy || 'Looking…' }}</span></span></div>
         <!-- 0.9.62 (owner: advanced settings too): the emulator's own debug and expert settings, kept apart -->
-        <div v-if="tab === 'Advanced'" class="gs-warn muted small"><Icon name="mdiAlertOutline" :size="16" />For testing and fixing problems. Some of these can stop the game starting; “{{ d.name }}’s own” puts any of them back.</div>
+        <div v-if="tab === 'Advanced'" class="gs-warn muted small"><Icon name="mdiAlertOutline" :size="16" />For testing and fixing problems. Some of these can stop the game starting; “{{ own }}’s own” puts any of them back.</div>
         <template v-for="(it, i) in shown" :key="it.id">
         <div v-if="it.group && it.group !== shown[i - 1]?.group" class="gs-group">{{ it.group }}</div>
         <button class="lrow" :class="{ 'gs-locked': it.locked }" data-focus data-expand :data-key="'gs-' + it.id" :disabled="busy" @click="pick(it)">
-          <span class="l-mid"><b>{{ it.label }}</b><span class="l-sub">{{ it.locked ? `Its choices differ between ${d.name} versions: change it in ${d.name}` : it.sub || (it.game != null ? 'This game’s own' : `${d.name}’s own${it.base != null ? ': ' + labelOf(it, it.base) : ''}`) }}</span><span v-if="it.desc" class="l-sub gs-desc">{{ it.desc }}</span></span>
+          <span class="l-mid"><b>{{ it.label }}</b><span class="l-sub">{{ it.locked ? `Its choices differ between ${d.name} versions: change it in ${d.name}` : it.sub || (it.game != null ? (recomp ? 'Yours' : 'This game’s own') : `${own}’s own${it.base != null ? ': ' + labelOf(it, it.base) : ''}`) }}</span><span v-if="it.desc" class="l-sub gs-desc">{{ it.desc }}</span></span>
           <span class="l-end"><span class="status" :class="{ ok: it.game != null }">{{ it.game != null ? labelOf(it, it.game) : 'Default' }}</span></span>
         </button>
         </template>
       </div>
       <div class="row" style="justify-content: flex-end">
-        <button v-if="d?.items?.some((x) => x.game != null)" class="btn" data-focus :disabled="busy" @click="resetAll"><Icon name="mdiRestore" />Back to {{ d.name }}’s Own</button>
+        <button v-if="d?.items?.some((x) => x.game != null)" class="btn" data-focus :disabled="busy" @click="resetAll"><Icon name="mdiRestore" />Back to {{ own }}’s Own</button>
         <button class="btn" data-focus @click="closeModal(null)">Done</button>
       </div>
     </div>
@@ -52,12 +53,13 @@ import Icon from './Icon.vue';
 import Btn from './Btn.vue';
 import { frameGenFor } from '../steam.js';
 
-const props = defineProps({ romId: Number, name: String, tab: String, at: String });
+const props = defineProps({ romId: Number, name: String, tab: String, at: String, recomp: String }); // recomp: a Cartridge Verified port's settings (0.9.70)
+const own = computed(() => (props.recomp ? 'Port' : d.value?.name || 'Emulator'));
 const el = ref(null), d = ref(null), busy = ref(false);
 const rom = computed(() => romById(props.romId));
 const art = computed(() => (rom.value ? cover(rom.value) : ''));
 const tab = ref(props.tab || ''); // back from a picker: the tab you were on (0.9.46: it fell to Steam, the only tab before the list loaded)
-const tabs = computed(() => { const t = [...new Set((d.value?.items || []).map((x) => x.tab || 'General'))]; const a = t.indexOf('Advanced'); if (a >= 0) t.splice(a, 0, 'Steam'); else t.push('Steam'); return t; }); // Advanced stays last (0.9.62) // Steam always: frame generation says why when it can't apply (0.9.28)
+const tabs = computed(() => { const t = [...new Set((d.value?.items || []).map((x) => x.tab || 'General'))]; if (props.recomp) return t; const a = t.indexOf('Advanced'); if (a >= 0) t.splice(a, 0, 'Steam'); else t.push('Steam'); return t; }); // a PC port's shortcut is its start script: no Steam tab (0.9.70) // Advanced stays last (0.9.62) // Steam always: frame generation says why when it can't apply (0.9.28)
 const shown = computed(() => (d.value?.items || []).filter((x) => (x.tab || 'General') === tab.value));
 watch(tabs, (t) => { if (d.value && !t.includes(tab.value)) tab.value = t[0] || ''; }, { immediate: true }); // only once the list is in: before it, Steam is the only tab
 function stepTab(n) { const t = tabs.value; if (t.length < 2) return; tab.value = t[(t.indexOf(tab.value) + n + t.length) % t.length]; nextTick(() => el.value && focusFirst(el.value.querySelector('.gs-list') || el.value)); }
@@ -86,7 +88,7 @@ async function pickFg() {
 const labelOf = (it, v) => it.options.find((o) => String(o.value) === String(v))?.label || String(v);
 let saved = null, layer;
 // the picker takes the one modal slot: this sheet comes back after it
-function reopen(at) { if (store.modal?.type !== 'gamesettings') store.modal = { type: 'gamesettings', props: { romId: props.romId, name: props.name, tab: tab.value, at: at || '' }, resolve: saved || (() => {}) }; }
+function reopen(at) { if (store.modal?.type !== 'gamesettings') store.modal = { type: 'gamesettings', props: { romId: props.romId, name: props.name, tab: tab.value, at: at || '', recomp: props.recomp }, resolve: saved || (() => {}) }; }
 async function pick(it) {
   // a locked setting (its version unknown): its own value can still go back to the emulator's, nothing else
   if (it.locked) { if (it.game == null) return toast(`${it.label} is changed in ${d.value.name} itself: its choices differ between versions.`, 'info', 4500, 'mdiInformationOutline'); const v = await choose({ title: it.label, message: `${d.value.name} versions number this setting differently, so Cartridge only puts it back.`, options: [{ label: `Back to ${d.value.name}’s Own`, value: 'base', icon: 'mdiRestore' }] }); reopen('gs-' + it.id); if (v === 'base') await save([{ id: it.id, value: null }]); return; }
@@ -94,7 +96,7 @@ async function pick(it) {
   // the emulator's own first, then Type a Number or a Value (0.9.62, owner: type any number in its range), then the choices
   const range = it.num ? `${Math.abs(it.num.min) >= 1e6 && Math.abs(it.num.max) >= 1e6 ? 'Any number' : Math.abs(it.num.max) >= 1e6 ? `${it.num.min} or more` : `${it.num.min} to ${it.num.max}`}${it.num.unit ? ' ' + it.num.unit : ''}` : '';
   const v = await choose({ title: it.label, message: it.desc || it.sub || '', sheet: true, options: [
-    { label: `${d.value.name}’s own`, sub: it.base != null ? `Now ${labelOf(it, it.base)}` : 'Follows your normal settings', value: '__base', icon: 'mdiArrowULeftTop', selected: cur == null, raw: true },
+    { label: `${own.value}’s own`, sub: it.base != null ? `${props.recomp ? 'Its default' : 'Now'}: ${labelOf(it, it.base)}` : 'Follows your normal settings', value: '__base', icon: 'mdiArrowULeftTop', selected: cur == null, raw: true },
     ...(it.num ? [{ label: 'Type a Number', sub: `${range}${cur != null && !it.options.some((o) => String(o.value) === String(cur)) ? ' · now ' + cur : ''}`, value: '__num', icon: 'mdiNumeric', raw: true }] : []),
     ...(it.type === 'text' ? [{ label: 'Type a Value', sub: cur != null ? 'Now ' + cur : it.base != null ? `${d.value.name}’s own is ${it.base}` : '', value: '__text', icon: 'mdiFormTextbox', raw: true }] : []),
     ...it.options.map((o) => ({ label: o.label, value: o.value, selected: cur != null && String(cur) === String(o.value), raw: true })),
@@ -111,7 +113,7 @@ async function pick(it) {
 }
 async function save(changes) {
   busy.value = true;
-  try { d.value = await call('gamesettings:set', { romId: props.romId, changes }); toast('Saved. It applies the next time the game starts.', 'ok', 2500, 'mdiTune'); }
+  try { d.value = props.recomp ? await call('recomps:setSettings', { id: props.recomp, changes }) : await call('gamesettings:set', { romId: props.romId, changes }); toast('Saved. It applies the next time the game starts.', 'ok', 2500, 'mdiTune'); }
   catch (e) { toast(e.message, 'error', 6000); }
   busy.value = false;
 }
@@ -119,8 +121,8 @@ async function resetAll() { await save((d.value.items || []).filter((x) => x.gam
 onMounted(async () => {
   saved = store.modal?.resolve;
   layer = pushLayer(el.value, { back: () => closeModal(null), start: () => closeModal(null), lb: () => stepTab(-1), rb: () => stepTab(1), x() {}, y() {}, select() {}, lt() {}, rt() {} });
-  loadFg();
-  d.value = await call('gamesettings:get', { romId: props.romId }).catch((e) => ({ why: e.message, items: [] }));
+  if (!props.recomp) loadFg();
+  d.value = await (props.recomp ? call('recomps:settings', { id: props.recomp }) : call('gamesettings:get', { romId: props.romId })).catch((e) => ({ why: e.message, items: [] }));
   await nextTick();
   if (!el.value) return; // closed (or reopened) while its settings were loading (0.9.63, owner's log: a null querySelector)
   // back from a picker: the row you picked from, else the first

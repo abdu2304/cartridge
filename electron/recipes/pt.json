@@ -21,7 +21,7 @@
   ],
   "kind": "folder-or-pkg",
   "has": [],
-  "why": "A dump folder from your PS4 or a fake PKG made from it. The US release CUSA01127 is the tested one; the European and Japanese ones install with a note."
+  "why": "The US release CUSA01127 is the tested one; the European and Japanese ones install with a note."
  },
  "builds": [
   {

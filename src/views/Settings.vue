@@ -697,7 +697,7 @@ const SEARCH = [
   ['New games go to', 'Library · Games and Storage', 'library', 'folders'], ['Always ask where downloads go', 'Library · Games and Storage', 'library', 'folders'],
   ['BIOS folder', 'Library · Games and Storage', 'library', 'folders'], ['Free up space, storage manager', 'Library · Games and Storage', 'library', 'folders'], ['Check downloaded games', 'Library · Games and Storage', 'library', 'folders'],
   ['Online play, netplay, RPCN, ShadNet, rooms, ad hoc, Wiimmfi, Pretendo', 'Online Play', 'online'],
-  ['Recomps, native ports of console games', 'Emulators · Recomps', 'emu', 'recomps'], ['Zelda 64 Recompiled, Ship of Harkinian, Unleashed...', 'Emulators · Recomps', 'emu', 'recomps'],
+  ['Recomps, native ports of console games', 'Emulators · Recomps', 'emu', 'recomps'], ['Cartridge Verified PC ports: Bloodborne, Uncharted, God of War III, P.T., inFAMOUS Second Son', 'Emulators · Recomps', 'emu', 'recomps'],
   ['Get and update emulators', 'Emulators', 'emu', 'emus'], ['Vita3K, RPCS3, shadPS4, Dolphin, PCSX2...', 'Emulators', 'emu', 'emus'],
   ['Game add-ons, mods, texture packs, patches', 'Emulators · Game Add-ons', 'emu', 'addons'], ['Nexus Mods API key', 'Emulators · Game Add-ons', 'emu', 'addons'], ['BIOS and firmware', 'Emulators · Setup and Health', 'emu', 'overview'],
   ['Shortcut health, issues', 'Emulators · Setup and Health', 'emu', 'overview'], ['Console folders', 'Emulators · Console Folders', 'emu', 'folders'], ['Linked folders, share saves with a fork', 'Emulators · Linked Folders', 'emu', 'links'],

@@ -656,7 +656,10 @@ async function more() {
     { label: 'Timeline', sub: 'Added, downloaded, played, trophies', value: 'timeline', icon: 'mdiTimelineClockOutline' },
     { label: 'Pin to Start', sub: 'A tile of its own on Start', value: 'pin', icon: 'mdiPinOutline' },
     // 0.9.65: a native PC port of this game (a recomp), each its own sheet
-    ...rcs.map((r) => ({ label: `Recomp: ${r.name}`, sub: r.installed ? (r.installed.ready ? `Installed ${r.installed.tag}` : 'Installed, needs your game') : 'A native PC port of this game', value: 'recomp:' + r.id, icon: 'mdiRocketLaunchOutline', raw: true })),
+    // 0.9.70: a Cartridge Verified port says where it is in its setup; one from a link stays as it was
+    ...rcs.map((r) => (r.from === 'verified'
+      ? { label: `PC Port: ${r.name}`, sub: { play: 'Cartridge Verified · ready to play', update: 'Cartridge Verified · an update is out', game: 'Cartridge Verified · installed, needs your copy', setup: 'Cartridge Verified · finish setting up', broken: 'Cartridge Verified · needs repairing' }[r.state] || 'Cartridge Verified · a native PC port, set up for you', value: 'verified:' + r.id, icon: 'mdiCheckDecagramOutline', raw: true }
+      : { label: `Recomp: ${r.name}`, sub: r.installed ? (r.installed.ready ? `Installed ${r.installed.tag}` : 'Installed, needs your game') : 'A native PC port of this game', value: 'recomp:' + r.id, icon: 'mdiRocketLaunchOutline', raw: true })),
     // 0.9.38 (owner): About belongs with the game, last, under Pin to Start (it was in Options)
     { label: 'About', sub: 'Console, ID, version, and what’s installed for it', value: 'about', icon: 'mdiInformationOutline' },
   ];
@@ -737,6 +740,7 @@ async function more() {
   if (v === 'pkg') { await installPkg(); return; }
   if (v === 'patches') { await openModal('gameaddons', { romId: Number(props.romId), name: base.value.name, tab: 'patches' }); return; }
   if (typeof v === 'string' && v.startsWith('recomp:')) { await openModal('recomp', { id: v.slice(7) }); return; }
+  if (typeof v === 'string' && v.startsWith('verified:')) { await openModal('verified', { id: v.slice(9) }); return; }
   if (v === 'redownload') { await redownload(); return; }
   if (v === 'morefiles') { await downloadMore(base.value, moreFiles.have); return; }
   if (v === 'ps3check') {

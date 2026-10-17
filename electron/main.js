@@ -5065,9 +5065,9 @@ const handlers = {
     return finishCustom({ ...p, file, files: p.relFiles });
   },
   // ---- recomps (0.9.65)
-  'recomps:list': () => { const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) if (e.installed) { const sc = (() => { try { return steamMgr.recompShortcut(e.id); } catch { return null; } })(); e.installed.steam = sc ? sc.appid : null; } return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
+  'recomps:list': () => { const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) if (e.installed) { const key = e.starts?.length > 1 ? `${e.id}:${e.starts[0].id}` : e.id; const sc = (() => { try { return steamMgr.recompShortcut(key); } catch { return null; } })(); e.installed.steam = sc ? sc.appid : null; } return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
   // the recomps of one library game (game page More, 0.9.65)
-  'recomps:forRom': ({ romId }) => { const rom = romIndexMain().get(Number(romId)); if (!rom) return []; return recomps().list({ roms: [rom] }).entries.filter((e) => e.roms.includes(rom.id)).map((e) => ({ id: e.id, name: e.name, installed: e.installed })); },
+  'recomps:forRom': ({ romId }) => { const rom = romIndexMain().get(Number(romId)); if (!rom) return []; return recomps().list({ roms: [rom] }).entries.filter((e) => e.roms.includes(rom.id)).map((e) => ({ id: e.id, name: e.name, installed: e.installed, from: e.from, state: e.state || null })); },
   'recomps:check': ({ id, force }) => recomps().check(id, { force }),
   // 0.9.66: the project's stars, newest version, release notes and first README picture (read once a day)
   'recomps:details': ({ id, fresh }) => recomps().details(id, { fresh }),
@@ -5083,11 +5083,11 @@ const handlers = {
     const g = R.guessFromText(`${repo.split('/')[1]} ${j?.description || ''} ${(j?.topics || j?.tag_list || []).join(' ')}`, libraryRoms(), R.CONSOLES);
     return { ...g, description: j?.description || '' };
   },
-  'recomps:install': async ({ id, channel }) => {
+  'recomps:install': async ({ id, channel, build }) => {
     if (recompRun) throw new Error(`${recomps().byId(recompRun.id)?.name || 'Another recomp'} is downloading. Wait for it to finish.`);
     const ac = new AbortController(); recompRun = { id, ac };
     try {
-      const r = await recomps().install(id, { channel, signal: ac.signal, onProgress: (m) => broadcast('recomp-progress', { id, ...m }) });
+      const r = await recomps().install(id, { channel, build, signal: ac.signal, onProgress: (m) => broadcast('recomp-progress', { id, ...m }) });
       recompTrophies();
       // an update that moved its program: the Steam shortcut follows in place when Steam can be reached
       if (r.programMoved) { try { const sp = recompShortcutSpec(id); await steamMgr.recompRepoint(id, { exe: sp.exe, start: sp.start, lo: sp.args }); } catch (e) { log('recomp shortcut repoint', e.message); } }
@@ -5102,11 +5102,14 @@ const handlers = {
   'recomps:backups': ({ id }) => recomps().backups(id),
   'recomps:restore': ({ id, stamp }) => recomps().restoreBackup(id, stamp), // 0.9.69
   'recomps:remove': async ({ id, steam }) => {
+    // a verified game can have one shortcut per start (Uncharted's three games): their keys, before the record goes
+    const keys = [id, ...(recomps().record(id)?.starts || []).map((st) => `${id}:${st.id}`)];
     const r = await recomps().remove(id);
     recompTrophies();
     // its Steam shortcut goes too when asked (owner's rule for removals: say what happens, nothing silent)
-    const sc = steam ? steamMgr.recompShortcut(id) : null;
-    if (sc) { steamMgr.queueRemove([sc.appid]); if (await steamMgr.liveNow()) await steamMgr.apply({ restart: false }).catch((e) => log('recomp steam remove', e.message)); }
+    const scs = steam ? keys.map((k) => steamMgr.recompShortcut(k)).filter(Boolean) : [];
+    const sc = scs[0] || null;
+    if (sc) { steamMgr.queueRemove(scs.map((x) => x.appid)); if (await steamMgr.liveNow()) await steamMgr.apply({ restart: false }).catch((e) => log('recomp steam remove', e.message)); }
     return { ...r, steamRemoved: !!sc };
   },
   // the player's copy for it: from the library when it's on this device (the file inside a game folder that has the
@@ -5221,7 +5224,7 @@ const handlers = {
       if (!copies.length) return { ok: false, noCopy: true, why: `${e.recipe.game.title} isn’t on this device yet. Download it from your library first.` };
       use = copies[0].path;
     }
-    const r = await R.setVerifiedGame(id, use, { candidates: updateCandidates(use) });
+    const r = await R.setVerifiedGame(id, use, { candidates: updateCandidates(use), onProgress: (m) => broadcast('recomp-prep', { id, ...m }) });
     recompTrophies();
     return r;
   },
@@ -6000,6 +6003,7 @@ const JOBS = {
   'savesync:run': () => ({ key: 'savesync', kind: 'Save Sync', title: 'Cartridge Save Sync', icon: 'mdiCloudSyncOutline' }),
   'recomps:setGame': (a) => ({ key: 'recompset:' + a.id, kind: 'Recomp Setup', title: recomps().byId(a.id)?.name || 'Recomp', icon: 'mdiCogOutline' }), // 0.9.67: checking a big copy runs on under Downloads
   'recomps:install': (a) => ({ key: 'recomp:' + a.id, kind: recomps().record(a.id) ? 'Recomp Update' : 'Recomp', title: recomps().byId(a.id)?.name || 'Recomp', icon: 'mdiDownload' }), // 0.9.65
+  'recomps:prepare': (a) => ({ key: 'recompprep:' + a.id, kind: 'Setting Up', title: recomps().byId(a.id)?.name || 'Recomp', icon: 'mdiCogOutline' }), // 0.9.70: P.T.'s installer and inFAMOUS's links take a while
   'emuup:all': (a) => ({ key: 'emu:all', kind: 'Update All', title: `${(a.items || []).length} Emulators`, icon: 'mdiUpdate' }),
   'saves:search': () => ({ key: 'savesearch', kind: 'Search', title: 'Search for Saves', icon: 'mdiFolderSearchOutline' }), // 0.9.59
 };
@@ -6058,7 +6062,8 @@ for (const [ch, info] of Object.entries(JOBS)) {
 // the progress each task already sends, onto its job
 const JOB_EVENTS = {
   'emu-update': (m) => ['emu:' + m.path, { pct: m.pct, text: m.text || '' }],
-  'recomp-progress': (m) => ['recomp:' + m.id, { pct: m.pct, text: { check: 'Checking', download: 'Downloading', unpack: 'Unpacking' }[m.step] || '' }],
+  'recomp-progress': (m) => ['recomp:' + m.id, { pct: m.pct, text: { check: 'Checking', download: 'Downloading', unpack: 'Unpacking', installer: 'Running its installer', prefix: 'Preparing Proton', trial: 'Starting it once' }[m.step] || '' }],
+  'recomp-prep': (m) => ['recompprep:' + m.id, { pct: null, text: { installer: 'Running its installer', prefix: 'Preparing Proton', view: 'Laying the update over it' }[m.step] || '' }],
   'emuget-progress': (m) => [`get:${m.key}:${m.id}`, { pct: m.pct }],
   'emuget-custom': (m) => [customJob, { pct: m.pct }],
   'shadv-progress': (m) => ['shadv:' + m.tag, { pct: m.pct }],
