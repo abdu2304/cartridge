@@ -94,7 +94,7 @@ onBeforeUnmount(() => { layer.pop(); clearInterval(tick); });
 </script>
 <style scoped>
 .qm-scrim { position: fixed; inset: 0; z-index: 45; background: rgba(3, 4, 7, 0.45); animation: fade var(--fade-in); }
-.qm { position: absolute; top: var(--s-4); right: var(--s-4); bottom: var(--s-4); width: min(420px, calc(100vw - 2 * var(--s-4))); padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); background: var(--s1); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); animation: qm-in var(--spring-d) var(--spring); overflow-y: auto; overscroll-behavior: contain; }
+.qm { position: absolute; top: var(--s-4); right: var(--s-4); max-height: calc(100% - 2 * var(--s-4)); width: min(420px, calc(100vw - 2 * var(--s-4))); padding: var(--s-4); display: flex; flex-direction: column; gap: var(--s-3); background: var(--s1); border-radius: var(--r-lg); box-shadow: var(--shadow-pop); animation: qm-in var(--spring-d) var(--spring); overflow-y: auto; overscroll-behavior: contain; } /* as tall as what it holds (0.9.71 playtest: a gap above Quit on 1280x800), scrolls when taller than the screen */
 @keyframes qm-in { from { transform: translateX(48px); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .qm { animation: fade var(--fade-in); } }
 .qm-head { display: flex; align-items: center; gap: var(--s-3); padding: 2px 4px var(--s-1); }
@@ -122,7 +122,7 @@ onBeforeUnmount(() => { layer.pop(); clearInterval(tick); });
 .qm-item div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .qm-item b { font-weight: 600; font-size: var(--t-sm); }
 .qm-item small { color: var(--muted); font-size: var(--t-xs); overflow-wrap: anywhere; }
-.qm-item.quit { margin-top: auto; color: var(--danger-t, #ffa39c); }
+.qm-item.quit { margin-top: var(--s-2); /* right under the actions, no gap on 1280x800 (0.9.71 playtest) */ color: var(--danger-t, #ffa39c); }
 .qm-item.upd { background: var(--grad); color: var(--on-primary); }
 .qm-item.upd small { color: inherit; opacity: 0.8; }
 :is(.qm-item, .qm-stat, .qm-tog):hover { background: var(--s3); }
