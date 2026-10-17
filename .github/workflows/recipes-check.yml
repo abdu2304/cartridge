@@ -1,6 +1,7 @@
 name: Recipes check
-# Every night: does each Cartridge Verified recipe's newest release still have its files? Opens (or updates) one
-# issue labelled "recipes" when not, and closes it once everything passes again.
+# Every night: does each Cartridge Verified recipe's newest release still have its files, and does it still install
+# and set up (tools/recipes/install-test.js, 0.9.71)? Opens (or updates) one issue labelled "recipes" when not, and
+# closes it once everything passes again.
 on:
   schedule:
     - cron: '17 3 * * *'
@@ -22,7 +23,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RECIPES_REPORT: report.md
-        run: node tools/recipes/check.js
+        run: node tools/recipes/check.js && npm ci --ignore-scripts && node tools/recipes/install-test.js
       - name: Open or update the issue
         if: steps.check.outcome == 'failure'
         env:
