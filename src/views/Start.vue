@@ -381,7 +381,8 @@ import { timing } from '../motion.js';
 // Hold A (or press and hold) to arrange. Controller: A picks a tile up and the D-pad moves it, X resizes
 // (the D-pad moves a corner, LB/RB pick the corner), Y removes, B is done. Touch and mouse: drag a tile
 // to move it, drag an edge or a corner to resize. Saved in config.ui.start.
-import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
+import { computed, ref, reactive, onMounted, onBeforeUnmount, onBeforeUpdate, onUpdated, nextTick, watch } from 'vue';
+import { gsapOn, load as loadGsap, ready as gsapReady, EASE } from '../gsapEngine.js';
 import { store, heroArt, call, go, tab, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour, plural } from '../store.js';
 import { useView } from '../useView.js';
 import { recommend } from '../recs.js';
@@ -1279,6 +1280,12 @@ onMounted(async () => {
 onBeforeUnmount(() => { store.forceHints = false; clearInterval(clockT); clearInterval(spotT); clearInterval(rollT); clearInterval(spaceT); clearTimeout(pressT); ro?.disconnect(); if (editing.value) { settle(tiles.value); save(); } });
 watch(() => store.trophyVer, loadAch);
 watch(() => store.play, loadWeek);
+// 0.9.70 GSAP test switch (src/gsapEngine.js): while arranging, the tiles that move are flown by GSAP Flip from where
+// they were to where Vue put them (their CSS transitions are off then); the held tile still follows the finger
+let flipState = null;
+watch(() => editing.value, (v) => { if (v && gsapOn()) loadGsap().catch(() => {}); });
+onBeforeUpdate(() => { const G = editing.value && gsapOn() ? gsapReady() : null; flipState = G && el.value ? G.Flip.getState(el.value.querySelectorAll('.st-tile:not(.held)')) : null; });
+onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G && st) G.Flip.from(st, { duration: 0.42, ease: EASE, simple: true }); });
 </script>
 
 <style scoped>
@@ -1337,6 +1344,7 @@ watch(() => store.play, loadWeek);
 .editing .st-face { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
 .editing .st-tile:not(.held):not(.picked) .st-face { transform: scale(0.975); }
 .editing .st-tile:focus .st-face, .editing .st-tile:focus-visible .st-face { box-shadow: var(--ring); transform: none; }
+:global(body.motion-gsap .start.editing .st-tile:not(.held)) { transition: opacity var(--fade-in); }
 .st-tile.held { z-index: 5; transition: width var(--glide), height var(--glide); }
 .st-tile.held .st-face, .st-tile.picked .st-face { transform: scale(1.035) rotate(-0.6deg); box-shadow: var(--ring), 0 30px 70px rgba(0, 0, 0, 0.6); }
 .st-tile.picked { z-index: 5; }

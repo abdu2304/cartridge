@@ -582,6 +582,7 @@
             <div class="row"><button class="btn" data-focus @click="store.welcoming = true"><Icon name="mdiHandWave" />Run the Welcome Again</button><span class="muted small">Starts from your current settings. Nothing is reset.</span></div>
             <div class="row"><button class="btn" data-focus @click="openTour({ start: activeTabs().includes('start') })"><Icon name="mdiGestureTapButton" />Take the Tour</button><span class="muted small">Try each control yourself, a step at a time.</span></div>
             <ServerStatus />
+            <Toggle :model-value="ui.motionEngine === 'gsap'" label="GSAP Motion (Test)" desc="Runs the game cover's flight to its page, tiles moving while you arrange Start, and the welcome's opening on GSAP instead of Cartridge's own engine. Try both with the Performance Overlay on and keep the smoother one" @update:model-value="(v) => saveConfig({ ui: { motionEngine: v ? 'gsap' : 'cae' } })" />
             <Toggle :model-value="ui.perfOverlay === true" label="Performance Overlay" desc="Frame rate, slowest frame, CPU and memory in a corner of the screen, to see how Cartridge runs on this device" @update:model-value="(v) => saveConfig({ ui: { perfOverlay: v } })" />
             <ReportProblem />
             <div class="card-s glass">
@@ -710,7 +711,7 @@ const SEARCH = [
   ['Button icons, controller', 'Controls', 'controls'], ['Touch and mouse', 'Controls', 'controls'], ['On-screen keyboard', 'Controls', 'controls'], ['Tabs in the Dock, open on', 'Controls', 'controls'], ['Controller test', 'Controls', 'controls'],
   ['Downloads at once, speed limit', 'Downloads and Updates', 'dlup', 'downloads'], ['Multi-disc folders', 'Downloads and Updates', 'dlup', 'downloads'],
   ['Check for updates', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'], ['Roll back to an earlier version', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'], ['What’s New', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'],
-  ['Device name', 'Help and About', 'about'], ['Take the tour', 'Help and About', 'about'], ['Run the welcome again', 'Help and About', 'about'], ['Report a problem', 'Help and About', 'about'], ['Performance overlay', 'Help and About', 'about'], ['Licences', 'Help and About', 'about'], ['Quit Cartridge', 'Help and About', 'about'],
+  ['Device name', 'Help and About', 'about'], ['Take the tour', 'Help and About', 'about'], ['Run the welcome again', 'Help and About', 'about'], ['Report a problem', 'Help and About', 'about'], ['Performance overlay', 'Help and About', 'about'], ['GSAP motion (test)', 'Help and About', 'about'], ['Licences', 'Help and About', 'about'], ['Quit Cartridge', 'Help and About', 'about'],
 ];
 async function searchSettings() {
   const q = await askText({ title: 'Find a Setting', placeholder: 'Drive, rumble, Vita3K, colour...' });
