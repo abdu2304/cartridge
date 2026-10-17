@@ -5293,9 +5293,22 @@ const handlers = {
     const forkAt = new Map(forks.filter((f) => f.exe && fs.existsSync(f.exe)).map((f) => [realOf(f.exe), f]));
     for (let i = list.length - 1; i >= 0; i--) { const f = list[i].path && forkAt.get(realOf(list[i].path)); if (f) list[i] = { ...list[i], id: f.of, label: f.name, fork: true, forkOf: f.of }; }
     for (const [, f] of forkAt) if (!list.some((e) => e.path && realOf(e.path) === realOf(f.exe))) list.push({ id: f.of, label: f.name, kind: /\.appimage$/i.test(f.exe) ? 'appimage' : 'folder', path: f.exe, fork: true, forkOf: f.of });
+    // 0.9.76 (owner: an emulator's card said "already on this device" and opened nothing): every emulator Get Emulators
+    // counts as here gets a row, from what starts it (an EmuDeck launcher, a program on the PATH), so its sheet opens
+    try {
+      for (const c of emugetRows()) for (const e of c.emus) {
+        if (!e.installed || list.some((x) => x.id === e.id && !x.fork)) continue;
+        const ck = { retro: 'snes', gc: 'gc' }[c.key] || c.key;
+        const cand = (steamMgr._candidates(ck) || []).find((x) => x.id.split('@')[0] === e.id && x.t?.exe);
+        if (!cand) continue;
+        const exe = cand.t.exe, sh = /\.sh$/.test(exe);
+        list.push({ id: e.id, label: e.label, kind: sh ? 'emudeck' : /\.exe$/i.test(exe) ? 'windows' : 'program', path: exe, launcher: sh, fromCand: true });
+      }
+    } catch (er) { log('emuup rows from candidates', er.message); }
     for (const e of list) {
       const custom = customs.find((x) => x.path === e.path);
-      if (e.fork && !custom) { out.push(() => ({ ...e, noSource: true, linkable: true, channel: null, channels: [], page: null })); continue; } // never the parent's releases: link it to its own project first
+      if (e.fork && !custom) { out.push(() => ({ ...e, noSource: true, linkable: true, channel: null, channels: [], page: null })); continue; }
+      if (e.fromCand) { out.push(() => ({ ...e, noSource: true, channel: null, channels: [], page: null })); continue; } // updated by EmuDeck or its package manager, never replaced here // never the parent's releases: link it to its own project first
       if (custom) {
         const ck = 'gh:' + custom.repo; let c = cache[ck];
         if (!cached && (fresh || !c || Date.now() - c.t > TTL)) jobs.push(require('./github').release(custom.repo).then((r) => { cache[ck] = { t: Date.now(), tag: r?.tag || null }; }).catch((err) => { cache[ck] = { t: c?.t || 0, tag: c?.tag || null, error: err.message }; }));

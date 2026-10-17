@@ -246,7 +246,8 @@ async function manage(u) {
     ...(u.linkable ? [{ label: 'Link to Its Project', sub: 'Its GitHub project, so it can update and keep versions', value: 'adopt', icon: 'mdiGithub' }] : []),
     ...(u.page ? [{ label: 'Open Its Download Page', value: 'page', icon: 'mdiOpenInNew' }] : []),
     ...(u.site && u.site !== u.page ? [{ label: 'Open Its Website', value: 'site', icon: 'mdiWeb' }] : []),
-    { label: 'Delete', sub: u.kind === 'flatpak' ? 'Uninstall the Flatpak' : 'Your saves and settings stay', value: 'delete', icon: 'mdiDeleteOutline', danger: true },
+    // one found only through what starts it (an EmuDeck launcher, a distro package) is removed by what installed it (0.9.76)
+    ...(u.fromCand ? [] : [{ label: 'Delete', sub: u.kind === 'flatpak' ? 'Uninstall the Flatpak' : 'Your saves and settings stay', value: 'delete', icon: 'mdiDeleteOutline', danger: true }]),
   ];
   const v = await choose({ title: u.label, message: [u.version ? 'Version ' + u.version : '', CH[u.channel] || (u.kind === 'flatpak' ? 'Flatpak from Flathub' : ''), u.path ? short(u.path) : ''].filter(Boolean).join(' · '), options: opts, sheet: true });
   if (!v) return;

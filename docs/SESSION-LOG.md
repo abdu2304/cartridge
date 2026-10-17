@@ -7,6 +7,10 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 17 Oct 2026 · 0.9.76 · Every Emulator Opens
+
+**Asked:** Vita3K's sheet didn't open; test every setup and keep looping until there are no bugs. Fixed with a setups sweep in CI (handover Part 23); the wider sweep continues.
+
 ## 17 Oct 2026 · 0.9.75 · Found by What's Inside
 
 **Asked (photo):** P.T. unpacked by hand didn't show. PS4/PS5 folders are now recognised by their param.sfo (handover Part 22); e2e reproduces it.
