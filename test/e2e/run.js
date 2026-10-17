@@ -19,10 +19,10 @@ async function until(fn, ms = 15000, step = 150) { const t = Date.now(); while (
 (async () => {
   const srv = await mock.start({ games: Number(process.env.E2E_GAMES || 120) });
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-e2e-'));
-  const data = path.join(home, '.config/Cartridge'), roms = path.join(home, 'Emulation/roms');
-  fs.mkdirSync(data, { recursive: true }); fs.mkdirSync(roms, { recursive: true });
+  const data = path.join(home, '.config/Cartridge'), roms = path.join(home, 'Emulation/roms'), drive2 = path.join(home, 'Drive2/Emulation/roms');
+  fs.mkdirSync(data, { recursive: true }); fs.mkdirSync(roms, { recursive: true }); fs.mkdirSync(drive2, { recursive: true });
   fs.writeFileSync(path.join(data, 'config.json'), JSON.stringify({
-    configured: true, welcomed: 1, setupDone: true, configVersion: 3, romsRoot: roms,
+    configured: true, welcomed: 1, setupDone: true, configVersion: 3, romsRoot: roms, extraRoots: [{ path: drive2 }], downloadRoot: roms,
     server: { localUrl: `http://127.0.0.1:${srv.port}`, mode: 'local', auth: 'password', username: 'tester', password: 'pw' },
     downloads: { concurrency: 2 }, sync: { onLaunch: true, everyMinutes: 0 },
     ui: { toured: true, startTips: true, setupNotice: 1, welcomeNotice: 1, gameModeAsked: 1, sounds: false, idle: '0' },
@@ -88,6 +88,17 @@ async function until(fn, ms = 15000, step = 150) { const t = Date.now(); while (
       if (id === 2) { const it = await until(async () => ((await st(id))?.status === 'error' ? await st(id) : null), 15000); if (it) await page.evaluate((i) => window.cart.call('dl:retry', i), it.id); done = await until(async () => { const d = await st(id); return d?.status === 'done' && d.notice === 'stale' && fs.existsSync(path.join(roms, file)); }, 30000); }
       if (!done) console.log('    ', JSON.stringify(await page.evaluate((romId) => window.cart.call('dl:list').then((r) => (r.data || r).filter?.((d) => d.romId === romId)), id)));
       check(`download ${path.basename(file)}`, done, `${Date.now() - t} ms`);
+    }
+    // 4b. a game moved to the other drive, then that drive unplugged: shown as away, not as never downloaded (0.9.71)
+    {
+      const moved = await page.evaluate((root) => window.cart.call('library:moveGame', { romId: 1, root }).then((r) => r.data || r, (e) => ({ error: e.message })), drive2);
+      const there = fs.existsSync(path.join(drive2, 'snes/Good Game.sfc')) && !fs.existsSync(path.join(roms, 'snes/Good Game.sfc'));
+      fs.renameSync(path.join(home, 'Drive2'), path.join(home, 'Drive2-out'));
+      await page.evaluate(() => window.cart.call('installed:rescan'));
+      const away = await page.evaluate(() => window.cart.call('roots:away').then((r) => r.data || r));
+      fs.renameSync(path.join(home, 'Drive2-out'), path.join(home, 'Drive2'));
+      await page.evaluate(() => window.cart.call('installed:rescan'));
+      check('a game moves to another drive and shows as away when it is unplugged', there && away?.[1] && !moved?.error, moved?.error || JSON.stringify(away));
     }
     // 5. every main tab and every Settings section opens without a script error
     for (const tab of ['start', 'home', 'consoles', 'achievements', 'downloads', 'settings']) await page.click(`[data-tab="${tab}"]`).then(() => wait(500)).catch(() => {});

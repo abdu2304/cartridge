@@ -72,6 +72,8 @@
             <button class="btn icon-btn" data-focus title="More options" @click="more"><Icon name="mdiDotsHorizontal" :size="22" /><span>More</span></button>
           </div>
           <div v-if="dl && dl.status === 'error'" class="chip red" style="align-self: flex-start">Last attempt failed: {{ dl.error }}</div>
+          <!-- 0.9.71: it was last seen on a drive that's unplugged now; downloading again isn't needed once it's back -->
+          <div v-if="!installedPath && store.awayRoms[romId]" class="chip" style="align-self: flex-start"><Icon name="mdiUsbFlashDriveOutline" :size="16" />On {{ store.awayRoms[romId].drive }}, which isn’t plugged in</div>
           <div class="dest"><Icon name="mdiFolderArrowDownOutline" :size="16" /><span class="mono">{{ marked ? 'Marked as installed by you' : installedPath || target?.path || 'No folder set for this system' }}</span><span v-if="space" class="muted">· {{ bytes(space.free) }} free</span></div>
         </div>
         <div class="g-cover">
@@ -680,6 +682,7 @@ async function more() {
     ...(moreFiles ? [{ label: 'Download More Files', sub: `${moreFiles.missing} of ${moreFiles.total} files aren’t on this device yet`, value: 'morefiles', icon: 'mdiFilePlusOutline' }] : []),
     ...(installedPath.value && !marked.value ? [
       { label: 'Re-download', sub: 'The copy on this device is replaced', value: 'redownload', icon: 'mdiRefresh' },
+      ...(store.config.extraRoots?.length ? [{ label: 'Move to Another Drive', sub: 'Its Steam shortcut follows it', value: 'move', icon: 'mdiFolderMoveOutline' }] : []),
       { label: 'Delete from this device', sub: 'Stays on your RomM server', value: 'delete', icon: 'mdiDeleteOutline', danger: true },
     ] : []),
   ];
@@ -745,6 +748,15 @@ async function more() {
   if (typeof v === 'string' && v.startsWith('recomp:')) { await openModal('recomp', { id: v.slice(7) }); return; }
   if (typeof v === 'string' && v.startsWith('verified:')) { await openModal('verified', { id: v.slice(9) }); return; }
   if (v === 'redownload') { await redownload(); return; }
+  if (v === 'move') { // 0.9.71 (plan-multidrive)
+    const r = await call('roots:list').catch(() => null), here = installedPath.value || '';
+    const opts = (r?.roots || []).filter((x) => x.here && !here.startsWith(x.path.replace(/\/?$/, '/'))).map((x) => ({ label: x.drive, sub: `${bytes(x.free)} free`, value: x.path, icon: x.main ? 'mdiHarddisk' : 'mdiSdCard', raw: true }));
+    if (!opts.length) return toast('No other games folder is plugged in.', 'info', 3500);
+    const to = await choose({ title: 'Move to Another Drive', message: 'The game moves with all its files; its Steam shortcut is updated to the new place.', options: opts });
+    if (!to) return;
+    try { const res = await call('library:moveGame', { romId: Number(props.romId), root: to }); toast(res.steam ? 'Moved, and its Steam shortcut follows it' : 'Moved', 'ok', 3500, 'mdiFolderMoveOutline'); } catch (e) { toast(e.message, 'error', 6000); }
+    return;
+  }
   if (v === 'morefiles') { await downloadMore(base.value, moreFiles.have); return; }
   if (v === 'ps3check') {
     toast('Checking Sony’s update list…', 'info', 2500, 'mdiPackageUp');

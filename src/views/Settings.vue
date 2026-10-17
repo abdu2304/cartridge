@@ -96,7 +96,20 @@
               <div class="subh">New Games Go To</div>
               <div class="seg wrap-seg"><button data-focus :class="{ on: rootTo === 'most' }" @click="setRootTo('most')">Most Free Space</button><button v-for="r in allRoots" :key="r.path" data-focus :class="{ on: rootTo === r.path }" @click="setRootTo(r.path)">{{ r.drive }}</button></div>
               <Toggle :model-value="!!dls.askWhere" label="Always Ask" desc="Each download asks which drive it goes to" @update:model-value="(v) => saveConfig({ downloads: { askWhere: v } })" />
+              <!-- 0.9.71 (plan-multidrive): one console's games on a drive of its own -->
+              <div class="row wrap"><button class="btn" data-focus @click="consoleDrive"><Icon name="mdiGamepadSquareOutline" :size="18" />Drive per Console<span v-if="Object.keys(store.config.consoleRoots || {}).length" class="count-dot">{{ Object.keys(store.config.consoleRoots).length }}</span></button></div>
             </template>
+            <!-- 0.9.71: where emulators keep installed games, firmware and saves, and how much each holds -->
+            <div class="subh">Emulator Storage</div>
+            <div v-if="emuStore === null" class="muted small">Measuring…</div>
+            <div v-else-if="!emuStore.length" class="muted small">No emulator keeps its own storage folder here.</div>
+            <div v-else class="gf-list">
+              <button v-for="x in emuStore" :key="x.path" class="lrow" data-focus @click="openEmuPaths(x.id)">
+                <EmuIcon :id="x.id" :size="26" />
+                <span class="l-mid"><b>{{ x.name }} · {{ x.label }}</b><span class="mono small gf-path">{{ short(x.path) }}</span></span>
+                <span class="l-end"><span class="status">{{ bytes(x.size) }}</span></span>
+              </button>
+            </div>
             <div class="subh">BIOS Folder</div>
             <div class="pathrow glass">
               <div style="min-width: 0"><div class="mono">{{ store.config.biosPath ? short(store.config.biosPath) : 'Not set' }}</div><div class="muted small">BIOS and firmware files your emulators need</div></div>
@@ -1175,6 +1188,19 @@ const allRoots = ref([]), rootTo = ref('most');
 const rootsShown = computed(() => (allRoots.value.length ? allRoots.value : store.config.romsRoot ? [{ path: store.config.romsRoot, main: true, drive: 'Games Folder', here: true, free: 0, total: 0 }] : []));
 const short = (p) => String(p || '').replace(store.info?.home || '\0', '~'); // paths with ~ for home
 // a drive's name from its folder: /run/media/deck/SD/Emulation/roms -> SD
+const emuStore = ref(null);
+async function loadEmuStore() { emuStore.value = await call('roots:emuStorage').catch(() => []); }
+async function consoleDrive() {
+  const plats = (store.lib?.platforms || []).filter((p) => p.rom_count > 0).sort((a, b) => consoleName(a).localeCompare(consoleName(b)));
+  const cur = store.config.consoleRoots || {}, driveOf = (p) => allRoots.value.find((r) => r.path === p)?.drive || 'A drive that isn’t listed';
+  const slug = await choose({ title: 'Drive per Console', message: 'Pick a console, then the drive its new downloads go to. Games already downloaded stay where they are (Move to Another Drive is in each game’s More → Options).', options: plats.map((p) => ({ label: consoleName(p), sub: cur[p.slug] ? driveOf(cur[p.slug]) : 'As the rest', value: p.slug, raw: true })) });
+  if (!slug) return;
+  const to = await choose({ title: consoleName(plats.find((p) => p.slug === slug)), options: [{ label: 'As the Rest', sub: 'New Games Go To decides', value: '-', selected: !cur[slug] }, ...allRoots.value.map((r) => ({ label: r.drive, sub: r.here ? `${bytes(r.free)} free` : 'Not plugged in', value: r.path, selected: cur[slug] === r.path, raw: true }))] });
+  if (!to) return;
+  const next = await call('roots:console', { slug, root: to === '-' ? '' : to });
+  store.config.consoleRoots = next;
+}
+function openEmuPaths(id) { openModal('emupaths', { id }); }
 async function loadRoots() { const r = await call('roots:list').catch(() => null); if (r) { allRoots.value = r.roots; rootTo.value = r.to; } }
 async function addRoot() {
   const dir = await pickFolder({ title: 'Choose a drive (or a folder on it)', subtitle: 'An Emulation/roms folder is made there, with a folder per console', start: '/run/media' });
@@ -1190,7 +1216,7 @@ async function removeRoot(r) {
   await call('roots:remove', { dir: r.path }); await loadRoots(); storageKey.value++;
 }
 async function setRootTo(v) { await call('roots:to', { to: v }); rootTo.value = v; }
-watch([sec, libPage], ([v, p]) => { if (v === 'library' && p === 'folders') loadRoots(); }, { immediate: true });
+watch([sec, libPage], ([v, p]) => { if (v === 'library' && p === 'folders') { loadRoots(); if (emuStore.value === null) loadEmuStore(); } }, { immediate: true });
 // 0.9.38 (owner: Look & Feel opened at the depth Achievements was scrolled to): every section shares the one .pane
 // scroll box and only its contents change, so a new section starts at the top
 watch(sec, () => { const el = paneEl.value; if (el) { stopScroll(el); el.scrollTop = 0; } });

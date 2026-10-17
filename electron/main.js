@@ -656,7 +656,9 @@ function downloadDir(p, need = 0, root = null) {
   const roots = extraRoots().filter((r) => isDir(r));
   if (!roots.length || config.paths[p.slug]) return main; // one drive, or a folder you set for this console
   const opts = [main, ...roots.map((r) => rootFolder(r, p))].filter(Boolean);
-  const want = root || (config.downloadRoot && config.downloadRoot !== 'most' ? config.downloadRoot : null);
+  // 0.9.71: a drive picked for this console (Storage → Drive per Console) wins over the general choice while it's plugged in
+  const mine = config.consoleRoots?.[p.slug];
+  const want = root || (mine && isDir(mine) ? mine : null) || (config.downloadRoot && config.downloadRoot !== 'most' ? config.downloadRoot : null);
   // the main games folder (config.romsRoot) holds main, which may sit under another path than romsRoot's (a console
   // folder set by name), so the main root picks main itself
   const pick = want ? (path.resolve(want) === path.resolve(config.romsRoot || '') ? main : opts.find((d) => path.resolve(d).startsWith(path.resolve(want) + path.sep))) : null;
@@ -735,11 +737,31 @@ function publicLibrary() {
   };
 }
 
+// 0.9.71 (plan-multidrive): which games folder each installed game was last seen in, so a game on a drive that's
+// unplugged shows as "On <drive>, not plugged in" instead of simply not downloaded
+const SEEN_FILE = path.join(USER_DATA, 'seen-roots.json');
+const seenRoots = loadJson(SEEN_FILE, {}); // romId -> games folder (an extra root)
+let awayMap = {};
+function noteRoots(out) {
+  const roots = extraRoots(), real = (x) => path.resolve(x) + path.sep;
+  let changed = false;
+  for (const [id, p] of Object.entries(out)) { if (p === MARKED) continue; const r = roots.find((x) => path.resolve(p).startsWith(real(x))) || null; if ((seenRoots[id] || null) !== r) { if (r) seenRoots[id] = r; else delete seenRoots[id]; changed = true; } }
+  const away = {};
+  for (const [id, r] of Object.entries(seenRoots)) {
+    if (out[id]) continue;
+    if (!roots.includes(r)) { delete seenRoots[id]; changed = true; continue; } // that drive was taken off the list
+    if (!isDir(r)) away[id] = { root: r, drive: (config.extraRoots || []).find((x) => x.path === r)?.label || path.basename(path.dirname(path.dirname(r))) || r };
+  }
+  if (changed) saveJson(SEEN_FILE, seenRoots, false);
+  awayMap = away;
+  broadcast('roots-away', away);
+}
 function computeInstalled() {
   const out = {};
   if (!library) return out;
   for (const p of library.platforms) Object.assign(out, installedState(library.roms[p.id] || [], p));
   installedMap = out;
+  try { noteRoots(out); } catch (e) { log('seen roots', e.message); }
   try { identity.bump(); } catch {} // the game identity index follows what's on the device (defined further down)
   playSyncAt = 0; // play time can be matched to games now: sync again
   broadcast('installed', out);
@@ -5697,6 +5719,52 @@ const handlers = {
   },
   'roots:remove': ({ dir } = {}) => { config.extraRoots = (config.extraRoots || []).filter((r) => r.path !== dir); if (config.downloadRoot === dir) config.downloadRoot = 'most'; saveConfig(); computeInstalled(); return true; },
   'roots:to': ({ to } = {}) => { config.downloadRoot = to || 'most'; saveConfig(); return true; },
+  // 0.9.71 (plan-multidrive): a drive for one console's downloads ('' = as the rest)
+  'roots:console': ({ slug, root } = {}) => { config.consoleRoots = { ...(config.consoleRoots || {}) }; if (root) config.consoleRoots[slug] = root; else delete config.consoleRoots[slug]; saveConfig(); return config.consoleRoots; },
+  'roots:away': () => awayMap,
+  // a downloaded game moved to another games folder, its Steam shortcut following (renamed in one go on the same drive,
+  // else copied, checked by size, and only then the old copy removed); never over anything, never while it runs
+  'library:moveGame': async ({ romId, root } = {}) => {
+    romId = Number(romId);
+    const from = installedMap[romId], r = romIndexMain().get(romId);
+    if (!r || !from || from === MARKED || !fs.existsSync(from)) throw new Error('This game isn’t on this device.');
+    if (!root || !isDir(root)) throw new Error('That games folder isn’t there.');
+    const p = (library?.platforms || []).find((x) => x.id === r.platform_id) || { slug: r.platform_slug, fs_slug: r.platform_fs_slug };
+    const destDir = path.resolve(root) === path.resolve(config.romsRoot || '') ? platformPath(p).path : rootFolder(root, p);
+    const to = path.join(destDir, path.basename(from));
+    if (path.resolve(to) === path.resolve(from)) throw new Error('It’s already in that folder.');
+    if (fs.existsSync(to)) throw new Error(`There’s already a ${path.basename(from)} there.`);
+    if (runOn) throw new Error('Close the game that’s running first.');
+    const size = (x) => { try { const st = fs.statSync(x); if (!st.isDirectory()) return st.size; return fs.readdirSync(x).reduce((n, c) => n + size(path.join(x, c)), 0); } catch { return 0; } };
+    const total = size(from);
+    const sp = await handlers['fs:space'](destDir);
+    if (sp && sp.free < total + 5e8) throw new Error(`Not enough room there: it needs ${(total / 1e9).toFixed(1)} GB.`);
+    fs.mkdirSync(destDir, { recursive: true });
+    {
+      try { fs.renameSync(from, to); }
+      catch (e) {
+        if (e.code !== 'EXDEV') throw e;
+        await fs.promises.cp(from, to, { recursive: true, errorOnExist: true, force: false });
+        if (size(to) !== total) { fs.rmSync(to, { recursive: true, force: true }); throw new Error('The copy didn’t match the game, so nothing was moved.'); }
+        fs.rmSync(from, { recursive: true, force: true });
+      }
+      if (manifest[romId]) { manifest[romId] = { ...manifest[romId], path: to }; saveManifest(); }
+      computeInstalled();
+      let steam = false; try { await steamMgr.refreshGame(romId, { force: true }); steam = true; } catch (e) { log('move: steam shortcut', e.message); }
+      log('game moved', from, '->', to);
+      return { to, steam };
+    }
+  },
+  // emulator storage folders (RPCS3's dev_hdd0 and the rest) with their sizes, for Storage (each changed in its own Folders sheet)
+  'roots:emuStorage': async () => {
+    const P = require('./emuPaths'), out = [];
+    const sizeOf = async (d) => { let n = 0, seen = 0; const walk = async (x) => { if (seen++ > 200000) return; let st; try { st = await fs.promises.lstat(x); } catch { return; } if (st.isSymbolicLink()) return; if (!st.isDirectory()) { n += st.size; return; } let kids = []; try { kids = await fs.promises.readdir(x); } catch {} for (const k of kids) await walk(path.join(x, k)); }; await walk(d); return n; };
+    for (const id of Object.keys(P.NAMES || {})) {
+      let d; try { d = P.describe(id); } catch { continue; }
+      for (const it of d?.items || []) if (it.path && !it.list && isDir(it.path)) out.push({ id, name: d.name, label: it.label, path: it.path, size: await sizeOf(it.path) });
+    }
+    return out.filter((x) => x.size > 0).sort((a, b) => b.size - a.size);
+  },
   'fs:space': async (dir) => {
     let d = dir;
     while (d && !isDir(d)) { const up = path.dirname(d); if (up === d) break; d = up; }
@@ -5925,6 +5993,7 @@ const emuLabel = (id) => require('./emulators').EMU[String(id || '').split('@')[
 const romName = (id) => romIndexMain().get(Number(id))?.name || 'Game';
 let customJob = '';
 const JOBS = {
+  'library:moveGame': (a) => ({ key: 'move:' + a.romId, kind: 'Moving a Game', title: romName(a.romId), icon: 'mdiFolderMoveOutline' }), // 0.9.71
   'emuup:run': (a) => ({ key: 'emu:' + (a.path || a.fp), kind: a.force ? 'Emulator Download' : 'Emulator Update', title: emuLabel(a.id), emu: a.id, icon: 'mdiUpdate' }),
   'emuget:install': (a) => ({ key: `get:${a.key}:${a.id}`, kind: 'Emulator', title: emuLabel(a.id), emu: a.id, icon: 'mdiDownload' }),
   'emuget:custom': (a) => { const repo = require('./customEmu').repoOf(a.link) || String(a.link || ''); customJob = 'custom:' + repo; return { key: customJob, kind: 'Emulator from GitHub', title: repo.split('/').pop() || repo, icon: 'mdiGithub' }; },
