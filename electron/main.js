@@ -96,6 +96,15 @@ if (rawVersion < 3 && config.configured) {
   try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 }); } catch {}
 }
 
+// Recovery (0.9.71, electron/recovery.js): safe start after two starts in a row that never finished, settings backups
+// (daily, before updates, imports and restores), export and import, unexpected closes for Report a Problem
+const RECOVERY = require('./recovery');
+const recovery = RECOVERY.createRecovery({ dir: USER_DATA, version: (() => { try { return require('../package.json').version; } catch { return ''; } })() });
+let safeStart = { safe: false, unclean: 0 }; // started below, once this is the one running copy (a second copy hands over)
+try { recovery.backup(CONFIG_FILE, 'daily'); } catch {}
+// what the UI sees: in a safe start the looks are the safe ones, held here only, never saved over the person's own
+const shownConfig = () => (safeStart.safe ? { ...config, ui: recovery.safeUi(config.ui || {}), safeMode: true } : config);
+
 // ---------------------------------------------------------------- log
 // (How Cartridge picks GPU or software rendering is further down: isGamescope, launchedBySteam,
 // biggestDisplay and forceSoftware. In short: software in Game Mode or under Steam on small
@@ -128,6 +137,8 @@ if (!process.env.CARTRIDGE_SMOKE && !process.env.CARTRIDGE_MULTI) {
   } else {
     const beatNow = () => { try { fs.writeFileSync(BEAT_FILE, JSON.stringify({ pid: process.pid, t: Date.now() })); } catch {} };
     beatNow(); setInterval(beatNow, 5000).unref?.();
+    safeStart = recovery.start();
+    if (safeStart.safe) log('safe start: the last', safeStart.unclean, 'starts never finished');
     app.on('second-instance', (_e, argv, _cwd, data) => {
       if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
       const g = data?.game ?? argGame(argv);
@@ -3254,7 +3265,7 @@ function setupUpdater() {
   autoUpdater.on('update-available', (i) => set({ state: 'downloading', version: nameOf(i), percent: 0 }));
   autoUpdater.on('download-progress', (p) => set({ ...updateState, state: 'downloading', percent: Math.round(p.percent) }));
   autoUpdater.on('update-not-available', () => set({ state: 'current', version: versionName() }));
-  autoUpdater.on('update-downloaded', (i) => { set({ state: 'ready', version: nameOf(i) }); if (config.updateSwitched) { delete config.updateSwitched; saveConfig(); } });
+  autoUpdater.on('update-downloaded', (i) => { try { recovery.backup(CONFIG_FILE, 'update'); } catch {} set({ state: 'ready', version: nameOf(i) }); if (config.updateSwitched) { delete config.updateSwitched; saveConfig(); } });
   autoUpdater.on('error', (e) => set({ state: 'error', error: String(e?.message || e).slice(0, 200) }));
   const check = () => autoUpdater.checkForUpdates().catch(() => {});
   setTimeout(check, 8000);
@@ -3337,7 +3348,8 @@ function createWindow() {
   win.setMenuBarVisibility(false);
   if (process.env.VITE_DEV) win.loadURL('http://localhost:5173');
   else win.loadFile(path.join(__dirname, '../dist/index.html'));
-  win.webContents.on('render-process-gone', (_e, d) => log('renderer gone', d.reason, d.exitCode));
+  win.webContents.on('render-process-gone', (_e, d) => { log('renderer gone', d.reason, d.exitCode); if (d.reason !== 'clean-exit') recovery.note(`the screen closed (${d.reason})`); });
+  win.webContents.once('did-finish-load', () => setTimeout(() => recovery.ok(), 15000)); // started properly (recovery.js)
   win.webContents.on('did-start-loading', () => { imgReady = false; }); // the image worker comes back with the page
   // CI launch check: exit 0 only if the UI actually rendered
   if (process.env.CARTRIDGE_SMOKE) {
@@ -4029,7 +4041,12 @@ const handlers09 = {
   'setup:confirm': ({ path: f, id }) => steamMgr.confirm(f, id),
   'setup:fork': ({ path: f, of, name }) => steamMgr.markFork(f, of, name),
   'setup:use': ({ key, file, as, args }) => steamMgr.useFile(key, file, { as, args }),
-  'setup:report': () => steamMgr.setupReport(),
+  'setup:report': () => {
+    // 0.9.71: unexpected closes and a safe start go in too (times, reasons and versions only)
+    const c = recovery.closes();
+    const extra = c.length || safeStart.safe ? `\n\nUnexpected closes (newest first)${safeStart.safe ? ', this start is in safe mode' : ''}:\n${c.map((x) => `- ${new Date(x.at).toISOString().slice(0, 16).replace('T', ' ')} ${x.what} (${x.version})`).join('\n') || '- none'}` : '';
+    return steamMgr.setupReport() + extra;
+  },
   // give a Flatpak emulator your games folder (asked first in Setup): only its Flatpak permissions change
   'setup:flatpakAllow': async ({ id, dir }) => {
     if (!/^[A-Za-z0-9_.-]+$/.test(String(id || '')) || !path.isAbsolute(String(dir || ''))) throw new Error('Not a Flatpak app or folder');
@@ -4151,7 +4168,7 @@ const handlers = {
   ...handlers09,
   ...colHandlers,
   ...handlers08,
-  'config:get': () => config,
+  'config:get': () => shownConfig(),
   'wallpaper:set': async ({ file }) => {
     const ext = path.extname(file || '').toLowerCase();
     if (!['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) throw new Error('Pick a PNG, JPG or WebP image');
@@ -4285,7 +4302,32 @@ const handlers = {
     if (patch.ui && 'scale' in patch.ui) applyZoom();
     if ('sgdbKey' in patch) { for (const k of Object.keys(logoCache)) if (!logoCache[k].file) delete logoCache[k]; saveLogoCache(); }
     if ('romsRoot' in patch && library) { broadcast('library', publicLibrary()); computeInstalled(); }
-    return config;
+    return shownConfig();
+  },
+  // recovery (0.9.71)
+  'recovery:state': () => ({ safe: safeStart.safe, unclean: safeStart.unclean, closes: recovery.closes(), backups: recovery.backupList() }),
+  'recovery:keepSafe': () => { config.ui = recovery.safeUi(config.ui || {}); saveConfig(); safeStart = { safe: false, unclean: 0 }; log('safe start: kept'); return config; },
+  'recovery:leaveSafe': () => { safeStart = { safe: false, unclean: 0 }; log('safe start: back to own settings'); return config; },
+  'recovery:restore': ({ name }) => {
+    const v = recovery.backupRead(name);
+    recovery.backup(CONFIG_FILE, 'restore');
+    config = deepMerge(DEFAULT_CONFIG, v); saveConfig(); log('settings restored from', name);
+    setTimeout(() => relaunch(), 500);
+    return true;
+  },
+  'settings:export': async ({ dir }) => {
+    if (!dir || !fs.existsSync(dir)) throw new Error('Pick a folder to save the file in.');
+    const file = path.join(dir, `Cartridge settings ${new Date().toISOString().slice(0, 10)}.json`);
+    await fsp.writeFile(file, JSON.stringify(RECOVERY.exportOf(config, app.getVersion()), null, 2));
+    return file;
+  },
+  'settings:import': async ({ file }) => {
+    let v; try { v = JSON.parse(await fsp.readFile(file, 'utf8')); } catch { throw new Error('That file can’t be read.'); }
+    const next = RECOVERY.importInto(config, v);
+    recovery.backup(CONFIG_FILE, 'import');
+    config = deepMerge(DEFAULT_CONFIG, next); saveConfig(); log('settings imported');
+    setTimeout(() => relaunch(), 500);
+    return true;
   },
   'config:setPath': ({ slug, path: p }) => {
     if (p) config.paths[slug] = p; else delete config.paths[slug];
@@ -6210,6 +6252,7 @@ app.whenReady().then(() => {
 });
 app.on('child-process-gone', (_e, d) => {
   log('child gone', d.type, d.reason, d.exitCode);
+  if (d.type === 'GPU' && !['clean-exit', 'killed'].includes(d.reason)) recovery.note(`the graphics process stopped (${d.reason})`);
   // If the GPU dies early, remember it and restart without the GPU so the window is never blank
   if (d.type === 'GPU' && useGpu && d.reason !== 'clean-exit' && Date.now() - startedAt < 20000) {
     log('gpu failed at startup, relaunching in software mode for this launch');
@@ -6227,6 +6270,7 @@ app.on('before-quit', () => {
   if (quitting) return;
   quitting = true;
   log('quit');
+  recovery.ok(); // a normal quit is never a crash
   setTimeout(() => app.exit(0), 3000).unref?.();
   try { trophySvc.stop(); } catch {}
   for (const it of queue) try { it.abort?.abort(); } catch {}

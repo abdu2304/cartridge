@@ -587,6 +587,13 @@
             <Toggle :model-value="ui.motionEngine === 'gsap'" label="GSAP Motion (Test)" desc="Runs the game cover's flight to its page, tiles moving while you arrange Start, and the welcome's opening on GSAP instead of Cartridge's own engine. Try both with the Performance Overlay on and keep the smoother one" @update:model-value="(v) => saveConfig({ ui: { motionEngine: v ? 'gsap' : 'cae' } })" />
             <Toggle :model-value="ui.perfOverlay === true" label="Performance Overlay" desc="Frame rate, slowest frame, CPU and memory in a corner of the screen, to see how Cartridge runs on this device" @update:model-value="(v) => saveConfig({ ui: { perfOverlay: v } })" />
             <ReportProblem />
+            <div class="subh">Your Settings</div>
+            <p class="muted small" style="margin-top: -6px">Cartridge keeps a copy of your settings once a day and before every update. Move them to another device with a file: sign-in details stay out of it.</p>
+            <div class="row wrap">
+              <button class="btn" data-focus @click="putBack"><Icon name="mdiBackupRestore" />Put Back a Copy</button>
+              <button class="btn" data-focus @click="exportSettings"><Icon name="mdiExport" />Save to a File</button>
+              <button class="btn" data-focus @click="importSettings"><Icon name="mdiImport" />Load From a File</button>
+            </div>
             <div class="card-s glass">
               <div class="kv"><span>Game Mode</span><span>{{ store.info.gamescope ? 'Yes (gamescope)' : 'No (desktop)' }}</span></div>
               <div class="kv"><span>Controller</span><span>{{ padInfo?.name || input.padName || 'Press any button' }}</span></div>
@@ -713,7 +720,7 @@ const SEARCH = [
   ['Button icons, controller', 'Controls', 'controls'], ['Touch and mouse', 'Controls', 'controls'], ['On-screen keyboard', 'Controls', 'controls'], ['Tabs in the Dock, open on', 'Controls', 'controls'], ['Controller test', 'Controls', 'controls'],
   ['Downloads at once, speed limit', 'Downloads and Updates', 'dlup', 'downloads'], ['Multi-disc folders', 'Downloads and Updates', 'dlup', 'downloads'],
   ['Check for updates', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'], ['Choose a version (roll back, beta, nightly)', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'], ['Update channel (Stable, Beta, Nightly)', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'], ['What’s New', 'Downloads and Updates · Cartridge Updates', 'dlup', 'updates'],
-  ['Device name', 'Help and About', 'about'], ['Take the tour', 'Help and About', 'about'], ['Run the welcome again', 'Help and About', 'about'], ['Report a problem', 'Help and About', 'about'], ['Performance overlay', 'Help and About', 'about'], ['GSAP motion (test)', 'Help and About', 'about'], ['Licences', 'Help and About', 'about'], ['Quit Cartridge', 'Help and About', 'about'],
+  ['Device name', 'Help and About', 'about'], ['Take the tour', 'Help and About', 'about'], ['Run the welcome again', 'Help and About', 'about'], ['Report a problem', 'Help and About', 'about'], ['Settings backup, export and import', 'Help and About', 'about'], ['Performance overlay', 'Help and About', 'about'], ['GSAP motion (test)', 'Help and About', 'about'], ['Licences', 'Help and About', 'about'], ['Quit Cartridge', 'Help and About', 'about'],
 ];
 async function searchSettings() {
   const q = await askText({ title: 'Find a Setting', placeholder: 'Drive, rumble, Vita3K, colour...' });
@@ -1313,6 +1320,27 @@ async function rollBack() {
   try { await call('update:rollback', { tag }); toast('Restarting…', 'ok', 3000, 'mdiHistory'); } catch (e) { toast(e.message, 'error', 6000); rollBusy.value = false; }
 }
 async function checkUpdates() { try { await call('update:check'); } catch (e) { toast(e.message, 'info', 4000); } }
+// your settings (0.9.71, electron/recovery.js): backups to put back, a file to move them
+const WHY_BAK = { daily: 'Daily copy', update: 'Before an update', import: 'Before loading a file', restore: 'Before putting one back' };
+async function putBack() {
+  const st = await call('recovery:state').catch(() => null);
+  const list = st?.backups || [];
+  if (!list.length) return toast('No copies yet. The first is made today.', 'info', 3500);
+  const name = await choose({ sheet: true, title: 'Put Back a Copy', options: list.map((b) => ({ label: new Date(b.at).toLocaleString(undefined, { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }), sub: WHY_BAK[b.why] || '', value: b.name, icon: 'mdiBackupRestore', raw: true })) });
+  if (!name || !(await confirm('Put this copy back?', 'Your settings now are copied first, so you can come back to them. Cartridge restarts.', 'Put Back'))) return;
+  try { await call('recovery:restore', { name }); toast('Restarting…', 'ok', 3000, 'mdiRestart'); } catch (e) { toast(e.message, 'error', 5000); }
+}
+async function exportSettings() {
+  const dir = await pickFolder({ title: 'Save Your Settings', subtitle: 'The folder for the settings file', start: store.info?.home });
+  if (!dir) return;
+  try { const f = await call('settings:export', { dir }); toast(`Saved: ${f.split('/').pop()}`, 'ok', 4000, 'mdiExport'); } catch (e) { toast(e.message, 'error', 5000); }
+}
+async function importSettings() {
+  const file = await pickFolder({ title: 'Load Settings', subtitle: 'A Cartridge settings file (.json)', start: store.info?.home, files: ['json'] });
+  if (!file) return;
+  if (!(await confirm('Load these settings?', 'They replace your looks and choices. Your sign-ins, drives and folders on this device stay. Your settings now are copied first. Cartridge restarts.', 'Load'))) return;
+  try { await call('settings:import', { file }); toast('Restarting…', 'ok', 3000, 'mdiRestart'); } catch (e) { toast(e.message, 'error', 6000); }
+}
 // update channels (0.9.71)
 const CHANNELS = { stable: { label: 'Stable', what: 'Finished releases. Recommended.' }, beta: { label: 'Beta', what: 'The next release a few days early, to try before everyone else. You get stable releases too.' }, nightly: { label: 'Nightly', what: 'Built every night from the newest work. Can be broken: Choose a Version below always takes you back.' } };
 const chan = computed(() => (CHANNELS[store.update.channel] ? store.update.channel : 'stable'));
