@@ -94,6 +94,11 @@ async function until(fn, ms = 15000, step = 150) { const t = Date.now(); while (
     const secs = await page.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key));
     for (const k of secs) await page.click(`[data-key="${k}"]`).then(() => wait(300)).catch(() => {});
     check('every tab and Settings section opens', secs.length >= 8 && !errors.length, `${secs.length} sections${errors.length ? ' · ' + errors.slice(0, 3).join(' | ') : ''}`);
+    // 5b. recomps answer through their own module (0.9.71 split): the five verified ports listed, their settings readable
+    const rl = await page.evaluate(() => window.cart.call('recomps:list').then((r) => r.data || r));
+    const verified = (rl?.entries || []).filter((e) => e.from === 'verified');
+    const st = await page.evaluate(() => window.cart.call('recomps:settings', { id: 'bloodborne' }).then((r) => r.data || r));
+    check('Cartridge Verified ports listed with settings', verified.length >= 5 && (st?.items || []).length > 10, `${verified.length} ports, ${(st?.items || []).length} Bloodborne settings`);
     // 6. the update channel switch answers (0.9.71)
     const ch = await page.evaluate(() => window.cart.call('update:get').then((r) => (r.data || r).channel));
     check('update channel is reported', ['stable', 'beta', 'nightly'].includes(ch), ch);
