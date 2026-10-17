@@ -7,6 +7,10 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 17 Oct 2026 · 0.9.74 · Unpacked Again
+
+**Asked:** zip extraction for PS4 broken, check PS3 and other systems. Fixed and widened (handover Part 21); e2e covers six cases.
+
 ## 17 Oct 2026 · 0.9.73 · Settings, As Before
 
 **Asked (photo of the cards):** "return to how the menus looked before but more polished". The rail is back with a status line under each section; the cards are gone. Handover Part 20.

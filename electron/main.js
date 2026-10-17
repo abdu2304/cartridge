@@ -680,6 +680,13 @@ function candidatesFor(rom) {
 // PlayStation title ID (CUSA12345 / PPSA12345), and can also be marked by hand.
 const FOLDER_SYSTEMS = new Set(['ps4', 'ps5']);
 const isFolderSystem = (r) => FOLDER_SYSTEMS.has(r.platform_slug) || FOLDER_SYSTEMS.has(r.platform_fs_slug);
+// 0.9.74 (owner: "auto zip extraction doesn't work for ps4 anymore, check ps3 and other systems"): every console whose
+// emulators can't play a game from an archive gets it unpacked after the download, whether RomM has it as one file or
+// as a folder of files (a game plus its update). Cartridge-based consoles and arcade stay zipped: RetroArch and MAME
+// read those zips themselves (and MAME needs them). PS Vita archives go to Vita3K as they are (Install in Downloads).
+const UNPACK_SYSTEMS = new Set([...FOLDER_SYSTEMS, 'ps3', 'ps2', 'psp', 'psx', 'wiiu', 'wii', 'ngc', 'gc', 'gamecube', 'switch', 'xbox', 'xbox360', '3ds', 'n3ds', 'new-nintendo-3ds', 'dc', 'dreamcast', 'saturn', 'segacd', 'sega-cd']);
+const isUnpackSystem = (r) => UNPACK_SYSTEMS.has(r.platform_slug) || UNPACK_SYSTEMS.has(r.platform_fs_slug);
+const GAME_ARCHIVE = /\.(zip|7z|rar)$/i;
 const MARKS_FILE = path.join(USER_DATA, 'marked.json');
 const marks = loadJson(MARKS_FILE, {}); // romId -> { at }
 function saveMarks() { try { fs.writeFileSync(MARKS_FILE, JSON.stringify(marks, null, 1)); } catch {} }
@@ -695,9 +702,14 @@ function installedState(roms, platform) {
     for (const D of dirs) {
       const hit = candidatesFor(rom).find((n) => D.entries.has(n));
       if (hit) { found = path.join(D.dir, hit); break; }
-      if (isFolderSystem(rom)) {
-        const stem = String(rom.fs_name || '').replace(/\.(zip|7z|rar)$/i, '');
+      if (isUnpackSystem(rom)) {
+        // unpacked: a folder named like the archive, or (one file inside) that file with the archive's name
+        const stem = String(rom.fs_name || '').replace(GAME_ARCHIVE, '');
         if (stem && D.entries.has(stem)) { found = path.join(D.dir, stem); break; }
+        const lone = stem && GAME_ARCHIVE.test(rom.fs_name || '') && [...D.entries].find((e) => e.replace(/\.[^.]+$/, '') === stem && !GAME_ARCHIVE.test(e));
+        if (lone) { found = path.join(D.dir, lone); break; }
+      }
+      if (isFolderSystem(rom)) {
         const tid = titleId(rom.fs_name) || titleId(rom.name);
         if (tid) {
           D.ids ||= new Map([...D.entries].map((e) => [titleId(e), e]).filter(([k]) => k));
@@ -1777,7 +1789,7 @@ async function checkFiles(pairs, it) {
   throw new Error(`Damaged download: ${path.basename(bad[0][0])}${bad.length > 1 ? ` and ${bad.length - 1} more` : ''} didn't match RomM's checksum. Retry to download again.`);
 }
 
-// PS4/PS5 zips: unpacked into <console folder>/<zip name>/, which is also how installed games are
+// Game archives (PS4/PS5 since 0.7.0, every console in UNPACK_SYSTEMS since 0.9.74): unpacked into <console folder>/<archive name>/, which is also how installed games are
 // recognised. When everything in the zip sits in one folder, its contents go straight in (no
 // folder inside a folder). Unpacking goes to a ".partial" folder first, and the zip is deleted
 // only once every file is out. yauzl reads zip64, which games over 4 GB need.
@@ -1791,47 +1803,79 @@ function zipEntries(z) {
     z.readEntry();
   });
 }
-async function unzipGame(zipPath, target, it) {
-  const dest = path.join(target, path.basename(zipPath).replace(/\.zip$/i, ''));
+// a game archive unpacked into dest (0.9.74: zip, 7z and rar; into a folder already holding other files too). One
+// folder around everything is dropped. When what's inside is a single file and `home` is given, that file goes
+// into home instead of a folder of its own (Game.zip holding Game.iso becomes Game.iso beside your other games).
+async function unpackGame(arc, dest, it, { home = null } = {}) {
   const tmp = dest + '.partial';
-  const z = await openZip(zipPath);
+  await fsp.rm(tmp, { recursive: true, force: true });
+  await fsp.mkdir(tmp, { recursive: true });
   try {
-    const entries = await zipEntries(z);
-    const names = entries.map((e) => e.fileName).filter((n) => !/^__MACOSX\//.test(n));
-    const tops = new Set(names.map((n) => n.split('/')[0]));
-    const strip = tops.size === 1 && names.every((n) => n.includes('/')) ? [...tops][0] + '/' : '';
-    const total = entries.reduce((s, e) => s + (e.uncompressedSize || 0), 0);
-    const free = await fsp.statfs(target).then((st) => st.bavail * st.bsize).catch(() => Infinity);
-    if (total > free) throw new Error(`Not enough space to unpack: it needs ${Math.ceil(total / 1e9)} GB and the drive has ${Math.floor(free / 1e9)} GB free. The zip is kept, so free up space and press Retry.`);
-    await fsp.rm(tmp, { recursive: true, force: true });
-    await fsp.mkdir(tmp, { recursive: true });
-    let done = 0, lastPct = -1;
-    for (const e of entries) {
-      if (it.abort.signal.aborted) throw new Error('aborted');
-      if (/^__MACOSX\//.test(e.fileName)) continue;
-      const rel = strip && e.fileName.startsWith(strip) ? e.fileName.slice(strip.length) : e.fileName;
-      if (!rel) continue;
-      const out = path.join(tmp, rel);
-      if (!path.resolve(out).startsWith(path.resolve(tmp) + path.sep)) throw new Error('Unsafe file path in zip');
-      if (/\/$/.test(e.fileName)) { await fsp.mkdir(out, { recursive: true }); continue; }
-      await fsp.mkdir(path.dirname(out), { recursive: true });
-      const rs = await new Promise((ok, bad) => z.openReadStream(e, (err, s) => (err ? bad(err) : ok(s))));
-      rs.on('data', (c) => {
-        done += c.length;
-        const pct = total ? Math.floor((done / total) * 100) : 0;
-        if (pct !== lastPct) { lastPct = pct; it.currentFile = `Extracting ${pct}%`; emitQueueThrottled(); }
-      });
-      await pipeline(rs, fs.createWriteStream(out), { signal: it.abort.signal });
+    if (/\.zip$/i.test(arc)) {
+      const z = await openZip(arc);
+      try {
+        const entries = await zipEntries(z);
+        const names = entries.map((e) => e.fileName).filter((n) => !/^__MACOSX\//.test(n));
+        const tops = new Set(names.map((n) => n.split('/')[0]));
+        const strip = tops.size === 1 && names.every((n) => n.includes('/')) ? [...tops][0] + '/' : '';
+        const total = entries.reduce((s, e) => s + (e.uncompressedSize || 0), 0);
+        const free = await fsp.statfs(path.dirname(dest)).then((st) => st.bavail * st.bsize).catch(() => Infinity);
+        if (total > free) throw new Error(`Not enough space to unpack: it needs ${Math.ceil(total / 1e9)} GB and the drive has ${Math.floor(free / 1e9)} GB free. The archive is kept, so free up space and press Retry.`);
+        let done = 0, lastPct = -1;
+        for (const e of entries) {
+          if (it.abort.signal.aborted) throw new Error('aborted');
+          if (/^__MACOSX\//.test(e.fileName)) continue;
+          const rel = strip && e.fileName.startsWith(strip) ? e.fileName.slice(strip.length) : e.fileName;
+          if (!rel) continue;
+          const out = path.join(tmp, rel);
+          if (!path.resolve(out).startsWith(path.resolve(tmp) + path.sep)) throw new Error('Unsafe file path in zip');
+          if (/\/$/.test(e.fileName)) { await fsp.mkdir(out, { recursive: true }); continue; }
+          await fsp.mkdir(path.dirname(out), { recursive: true });
+          const rs = await new Promise((ok, bad) => z.openReadStream(e, (err, s) => (err ? bad(err) : ok(s))));
+          rs.on('data', (c) => {
+            done += c.length;
+            const pct = total ? Math.floor((done / total) * 100) : 0;
+            if (pct !== lastPct) { lastPct = pct; it.currentFile = `Extracting ${pct}%`; emitQueueThrottled(); }
+          });
+          await pipeline(rs, fs.createWriteStream(out), { signal: it.abort.signal });
+        }
+      } finally { z.close(); }
+    } else {
+      // 7z and rar through the system's bsdtar or 7z (addonInstall.openArchive), then the same folder rule
+      it.currentFile = 'Extracting'; emitQueueThrottled();
+      await unpackTo(arc, tmp);
+      const kids = (await fsp.readdir(tmp)).filter((n) => n !== '__MACOSX');
+      if (kids.length === 1 && (await fsp.stat(path.join(tmp, kids[0]))).isDirectory()) {
+        const inner = path.join(tmp, kids[0]);
+        for (const n of await fsp.readdir(inner)) await fsp.rename(path.join(inner, n), path.join(tmp, n === kids[0] ? n + '.cartridge-inner' : n));
+        await fsp.rm(inner, { recursive: true, force: true });
+        const back = path.join(tmp, kids[0] + '.cartridge-inner');
+        if (fs.existsSync(back)) await fsp.rename(back, path.join(tmp, kids[0]));
+      }
     }
   } catch (e) {
     await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
+    it.currentFile = null;
     throw e;
-  } finally { z.close(); }
-  await fsp.rm(dest, { recursive: true, force: true });
-  await fsp.rename(tmp, dest);
-  await fsp.rm(zipPath, { force: true });
+  }
+  await fsp.rm(arc, { force: true });
   it.currentFile = null;
-  log('unpacked', path.basename(zipPath));
+  log('unpacked', path.basename(arc));
+  const got = (await fsp.readdir(tmp)).filter((n) => n !== '__MACOSX');
+  // one file inside: beside the other games, under its own name
+  if (home && got.length === 1 && (await fsp.stat(path.join(tmp, got[0]))).isFile()) {
+    const out = path.join(home, got[0]);
+    await fsp.rm(out, { force: true });
+    await fsp.rename(path.join(tmp, got[0]), out);
+    await fsp.rm(tmp, { recursive: true, force: true });
+    if (path.resolve(dest) !== path.resolve(home)) await fsp.rm(dest, { recursive: true, force: true }).catch(() => {});
+    return out;
+  }
+  if (fs.existsSync(dest)) {
+    // into a folder that's already there (the game's own folder in RomM): what's inside joins it
+    for (const n of got) { await fsp.rm(path.join(dest, n), { recursive: true, force: true }); await fsp.rename(path.join(tmp, n), path.join(dest, n)); }
+    await fsp.rm(tmp, { recursive: true, force: true });
+  } else await fsp.rename(tmp, dest);
   return dest;
 }
 
@@ -1884,8 +1928,11 @@ async function runJob(it) {
         }
       }
       await checkFiles([[finalPath, files[0]]], it);
-      // PS4 and PS5 games come as zips and are played from a folder: unpack, then drop the zip
-      if (isFolderSystem(rom) && /\.zip$/i.test(finalPath)) finalPath = await unzipGame(finalPath, target, it);
+      // archives the emulators can't read: unpacked, then the archive goes (PS4 and PS5 always into a folder)
+      if (isUnpackSystem(rom) && GAME_ARCHIVE.test(finalPath)) {
+        await fsp.rm(path.join(target, path.basename(finalPath).replace(GAME_ARCHIVE, '')), { recursive: true, force: true });
+        finalPath = await unpackGame(finalPath, path.join(target, path.basename(finalPath).replace(GAME_ARCHIVE, '')), it, { home: isFolderSystem(rom) ? null : target });
+      }
     } else {
       // Multi-file: mirror the server folder, one file at a time (resumable)
       const folder = it.into || path.join(target, rom.fs_name);
@@ -1902,6 +1949,17 @@ async function runJob(it) {
       it.currentFile = null;
       await checkFiles(files.map((f) => [path.join(folder, f.full_path.startsWith(romPrefix) ? f.full_path.slice(romPrefix.length) : f.file_name), f]), it);
       finalPath = folder;
+      // archives in the game's folder (a game and its update as two zips, or one zip RomM keeps in a folder): one
+      // alone is unpacked into the folder itself, several each into a folder named after it
+      if (isUnpackSystem(rom)) {
+        const arcs = files.map((f) => (f.full_path.startsWith(romPrefix) ? f.full_path.slice(romPrefix.length) : f.file_name)).filter((r) => GAME_ARCHIVE.test(r) && !r.includes('/'));
+        for (const r of arcs) {
+          const a = path.join(folder, r);
+          if (!fs.existsSync(a)) continue;
+          const alone = arcs.length === 1 && files.length === 1;
+          await unpackGame(a, alone ? folder : path.join(folder, r.replace(GAME_ARCHIVE, '')), it, { home: isFolderSystem(rom) ? null : folder });
+        }
+      }
       // Multi-disc: generate an .m3u if the server has none
       const exts = files.map((f) => (f.file_name.split('.').pop() || '').toLowerCase());
       const hasM3u = exts.includes('m3u');
@@ -4075,7 +4133,7 @@ async function verifyLibrary() {
       const st = await fsp.stat(where).catch(() => null);
       if (!st) { out.damaged.push({ romId: id, name: rom.name, why: 'Its files are gone' }); continue; }
       // PS4/PS5 games unpacked from a zip can't be compared with the zip RomM has
-      if (isFolderSystem(rom) && files.length === 1 && /\.zip$/i.test(files[0].file_name) && st.isDirectory()) { out.skipped++; continue; }
+      if (isUnpackSystem(rom) && files.some((f) => GAME_ARCHIVE.test(f.file_name)) && !GAME_ARCHIVE.test(where)) { out.skipped++; continue; }
       const prefix = rom.full_path + '/';
       const pairs = st.isDirectory() ? files.map((f) => [path.join(where, f.full_path.startsWith(prefix) ? f.full_path.slice(prefix.length) : f.file_name), f]) : [[where, files[0]]];
       const bad = [];

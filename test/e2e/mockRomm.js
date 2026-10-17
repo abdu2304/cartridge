@@ -12,6 +12,22 @@ function bmp(w, h, seed) {
   for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const o = 54 + y * row + x * 3; b[o] = (x * 2 + seed * 37) & 255; b[o + 1] = (y + seed * 91) & 255; b[o + 2] = ((x ^ y) + seed * 13) & 255; }
   return b;
 }
+// a zip with its files stored (0.9.74: the unpacking checks), crc32 by table so any Node runs it
+const CRC = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+const crc32 = (b) => { let c = 0xffffffff; for (const x of b) c = CRC[(c ^ x) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+function zip(entries) {
+  const parts = [], dir = []; let off = 0;
+  for (const [name, data] of entries) {
+    const n = Buffer.from(name), c = crc32(data), h = Buffer.alloc(30);
+    h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt32LE(c, 14); h.writeUInt32LE(data.length, 18); h.writeUInt32LE(data.length, 22); h.writeUInt16LE(n.length, 26);
+    parts.push(h, n, data);
+    const d = Buffer.alloc(46); d.writeUInt32LE(0x02014b50, 0); d.writeUInt16LE(20, 4); d.writeUInt16LE(20, 6); d.writeUInt32LE(c, 16); d.writeUInt32LE(data.length, 20); d.writeUInt32LE(data.length, 24); d.writeUInt16LE(n.length, 28); d.writeUInt32LE(off, 42);
+    dir.push(d, n); off += 30 + n.length + data.length;
+  }
+  const cd = Buffer.concat(dir), e = Buffer.alloc(22);
+  e.writeUInt32LE(0x06054b50, 0); e.writeUInt16LE(entries.length, 8); e.writeUInt16LE(entries.length, 10); e.writeUInt32LE(cd.length, 12); e.writeUInt32LE(off, 16);
+  return Buffer.concat([...parts, cd, e]);
+}
 const PLATS = [[1, 'snes', 'Super Nintendo'], [2, 'psx', 'PlayStation'], [3, 'n64', 'Nintendo 64'], [4, 'ps2', 'PlayStation 2']];
 
 function library(games = 120, extra = {}) {
@@ -26,6 +42,12 @@ function library(games = 120, extra = {}) {
   // extra.ps4: [{ name, id }] PS4 games as RomM keeps them (a zip named with the title ID), for the playtest rig
   const pl = [...PLATS];
   if (extra.ps4?.length) { const P = [5, 'ps4', 'PlayStation 4']; pl.push(P); extra.ps4.forEach((g, i) => ROMS.push(rom(900 + i, P, g.name, [file(9000 + i, 'ps4', `${g.name} [${g.id}].zip`, Buffer.alloc(2000, i))]))); }
+  // extra.games: [{ id, plat: [id, slug, name], name, dir, files: [[name, Buffer]] }]: several files = a folder game
+  for (const g of extra.games || []) {
+    if (!pl.some((x) => x[0] === g.plat[0])) pl.push(g.plat);
+    const multi = g.files.length > 1 || !!g.dir;
+    ROMS.push(rom(g.id, g.plat, g.name, g.files.map(([n, d], k) => file(g.id * 10 + k, multi ? `${g.plat[1]}/${g.dir || g.name}` : g.plat[1], n, d)), multi));
+  }
   const plats = pl.map(([id, slug, name]) => ({ id, slug, fs_slug: slug, name, display_name: name, rom_count: ROMS.filter((r) => r.platform_id === id).length }));
   return { F, ROMS, plats };
 }
@@ -56,4 +78,4 @@ function start({ port = 0, games = 120, extra = {} } = {}) {
   return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok({ port: server.address().port, served, roms: ROMS, close: () => new Promise((d) => server.close(d)) })));
 }
 if (require.main === module) start({ port: Number(process.argv[2] || 8089) }).then((s) => console.log('fake RomM on', s.port));
-module.exports = { start };
+module.exports = { start, zip };
