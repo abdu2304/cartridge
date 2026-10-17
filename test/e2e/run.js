@@ -17,7 +17,18 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 async function until(fn, ms = 15000, step = 150) { const t = Date.now(); while (Date.now() - t < ms) { try { const v = await fn(); if (v) return v; } catch {} await wait(step); } return null; }
 
 (async () => {
-  const srv = await mock.start({ games: Number(process.env.E2E_GAMES || 120) });
+  // game archives (0.9.74): unpacked for consoles whose emulators can't read them, single file or a folder of files
+  const Z = mock.zip, B = (n, c) => Buffer.alloc(n, c);
+  const P4 = [5, 'ps4', 'PlayStation 4'], P3 = [6, 'ps3', 'PlayStation 3'], P2 = [4, 'ps2', 'PlayStation 2'], SN = [1, 'snes', 'Super Nintendo'];
+  const ARC = [
+    { id: 950, plat: P4, name: 'Zip Four', files: [['Zip Four [CUSA11111].zip', Z([['Zip Four/eboot.bin', B(5000, 1)], ['Zip Four/sce_sys/param.sfo', B(300, 2)]])]], want: ['ps4/Zip Four [CUSA11111]/eboot.bin', 'ps4/Zip Four [CUSA11111]/sce_sys/param.sfo'], gone: ['ps4/Zip Four [CUSA11111].zip'] },
+    { id: 951, plat: P4, name: 'Two Zips', files: [['Two Zips [CUSA33333].zip', Z([['eboot.bin', B(4000, 3)]])], ['Two Zips [CUSA33333] Update.zip', Z([['eboot.bin', B(4100, 4)]])]], want: ['ps4/Two Zips/Two Zips [CUSA33333]/eboot.bin', 'ps4/Two Zips/Two Zips [CUSA33333] Update/eboot.bin'], gone: ['ps4/Two Zips/Two Zips [CUSA33333].zip'] },
+    { id: 952, plat: P4, name: 'Nested', dir: 'Nested', files: [['Nested [CUSA22222].zip', Z([['eboot.bin', B(3000, 5)], ['sce_sys/param.sfo', B(200, 6)]])]], want: ['ps4/Nested/eboot.bin'], gone: ['ps4/Nested/Nested [CUSA22222].zip'] },
+    { id: 953, plat: P3, name: 'Three Game', files: [['Three Game.zip', Z([['BLUS12345/PS3_GAME/USRDIR/EBOOT.BIN', B(6000, 7)], ['BLUS12345/PS3_GAME/PARAM.SFO', B(250, 8)]])]], want: ['ps3/Three Game/PS3_GAME/USRDIR/EBOOT.BIN'], gone: ['ps3/Three Game.zip'] },
+    { id: 954, plat: P2, name: 'Two Disc', files: [['Two Disc.zip', Z([['Two Disc.iso', B(8000, 9)]])]], want: ['ps2/Two Disc.iso'], gone: ['ps2/Two Disc.zip', 'ps2/Two Disc'] },
+    { id: 955, plat: SN, name: 'Snes Zip', files: [['Snes Zip.zip', Z([['Snes Zip.sfc', B(2000, 10)]])]], want: ['snes/Snes Zip.zip'], gone: ['snes/Snes Zip'] },
+  ];
+  const srv = await mock.start({ games: Number(process.env.E2E_GAMES || 120), extra: { games: ARC } });
   const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-e2e-'));
   const data = path.join(home, '.config/Cartridge'), roms = path.join(home, 'Emulation/roms'), drive2 = path.join(home, 'Drive2/Emulation/roms');
   fs.mkdirSync(data, { recursive: true }); fs.mkdirSync(roms, { recursive: true }); fs.mkdirSync(drive2, { recursive: true });
@@ -88,6 +99,14 @@ async function until(fn, ms = 15000, step = 150) { const t = Date.now(); while (
       if (id === 2) { const it = await until(async () => ((await st(id))?.status === 'error' ? await st(id) : null), 15000); if (it) await page.evaluate((i) => window.cart.call('dl:retry', i), it.id); done = await until(async () => { const d = await st(id); return d?.status === 'done' && d.notice === 'stale' && fs.existsSync(path.join(roms, file)); }, 30000); }
       if (!done) console.log('    ', JSON.stringify(await page.evaluate((romId) => window.cart.call('dl:list').then((r) => (r.data || r).filter?.((d) => d.romId === romId)), id)));
       check(`download ${path.basename(file)}`, done, `${Date.now() - t} ms`);
+    }
+    // 4a. archives: unpacked where the emulators need it (PS4 single zip, PS4 game and update in a folder, one zip in a
+    // folder, a PS3 folder dump, a PS2 ISO straight beside the other games), kept zipped for SNES; each shown installed
+    for (const g of ARC) {
+      await page.evaluate(async (romId) => { await window.cart.call('dl:add', { romId }); }, g.id);
+      const ok = await until(async () => g.want.every((f) => fs.existsSync(path.join(roms, f))) && g.gone.every((f) => !fs.existsSync(path.join(roms, f))), 30000);
+      const st = await page.evaluate((r) => window.cart.call('dl:list').then((x) => (x.data || x).find?.((d) => d.romId === r)), g.id);
+      check(`archive: ${g.name} (${g.plat[1]})`, ok && st?.status === 'done', ok ? st?.path?.replace(roms, '') : JSON.stringify(st || {}).slice(0, 200));
     }
     // 4b. a game moved to the other drive, then that drive unplugged: shown as away, not as never downloaded (0.9.71)
     {
