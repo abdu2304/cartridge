@@ -26,6 +26,9 @@ async function until(fn, ms = 15000, step = 150) { const t = Date.now(); while (
     { id: 952, plat: P4, name: 'Nested', dir: 'Nested', files: [['Nested [CUSA22222].zip', Z([['eboot.bin', B(3000, 5)], ['sce_sys/param.sfo', B(200, 6)]])]], want: ['ps4/Nested/eboot.bin'], gone: ['ps4/Nested/Nested [CUSA22222].zip'] },
     { id: 953, plat: P3, name: 'Three Game', files: [['Three Game.zip', Z([['BLUS12345/PS3_GAME/USRDIR/EBOOT.BIN', B(6000, 7)], ['BLUS12345/PS3_GAME/PARAM.SFO', B(250, 8)]])]], want: ['ps3/Three Game/PS3_GAME/USRDIR/EBOOT.BIN'], gone: ['ps3/Three Game.zip'] },
     { id: 954, plat: P2, name: 'Two Disc', files: [['Two Disc.zip', Z([['Two Disc.iso', B(8000, 9)]])]], want: ['ps2/Two Disc.iso'], gone: ['ps2/Two Disc.zip', 'ps2/Two Disc'] },
+    // unpacked by hand (0.9.75, owner's P.T.): never downloaded by Cartridge, found by the folder's own param.sfo
+    { id: 956, plat: P4, name: 'Hand Made', files: [['Hand Made.zip', B(100, 11)]], manual: ['ps4/CUSA01127/sce_sys/param.sfo', { TITLE_ID: 'CUSA01127', TITLE: 'Hand Made' }] },
+    { id: 957, plat: P4, name: 'Inner Folder', files: [['Inner Folder (USA).zip', B(100, 12)]], manual: ['ps4/Inner/CUSA05555-app/sce_sys/param.sfo', { TITLE_ID: 'CUSA05555', TITLE: 'Inner Folder' }] },
     { id: 955, plat: SN, name: 'Snes Zip', files: [['Snes Zip.zip', Z([['Snes Zip.sfc', B(2000, 10)]])]], want: ['snes/Snes Zip.zip'], gone: ['snes/Snes Zip'] },
   ];
   const srv = await mock.start({ games: Number(process.env.E2E_GAMES || 120), extra: { games: ARC } });
@@ -103,10 +106,22 @@ async function until(fn, ms = 15000, step = 150) { const t = Date.now(); while (
     // 4a. archives: unpacked where the emulators need it (PS4 single zip, PS4 game and update in a folder, one zip in a
     // folder, a PS3 folder dump, a PS2 ISO straight beside the other games), kept zipped for SNES; each shown installed
     for (const g of ARC) {
+      if (g.manual) continue;
       await page.evaluate(async (romId) => { await window.cart.call('dl:add', { romId }); }, g.id);
       const ok = await until(async () => g.want.every((f) => fs.existsSync(path.join(roms, f))) && g.gone.every((f) => !fs.existsSync(path.join(roms, f))), 30000);
       const st = await page.evaluate((r) => window.cart.call('dl:list').then((x) => (x.data || x).find?.((d) => d.romId === r)), g.id);
       check(`archive: ${g.name} (${g.plat[1]})`, ok && st?.status === 'done', ok ? st?.path?.replace(roms, '') : JSON.stringify(st || {}).slice(0, 200));
+    }
+    // 4a2. games unpacked by hand into folders named anything: shown as on this device, at the folder holding sce_sys
+    for (const g of ARC.filter((x) => x.manual)) {
+      const f = path.join(roms, g.manual[0]); fs.mkdirSync(path.dirname(f), { recursive: true }); fs.writeFileSync(f, mock.sfo(g.manual[1]));
+    }
+    await page.evaluate(() => window.cart.call('installed:rescan'));
+    const inst = await page.evaluate(() => window.cart.call('installed:get').then((r) => r.data || r).catch(() => null));
+    for (const g of ARC.filter((x) => x.manual)) {
+      const want = path.join(roms, path.dirname(path.dirname(g.manual[0])));
+      const got = inst?.[g.id];
+      check(`unpacked by hand: ${g.name}`, got === want, String(got || 'not found').replace(roms, ''));
     }
     // 4b. a game moved to the other drive, then that drive unplugged: shown as away, not as never downloaded (0.9.71)
     {

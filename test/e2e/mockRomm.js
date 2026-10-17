@@ -28,6 +28,14 @@ function zip(entries) {
   e.writeUInt32LE(0x06054b50, 0); e.writeUInt16LE(entries.length, 8); e.writeUInt16LE(entries.length, 10); e.writeUInt32LE(cd.length, 12); e.writeUInt32LE(off, 16);
   return Buffer.concat([...parts, cd, e]);
 }
+// a PS4 param.sfo with string fields (TITLE_ID, TITLE, APP_VER), as saves.sfo reads it
+function sfo(fields) {
+  const keys = Object.keys(fields); let kt = Buffer.alloc(0), dt = Buffer.alloc(0); const ents = [];
+  for (const k of keys) { const v = Buffer.from(fields[k] + '\0'); ents.push({ ko: kt.length, len: v.length, off: dt.length }); kt = Buffer.concat([kt, Buffer.from(k + '\0')]); dt = Buffer.concat([dt, v]); }
+  const h = Buffer.alloc(20); h.writeUInt32BE(0x00505346, 0); h.writeUInt32LE(0x101, 4); const ktOff = 20 + 16 * keys.length; h.writeUInt32LE(ktOff, 8); h.writeUInt32LE(ktOff + kt.length, 12); h.writeUInt32LE(keys.length, 16);
+  const idx = Buffer.concat(ents.map((e) => { const b = Buffer.alloc(16); b.writeUInt16LE(e.ko, 0); b.writeUInt16LE(0x0204, 2); b.writeUInt32LE(e.len, 4); b.writeUInt32LE(e.len, 8); b.writeUInt32LE(e.off, 12); return b; }));
+  return Buffer.concat([h, idx, kt, dt]);
+}
 const PLATS = [[1, 'snes', 'Super Nintendo'], [2, 'psx', 'PlayStation'], [3, 'n64', 'Nintendo 64'], [4, 'ps2', 'PlayStation 2']];
 
 function library(games = 120, extra = {}) {
@@ -78,4 +86,4 @@ function start({ port = 0, games = 120, extra = {} } = {}) {
   return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok({ port: server.address().port, served, roms: ROMS, close: () => new Promise((d) => server.close(d)) })));
 }
 if (require.main === module) start({ port: Number(process.argv[2] || 8089) }).then((s) => console.log('fake RomM on', s.port));
-module.exports = { start, zip };
+module.exports = { start, zip, sfo };

@@ -715,6 +715,13 @@ function installedState(roms, platform) {
           D.ids ||= new Map([...D.entries].map((e) => [titleId(e), e]).filter(([k]) => k));
           if (D.ids.has(tid)) { found = path.join(D.dir, D.ids.get(tid)); break; }
         }
+        // 0.9.75 (owner: P.T. unpacked by hand didn't show): a folder named anything ("CUSA01127", "P.T", "game") is
+        // known by its own param.sfo, its title ID or its title, at the top or one folder down
+        D.sfo ||= sfoIndex(D.dir, D.entries);
+        const byId = tid && D.sfo.find((x) => x.id === tid);
+        const want = normTitle(rom.name), byName = !byId && want && D.sfo.filter((x) => normTitle(x.title) === want);
+        const hit2 = byId || (byName?.length === 1 ? byName[0] : null);
+        if (hit2) { found = path.join(D.dir, hit2.entry, hit2.rel); break; } // the folder holding sce_sys, which emulators and ports open
       }
     }
     if (found) { out[rom.id] = found; continue; }
@@ -723,6 +730,29 @@ function installedState(roms, platform) {
   return out;
 }
 const MARKED = '(marked as installed)';
+// PS4/PS5 folders by what's in them: sce_sys/param.sfo at the top or one level down (a zip unpacked by hand often keeps
+// its own folder inside); remembered per folder by its change time, so a scan reads only new or changed folders
+const SFO_SEEN = new Map();
+const normTitle = (t) => String(t || '').toLowerCase().replace(/[™®©]/g, '').replace(/&/g, 'and').replace(/[^a-z0-9]/g, '');
+function sfoIndex(dir, entries) {
+  const out = [];
+  for (const entry of entries) {
+    const at = path.join(dir, entry);
+    let st; try { st = fs.statSync(at); } catch { continue; }
+    if (!st.isDirectory()) continue;
+    const key = at + ':' + st.mtimeMs;
+    if (!SFO_SEEN.has(key)) {
+      let info = null;
+      const look = (d, rel) => { try { const p = require('./saves').sfo(path.join(d, 'sce_sys/param.sfo')); return p && (p.TITLE_ID || p.TITLE) ? { id: String(p.TITLE_ID || '').toUpperCase(), title: p.TITLE || '', rel } : null; } catch { return null; } };
+      info = look(at, '');
+      if (!info) { let kids = []; try { kids = fs.readdirSync(at, { withFileTypes: true }).filter((k) => k.isDirectory()); } catch {} for (const k of kids.slice(0, 8)) { info = look(path.join(at, k.name), k.name); if (info) break; } }
+      SFO_SEEN.set(key, info);
+    }
+    const info = SFO_SEEN.get(key);
+    if (info) out.push({ entry, ...info });
+  }
+  return out;
+}
 
 // ---------------------------------------------------------------- library cache + sync
 // The whole library is mirrored locally (Argosy-style): instant startup, offline browsing,
