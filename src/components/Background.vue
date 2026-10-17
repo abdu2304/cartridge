@@ -79,6 +79,7 @@ function setup() {
   c.width = w; c.height = h;
   ctx = c.getContext('2d', { alpha: true, desynchronized: true });
   setInk(pal.ink);
+  frame?.dispose?.(); // a shader background's WebGL context (0.9.71)
   frame = rendererOf(mode.value)(ctx, w, h, S, pal, light.value);
   return true;
 }
@@ -104,7 +105,7 @@ function loop(t) {
   cost = cost * 0.9 + (performance.now() - s) * 0.1;
 }
 function start() {
-  stop(); last = 0; key = ''; frame = null;
+  stop(); last = 0; key = ''; frame?.dispose?.(); frame = null;
   if (!rendererOf(mode.value)) return;
   // one still frame: reduced motion, and (0.9.28, owner: choppy on handhelds) light effects, where repainting a
   // full-screen canvas without the GPU took frames from the interface

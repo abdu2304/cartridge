@@ -391,7 +391,75 @@ export function artPan(urls, rgb = '150,150,170') {
   };
 }
 
-export const RENDERERS = { waves, ribbons, aurora, contours, drift, tide, ...SCENE_R };
+// Shader backgrounds (0.9.71, owner's picks A and D from the option board): drawn by the graphics chip in one pass
+// on a WebGL canvas of their own, then laid on the background canvas like any other renderer (one copy a frame).
+// The shader gives light as an amount per pixel; it is added over dark pages and drawn in the page's ink on Light,
+// as the 2D ones are. Without WebGL (software rendering, a driver that refuses) the 2D renderer named instead runs.
+const GLSL = `precision mediump float; uniform vec2 R; uniform float T; uniform vec3 C; uniform vec3 C2;
+float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float n(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); return mix(mix(h(i), h(i+vec2(1,0)), f.x), mix(h(i+vec2(0,1)), h(i+vec2(1,1)), f.x), f.y); }
+float fbm(vec2 p){ float s = 0., a = .5; for (int i = 0; i < 5; i++) { s += a*n(p); p *= 2.02; a *= .5; } return s; }
+void out_(vec3 col){ float a = clamp(max(col.r, max(col.g, col.b)), 0., 1.); gl_FragColor = vec4(min(col, vec3(1.)), a); }`;
+const SHADERS = {
+  // A, Aurora Veil: three curtains folding slowly along the top edge, fading out where the games sit
+  veil: `void main(){ vec2 uv = gl_FragCoord.xy / R; float t = T*.05; float band = 0.;
+    for (int i = 0; i < 3; i++) { float fi = float(i); float y = .84 + .07*sin(uv.x*2.3 + t*3. + fi*1.7) + .06*fbm(vec2(uv.x*3. + fi, t*2.));
+      float d = uv.y - y; band += exp(-d*d*180.) * (.55 + .45*fbm(vec2(uv.x*12. + t*6., fi))) * smoothstep(-.02, .25, d + .2); }
+    vec3 col = mix(C, C2, .45) * band * 1.1; col *= smoothstep(.0, .55, uv.y); out_(col); }`,
+  // D, Horizon Grid: a perspective floor of fine lines rolling toward you, to a low banded sun in the highlight colour
+  horizon: `void main(){ vec2 p = (gl_FragCoord.xy - vec2(.5*R.x, .42*R.y)) / R.y; vec3 col = vec3(0.);
+    float sun = smoothstep(.22, .2, length(p - vec2(0., .08))); col += sun * mix(C, C2, .4) * smoothstep(.0, .2, p.y + .1) * (.6 + .4*step(.5, fract((p.y+.3)*28.)));
+    col += exp(-abs(p.y)*18.) * C * .25;
+    if (p.y < 0.) { float z = 1. / -p.y; vec2 w = vec2(p.x*z, z + T*.6); vec2 g = abs(fract(w) - .5) / fwidth(w);
+      float line = 1. - min(min(g.x, g.y), 1.); col += line * C * .55 * smoothstep(12., 1., z); }
+    out_(col); }`,
+};
+const unit = (hex) => { const [r, g, b] = rgbOf(hex).split(',').map(Number); return [r / 255, g / 255, b / 255]; };
+function glOf(name, w, h) {
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const gl = cv.getContext('webgl', { antialias: false, premultipliedAlpha: true, alpha: true, preserveDrawingBuffer: true });
+  if (!gl || !gl.getExtension('OES_standard_derivatives')) return null;
+  const sh = (type, src) => { const x = gl.createShader(type); gl.shaderSource(x, src); gl.compileShader(x); return gl.getShaderParameter(x, gl.COMPILE_STATUS) ? x : null; };
+  const vs = sh(gl.VERTEX_SHADER, 'attribute vec2 a; void main(){ gl_Position = vec4(a, 0., 1.); }');
+  const fs = sh(gl.FRAGMENT_SHADER, '#extension GL_OES_standard_derivatives : enable\n' + GLSL + SHADERS[name]);
+  if (!vs || !fs) return null;
+  const pr = gl.createProgram(); gl.attachShader(pr, vs); gl.attachShader(pr, fs); gl.linkProgram(pr);
+  if (!gl.getProgramParameter(pr, gl.LINK_STATUS)) return null;
+  gl.useProgram(pr);
+  gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer()); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(pr, 'a'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  gl.viewport(0, 0, w, h);
+  const u = (k) => gl.getUniformLocation(pr, k);
+  return { cv, gl, R: u('R'), T: u('T'), C: u('C'), C2: u('C2') };
+}
+export function shaderWorks() { try { return !!glOf('horizon', 2, 2); } catch { return false; } }
+function shader(name, fallback, second) {
+  return (g, w, h, S, pal, light) => {
+    let s = null;
+    try { s = glOf(name, w, h); } catch {}
+    if (!s) return fallback(g, w, h, S, pal, light);
+    const ink = COMP !== 'lighter', inkRgb = INK; // read now: setInk() came before this renderer was made
+    s.gl.uniform2f(s.R, w, h); s.gl.uniform3f(s.C, ...unit(pal?.accent)); s.gl.uniform3f(s.C2, ...unit(second(pal)));
+    // on Light the light amount becomes dark ink (source-in keeps the shape, then it is laid over the page)
+    const tint = ink ? once(w, h, () => {}) : null, tg = tint?.getContext('2d');
+    // Chromium keeps only so many WebGL contexts: the picker's previews and a restarted background give theirs back
+    const frame = (t) => {
+      if (s.gl.isContextLost()) return;
+      s.gl.uniform1f(s.T, t + 20); s.gl.drawArrays(s.gl.TRIANGLES, 0, 3);
+      g.clearRect(0, 0, w, h);
+      if (!ink) { g.globalCompositeOperation = 'lighter'; g.drawImage(s.cv, 0, 0); g.globalCompositeOperation = 'source-over'; return; }
+      tg.globalCompositeOperation = 'copy'; tg.drawImage(s.cv, 0, 0);
+      tg.globalCompositeOperation = 'source-in'; tg.fillStyle = `rgb(${inkRgb})`; tg.fillRect(0, 0, w, h);
+      g.globalAlpha = 0.6; g.drawImage(tint, 0, 0); g.globalAlpha = 1;
+    };
+    frame.dispose = () => { try { s.gl.getExtension('WEBGL_lose_context')?.loseContext(); } catch {} };
+    return frame;
+  };
+}
+const veil = shader('veil', aurora, (pal) => pal?.light || '#5ae6bf');
+const horizon = shader('horizon', tide, (pal) => pal?.warm || '#ff8033');
+
+export const RENDERERS = { waves, ribbons, aurora, contours, drift, tide, veil, horizon, ...SCENE_R };
 // Backgrounds from before 0.9.15 whose console now shows its own game art (A)
 export const LEGACY_ART = { wiiu: 'wiiu', ds: 'nds', n3ds: '3ds', xbox: 'xbox', ps2: 'ps2', gc: 'ngc', wii: 'wii', xbox360: 'xbox360', switch: 'switch' }; // 0.9.19: the console scenes retired too (owner)
 // Picker entries. The first two follow your theme colours, the console ones use their own.
@@ -402,6 +470,8 @@ export const BACKGROUNDS = [
   { v: 'contours', l: 'Contours', sub: 'Slow height lines, like a map', group: 'Theme' },
   { v: 'drift', l: 'Drift', sub: 'Soft lights floating by', group: 'Theme' },
   { v: 'tide', l: 'Tide', sub: 'A sea of points rising and falling', group: 'Theme' },
+  { v: 'veil', l: 'Aurora Veil', sub: 'Curtains of light folding along the top', group: 'Theme', gpu: true },
+  { v: 'horizon', l: 'Horizon Grid', sub: 'A floor of lines rolling to a low sun', group: 'Theme', gpu: true },
   { v: 'midnight', l: 'Midnight', sub: 'Neon glass ribbons on obsidian', group: 'Scenes' },
   { v: 'solar', l: 'Solar Flare', sub: 'Slow amber and gold waves', group: 'Scenes' },
   { v: 'nordic', l: 'Nordic Aurora', sub: 'Emerald and teal ribbons drifting', group: 'Scenes' },
@@ -442,7 +512,7 @@ export function bgPreview(v, pal, w = 320, h = 180) {
     layer.width = w; layer.height = h;
     const was = [INK, COMP];
     setInk(ink);
-    try { R(layer.getContext('2d'), w, h, w / 1920, pal, true)(4000); g.drawImage(layer, 0, 0); } catch {}
+    try { const f = R(layer.getContext('2d'), w, h, w / 1920, pal, true); f(4000); f.dispose?.(); g.drawImage(layer, 0, 0); } catch {}
     [INK, COMP] = was; // the live background keeps its own
   }
   return c.toDataURL('image/png');
