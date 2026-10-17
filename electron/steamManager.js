@@ -357,6 +357,17 @@ module.exports = function createSteamManager(ctx) {
     for (const x of found?.items || []) if (x.kind === 'program' && x.id && x.conf >= 2 && !/\/\.mount_|cartridge/i.test(x.path)) addFolder(x.id, x.path, x.version || '');
     for (const [id, e] of Object.entries(EMU)) for (const d of APP_DIRS()) for (const b of e.bin || []) addFolder(id, path.join(d, e.label || id, b));
     for (const [id, e] of Object.entries(EMU)) for (const n of e.dir || []) for (const d of APP_DIRS()) for (const b of e.bin || []) addFolder(id, path.join(d, n, b));
+    // RetroArch isn't in EMU (its cores are): its own row, so its sheet opens like any emulator's (0.9.76)
+    if (flatpakApps().includes('org.libretro.RetroArch')) out.push({ id: 'retroarch', label: 'RetroArch', kind: 'flatpak', fp: 'org.libretro.RetroArch' });
+    for (const d of APP_DIRS()) for (const n of ls(d)) if (/^retroarch.*\.appimage$/i.test(n)) addFolder('retroarch', path.join(d, n));
+    // 0.9.76 (owner: Vita3K's sheet didn't open again): an AppImage in ~/Applications found by its name, as Get Emulators
+    // and the Steam candidates find it, even before the background scan has read it (a fresh install, an update that
+    // replaced the file); forks and old copies are left out as in emuup:list
+    for (const d of APP_DIRS()) for (const n of ls(d)) {
+      if (!/\.appimage$/i.test(n) || /_old\b|\.old\b|previous|\.cartridge-/i.test(n)) continue;
+      const id = Object.entries(EMU).find(([, e]) => e.app && e.app.test(n) && !e.forkOf)?.[0];
+      if (id && !(require('./emulators').FORKS[id] || []).some(([re]) => re.test(n))) addFolder(id, path.join(d, n));
+    }
     const fps = flatpakApps();
     for (const [id, e] of Object.entries(EMU)) for (const fp of e.fp || []) if (fps.includes(fp)) out.push({ id, label: labelOf(id), kind: 'flatpak', fp });
     // Windows builds run through Proton (Xenia Canary's xenia_canary.exe, EmuDeck keeps it in roms/xbox360):
