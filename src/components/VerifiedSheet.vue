@@ -26,6 +26,7 @@
               <button v-if="e.state === 'update'" class="btn" data-focus data-key="vs-update" :disabled="!!job" @click="install"><Icon name="mdiUpdate" :size="20" />Update to {{ e.latest?.tag }}</button>
             </template>
             <button v-else class="btn primary" data-focus data-key="vs-main" :disabled="!!job || step.off" @click="main"><Icon :name="step.icon" :size="20" />{{ step.button }}</button>
+            <button v-if="step.again" class="btn" data-focus data-key="vs-again" :disabled="!!job" @click="prepare(lastDir || undefined)"><Icon name="mdiRefresh" :size="20" />Try Again</button>
             <button v-if="e.installed" class="btn" data-focus data-key="vs-settings" @click="settings"><Icon name="mdiTune" :size="20" />Settings<span v-if="e.changed" class="count-dot">{{ e.changed }}</span></button>
             <button class="btn" data-focus data-key="vs-more" @click="more"><Icon name="mdiDotsHorizontal" :size="20" />More</button>
           </div>
@@ -35,6 +36,7 @@
           <div v-if="e.copy"><b>Your Copy</b><span class="mono">{{ short(e.copy.source) }}{{ e.copy.version ? ' · version ' + e.copy.version : '' }}{{ e.copy.id ? ' · ' + e.copy.id : '' }}</span></div>
           <div v-for="(n, i) in [...(e.copy?.notes || []), ...e.installNotes]" :key="'n' + i"><b>{{ i ? '' : 'Note' }}</b><span>{{ n }}</span></div>
           <div><b>Runs With</b><span>{{ runsWith }}</span></div>
+          <div v-if="e.installed && e.state !== 'get'"><b>Steam</b><span>{{ steamText }}</span></div>
           <div v-if="e.installed"><b>Here</b><span class="mono">{{ short(e.installed.dir) }}</span></div>
           <div><b>Checked</b><span>{{ checked }}</span></div>
         </div>
@@ -54,7 +56,7 @@ import Icon from './Icon.vue';
 import Btn from './Btn.vue';
 
 const props = defineProps({ id: String });
-const el = ref(null), e = ref(null), why = ref(''), copies = ref([]), runner = ref(undefined), kept = ref([]), saveBaks = ref([]);
+const el = ref(null), e = ref(null), why = ref(''), needUpd = ref(''), copyBad = ref(false), lastDir = ref(''), copies = ref([]), runner = ref(undefined), kept = ref([]), saveBaks = ref([]);
 const short = (p) => String(p || '').replace(store.info?.home || '\0', '~');
 const job = computed(() => bgJob('recomp:' + props.id) || bgJob('recompprep:' + props.id) || (copyRom.value ? dlJob.value : null));
 const startAt = ref(0);
@@ -77,6 +79,7 @@ const runsWith = computed(() => {
   return `Its Windows build, through ${r.kind === 'umu' ? 'umu-launcher and ' : ''}${r.name}${r.kind === 'sniper' ? ' in Steam’s runtime' : ''}. Cartridge keeps its own Proton folder for it.`;
 });
 const checked = computed(() => { const v = e.value.verified; if (!v) return ''; const d = new Date(v.on); return `${isNaN(d) ? v.on : d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}, with release ${v.release}. ${v.played ? 'Played through on a device.' : 'Installs and starts are checked; tell Cartridge’s author how it plays.'}`; });
+const steamText = computed(() => { const i = e.value.installed; return i.steam ? 'In Steam, in the Recomps collection.' : i.steamQueued ? 'Waiting to go in: Settings → Steam → Apply (Steam restarts).' : 'Not in Steam yet: More → Add to Steam.'; });
 // the one step that's next
 const step = computed(() => {
   const x = e.value, here = copyRom.value?.here;
@@ -86,10 +89,13 @@ const step = computed(() => {
   }
   if (x.state === 'broken') return { title: 'Its Files Are Missing', sub: 'Something removed the port’s program. Installing it again keeps your saves and settings.', button: 'Repair', icon: 'mdiWrenchOutline' };
   if (x.state === 'game') {
+    // 0.9.72 playtest: an update the copy needs gets its own step and picker, not Set Up again (it failed the same way)
+    if (needUpd.value) return { title: `Needs Update ${needUpd.value}`, sub: 'Your copy is older than the port needs. Pick the update’s dump folder (the one with sce_sys inside); it’s laid over your copy as links, nothing is copied.', button: 'Pick the Update’s Folder', icon: 'mdiFolderOpenOutline' };
     if (here) return { title: 'Set Up With Your Copy', sub: `${copyRom.value.name} from your library, on this device. Cartridge checks it and sets everything up.`, button: 'Set Up', icon: 'mdiCogPlayOutline' };
     if (copyRom.value) return { title: 'Get Your Copy', sub: `${copyRom.value.name} is in your library but not on this device. It downloads, then sets up by itself.`, button: 'Download Your Copy', icon: 'mdiDownload' };
     return { title: 'Your Copy', sub: `${x.wants.title} isn’t in your library. Pick its folder on this device.`, button: 'Pick a Folder', icon: 'mdiFolderOpenOutline' };
   }
+  if (x.state === 'setup' && copyBad.value) return { title: 'That Copy Didn’t Work', sub: 'The port couldn’t use it (see below). Pick another copy, or try this one again.', button: 'Pick Another Copy', icon: 'mdiFolderOpenOutline', again: true };
   if (x.state === 'setup') return { title: 'Finish Setting Up', sub: 'Your copy is picked; its settings and start still need writing.', button: 'Set Up', icon: 'mdiCogPlayOutline' };
   return x.state === 'update' ? { title: 'An Update Is Out', sub: `${x.installed.tag} now, ${x.latest?.tag} out. Your saves are backed up first and this version is kept.` } : { title: 'Ready to Play', sub: `${x.installed.tag} · ${x.changed ? `${x.changed} of ${x.settingsCount} settings changed` : `${plural(x.settingsCount, 'setting')}, all at the port’s own`}` };
 });
@@ -119,6 +125,8 @@ onBeforeUnmount(() => { off.forEach((f) => f?.()); layer?.pop(); });
 async function main() {
   const s = e.value.state;
   if (s === 'get' || s === 'broken') return install();
+  if (s === 'game' && needUpd.value) return pickUpdate();
+  if (s === 'setup' && copyBad.value) return pickCopy();
   if (s === 'game' && !copyRom.value?.here && copyRom.value) { const rom = romById(copyRom.value.romId); if (rom) { waitCopy = true; await download(rom); reopen(); toast('Downloading your copy. It sets up when it’s here.', 'info', 3500, 'mdiDownload'); } return; }
   if (s === 'game' && !copyRom.value) return pickCopy();
   return prepare();
@@ -127,27 +135,36 @@ async function install() {
   why.value = '';
   try {
     const r = await call('recomps:install', { id: props.id });
-    toast(r.already ? 'Already the newest' : r.updated ? `Updated to ${r.tag}` : `${e.value.name} is installed`, 'ok', 2500, 'mdiCheck');
     await load();
-    // straight on: your copy when it's here (owner: minimal input)
-    if (e.value.state === 'game' && copyRom.value?.here) await prepare();
+    // straight on: your copy when it's here (owner: minimal input); one toast for both (0.9.72 playtest: two in a row)
+    if (e.value.state === 'game' && copyRom.value?.here && !r.updated && !r.already) return prepare();
+    toast(r.already ? 'Already the newest' : r.updated ? `Updated to ${r.tag}` : `${e.value.name} is installed`, 'ok', 2500, 'mdiCheck');
   } catch (er) { why.value = er.message; load(); }
 }
-async function prepare(dir) {
-  why.value = '';
+async function prepare(dir, update) {
+  why.value = ''; copyBad.value = false;
   try {
-    const r = await call('recomps:prepare', { id: props.id, ...(dir ? { dir } : {}) });
-    if (!r.ok) why.value = r.why || (r.problems || []).join(' ');
-    else toast(`${e.value.name} is ready`, 'ok', 2500, 'mdiCheck');
+    const r = await call('recomps:prepare', { id: props.id, ...(dir ? { dir } : {}), ...(update ? { update } : {}) });
+    if (r.dir) lastDir.value = r.dir;
+    needUpd.value = !r.ok && r.needsUpdate ? r.needsUpdate : '';
+    if (!r.ok) { why.value = r.why || (r.problems || []).join(' '); copyBad.value = !r.needsUpdate && !r.noCopy && !r.notInstalled; }
+    else toast(`${e.value.name} is ready${r.steamQueued ? ' and on its way to Steam' : ''}`, 'ok', 3000, 'mdiCheck');
   } catch (er) { why.value = er.message; }
-  load();
+  await load();
+  // a failure that left the copy recorded shows as 'setup': only then is it the copy's fault
+  if (e.value?.state !== 'setup') copyBad.value = false;
+}
+async function pickUpdate() {
+  const dir = await pickFolder({ title: `Update ${needUpd.value} for ${e.value.wants.title}`, subtitle: 'The update’s dump folder: the one holding sce_sys', start: lastDir.value ? lastDir.value.replace(/\/[^/]+$/, '') : store.info?.home, hidden: true });
+  reopen();
+  if (dir) await prepare(lastDir.value || undefined, dir);
 }
 async function pickCopy() {
   const dir = await pickFolder({ title: `Your Copy of ${e.value.wants.title}`, subtitle: 'The dump folder: the one holding eboot.bin and sce_sys', start: store.info?.home, hidden: true, ...(e.value.wants.pkg ? { files: ['pkg'] } : {}) });
   reopen();
   if (dir) await prepare(dir);
 }
-async function play(start) { why.value = ''; try { await call('recomps:open', { id: props.id, start }); } catch (er) { why.value = er.message; } }
+async function play(start) { why.value = ''; try { await call('recomps:open', { id: props.id, start }); toast(`Starting ${e.value.starts.length > 1 ? curStart.value.name : e.value.name}`, 'info', 2500, 'mdiPlay'); } catch (er) { why.value = er.message; } }
 function settings() { openModal('gamesettings', { recomp: props.id, name: e.value.name, romId: e.value.roms?.[0] ?? null }).then(() => load()); }
 async function more() {
   const x = e.value, inst = x.installed;
@@ -169,7 +186,7 @@ async function more() {
     if (v === 'steam') { const r = await call('recomps:steam', { id: props.id }); toast(r.added ? 'Added to Steam, in Recomps' : 'Queued: Settings → Steam → Apply adds it (Steam restarts)', r.added ? 'ok' : 'info', 4000, 'mdiSteam'); }
     if (v === 'copy') await pickCopy();
     if (v === 'build') { await call('recomps:install', { id: props.id, build: x.build === 'linux' ? 'windows' : 'linux' }); toast('Switched', 'ok', 2000, 'mdiCheck'); }
-    if (v === 'check') await call('recomps:check', { id: props.id, force: true });
+    if (v === 'check') { const c = await call('recomps:check', { id: props.id, force: true }); toast(c?.tag && c.tag !== inst.tag && !c.none ? `${c.tag} is out` : c?.none ? 'No newer build for this system' : `${inst.tag} is the newest`, 'info', 3000, 'mdiRefresh'); }
     if (v === 'roll') { const t = await choose({ title: 'Roll Back', message: `In use: ${inst.tag}. Saves are backed up before switching.`, options: kept.value.map((k) => ({ label: k.tag, sub: `Kept ${ago(k.at)}`, value: k.tag, icon: 'mdiHistory', raw: true })) }); reopen(); if (t) await call('recomps:useVersion', { id: props.id, tag: t }); }
     if (v === 'baks') { const s = await choose({ title: 'Save Backups', message: 'Pick one to put back. The saves there now are backed up first.', options: saveBaks.value.map((b) => ({ label: new Date(b.at).toLocaleString(), sub: `${b.tag || ''} · ${b.files} ${b.files === 1 ? 'file' : 'files'}`, value: b.stamp, icon: 'mdiContentSaveOutline', raw: true })) }); reopen(); if (s && (await confirm('Put This Backup Back?', 'Its save files replace the ones there now. Files made since stay where they are.', 'Put It Back'))) { reopen(); await call('recomps:restore', { id: props.id, stamp: s }); toast('Put back', 'ok', 2000, 'mdiCheck'); } reopen(); }
     if (v === 'page') window.open(x.url, '_blank');

@@ -4225,7 +4225,7 @@ const handlers09 = {
 const MAIN = {
   log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob,
   get broadcast() { return broadcast; }, get webFetch() { return webFetch; }, get romName() { return romName; }, get isDir() { return isDir; }, get romIndexMain() { return romIndexMain; },
-  get steamMgr() { return steamMgr; }, get installedMap() { return installedMap; }, get library() { return library; }, get runOn() { return runOn; }, get gameFocus() { return gameFocus; }, get trophySvc() { return trophySvc; },
+  get steamMgr() { return steamMgr; }, get config() { return config; }, get installedMap() { return installedMap; }, get library() { return library; }, get runOn() { return runOn; }, get gameFocus() { return gameFocus; }, get trophySvc() { return trophySvc; },
   USER_DATA,
 };
 const RIPC = require('./recompsIpc')(MAIN);
@@ -6268,7 +6268,8 @@ function recompTrophies() { return RIPC.recompTrophies(); }
 function emugetRows() {
   const G = require('./emuGet'), have = steamMgr.installedEmulators();
   const isHere = (e, key) => {
-    if (e.id === 'retroarch') return ['snes', 'psx', 'genesis'].some((k) => (steamMgr.candidatesFor(k) || []).some((c) => /^ra:/.test(c.id)));
+    // RetroArch counts once it's here, with or without cores (0.9.72 playtest: a Flatpak with no cores yet showed Download)
+    if (e.id === 'retroarch') return steamMgr.retroarchHere() || ['snes', 'psx', 'genesis'].some((k) => (steamMgr.candidatesFor(k) || []).some((c) => /^ra:/.test(c.id)));
     if (have.some((x) => x.id === e.id)) return true;
     const ck = { retro: 'snes', gc: 'gc' }[key] || key;
     return (steamMgr.candidatesFor(ck) || []).some((c) => c.id.split('@')[0] === e.id);

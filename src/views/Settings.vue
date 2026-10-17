@@ -1140,7 +1140,14 @@ async function fixIssue(i) {
 watch(sec, (v) => { store.settingsSection = v; if (v === 'emu') { loadIssues(); loadBios(); } }, { immediate: true });
 
 
-function enter() { const f = [...(paneEl.value?.querySelectorAll('[data-focus]') || [])].find((x) => !x.closest('.hub-back') && x.offsetParent); f ? (f.focus({ preventScroll: true }), f.scrollIntoView({ block: 'nearest' })) : focusFirst(paneEl.value); }
+// a section that loads its rows (Online Play, Steam) has only All Settings at first: wait for its rows a moment
+// before falling back to it (0.9.72 playtest: focus stayed on All Settings)
+function enter(tries = 12) {
+  const f = [...(paneEl.value?.querySelectorAll('[data-focus]') || [])].find((x) => !x.closest('.hub-back') && x.offsetParent);
+  if (f) { f.focus({ preventScroll: true }); f.scrollIntoView({ block: 'nearest' }); return; }
+  if (tries > 0 && paneEl.value) { setTimeout(() => { if (!paneEl.value?.contains(document.activeElement) || document.activeElement?.closest('.hub-back')) enter(tries - 1); }, 120); if (tries === 12) focusFirst(paneEl.value); return; }
+  focusFirst(paneEl.value);
+}
 // a press on a section: with a controller or keys it was already focused (and chosen), so A goes in; a tap or click
 // chooses it (0.9.49, owner: tapping the left list did nothing; a touch never moves focus, so @focus never ran)
 // a tap or click also moves focus there (0.9.51, owner: touch didn't light the list like the controller does): the

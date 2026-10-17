@@ -7,6 +7,14 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 17 Oct 2026 · 0.9.72 · Played and Fixed
+
+**Asked:** host a playtest with about ten playtesters (UI, UX, recomps, Online Play, saves, emulator setup, Steam, smoothness), recomps the main focus, compile their points into fixes and fix them.
+
+**Done:** the real app in a fake home against the fake RomM, ports installed from their real release files; findings and fixes in docs/playtest-0.9.72.md, wiring in handover Part 19. Checked after: the same rig (update picker, Steam add and Apply into shortcuts.vdf, stale queue, RetroArch), `npm test` 382 pass, build, launch check, `npm run audit:ui`.
+
+**Left for the owner:** device tests at the end of Part 19; Part 9 items 23 to 25 (tested versions in recipes, P.T.'s files, ports on the Steam page).
+
 ## 17 Oct 2026 · 0.9.71 · Every Promise Kept
 
 **Asked:** do everything still promised (handover Part 9, the playtest wishes, the GSAP remainder, Play as PC Port, port trophies, hashes, the draft tool, the played mark) and my eight recommendations, starting with the recommendations, and let users switch to beta and nightly versions in the update menu.
