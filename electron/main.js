@@ -2331,6 +2331,9 @@ function afterInstall(romId) {
 const patchesMod = require('./patches');
 const cheatsMod = require('./cheats');
 const webFetch = require('./webFetch'); // outside services through Chromium's network stack (0.9.17: 403s)
+// 0.9.71: a fork list fetched since the release (forks-refresh) replaces the shipped one when it's newer
+const FORKS_FILE = path.join(USER_DATA, 'forks.json');
+try { const kept = loadJson(FORKS_FILE, null); if ((kept?.rev || 0) > (require('./forks.json').rev || 0)) require('./emulators').setForks(kept); } catch {}
 // add-ons Cartridge installed (0.9.17): { key: { dest, files, ... } }; Remove deletes only those files
 // The web and mods engines (0.9.52): one place for outside services, one shape for every mod source (web.js, modEngine.js)
 let webEngine = null, modEngine = null;
@@ -3408,6 +3411,13 @@ function createWindow() {
     // recomps' releases checked once a day, silently (owner: "without consuming many resources")
     scheduler.add('recomp-folders', { once: true, firstAfter: 25000, deferWhilePlaying: true, run: async () => { try { recomps().ensureFolders(); } catch (e) { log('recomp folders', e.message); } recompTrophies(); } });
     scheduler.add('recomps-refresh', { every: 24 * 3600e3, firstAfter: 5 * 60000, deferWhilePlaying: true, run: async () => { if (config.recomps?.daily === false) return; /* 0.9.69: Settings → Recomps, Check Every Day */ const r = await recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }); log('recomps refreshed', JSON.stringify(r)); } });
+    // 0.9.71: the fork list from Cartridge's repository (a newer rev than the one shipped or kept wins)
+    scheduler.add('forks-refresh', { every: 24 * 3600e3, firstAfter: 6 * 60000, deferWhilePlaying: true, run: async () => {
+      const res = await webFetch('https://raw.githubusercontent.com/abdu2304/cartridge/main/electron/forks.json', { signal: AbortSignal.timeout(20000) });
+      if (!res.ok) throw new Error('forks.json answered ' + res.status);
+      const d = await res.json(), have = loadJson(FORKS_FILE, null) || require('./forks.json');
+      if ((d?.rev || 0) > (have?.rev || 0) && require('./emulators').setForks(d)) { saveJson(FORKS_FILE, d); log('forks list updated to rev', d.rev); }
+    } });
     scheduler.add('bios-check', { once: true, firstAfter: 45000, deferWhilePlaying: true, run: () => biosSetup({ install: true }).catch(() => {}) }); // 0.9.38: firmware too, when an emulator lacks it
   }
   win.webContents.once('did-finish-load', () => log('ui loaded', Date.now() - startedAt + 'ms', 'window=' + win.getContentSize().join('x'), 'zoom=' + currentZoom()));
