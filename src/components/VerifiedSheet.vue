@@ -68,7 +68,7 @@ const runsWith = computed(() => {
   if (!r) return 'Its Windows build, through Proton, which isn’t installed here. Installing Steam brings it.';
   return `Its Windows build, through ${r.kind === 'umu' ? 'umu-launcher and ' : ''}${r.name}${r.kind === 'sniper' ? ' in Steam’s runtime' : ''}. Cartridge keeps its own Proton folder for it.`;
 });
-const checked = computed(() => { const v = e.value.verified; if (!v) return ''; const d = new Date(v.on); return `${isNaN(d) ? v.on : d.toLocaleDateString()}, with release ${v.release}. ${v.played ? 'Played through on a device.' : 'Installs and starts are checked; tell Cartridge’s author how it plays.'}`; });
+const checked = computed(() => { const v = e.value.verified; if (!v) return ''; const d = new Date(v.on); return `${isNaN(d) ? v.on : d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}, with release ${v.release}. ${v.played ? 'Played through on a device.' : 'Installs and starts are checked; tell Cartridge’s author how it plays.'}`; });
 // the one step that's next
 const step = computed(() => {
   const x = e.value, here = copyRom.value?.here;

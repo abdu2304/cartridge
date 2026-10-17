@@ -3,7 +3,7 @@
     <div v-if="!base" class="center"><div class="spinner" /></div>
     <template v-else>
       <section class="g-banner">
-        <img v-if="banner.src" class="g-banner-img" alt="" :class="{ blur: banner.blur }" :src="banner.src" @error="bannerFail = true" />
+        <img v-if="banner.src" :key="banner.src" class="g-banner-img" alt="" :class="{ blur: banner.blur }" :src="banner.src" @error="(e) => (bannerFail ? (e.target.style.visibility = 'hidden') : (bannerFail = true))" /><!-- 0.9.70 playtest: when the cover fails too, no broken-picture icon -->
         <div class="g-banner-shade" />
         <div class="g-banner-logo"><GameLogo :logo="store.config.ui.logos !== false ? logoOf(base) : null" :name="base.name" cls="g-title" :area="40000" :max-w="560" :max-h="150" /></div>
       </section>
@@ -118,7 +118,7 @@
           <template v-if="shots.length">
             <div class="shelf-title" style="margin-top: 22px"><Icon name="mdiImageMultipleOutline" :size="20" />Screenshots</div>
             <div class="shelf shots" data-hscroll>
-              <button v-for="(s, i) in shots" :key="s" class="shot" data-focus :aria-label="`Screenshot ${i + 1}`" @click="viewer = i"><img :src="img(s)" loading="lazy" alt="" /></button>
+              <button v-for="(s, i) in shots" :key="s" class="shot" data-focus :aria-label="`Screenshot ${i + 1}`" @click="viewer = i"><img :src="img(s)" loading="lazy" alt="" @error="(e) => (e.target.style.visibility = 'hidden')" /></button>
             </div>
           </template>
           <template v-if="detail?.sibling_roms?.length">

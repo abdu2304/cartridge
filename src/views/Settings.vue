@@ -1461,7 +1461,7 @@ onMounted(() => {
 .gf { display: flex; align-items: center; gap: var(--s-3); padding: 14px 16px; border-radius: var(--r-md); }
 .gf-ico { flex: none; color: var(--text-2, var(--muted)); }
 .gf-name { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-size: var(--t-md); }
-.gf-path { overflow-wrap: anywhere; color: var(--text-2, var(--muted)); }
+.gf-path { display: block; overflow-wrap: anywhere; color: var(--text-2, var(--muted)); }
 .gf-bar { display: block; height: 5px; max-width: 320px; margin: 6px 0 2px; }
 .wrap-seg { flex-wrap: wrap; align-self: flex-start; }
 .lookpages { display: flex; align-items: center; gap: var(--s-2); flex-wrap: nowrap; min-width: 0; }
