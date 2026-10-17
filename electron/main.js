@@ -5152,6 +5152,12 @@ const handlers = {
   // Add to Steam: queued and applied straight away when Steam can be changed while it runs; otherwise it waits for
   // Apply in Settings → Steam (Steam restarts for that), and the screen says so
   'recomps:steam': async ({ id }) => {
+    if (recomps().byId(id)?.from === 'verified') {
+      const specs = verifiedShortcutSpecs(id);
+      steamMgr.queueAdd(specs.map((sp) => ({ recomp: sp })));
+      if (await steamMgr.liveNow()) { await steamMgr.apply({ restart: false }); const sc = steamMgr.recompShortcut(specs[0].id); return { added: true, appid: sc?.appid || null, count: specs.length }; }
+      return { queued: true, count: specs.length };
+    }
     const spec = recompShortcutSpec(id);
     steamMgr.queueAdd([{ recomp: spec }]);
     if (await steamMgr.liveNow()) {
@@ -5164,8 +5170,9 @@ const handlers = {
   },
   // open it: a Linux build directly (its folder as the working folder), a Windows build through its Steam shortcut so
   // Proton uses the same prefix as play (owner: Windows setup must run through Proton)
-  'recomps:open': async ({ id }) => {
+  'recomps:open': async ({ id, start }) => {
     const R = recomps(), rec = R.record(id), e = R.byId(id);
+    if (e?.from === 'verified') return openVerified(id, start);
     if (!rec || !fs.existsSync(rec.program)) throw new Error('Install it first.');
     // 0.9.67: a recomp that isn't set up yet builds its own files on this start: watched as a background job
     if (!R.ready(id)) setTimeout(() => recompSetupWatch(id), 4000);
@@ -5202,6 +5209,25 @@ const handlers = {
     return r;
   },
   'recomps:folders': () => ({ made: recomps().ensureFolders(), roots: emulationFolders().map((d) => path.join(d, 'recomp')) }),
+  // ---- Cartridge Verified (0.9.70): your copy from the library (or a folder you pick), checked and set up; the
+  // port's settings in Cartridge; Proton found for Windows builds
+  'recomps:copies': ({ id }) => verifiedCopies(id),
+  'recomps:prepare': async ({ id, dir }) => {
+    const R = recomps(), e = R.byId(id);
+    if (e?.from !== 'verified') throw new Error('That isn’t a Cartridge Verified game.');
+    let use = dir;
+    if (!use) {
+      const copies = verifiedCopies(id).filter((c) => c.here);
+      if (!copies.length) return { ok: false, noCopy: true, why: `${e.recipe.game.title} isn’t on this device yet. Download it from your library first.` };
+      use = copies[0].path;
+    }
+    const r = await R.setVerifiedGame(id, use, { candidates: updateCandidates(use) });
+    recompTrophies();
+    return r;
+  },
+  'recomps:settings': ({ id }) => recomps().settings(id),
+  'recomps:setSettings': async ({ id, changes }) => { const d = await recomps().setSettings(id, changes); log('verified settings', id, (changes || []).map((x) => `${x.id}=${x.value}`).join(' ')); return d; },
+  'recomps:runner': () => { const r = require('./protonRunner').find({ roots: (() => { try { return steamMgr.steamRoots(); } catch { return []; } })() }); return r ? { kind: r.kind, name: r.name } : null; },
   'emuget:cancel': () => { emuGetRun?.abort.abort(); return true; },
   // emulator updates (0.9.16): each installed copy, its version and whether a newer one is out
   // 0.9.37 (owner: slow to open, and RPCS3 said it had an update while Cartridge said up to date): cached answers
@@ -6297,7 +6323,20 @@ function recomps() {
     search: (q2) => require('./github').search(q2),
     recompRoot: () => path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'),
     recompRoots: () => emulationFolders().map((d) => path.join(d, 'recomp')),
-    catalogueUrl: 'https://raw.githubusercontent.com/abdu2304/cartridge/main/electron/recomps.json',
+    // Cartridge Verified (0.9.70): newer recipes from the repository, the Proton runner for Windows builds, and the
+    // port's own installer or Proton's wineboot run and waited for (off the main thread: spawned, never execSync)
+    recipesUrl: 'https://raw.githubusercontent.com/abdu2304/cartridge/main/electron/recipes/index.json',
+    runner: () => require('./protonRunner').find({ roots: (() => { try { return steamMgr.steamRoots(); } catch { return []; } })() }),
+    runProgram: (cmd, args, { cwd, env: extra = {}, timeoutMs = 10 * 60e3 } = {}) => new Promise((ok, bad) => {
+      const env = { ...process.env, ...extra }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+      let tail = '';
+      const p = require('child_process').spawn(cmd, args, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      const keep = (b) => { tail = (tail + b).slice(-3000); };
+      p.stdout.on('data', keep); p.stderr.on('data', keep);
+      const t = setTimeout(() => { try { process.kill(-p.pid, 'SIGTERM'); } catch {} bad(new Error('It took too long and was stopped.')); }, timeoutMs);
+      p.once('error', (e) => { clearTimeout(t); bad(new Error(e.code === 'EACCES' ? 'It isn’t allowed to run.' : e.message)); });
+      p.once('exit', (code) => { clearTimeout(t); log('verified run', path.basename(cmd), args[0] || '', 'exit', code); if (code === 0) ok(tail); else bad(new Error(tail.trim().split('\n').pop() || `It stopped (exit ${code}).`)); });
+    }),
   });
   return recompsEng;
 }
@@ -6310,7 +6349,7 @@ function ssUnits(opts) {
     const R = recomps(), RC = require('./recomps'), roms = libraryRoms();
     for (const e of R.catalogue().entries) {
       const rec = R.record(e.id);
-      if (!rec || !e.saves?.length) continue;
+      if (!rec || !(e.saves?.length || e.from === 'verified')) continue;
       const romIds = RC.matchRoms(e, roms);
       R.saveDirs(e.id).filter((d) => path.resolve(d) !== path.resolve(rec.dir)).forEach((d, i) => {
         const key = i ? `${e.id}-${i}` : e.id;
@@ -6342,6 +6381,44 @@ let libRomsMemo = { roms: null, list: [] };
 const libraryRoms = () => { const r = library?.roms || null; if (libRomsMemo.roms !== r) libRomsMemo = { roms: r, list: r ? Object.values(r).flat() : [] }; return libRomsMemo.list; };
 let recompRun = null;
 // a recomp's Steam shortcut: its program, its folder as Start In, its arguments; art from the game when it's in the library
+// ---- Cartridge Verified (0.9.70)
+// your copies of a verified game: the library's matching games, on this device or not, with where they are
+function verifiedCopies(id) {
+  const R = recomps(), e = R.byId(id);
+  if (!e) return [];
+  return require('./recomps').matchRoms(e, libraryRoms()).map((rid) => { const where = installedMap[rid] || null; return { romId: rid, name: romName(rid), path: where, here: !!(where && fs.existsSync(where)) }; });
+}
+// folders that may hold an update for a game: beside it, inside it (one level) and the library's other PS4 copies
+function updateCandidates(dir) {
+  const out = new Set(), kids = (d) => { try { return fs.readdirSync(d, { withFileTypes: true }).filter((x) => x.isDirectory() || x.isSymbolicLink()).map((x) => path.join(d, x.name)); } catch { return []; } };
+  for (const d of [...kids(path.dirname(dir)), ...kids(dir)]) out.add(d);
+  for (const r of libraryRoms()) if (/^ps4/i.test(r.platform_slug || '') && installedMap[r.id]) { out.add(installedMap[r.id]); for (const d of kids(installedMap[r.id])) out.add(d); }
+  return [...out].slice(0, 600);
+}
+// a verified game started: its start script (one per game for Uncharted), the window stepping aside in Game Mode
+async function openVerified(id, start) {
+  const R = recomps(), rec = R.record(id), e = R.byId(id);
+  if (!rec) throw new Error('Install it first.');
+  if (!R.ready(id)) throw new Error(rec.game?.path ? `${e.name} isn’t set up yet. Press Set Up.` : `Pick your copy of ${e.recipe.game.title} first.`);
+  const st = rec.starts.find((x) => x.id === start) || rec.starts[0];
+  const runLog = path.join(USER_DATA, 'emulator-runs', `verified-${id}.log`);
+  let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
+  const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+  const p = require('child_process').spawn('/bin/sh', [st.script], { cwd: rec.dir, env, detached: true, stdio: ['ignore', fd, fd] });
+  if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
+  return new Promise((ok, bad) => {
+    p.once('error', (er) => bad(new Error(`It didn’t start: ${er.message}`)));
+    p.once('spawn', () => { log('verified opened', id, st.id); if (isGamescope()) { broadcast('background', { away: true }); p.once('exit', () => { broadcast('background', { away: false }); refocus(); }); } p.unref(); ok({ via: 'script', start: st.id }); });
+  });
+}
+// one Steam shortcut per start: its start script as the program (Proton, settings and the right game are in it),
+// art from your copy in the library
+function verifiedShortcutSpecs(id) {
+  const R = recomps(), e = R.byId(id), rec = R.record(id);
+  if (!e || !rec?.starts?.length) throw new Error('Set it up first.');
+  const romIds = require('./recomps').matchRoms(e, libraryRoms());
+  return rec.starts.map((st) => ({ id: rec.starts.length > 1 ? `${id}:${st.id}` : id, name: st.name, exe: st.script, start: rec.dir, args: '', game: e.recipe.game.title, artRomId: romIds[0] ?? null }));
+}
 function recompShortcutSpec(id) {
   const R = recomps(), e = R.byId(id), rec = R.record(id);
   if (!e || !rec) throw new Error('Install it first.');

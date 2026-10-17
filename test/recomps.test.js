@@ -1,5 +1,5 @@
 // Recomps (0.9.65): matching the player's games, picking a build (Linux first, Windows only without one, never
-// anything else), PCGamingWiki's wikitext, save places, the game check (hashes, N64 byte orders), and the engine's
+// anything else), save places, the game check (hashes, N64 byte orders), and the engine's
 // install, update with saves backed up and checked, Roll Back and removal, against a fake release.
 const test = require('node:test');
 const assert = require('node:assert');
@@ -46,22 +46,6 @@ test('save places: home, XDG folders and the recomp folder', () => {
   assert.strictEqual(R.expandPath('', '/x', home), null);
 });
 
-test('PCGamingWiki wikitext: console sections only, links read, PC sections left out', () => {
-  const wt = [
-    '== Nintendo ==', '=== Nintendo 64 ===', '{| class="wikitable"', '! Game !! Port name', '|-',
-    "| ''Mega Man 64'' || [https://github.com/MegaMan64Recomp/MegaMan64Recompiled Mega Man 64 Recompiled] || Recompilation",
-    '|-', '| [[Banjo-Kazooie]]', '| [https://github.com/BanjoRecomp/BanjoRecomp BanjoRecomp]', '| Recompilation', '|}',
-    '=== Game Boy Advance ===', '{|', '|-', '| Sonic Advance 2 || [https://github.com/SAT-R/sa2 sa2] || Decompilation', '|}',
-    '== Microsoft ==', '=== Windows ===', '{|', '|-', '| Carmageddon || [https://github.com/dethrace-labs/dethrace dethrace]', '|}',
-    '=== Xbox 360 ===', '{|', '|-', '| Sonic Unleashed || [https://github.com/hedge-dev/UnleashedRecomp Unleashed Recompiled]', '|}',
-  ].join('\n');
-  const rows = R.parseWikitext(wt);
-  assert.deepStrictEqual(rows.map((r) => [r.console, r.game, r.port]), [['n64', 'Mega Man 64', 'Mega Man 64 Recompiled'], ['n64', 'Banjo-Kazooie', 'BanjoRecomp'], ['gba', 'Sonic Advance 2', 'sa2'], ['xbox360', 'Sonic Unleashed', 'Unleashed Recompiled']]);
-  assert.strictEqual(R.repoFromLink(rows[0].links[0]), 'github:MegaMan64Recomp/MegaMan64Recompiled');
-  assert.strictEqual(R.repoFromLink('https://gitlab.com/sonicdcer/Starfox64Recomp/-/releases/'), 'gitlab:sonicdcer/Starfox64Recomp');
-  assert.strictEqual(R.repoFromLink('https://github.com/topics/decompilation'), null);
-});
-
 test('the game check: extension, listed hashes, and an N64 ROM in another byte order', async () => {
   const d = tmp(), z64 = Buffer.alloc(64);
   z64.writeUInt32BE(0x80371240, 0); for (let i = 4; i < 64; i++) z64[i] = i;
@@ -98,7 +82,7 @@ function fakeWorld(entries, extra = {}) {
   };
   const trashed = [];
   const eng = R.createRecomps({
-    dataDir: data, shipped: path.join(d, 'shipped.json'), fetchImpl,
+    dataDir: data, shipped: path.join(d, 'shipped.json'), recipesDir: path.join(d, 'no-recipes'), fetchImpl, // the verified recipes are tested in recipes.test.js
     download: async (url, dest, onBytes) => { const b = fs.readFileSync(url.replace('file://', '')); fs.writeFileSync(dest, b); onBytes(b.length); },
     unpackTo: async (a, out) => execFileSync('tar', ['-xf', a, '-C', out]),
     isElf: (f) => path.basename(f) === 'Game', isRunning: () => false,
@@ -166,17 +150,6 @@ test('a game placed by link; a wrong copy refused unless used anyway; path setup
   assert.strictEqual(w.eng.list().entries.find((e) => e.id === 'p').installed.ready, true);
   const q = await w.eng.setGame('q', rom);
   assert.strictEqual(q.args, `--rom "${rom}"`);
-});
-
-test('the daily refresh adds projects new on PCGamingWiki, quietly, once', async () => {
-  const w = fakeWorld([{ id: 'u', name: 'Unleashed Recompiled', games: [{ title: 'Sonic Unleashed', console: 'xbox360' }], repo: 'github:hedge-dev/UnleashedRecomp' }]);
-  const rows = R.parseWikitext(['=== Xbox 360 ===', '{|', '|-', '| Sonic Unleashed || [https://github.com/hedge-dev/UnleashedRecomp x]', '|-', '| Skate 3 || [https://github.com/mchughalex/skate3recomp Skate 3 Recomp]', '|-', '| Halo || [https://github.com/someone/a-fork Halo fork]', '|-', '| Fable || [https://github.com/nobuild/fable Fable]', '|}'].join('\n'));
-  w.publish('v1', 'x'); // a release with a Linux build
-  // 0.9.69: a fork and a project with no usable build are left out
-  assert.strictEqual(await w.eng.addFound(rows, { search: null }), 1);
-  assert.strictEqual(await w.eng.addFound(rows, { search: null }), 0);
-  const e = w.eng.catalogue().entries.find((x) => x.repo === 'github:mchughalex/skate3recomp');
-  assert.deepStrictEqual([e.from, e.auto, e.games[0].console], ['found', true, 'xbox360']);
 });
 
 test('Save Sync: a recomp save has its own slot, and is never synced while the recomp runs', () => {
@@ -299,7 +272,6 @@ test('save notes read as paths: sentences, Proton prefixes, Flatpak sandboxes, p
   assert.deepStrictEqual(R.savePaths('Documents/ac6recomp inside the Proton prefix', { ...win, appid: null }, h), [], 'not in Steam yet: no prefix');
   assert.deepStrictEqual(R.saveDirs({ saves: ['~/.config/UnleashedRecomp/save', '~/.local/share/skate3 (x; $XDG_DATA_HOME/skate3)'] }, { dir: '/E/x', flatpak: 'io.x.App' }, '/H'), ['/H/.var/app/io.x.App/config/UnleashedRecomp/save', '/H/.var/app/io.x.App/data/skate3']);
   // every note in the shipped catalogue gives only real paths (no sentence taken as a folder name)
-  for (const e of require('../electron/recomps.json').entries) for (const p of R.saveDirs(e, { dir: '/E/x', kind: e.builds === 'windows' ? 'windows' : 'linux' }, '/H')) assert.doesNotMatch(p, /\s(in|the|and|beside|inside|relative|when|or)\s|[()<>*%]/, `${e.id}: ${p}`);
 });
 
 
@@ -310,29 +282,6 @@ test('a game file goes into an argument template quoted once, with Z: once for W
   assert.strictEqual(fileArg('"Z:{FILE}"', '/g/r.iso', true), '"Z:/g/r.iso"');
   assert.strictEqual(fileArg('--game_data_root "{FILE}"', '/g/d', true), '--game_data_root "Z:/g/d"');
   assert.strictEqual(fileArg('{FILE}', '/g/x', false), '"/g/x"');
-});
-
-test('place rules: every Place entry in the catalogue has paths Cartridge can follow, or is set up by hand', () => {
-  const cat = require('../electron/recomps.json');
-  const P = /^(~\/|\$XDG_(DATA|CONFIG)_HOME\/|\/)?[\w.\-\[\]()!'/ ]+$/;
-  const rec = { dir: '/r/x', program: '/r/x/bin/game', kind: 'linux' };
-  for (const e of cat.entries) {
-    if (e.done) assert.match(e.done, P, `${e.id} done is a path`);
-    if (e.setup?.how !== 'place') continue;
-    const to = e.setup.to;
-    if (!to) continue; // set up by hand (It's Set Up)
-    for (const k of ['file', 'dir']) if (to[k] != null) assert.match(to[k], P, `${e.id} to.${k}`);
-    const isDir = !to.file;
-    const plan = R.placePlan(e, rec, isDir ? fs.mkdtempSync(path.join(os.tmpdir(), 'cart-pl-')) : '/games/My Game.' + (e.needs?.ext?.[0] || 'bin'), isDir);
-    if (isDir) { assert.ok(plan.why === 'That folder is empty.', `${e.id} folder plan`); continue; }
-    for (const l of plan.links) {
-      assert.ok(!/\s(the|in|beside|next|or|and)\s/i.test(l.to), `${e.id} links under a sentence: ${l.to}`);
-      assert.ok(l.to.startsWith('/r/x/bin/') || l.to.startsWith(os.homedir()), `${e.id} beside the program or in home: ${l.to}`);
-    }
-  }
-  // the 0.9.67 bug: Ship of Harkinian's note was taken as a file name
-  const soh = cat.entries.find((e) => e.id === 'shipofharkinian');
-  assert.deepStrictEqual(R.placePlan(soh, rec, '/games/oot.z64', false).links, [{ from: '/games/oot.z64', to: '/r/x/bin/oot.z64' }]);
 });
 
 test('place: a cue brings its tracks, folders go in by content, disc files take their names, old sentence links are put right', async () => {

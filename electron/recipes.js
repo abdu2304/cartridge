@@ -1,0 +1,275 @@
+'use strict';
+// Cartridge Verified (0.9.70, owner: "a curated list I update myself via you"): one recipe per game in
+// electron/recipes/<id>.json, each made from that port's own source, so Cartridge sets it up with no input beyond
+// picking the game: the build for this system, your copy from the library, the port's settings (written into the
+// port's own files, the ones its launcher writes), and one start script that Steam and Cartridge both run.
+//
+// A recipe holds:
+//   game      the console game it needs: title, title IDs, what the folder must hold, the version (APP_VER in
+//             sce_sys/param.sfo) and whether an update has to be laid over it
+//   builds    per system (linux first, windows through Proton): the release file, the program, its arguments,
+//             an installer to run instead of unpacking (P.T.), and where its files are:
+//               app   the launcher's settings.json (its --play reads it), json
+//               ini   the game's own settings file: flat (key=value) or ini ([section] key = value)
+//   app       constant keys of settings.json ({game} is your copy); play entries can add their own (Uncharted's
+//             three games are one start each, "start": u1/u2/u3)
+//   settings  every setting Cartridge shows: id, tab, label, type (choice, bool, number, text), def (the port's own
+//             default), options, at: ['app', key] or ['ini', key | [section, key]]
+//   saves     the folders that hold the saves ({dir}, {data}, {config}); per system when they differ
+// Templates: {dir} the install folder, {game} your copy (a Windows path for Windows builds), {home}, {config}
+// ($XDG_CONFIG_HOME), {data} ($XDG_DATA_HOME), {appdata} (AppData/Roaming in Cartridge's Proton prefix), {result}.
+// Tested in test/recipes.test.js.
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+
+const SHIPPED = path.join(__dirname, 'recipes');
+const TYPES = new Set(['choice', 'bool', 'number', 'text']);
+const TPL = /\{(dir|game|home|config|data|appdata|result)\}/g;
+
+// ---- loading and checking: a recipe that fails a check is left out (and named in the log), never half used
+function validate(r) {
+  const bad = [];
+  if (!r || typeof r !== 'object') return ['not an object'];
+  if (r.schema !== 1) bad.push('schema is not 1');
+  if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(r.id || '')) bad.push('id');
+  if (!r.name) bad.push('name');
+  if (!/^github:[\w.-]+\/[\w.-]+$/.test(r.repo || '')) bad.push('repo');
+  if (!r.game?.console || !r.game?.title) bad.push('game');
+  if (!Array.isArray(r.builds) || !r.builds.length) bad.push('builds');
+  for (const b of r.builds || []) {
+    if (!['linux', 'windows'].includes(b.os)) bad.push(`build os ${b.os}`);
+    try { new RegExp(b.asset); } catch { bad.push(`build asset ${b.asset}`); }
+    if (!b.program || /[/\\]\.\.|^\//.test(b.program)) bad.push(`build program ${b.program}`);
+    for (const [k, f] of Object.entries(b.files || {})) if (!['app', 'ini'].includes(k) || !['json', 'flat', 'ini'].includes(f.format) || !/^\{(dir|config|data|appdata)\}\//.test(f.path || '')) bad.push(`build file ${k}`);
+  }
+  const ids = new Set();
+  for (const s of r.settings || []) {
+    if (!s.id || ids.has(s.id)) bad.push(`setting id ${s.id}`); ids.add(s.id);
+    if (!TYPES.has(s.type)) bad.push(`setting ${s.id} type`);
+    if (s.type === 'choice' && !(s.options || []).some(([v]) => String(v) === String(s.def))) bad.push(`setting ${s.id} default not a choice`);
+    if (!Array.isArray(s.at) || !['app', 'ini'].includes(s.at[0])) bad.push(`setting ${s.id} at`);
+  }
+  return bad;
+}
+function loadDir(dir) {
+  const out = [];
+  for (const n of (() => { try { return fs.readdirSync(dir).filter((x) => x.endsWith('.json') && x !== 'index.json').sort(); } catch { return []; } })()) {
+    try { out.push(JSON.parse(fs.readFileSync(path.join(dir, n), 'utf8'))); } catch {}
+  }
+  return out;
+}
+// the shipped recipes, then a newer copy of any of them fetched from Cartridge's repository (its "rev" higher)
+function load({ dir = SHIPPED, fetched = [], log = () => {} } = {}) {
+  const by = new Map();
+  for (const r of [...loadDir(dir), ...(Array.isArray(fetched) ? fetched : [])]) {
+    const bad = validate(r);
+    if (bad.length) { log('recipe left out', r?.id || '?', bad.join(', ')); continue; }
+    const had = by.get(r.id);
+    if (!had || (r.rev || 0) > (had.rev || 0)) by.set(r.id, r);
+  }
+  return [...by.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ---- the build for this system: yours if picked, else Linux, else Windows when Proton (or umu) can run it
+function chooseBuild(r, { pick, runner } = {}) {
+  const b = r.builds || [];
+  const mine = pick && b.find((x) => x.os === pick);
+  if (mine && (mine.os === 'linux' || runner)) return mine;
+  return b.find((x) => x.os === 'linux') || (runner ? b.find((x) => x.os === 'windows') : null) || null;
+}
+const winPath = (p) => 'Z:' + String(p).replace(/\//g, '\\');
+// what the templates stand for, for one install (the prefix is Cartridge's own, beside the install)
+function varsFor(r, build, rec, { home = os.homedir(), env = process.env, game } = {}) {
+  const prefix = prefixOf(rec);
+  const g = game ?? rec?.game?.path ?? '';
+  return {
+    dir: rec.dir, home,
+    config: env.XDG_CONFIG_HOME || path.join(home, '.config'),
+    data: env.XDG_DATA_HOME || path.join(home, '.local/share'),
+    appdata: path.join(prefix, 'pfx/drive_c/users/steamuser/AppData/Roaming'),
+    game: build?.os === 'windows' && g ? winPath(g) : g,
+    gamePosix: g,
+    result: path.join(rec.dir, '.cartridge', 'install-result.txt'),
+    prefix,
+  };
+}
+const prefixOf = (rec) => path.join(rec.dir, '.cartridge', 'proton');
+const expand = (t, v) => String(t).replace(TPL, (_, k) => v[k] ?? '');
+
+// ---- values: yours where you changed one, else the port's own default; settings for another system are left out
+function settingsFor(r, build) { return (r.settings || []).filter((s) => !s.os || s.os === build?.os); }
+function effective(r, build, saved = {}) {
+  const out = {};
+  for (const s of settingsFor(r, build)) out[s.id] = saved[s.id] != null ? saved[s.id] : s.def;
+  return out;
+}
+// a value in the type the port's file holds: settings.json booleans and numbers as JSON, ini values as text
+// (booleans 1/0, as the launchers write them)
+function typed(s, v, where) {
+  if (s.type === 'bool') { const on = v === true || v === 'true' || v === '1' || v === 1; return where === 'app' ? on : on ? '1' : '0'; }
+  if (s.quote && where === 'ini') return `"${String(v ?? '').replace(/"/g, '')}"`; // P.T. writes its text values in quotes
+  if (s.type === 'number') { const n = Number(v); if (!Number.isFinite(n)) return where === 'app' ? s.def : String(s.def); return where === 'app' && typeof s.def === 'number' ? n : String(v); }
+  return v == null ? '' : String(v);
+}
+// a value read back from the port's own file, as Cartridge holds it (so a choice you made in the port's launcher
+// before is kept when Cartridge takes over)
+function untyped(s, v) {
+  if (v == null) return null;
+  if (s.quote) v = String(v).replace(/^"(.*)"$/, '$1');
+  if (s.type === 'bool') return v === true || v === 'true' || v === '1' || v === 1;
+  if (s.type === 'choice' && !(s.options || []).some(([o]) => String(o) === String(v))) return null;
+  return typeof s.def === 'number' && s.type === 'number' ? Number(v) : String(v);
+}
+function check(s, v) {
+  if (v == null) return null;
+  if (s.type === 'choice' && !(s.options || []).some(([o]) => String(o) === String(v))) return `${s.label}: that isn’t one of its choices.`;
+  if (s.type === 'number') {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return `${s.label}: type a number.`;
+    if (s.num && (n < s.num.min || n > s.num.max)) return `${s.label}: ${s.num.min} to ${s.num.max}${s.num.unit ? ' ' + s.num.unit : ''}.`;
+  }
+  if (s.type === 'text' && /[\r\n\0]/.test(String(v))) return `${s.label}: one line only.`;
+  return null;
+}
+
+// ---- the files: the launcher's settings.json for each start (Uncharted: one per game) and the game's own ini.
+// read(path) gives a file's text or null; nothing here touches the disk.
+function render(r, build, rec, values, { read = () => null, home, env } = {}) {
+  const F = require('./onlineFormats').FORMATS, v = varsFor(r, build, rec, { home, env });
+  const files = [], starts = [];
+  const sets = settingsFor(r, build);
+  const appAt = build.files?.app, iniAt = build.files?.ini;
+  // the game's ini: only the keys of the settings shown, every other line kept
+  if (iniAt) {
+    const p = expand(iniAt.path, v);
+    let text = read(p) || '';
+    const fmt = iniAt.format === 'flat' ? flat : F.ini;
+    for (const s of sets.filter((x) => x.at[0] === 'ini')) text = fmt.set(text, Array.isArray(s.at[1]) ? s.at[1] : [s.at[1]], typed(s, values[s.id], 'ini'));
+    files.push({ path: p, text });
+  }
+  const plays = r.play?.length ? r.play : [{ id: 'main', name: r.name }];
+  for (const pl of plays) {
+    const st = { id: pl.id, name: pl.name, sub: pl.sub || '' };
+    if (appAt) {
+      const target = expand(appAt.path, v);
+      let base = {}; try { base = JSON.parse(read(target) || '{}') || {}; } catch {}
+      const json = { ...base };
+      for (const [k, x] of Object.entries({ ...(r.app || {}), ...(pl.app || {}) })) json[k] = typeof x === 'string' ? expand(x, v) : x;
+      for (const s of sets.filter((x) => x.at[0] === 'app')) json[s.at[1]] = typed(s, values[s.id], 'app');
+      const staged = path.join(rec.dir, '.cartridge', `settings-${pl.id}.json`);
+      files.push({ path: staged, text: JSON.stringify(json, null, 2) + '\n' });
+      st.copy = { from: staged, to: target };
+    }
+    st.script = path.join(rec.dir, '.cartridge', plays.length > 1 ? `play-${pl.id}.sh` : 'play.sh');
+    starts.push(st);
+  }
+  return { files, starts, vars: v };
+}
+// flat "key=value" files (bbport.ini, gow3.ini): a key rewritten in place, a missing one added at the end
+const flat = {
+  get(text, [key]) { const m = new RegExp(`^\\s*${esc(key)}\\s*=(.*)$`, 'm').exec(String(text || '')); return m ? m[1].trim() : undefined; },
+  set(text, [key], value) {
+    const nl = /\r\n/.test(text || '') ? '\r\n' : '\n', ls = String(text || '').split(/\r?\n/);
+    if (ls.length && ls[ls.length - 1] === '') ls.pop();
+    const i = ls.findIndex((l) => !/^\s*[#;]/.test(l) && l.includes('=') && l.slice(0, l.indexOf('=')).trim() === key);
+    if (i >= 0) ls[i] = `${key}=${value}`; else ls.push(`${key}=${value}`);
+    return ls.join(nl) + nl;
+  },
+};
+const esc = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+// the values already in the port's files (first set up: what you chose in its own launcher stays)
+function readBack(r, build, rec, { read = () => null, home, env } = {}) {
+  const F = require('./onlineFormats').FORMATS, v = varsFor(r, build, rec, { home, env }), out = {};
+  const iniText = build.files?.ini ? read(expand(build.files.ini.path, v)) : null;
+  let app = null; try { app = build.files?.app ? JSON.parse(read(expand(build.files.app.path, v)) || 'null') : null; } catch {}
+  for (const s of settingsFor(r, build)) {
+    let x;
+    if (s.at[0] === 'ini' && iniText) x = (build.files.ini.format === 'flat' ? flat : F.ini).get(iniText, Array.isArray(s.at[1]) ? s.at[1] : [s.at[1]]);
+    if (s.at[0] === 'app' && app) x = app[s.at[1]];
+    const u = untyped(s, x);
+    if (u != null && String(u) !== String(s.def)) out[s.id] = u;
+  }
+  return out;
+}
+
+// ---- the start script: Steam's shortcut and Cartridge's Play both run it, so a setting changed in Cartridge needs
+// nothing changed in Steam. Linux builds start directly; Windows builds through umu-launcher when it's installed,
+// else Proton inside Steam's own runtime (as Steam starts them), else Proton by itself, always in Cartridge's prefix
+// beside the install. The launcher's settings.json for this start is copied into place first.
+const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+function script(r, build, rec, start, runner, vars, { env = {} } = {}) {
+  const program = rec.program || path.join(rec.dir, build.program); // as installed (a lone AppImage is renamed after the game)
+  const args = (build.args || []).map((a) => expand(a, vars)).map(q).join(' ');
+  const L = ['#!/bin/sh', `# Cartridge's start for ${start.name}. Its settings are changed in Cartridge, which writes this file again.`];
+  if (start.copy) L.push(`mkdir -p ${q(path.dirname(start.copy.to))} && cp -f ${q(start.copy.from)} ${q(start.copy.to)}`);
+  for (const [k, x] of Object.entries({ ...(r.env || {}), ...env })) if (/^[A-Z_][A-Z0-9_]*$/.test(k)) L.push(`export ${k}=${q(expand(x, vars))}`);
+  L.push(`cd ${q(path.dirname(program))}`);
+  if (build.os === 'linux') { L.push(`exec ${q(program)}${args ? ' ' + args : ''} "$@"`); return L.join('\n') + '\n'; }
+  if (!runner) throw new Error('Proton isn’t installed, and this game’s port is a Windows build.');
+  const pfx = vars.prefix;
+  if (runner.kind === 'umu') {
+    L.push(`export WINEPREFIX=${q(path.join(pfx, 'pfx'))} GAMEID=0 STORE=none`);
+    if (runner.proton) L.push(`export PROTONPATH=${q(runner.proton)}`);
+    L.push(`exec ${q(runner.umu)} ${q(program)}${args ? ' ' + args : ''} "$@"`);
+  } else {
+    L.push(`export STEAM_COMPAT_DATA_PATH=${q(pfx)} STEAM_COMPAT_CLIENT_INSTALL_PATH=${q(runner.steam || '')}`);
+    const proton = `${q(path.join(runner.proton, 'proton'))} waitforexitandrun ${q(program)}${args ? ' ' + args : ''} "$@"`;
+    L.push(runner.sniper ? `exec ${q(path.join(runner.sniper, '_v2-entry-point'))} --verb=waitforexitandrun -- ${proton}` : `exec ${proton}`);
+  }
+  return L.join('\n') + '\n';
+}
+// the same runner once with wineboot, so Proton makes the prefix before Cartridge puts settings.json in it
+function prefixCommand(runner, vars) {
+  if (runner.kind === 'umu') return { cmd: runner.umu, args: ['wineboot', '-u'], env: { WINEPREFIX: path.join(vars.prefix, 'pfx'), GAMEID: '0', STORE: 'none', ...(runner.proton ? { PROTONPATH: runner.proton } : {}) } };
+  const proton = [path.join(runner.proton, 'proton'), 'run', 'wineboot', '-u'];
+  const env = { STEAM_COMPAT_DATA_PATH: vars.prefix, STEAM_COMPAT_CLIENT_INSTALL_PATH: runner.steam || '' };
+  return runner.sniper ? { cmd: path.join(runner.sniper, '_v2-entry-point'), args: ['--verb=run', '--', ...proton], env } : { cmd: proton[0], args: proton.slice(1), env };
+}
+
+// ---- your copy: a dump folder (eboot.bin, sce_sys/param.sfo), its title ID and version, and what's missing
+const verNum = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
+const verCmp = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
+function checkGame(r, dir, { sfo } = {}) {
+  const g = r.game || {}, out = { ok: true, problems: [], notes: [] };
+  let st; try { st = fs.statSync(dir); } catch { return { ok: false, problems: ['That folder isn’t there any more.'] }; }
+  const pkg = st.isFile() && /\.pkg$/i.test(dir);
+  if (pkg && g.kind !== 'folder-or-pkg') return { ok: false, problems: [`${r.name} needs the game as a dump folder (with eboot.bin), not a PKG.`] };
+  if (!st.isDirectory() && !pkg) return { ok: false, problems: ['That’s a file, not the game’s folder.'] };
+  if (st.isDirectory()) {
+    for (const f of g.has || []) if (!fs.existsSync(path.join(dir, f))) out.problems.push(`${f} isn’t in it.`);
+    const p = sfo ? sfo(path.join(dir, 'sce_sys/param.sfo')) : {};
+    out.id = p.TITLE_ID || null; out.version = p.APP_VER || p.VERSION || null; out.title = p.TITLE || null;
+    if (out.id && g.ids?.length && !g.ids.includes(out.id)) out.notes.push(`It’s ${out.id}; the port is tested with ${g.ids.join(' and ')}.`);
+    if (g.version?.want && out.version && verCmp(out.version, g.version.want) < 0) {
+      if (g.version.soft) out.notes.push(`It’s version ${out.version}. ${g.version.why}`);
+      else { out.needsUpdate = g.version.want; out.problems.push(`It’s version ${out.version}; it needs ${g.version.want}.`); }
+    }
+  }
+  out.ok = !out.problems.length;
+  return out;
+}
+// an update for that game on this device: a folder with the same title ID and a newer version (a dumped patch,
+// CUSA00223-patch), from the folders given (beside the game, and the library's other copies)
+function findUpdate(r, gameDir, candidates, { sfo }) {
+  const base = sfo(path.join(gameDir, 'sce_sys/param.sfo'));
+  if (!base.TITLE_ID) return null;
+  let best = null;
+  for (const c of candidates) {
+    if (path.resolve(c) === path.resolve(gameDir)) continue;
+    const p = sfo(path.join(c, 'sce_sys/param.sfo'));
+    if (p.TITLE_ID !== base.TITLE_ID || !p.APP_VER) continue;
+    if (verCmp(p.APP_VER, base.APP_VER) <= 0) continue;
+    if (!best || verCmp(p.APP_VER, best.version) > 0) best = { dir: c, version: p.APP_VER };
+  }
+  return best;
+}
+// the game with its update on top, as links (no copies): every file of the game, then the update's files over them
+function viewPlan(base, update, { list }) {
+  const plan = new Map();
+  for (const rel of list(base)) plan.set(rel, path.join(base, rel));
+  for (const rel of list(update)) plan.set(rel, path.join(update, rel));
+  return [...plan].map(([rel, from]) => ({ rel, from }));
+}
+
+module.exports = { SHIPPED, validate, load, chooseBuild, winPath, varsFor, expand, settingsFor, effective, typed, untyped, check, render, readBack, flat, script, prefixCommand, checkGame, findUpdate, viewPlan, verCmp, prefixOf };

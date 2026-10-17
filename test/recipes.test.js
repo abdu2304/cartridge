@@ -1,0 +1,236 @@
+// Cartridge Verified (0.9.70): the recipes, the files and start scripts written from them, your copy checked (and an
+// update laid over it), the Proton runner found, and the engine installing, setting up and changing settings
+// against a fake release. The five real releases were also run end to end in the session (not in the repo).
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { execFileSync } = require('child_process');
+const RC = require('../electron/recipes');
+const PR = require('../electron/protonRunner');
+const R = require('../electron/recomps');
+const { sfo } = require('../electron/saves');
+
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'cart-vf-'));
+// a param.sfo with text fields
+function sfoBytes(fields) {
+  const keys = Object.keys(fields); let kt = Buffer.alloc(0), dt = Buffer.alloc(0); const ents = [];
+  for (const k of keys) { const v = Buffer.from(fields[k] + '\0'); ents.push({ ko: kt.length, len: v.length, off: dt.length }); kt = Buffer.concat([kt, Buffer.from(k + '\0')]); dt = Buffer.concat([dt, v]); }
+  const head = Buffer.alloc(20), ktOff = 20 + 16 * keys.length;
+  head.writeUInt32BE(0x00505346, 0); head.writeUInt32LE(0x101, 4); head.writeUInt32LE(ktOff, 8); head.writeUInt32LE(ktOff + kt.length, 12); head.writeUInt32LE(keys.length, 16);
+  const idx = Buffer.concat(ents.map((e) => { const b = Buffer.alloc(16); b.writeUInt16LE(e.ko, 0); b.writeUInt16LE(0x0204, 2); b.writeUInt32LE(e.len, 4); b.writeUInt32LE(e.len, 8); b.writeUInt32LE(e.off, 12); return b; }));
+  return Buffer.concat([head, idx, kt, dt]);
+}
+function dump(dir, id, ver, files = []) {
+  for (const f of ['eboot.bin', ...files]) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); fs.writeFileSync(path.join(dir, f), `${f} ${ver}`); }
+  fs.mkdirSync(path.join(dir, 'sce_sys'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'sce_sys/param.sfo'), sfoBytes({ TITLE_ID: id, APP_VER: ver, TITLE: id }));
+}
+const recipe = (id) => RC.load().find((r) => r.id === id);
+
+test('every shipped recipe passes its checks, and index.json holds exactly them', () => {
+  const list = RC.load({ log: (...a) => assert.fail(a.join(' ')) });
+  assert.deepStrictEqual(list.map((r) => r.id).sort(), ['bloodborne', 'gow3', 'iss', 'pt', 'uncharted']);
+  for (const r of list) {
+    assert.ok(r.verified?.on && r.verified?.release, `${r.id} says when it was checked`);
+    for (const s of r.settings) {
+      assert.ok(s.label && s.tab, `${r.id}.${s.id}`);
+      if (s.at[0] === 'app') assert.ok(r.builds.some((b) => b.files?.app), `${r.id}.${s.id} has a settings.json to go in`);
+      if (s.at[0] === 'ini') assert.ok(r.builds.some((b) => b.files?.ini), `${r.id}.${s.id} has an ini to go in`);
+    }
+  }
+  const index = JSON.parse(fs.readFileSync(path.join(RC.SHIPPED, 'index.json'), 'utf8'));
+  assert.deepStrictEqual(index.map((r) => r.id).sort(), list.map((r) => r.id).sort(), 'run node tools/recipes/index.js');
+  for (const r of index) assert.deepStrictEqual(r, list.find((x) => x.id === r.id), `index.json is out of date for ${r.id}: run node tools/recipes/index.js`);
+  // a broken recipe is left out, a newer one (rev) replaces the shipped one
+  const bad = { ...list[0], id: 'Bad Id' };
+  assert.ok(RC.validate(bad).includes('id'));
+  const newer = { ...recipe('iss'), rev: 9, name: 'inFAMOUS Second Son (newer)' };
+  assert.strictEqual(RC.load({ fetched: [newer, bad], log: () => {} }).find((r) => r.id === 'iss').name, 'inFAMOUS Second Son (newer)');
+});
+
+test('the build: Linux first, Windows only with a Proton runner, yours when picked', () => {
+  const g = recipe('gow3'), bb = recipe('bloodborne');
+  assert.strictEqual(RC.chooseBuild(g, {}).os, 'linux');
+  assert.strictEqual(RC.chooseBuild(g, { pick: 'windows' }).os, 'linux', 'no runner: the Linux build');
+  assert.strictEqual(RC.chooseBuild(g, { pick: 'windows', runner: {} }).os, 'windows');
+  assert.strictEqual(RC.chooseBuild(bb, {}), null);
+  assert.strictEqual(RC.chooseBuild(bb, { runner: {} }).os, 'windows');
+});
+
+test('Bloodborne: settings.json for the prefix (game folder as a Windows path), bbport.ini keys, typed values', () => {
+  const r = recipe('bloodborne'), b = r.builds[0], rec = { dir: '/E/recomp/ps4/Bloodborne', program: '/E/recomp/ps4/Bloodborne/Bloodborne.exe', game: { path: '/home/me/Games/Bloodborne' } };
+  const ini = '# bbport settings\nupscaler=fsr3\nsome_other=7\n';
+  const out = RC.render(r, b, rec, RC.effective(r, b, { fps_mode: '60', cheat_no_death: true, sharpness: '0.8', fullscreen: true }), { read: (p) => (p.endsWith('bbport.ini') ? ini : null), home: '/home/me', env: {} });
+  const iniOut = out.files.find((f) => f.path.endsWith('bbport.ini')).text;
+  assert.match(iniOut, /^# bbport settings$/m); assert.match(iniOut, /^some_other=7$/m, 'other keys kept');
+  assert.match(iniOut, /^upscaler=fsr4$/m, 'the port\'s default when you left it');
+  assert.match(iniOut, /^cheat_no_death=1$/m); assert.match(iniOut, /^sharpness=0.8$/m); assert.match(iniOut, /^effect_dof=1$/m);
+  const app = JSON.parse(out.files.find((f) => f.path.endsWith('settings-main.json')).text);
+  assert.strictEqual(app.game_dir, 'Z:\\home\\me\\Games\\Bloodborne');
+  assert.deepStrictEqual([app.fps_mode, app.fullscreen, app.hdr, app.check_updates], ['60', true, false, false]);
+  assert.strictEqual(out.starts.length, 1);
+  assert.strictEqual(out.starts[0].copy.to, '/E/recomp/ps4/Bloodborne/.cartridge/proton/pfx/drive_c/users/steamuser/AppData/Roaming/bbport-launcher/settings.json');
+  // what you chose in its own launcher before is read back
+  const back = RC.readBack(r, b, rec, { read: (p) => (p.endsWith('bbport.ini') ? ini : p.endsWith('settings.json') ? JSON.stringify({ fps_mode: '30', fullscreen: true }) : null), home: '/home/me', env: {} });
+  assert.deepStrictEqual(back, { upscaler: 'fsr3', fps_mode: '30', fullscreen: true });
+});
+
+test('Uncharted: one start per game, each with its own "start"; P.T.: sectioned pt.ini with quoted text', () => {
+  const u = recipe('uncharted'), rec = { dir: '/E/U', program: '/E/U/Uncharted.exe', game: { path: '/g/U' } };
+  const out = RC.render(u, u.builds[0], rec, RC.effective(u, u.builds[0]), { home: '/h', env: {} });
+  assert.deepStrictEqual(out.starts.map((s) => [s.id, path.basename(s.script)]), [['u1', 'play-u1.sh'], ['u2', 'play-u2.sh'], ['u3', 'play-u3.sh']]);
+  assert.deepStrictEqual(out.files.filter((f) => /settings-u\d/.test(f.path)).map((f) => JSON.parse(f.text).start), ['u1', 'u2', 'u3']);
+  const p = recipe('pt'), prec = { dir: '/E/P', program: '/E/P/game/pt', game: { path: '/g/P' } };
+  const po = RC.render(p, p.builds[0], prec, RC.effective(p, p.builds[0], { voice_key: 'J', fullscreen: '1' }), { read: () => '; P.T. port settings.\n\n[display]\nwidth = 1920\nfullscreen = 0\n', home: '/h', env: {} });
+  const text = po.files[0].text;
+  assert.strictEqual(po.files[0].path, '/E/P/game/data/pt.ini');
+  assert.match(text, /^width = 1920$/m); assert.match(text, /^fullscreen = 1$/m); assert.match(text, /^\[voice\]\nkey = "J"$/m);
+  assert.deepStrictEqual(RC.readBack(p, p.builds[0], prec, { read: () => text, home: '/h', env: {} }), { voice_key: 'J', fullscreen: '1' });
+});
+
+test('start scripts: Linux directly; Windows through umu, Steam\'s runtime or Proton; quoting holds', () => {
+  const g = recipe('gow3'), bb = recipe('bloodborne');
+  const rec = { dir: "/E/it's here", program: "/E/it's here/God.AppImage", game: { path: '/g' } };
+  const o = RC.render(g, g.builds[0], rec, RC.effective(g, g.builds[0]), { home: '/h', env: {} });
+  const sh = RC.script(g, g.builds[0], rec, o.starts[0], null, o.vars);
+  assert.match(sh, /^exec '\/E\/it'\\''s here\/God\.AppImage' '--play' "\$@"$/m);
+  assert.match(sh, /^mkdir -p '\/h\/\.config\/gow3-launcher' && cp -f /m);
+  const wrec = { dir: '/E/B', program: '/E/B/Bloodborne.exe', game: { path: '/g' } }, wo = RC.render(bb, bb.builds[0], wrec, RC.effective(bb, bb.builds[0]), { home: '/h', env: {} });
+  const umu = RC.script(bb, bb.builds[0], wrec, wo.starts[0], { kind: 'umu', umu: '/usr/bin/umu-run', proton: '/s/Proton 10.0' }, wo.vars);
+  assert.match(umu, /^export WINEPREFIX='\/E\/B\/\.cartridge\/proton\/pfx' GAMEID=0 STORE=none$/m);
+  assert.match(umu, /^exec '\/usr\/bin\/umu-run' '\/E\/B\/Bloodborne\.exe' '--play' "\$@"$/m);
+  const sn = RC.script(bb, bb.builds[0], wrec, wo.starts[0], { kind: 'sniper', proton: '/s/P', sniper: '/s/SLR', steam: '/s' }, wo.vars);
+  assert.match(sn, /^exec '\/s\/SLR\/_v2-entry-point' --verb=waitforexitandrun -- '\/s\/P\/proton' waitforexitandrun '\/E\/B\/Bloodborne\.exe' '--play' "\$@"$/m);
+  assert.match(sn, /^export STEAM_COMPAT_DATA_PATH='\/E\/B\/\.cartridge\/proton' STEAM_COMPAT_CLIENT_INSTALL_PATH='\/s'$/m);
+  assert.throws(() => RC.script(bb, bb.builds[0], wrec, wo.starts[0], null, wo.vars), /Proton/);
+  // the script really runs: its copy line puts settings.json in place
+  const d = tmp(), r2 = { dir: d, program: path.join(d, 'God.AppImage'), game: { path: '/g' } };
+  fs.writeFileSync(r2.program, '#!/bin/sh\necho "started $1"\n'); fs.chmodSync(r2.program, 0o755);
+  const o2 = RC.render(g, g.builds[0], r2, RC.effective(g, g.builds[0]), { home: d, env: {} });
+  for (const f of o2.files) { fs.mkdirSync(path.dirname(f.path), { recursive: true }); fs.writeFileSync(f.path, f.text); }
+  const s2 = path.join(d, 'play.sh'); fs.writeFileSync(s2, RC.script(g, g.builds[0], r2, o2.starts[0], null, o2.vars));
+  assert.strictEqual(execFileSync('/bin/sh', [s2]).toString().trim(), 'started --play');
+  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(d, '.config/gow3-launcher/settings.json'), 'utf8')).game_dir, '/g');
+});
+
+test('your copy: files, title ID and version checked; inFAMOUS\'s update found beside it and laid over it as links', () => {
+  const iss = recipe('iss'), d = tmp();
+  const base = path.join(d, 'inFAMOUS'), upd = path.join(d, 'CUSA00223-patch'), other = path.join(d, 'Other');
+  dump(base, 'CUSA00223', '01.00', ['sce_module/libc.prx', 'sce_module/libSceFios2.prx', 'data/a.dat']);
+  dump(upd, 'CUSA00223', '01.07', ['data/a.dat']);
+  dump(other, 'CUSA99999', '09.99');
+  const c = RC.checkGame(iss, base, { sfo });
+  assert.deepStrictEqual([c.ok, c.needsUpdate, c.id], [false, '01.07', 'CUSA00223']);
+  const u = RC.findUpdate(iss, base, [base, upd, other], { sfo });
+  assert.deepStrictEqual(u, { dir: upd, version: '01.07' });
+  const plan = RC.viewPlan(base, upd, { list: (x) => require('../electron/forkVersions').filesOf(x) });
+  assert.strictEqual(plan.find((l) => l.rel === 'eboot.bin').from, path.join(upd, 'eboot.bin'));
+  assert.strictEqual(plan.find((l) => l.rel === 'sce_module/libc.prx').from, path.join(base, 'sce_module/libc.prx'));
+  // a missing module, another game, a PKG where a folder is needed
+  const bb = recipe('bloodborne'), half = path.join(d, 'half'); dump(half, 'CUSA03173', '01.00');
+  const g = RC.checkGame(recipe('gow3'), half, { sfo });
+  assert.ok(g.problems.includes('sce_module/libc.prx isn’t in it.'));
+  const v = RC.checkGame(bb, half, { sfo });
+  assert.ok(v.ok && v.notes.some((n) => /1\.09/.test(n)), 'Bloodborne 1.00 runs, with a note about 1.09');
+  fs.writeFileSync(path.join(d, 'g.pkg'), 'x');
+  assert.match(RC.checkGame(bb, path.join(d, 'g.pkg'), { sfo }).problems[0], /dump folder/);
+  assert.ok(RC.checkGame(recipe('pt'), path.join(d, 'g.pkg'), { sfo }).ok, 'P.T. takes a fake PKG');
+});
+
+test('the Proton runner: umu first, else the newest Proton in Steam\'s runtime, else none', () => {
+  const home = tmp(), steam = path.join(home, '.local/share/Steam');
+  const mk = (rel) => { fs.mkdirSync(path.join(steam, rel), { recursive: true }); fs.writeFileSync(path.join(steam, rel, 'proton'), ''); };
+  assert.strictEqual(PR.find({ home, roots: [steam], env: { PATH: '' } }), null);
+  mk('steamapps/common/Proton 9.0'); mk('steamapps/common/Proton 10.0'); mk('steamapps/common/Proton - Experimental'); mk('compatibilitytools.d/GE-Proton10-4');
+  let r = PR.find({ home, roots: [steam], env: { PATH: '' } });
+  assert.deepStrictEqual([r.kind, r.name], ['proton', 'Proton 10.0']);
+  fs.mkdirSync(path.join(steam, 'steamapps/common/SteamLinuxRuntime_sniper'), { recursive: true }); fs.writeFileSync(path.join(steam, 'steamapps/common/SteamLinuxRuntime_sniper/_v2-entry-point'), '');
+  r = PR.find({ home, roots: [steam], env: { PATH: '' } });
+  assert.deepStrictEqual([r.kind, r.steam], ['sniper', steam]);
+  fs.mkdirSync(path.join(home, '.local/bin'), { recursive: true }); fs.writeFileSync(path.join(home, '.local/bin/umu-run'), '');
+  r = PR.find({ home, roots: [steam], env: { PATH: '' } });
+  assert.deepStrictEqual([r.kind, r.name], ['umu', 'Proton 10.0']);
+});
+
+test('the engine: a verified game installed from its release, set up with your copy, its settings changed', async () => {
+  const d = tmp(), data = path.join(d, 'data'), emu = path.join(d, 'Emulation'), home = path.join(d, 'home');
+  fs.mkdirSync(data); fs.mkdirSync(home);
+  // a recipe of the bbport kind with a Linux build: a tar.gz holding a program that prints its settings
+  const rdir = path.join(d, 'recipes'); fs.mkdirSync(rdir);
+  const rcp = { schema: 1, id: 'demo', name: 'Demo Port', repo: 'github:o/demo', game: { console: 'ps4', title: 'Demo', ids: ['CUSA00001'], kind: 'folder', has: ['eboot.bin'] }, verified: { on: '2026-10-17', release: 'v1' },
+    builds: [{ os: 'linux', asset: '^demo-linux\\.tar\\.gz$', program: 'demo', args: ['--play'], files: { app: { path: '{config}/demo/settings.json', format: 'json' }, ini: { path: '{dir}/demo.ini', format: 'flat' } } }],
+    app: { game_dir: '{game}' }, saves: ['{dir}/user'],
+    settings: [{ id: 'fps', tab: 'Display', label: 'Frame rate', type: 'choice', def: '60', options: [['30', '30'], ['60', '60']], at: ['app', 'fps'] }, { id: 'aa', tab: 'Graphics', label: 'Anti-aliasing', type: 'bool', def: true, at: ['ini', 'aa'] }] };
+  fs.writeFileSync(path.join(rdir, 'demo.json'), JSON.stringify(rcp));
+  const pkg = path.join(d, 'pkg'); fs.mkdirSync(path.join(pkg, 'demo-linux'), { recursive: true });
+  fs.writeFileSync(path.join(pkg, 'demo-linux/demo'), '#!/bin/sh\necho "play $1"\n'); fs.chmodSync(path.join(pkg, 'demo-linux/demo'), 0o755);
+  execFileSync('tar', ['-czf', path.join(d, 'demo-linux.tar.gz'), '-C', pkg, 'demo-linux']);
+  const rel = [{ tag_name: 'v1', published_at: '2026-10-17', prerelease: false, draft: false, assets: [{ name: 'demo-linux.tar.gz', browser_download_url: 'file://' + path.join(d, 'demo-linux.tar.gz'), size: 1 }, { name: 'demo-windows.zip', browser_download_url: 'x', size: 1 }] }];
+  const fetchImpl = async (url) => ({ ok: true, status: 200, json: async () => (url.includes('/latest') ? rel[0] : rel) });
+  const prevHome = process.env.XDG_CONFIG_HOME; process.env.XDG_CONFIG_HOME = path.join(home, '.config');
+  try {
+    const eng = R.createRecomps({ dataDir: data, recipesDir: rdir, fetchImpl, log: () => {},
+      download: async (url, dest, onBytes) => { fs.copyFileSync(url.replace('file://', ''), dest); onBytes(1); },
+      unpackTo: async (a, out) => execFileSync('tar', ['-xf', a, '-C', out]), isElf: (f) => path.basename(f) === 'demo', isRunning: () => false,
+      recompRoot: () => path.join(emu, 'recomp'), recompRoots: () => [path.join(emu, 'recomp')] });
+    assert.strictEqual(eng.list().entries.find((e) => e.id === 'demo').state, 'get');
+    const r1 = await eng.install('demo');
+    assert.deepStrictEqual([r1.tag, r1.build, path.basename(r1.program)], ['v1', 'linux', 'demo']);
+    assert.strictEqual(eng.list().entries.find((e) => e.id === 'demo').state, 'game', 'installed, your copy not picked yet');
+    const copy = path.join(d, 'games/Demo'); dump(copy, 'CUSA00001', '01.00');
+    const g = await eng.setVerifiedGame('demo', copy);
+    assert.ok(g.ok && g.ready, JSON.stringify(g));
+    const rec = eng.record('demo'), l = eng.list().entries.find((e) => e.id === 'demo');
+    assert.deepStrictEqual([l.state, l.settingsCount, l.changed], ['play', 2, 0]);
+    assert.strictEqual(execFileSync('/bin/sh', [rec.starts[0].script]).toString().trim(), 'play --play');
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(home, '.config/demo/settings.json'), 'utf8')).game_dir, copy);
+    assert.match(fs.readFileSync(path.join(rec.dir, 'demo.ini'), 'utf8'), /^aa=1$/m);
+    // a setting changed: the files follow at once; one back to the port's own isn't kept as yours
+    const s = await eng.setSettings('demo', [{ id: 'fps', value: '30' }, { id: 'aa', value: false }]);
+    assert.deepStrictEqual(s.items.map((x) => [x.id, x.game]), [['fps', '30'], ['aa', false]]);
+    assert.match(fs.readFileSync(path.join(rec.dir, 'demo.ini'), 'utf8'), /^aa=0$/m);
+    assert.strictEqual(JSON.parse(fs.readFileSync(path.join(rec.dir, '.cartridge/settings-main.json'), 'utf8')).fps, '30');
+    await eng.setSettings('demo', [{ id: 'fps', value: '60' }]);
+    assert.deepStrictEqual(eng.record('demo').settings, { aa: false });
+    await assert.rejects(eng.setSettings('demo', [{ id: 'fps', value: '144' }]), /isn’t one of its choices/);
+    assert.deepStrictEqual(eng.saveDirs('demo'), [path.join(rec.dir, 'user')]);
+    // a copy that isn't the game is refused with what's missing
+    const wrong = path.join(d, 'games/Wrong'); fs.mkdirSync(wrong, { recursive: true });
+    const w = await eng.setVerifiedGame('demo', wrong);
+    assert.match(w.why, /eboot\.bin isn’t in it/);
+  } finally { if (prevHome === undefined) delete process.env.XDG_CONFIG_HOME; else process.env.XDG_CONFIG_HOME = prevHome; }
+});
+
+test('the engine: a port with its own installer (P.T.) runs it with your copy into game/, and again for an update', async () => {
+  const d = tmp(), data = path.join(d, 'data'), emu = path.join(d, 'Emulation'); fs.mkdirSync(data);
+  // the installer stands in for P.T.'s: --install <copy> <destination> <result>, refusing a folder holding anything else
+  const setup = path.join(d, 'Setup-linux');
+  fs.writeFileSync(setup, '#!/bin/sh\n[ "$1" = --install ] || exit 2\nif [ -d "$3" ] && [ ! -f "$3/pt" ] && [ -n "$(ls -A "$3")" ]; then echo "This folder holds something else." > "$4"; exit 1; fi\nmkdir -p "$3/data" && printf "#!/bin/sh\\necho pt\\n" > "$3/pt" && chmod +x "$3/pt"\nif [ -f "$3/.done" ]; then echo "PASS updated" > "$4"; else touch "$3/.done"; printf "PASS installed\\nnote: it is the US release\\n" > "$4"; fi\n');
+  fs.chmodSync(setup, 0o755);
+  const rel = [{ tag_name: 'v1.0.5', published_at: '2026-10-17', prerelease: false, draft: false, assets: [{ name: 'P.T.PC.Port.Setup-linux', browser_download_url: 'file://' + setup, size: 1 }] }];
+  const runs = [];
+  const eng = R.createRecomps({ dataDir: data, fetchImpl: async (url) => ({ ok: true, json: async () => (url.includes('/latest') ? rel[0] : rel) }), log: () => {},
+    download: async (url, dest) => fs.copyFileSync(url.replace('file://', ''), dest), isRunning: () => false,
+    recompRoot: () => path.join(emu, 'recomp'), recompRoots: () => [path.join(emu, 'recomp')],
+    runProgram: (cmd, args, o) => { runs.push(args[0]); return new Promise((ok, bad) => require('child_process').execFile(cmd, args, { cwd: o.cwd }, (e) => (e ? bad(e) : ok('')))); } });
+  const i = await eng.install('pt');
+  assert.deepStrictEqual([i.tag, i.build], ['v1.0.5', 'linux']);
+  assert.strictEqual(eng.list().entries.find((e) => e.id === 'pt').state, 'game');
+  const copy = path.join(d, 'P.T. dump'); fs.mkdirSync(copy);
+  const g = await eng.setVerifiedGame('pt', copy);
+  assert.ok(g.ok && g.ready, JSON.stringify(g));
+  const rec = eng.record('pt');
+  assert.strictEqual(rec.program, path.join(rec.dir, 'game/pt'));
+  assert.deepStrictEqual(rec.installNotes, ['it is the US release']);
+  assert.strictEqual(execFileSync('/bin/sh', [rec.starts[0].script]).toString().trim(), 'pt');
+  assert.ok(fs.existsSync(path.join(rec.dir, 'game/data/pt.ini')));
+  // a settings change doesn't run the installer again; another copy does
+  await eng.setSettings('pt', [{ id: 'vsync', value: false }]);
+  assert.strictEqual(runs.length, 1);
+  assert.match(fs.readFileSync(path.join(rec.dir, 'game/data/pt.ini'), 'utf8'), /^vsync=0$/m);
+  const copy2 = path.join(d, 'Another dump'); fs.mkdirSync(copy2);
+  await eng.setVerifiedGame('pt', copy2);
+  assert.strictEqual(runs.length, 2);
+});

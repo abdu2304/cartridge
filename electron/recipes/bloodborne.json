@@ -1,0 +1,932 @@
+{
+ "schema": 1,
+ "id": "bloodborne",
+ "name": "Bloodborne",
+ "by": "Supermedo (Mohammed Albarghouthi), on deadinside28’s bbport",
+ "repo": "github:Supermedo/bloodborne_pc",
+ "licence": "GPL-2.0-or-later",
+ "about": "The PlayStation 4 game’s own code runs natively on the PC and its graphics are translated to Vulkan. Upscaling, unlocked frame rates, effects on and off, cheats and gameplay tweaks.",
+ "verified": {
+  "on": "2026-10-17",
+  "release": "windows-v1.9",
+  "played": false
+ },
+ "game": {
+  "console": "ps4",
+  "title": "Bloodborne",
+  "ids": [
+   "CUSA03173"
+  ],
+  "kind": "folder",
+  "has": [
+   "eboot.bin",
+   "sce_sys/param.sfo"
+  ],
+  "version": {
+   "want": "01.09",
+   "soft": true,
+   "why": "Version 1.09 is needed for the 60, 90 and unlocked frame rates, the resolution and the effect switches. Other versions run at 30 FPS."
+  },
+  "dlc": "The Game of the Year edition already has The Old Hunters."
+ },
+ "builds": [
+  {
+   "os": "windows",
+   "asset": "^bloodborne-windows\\.zip$",
+   "program": "Bloodborne.exe",
+   "args": [
+    "--play"
+   ],
+   "files": {
+    "app": {
+     "path": "{appdata}/bbport-launcher/settings.json",
+     "format": "json"
+    },
+    "ini": {
+     "path": "{dir}/bbport.ini",
+     "format": "flat"
+    }
+   }
+  }
+ ],
+ "app": {
+  "game_dir": "{game}",
+  "check_updates": false,
+  "close_on_play": true
+ },
+ "keep": [
+  "user",
+  "out",
+  "mods",
+  "bbport.ini",
+  "input.ini",
+  "mods.json",
+  "patches.json",
+  "last_run.log"
+ ],
+ "saves": [
+  "{dir}/user/savedata"
+ ],
+ "shadps4Saves": "CUSA03173",
+ "settings": [
+  {
+   "id": "fps_mode",
+   "tab": "Display",
+   "label": "Frame rate",
+   "type": "choice",
+   "def": "uncap",
+   "at": [
+    "app",
+    "fps_mode"
+   ],
+   "options": [
+    [
+     "uncap",
+     "Unlocked (frame-time patch)"
+    ],
+    [
+     "60",
+     "60 FPS"
+    ],
+    [
+     "90",
+     "90 FPS"
+    ],
+    [
+     "30",
+     "30 FPS (as on PS4)"
+    ]
+   ]
+  },
+  {
+   "id": "frame_cap",
+   "tab": "Display",
+   "label": "Frame cap (unlocked mode)",
+   "type": "choice",
+   "def": "",
+   "at": [
+    "app",
+    "frame_cap"
+   ],
+   "options": [
+    [
+     "",
+     "Auto: display refresh, max 120 (recommended)"
+    ],
+    [
+     "60",
+     "60"
+    ],
+    [
+     "90",
+     "90"
+    ],
+    [
+     "120",
+     "120"
+    ],
+    [
+     "144",
+     "144 (risky)"
+    ],
+    [
+     "165",
+     "165 (risky)"
+    ],
+    [
+     "240",
+     "240 (risky)"
+    ],
+    [
+     "0",
+     "No limit (risky)"
+    ]
+   ],
+   "desc": "The game’s movement timing breaks above about 120 FPS."
+  },
+  {
+   "id": "fullscreen",
+   "tab": "Display",
+   "label": "Fullscreen",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "fullscreen"
+   ]
+  },
+  {
+   "id": "present_mode",
+   "tab": "Display",
+   "label": "Presentation",
+   "type": "choice",
+   "def": "Mailbox",
+   "at": [
+    "app",
+    "present_mode"
+   ],
+   "options": [
+    [
+     "Mailbox",
+     "Mailbox (low latency, no tearing)"
+    ],
+    [
+     "Fifo",
+     "FIFO (VSync)"
+    ],
+    [
+     "FifoRelaxed",
+     "FIFO Relaxed"
+    ],
+    [
+     "Immediate",
+     "Immediate (tearing)"
+    ]
+   ]
+  },
+  {
+   "id": "hdr",
+   "tab": "Display",
+   "label": "Allow HDR output",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "hdr"
+   ]
+  },
+  {
+   "id": "output_res",
+   "tab": "Display",
+   "label": "Output resolution",
+   "type": "choice",
+   "def": "1920x1080",
+   "at": [
+    "ini",
+    "output_res"
+   ],
+   "options": [
+    [
+     "1280x720",
+     "1280 × 720 (Steam Deck)"
+    ],
+    [
+     "1920x1080",
+     "1920 × 1080"
+    ],
+    [
+     "2560x1440",
+     "2560 × 1440"
+    ],
+    [
+     "3840x2160",
+     "3840 × 2160 (4K)"
+    ],
+    [
+     "2560x1080",
+     "2560 × 1080 (21:9)"
+    ],
+    [
+     "3440x1440",
+     "3440 × 1440 (21:9)"
+    ],
+    [
+     "3840x1600",
+     "3840 × 1600 (21:9)"
+    ],
+    [
+     "5120x2160",
+     "5120 × 2160 (21:9)"
+    ],
+    [
+     "3840x1080",
+     "3840 × 1080 (32:9)"
+    ],
+    [
+     "5120x1440",
+     "5120 × 1440 (32:9)"
+    ]
+   ]
+  },
+  {
+   "id": "hud_position",
+   "tab": "Display",
+   "label": "HUD position",
+   "type": "choice",
+   "def": "100",
+   "at": [
+    "ini",
+    "hud_position"
+   ],
+   "options": [
+    [
+     "100",
+     "Screen edges"
+    ],
+    [
+     "75",
+     "75%"
+    ],
+    [
+     "50",
+     "Halfway"
+    ],
+    [
+     "25",
+     "25%"
+    ],
+    [
+     "0",
+     "Centred (16:9)"
+    ]
+   ]
+  },
+  {
+   "id": "show_fps",
+   "tab": "Display",
+   "label": "Show the FPS counter",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "show_fps"
+   ]
+  },
+  {
+   "id": "upscaler",
+   "tab": "Graphics",
+   "label": "Upscaler",
+   "type": "choice",
+   "def": "fsr4",
+   "at": [
+    "ini",
+    "upscaler"
+   ],
+   "options": [
+    [
+     "dlss",
+     "DLSS (NVIDIA GeForce RTX)"
+    ],
+    [
+     "fsr4",
+     "FSR 4 (best quality)"
+    ],
+    [
+     "fsr411",
+     "FSR 4.1.1 (needs fsr4_411 assets)"
+    ],
+    [
+     "fsr3",
+     "FSR 3.1 (every GPU)"
+    ],
+    [
+     "taa",
+     "TAA (native resolution anti-aliasing)"
+    ],
+    [
+     "off",
+     "Off"
+    ]
+   ],
+   "desc": "DLSS needs a GeForce RTX card. FSR 3.1 runs on every graphics card."
+  },
+  {
+   "id": "preset",
+   "tab": "Graphics",
+   "label": "Quality preset",
+   "type": "choice",
+   "def": "1",
+   "at": [
+    "ini",
+    "preset"
+   ],
+   "options": [
+    [
+     "0",
+     "Native AA (×1.0)"
+    ],
+    [
+     "1",
+     "Quality (×1.5)"
+    ],
+    [
+     "2",
+     "Balanced (×1.7)"
+    ],
+    [
+     "3",
+     "Performance (×2)"
+    ],
+    [
+     "4",
+     "Ultra Performance (×3)"
+    ]
+   ]
+  },
+  {
+   "id": "sharpen",
+   "tab": "Graphics",
+   "label": "Sharpening (RCAS)",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "sharpen"
+   ]
+  },
+  {
+   "id": "sharpness",
+   "tab": "Graphics",
+   "label": "Sharpness",
+   "type": "number",
+   "def": "0.50",
+   "at": [
+    "ini",
+    "sharpness"
+   ],
+   "num": {
+    "min": 0,
+    "max": 2,
+    "decimals": 2
+   }
+  },
+  {
+   "id": "object_motion",
+   "tab": "Graphics",
+   "label": "Object motion vectors",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "object_motion"
+   ],
+   "desc": "Less ghosting on characters and weapons, at about 10% FPS."
+  },
+  {
+   "id": "live_resolution",
+   "tab": "Graphics",
+   "label": "Live resolution changes",
+   "type": "choice",
+   "def": "auto",
+   "at": [
+    "ini",
+    "live_resolution"
+   ],
+   "options": [
+    [
+     "auto",
+     "Auto (by graphics card)"
+    ],
+    [
+     "0",
+     "Off (faster)"
+    ],
+    [
+     "1",
+     "On (change without restarting)"
+    ]
+   ]
+  },
+  {
+   "id": "model_lod",
+   "tab": "Graphics",
+   "label": "Model detail (LOD)",
+   "type": "choice",
+   "def": "0",
+   "at": [
+    "ini",
+    "model_lod"
+   ],
+   "options": [
+    [
+     "0",
+     "As in the game"
+    ],
+    [
+     "-2",
+     "Highest (−2)"
+    ],
+    [
+     "1",
+     "Lower (1)"
+    ],
+    [
+     "2",
+     "Lowest (2)"
+    ]
+   ]
+  },
+  {
+   "id": "frame_gen",
+   "tab": "Graphics",
+   "label": "Frame generation",
+   "type": "choice",
+   "def": "off",
+   "at": [
+    "ini",
+    "frame_gen"
+   ],
+   "options": [
+    [
+     "off",
+     "Off"
+    ],
+    [
+     "fsr3",
+     "AMD FSR 3.1 Frame Generation (any GPU)"
+    ],
+    [
+     "dlss",
+     "NVIDIA DLSS Frame Generation (GeForce RTX 40/50)"
+    ]
+   ]
+  },
+  {
+   "id": "frame_gen_multiplier",
+   "tab": "Graphics",
+   "label": "Frame generation multiplier",
+   "type": "choice",
+   "def": "2",
+   "at": [
+    "ini",
+    "frame_gen_multiplier"
+   ],
+   "options": [
+    [
+     "2",
+     "2× (one generated frame)"
+    ],
+    [
+     "3",
+     "3× (DLSS on GeForce RTX 50)"
+    ],
+    [
+     "4",
+     "4× (DLSS on GeForce RTX 50)"
+    ]
+   ]
+  },
+  {
+   "id": "frame_gen_fit_display",
+   "tab": "Graphics",
+   "label": "Fit to display refresh",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "frame_gen_fit_display"
+   ]
+  },
+  {
+   "id": "effect_chromatic_aberration",
+   "tab": "Effects",
+   "label": "Chromatic aberration",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "effect_chromatic_aberration"
+   ]
+  },
+  {
+   "id": "effect_dof",
+   "tab": "Effects",
+   "label": "Depth of field",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "effect_dof"
+   ]
+  },
+  {
+   "id": "effect_motion_blur",
+   "tab": "Effects",
+   "label": "Motion blur",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "effect_motion_blur"
+   ]
+  },
+  {
+   "id": "effect_ssao",
+   "tab": "Effects",
+   "label": "Ambient occlusion (SSAO)",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "effect_ssao"
+   ]
+  },
+  {
+   "id": "effect_game_aa",
+   "tab": "Effects",
+   "label": "The game's own anti-aliasing",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "effect_game_aa"
+   ]
+  },
+  {
+   "id": "effect_dynamic_shadows",
+   "tab": "Effects",
+   "label": "Shadows of dynamic lights",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "effect_dynamic_shadows"
+   ]
+  },
+  {
+   "id": "effect_ssr",
+   "tab": "Effects",
+   "label": "Screen-space reflections (not in the original)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "effect_ssr"
+   ]
+  },
+  {
+   "id": "skip_intro",
+   "tab": "Effects",
+   "label": "Skip the intro logos and movie",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "skip_intro"
+   ]
+  },
+  {
+   "id": "debug_camera",
+   "tab": "Effects",
+   "label": "Free camera (hold Cross + L3; keyboard Space + Z)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "debug_camera"
+   ]
+  },
+  {
+   "id": "cheat_no_death",
+   "tab": "Cheats",
+   "label": "Never die (health stops at 1 HP)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "cheat_no_death"
+   ]
+  },
+  {
+   "id": "cheat_stealth",
+   "tab": "Cheats",
+   "label": "Enemies do not see you (unless attacked)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "cheat_stealth"
+   ]
+  },
+  {
+   "id": "cheat_silent",
+   "tab": "Cheats",
+   "label": "Enemies do not hear you",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "cheat_silent"
+   ]
+  },
+  {
+   "id": "cheat_rally_no_decay",
+   "tab": "Cheats",
+   "label": "Rally never fades",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "cheat_rally_no_decay"
+   ]
+  },
+  {
+   "id": "cheat_enemy_control",
+   "tab": "Cheats",
+   "label": "Control the targeted enemy (R3; L3 to go back; not with the free camera)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "cheat_enemy_control"
+   ]
+  },
+  {
+   "id": "tweak_no_rally",
+   "tab": "Gameplay",
+   "label": "No Rally (hits do not give health back)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "tweak_no_rally"
+   ]
+  },
+  {
+   "id": "tweak_camera_distance",
+   "tab": "Gameplay",
+   "label": "Camera further from the character",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "tweak_camera_distance"
+   ]
+  },
+  {
+   "id": "tweak_no_camera_rotation",
+   "tab": "Gameplay",
+   "label": "No camera auto-rotation while moving",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "tweak_no_camera_rotation"
+   ]
+  },
+  {
+   "id": "tweak_easy_run",
+   "tab": "Gameplay",
+   "label": "Run with less stick tilt (about 70%)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "tweak_easy_run"
+   ]
+  },
+  {
+   "id": "tweak_ragdoll",
+   "tab": "Gameplay",
+   "label": "Dark Souls-style ragdoll physics (corpses fly further)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "tweak_ragdoll"
+   ]
+  },
+  {
+   "id": "tweak_circle_confirm",
+   "tab": "Gameplay",
+   "label": "Japanese/Asian buttons: Circle confirms and interacts, Cross dodges",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "tweak_circle_confirm"
+   ]
+  },
+  {
+   "id": "quit_to_desktop",
+   "tab": "Gameplay",
+   "label": "Quit to Desktop in the title menu and in the System menu",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "ini",
+    "quit_to_desktop"
+   ]
+  },
+  {
+   "id": "language",
+   "tab": "Game",
+   "label": "Text language",
+   "type": "choice",
+   "def": "1",
+   "at": [
+    "app",
+    "language"
+   ],
+   "options": [
+    [
+     "1",
+     "English"
+    ],
+    [
+     "8",
+     "Russian"
+    ],
+    [
+     "0",
+     "Japanese"
+    ],
+    [
+     "2",
+     "French"
+    ],
+    [
+     "3",
+     "Spanish"
+    ],
+    [
+     "4",
+     "German"
+    ],
+    [
+     "5",
+     "Italian"
+    ],
+    [
+     "17",
+     "Português (Brasil)"
+    ]
+   ]
+  },
+  {
+   "id": "voice_language",
+   "tab": "Game",
+   "label": "Voice language",
+   "type": "choice",
+   "def": "auto",
+   "at": [
+    "app",
+    "voice_language"
+   ],
+   "options": [
+    [
+     "auto",
+     "As in the game"
+    ],
+    [
+     "eng",
+     "English"
+    ],
+    [
+     "ptb",
+     "Português (Brasil)"
+    ],
+    [
+     "ded",
+     "Deutsch"
+    ],
+    [
+     "esa",
+     "Español (América)"
+    ],
+    [
+     "ese",
+     "Español (España)"
+    ],
+    [
+     "frf",
+     "Français"
+    ],
+    [
+     "iti",
+     "Italiano"
+    ],
+    [
+     "jaj",
+     "日本語"
+    ]
+   ]
+  },
+  {
+   "id": "player_name",
+   "tab": "Game",
+   "label": "Player name",
+   "type": "text",
+   "def": "",
+   "at": [
+    "app",
+    "player_name"
+   ]
+  },
+  {
+   "id": "draw_pipe",
+   "tab": "Advanced",
+   "label": "Two-stage GPU pipeline",
+   "type": "choice",
+   "def": "",
+   "at": [
+    "app",
+    "draw_pipe"
+   ],
+   "options": [
+    [
+     "",
+     "Auto (8+ threads)"
+    ],
+    [
+     "1",
+     "On"
+    ],
+    [
+     "0",
+     "Off (more stable)"
+    ]
+   ]
+  },
+  {
+   "id": "readbacks",
+   "tab": "Advanced",
+   "label": "GPU readbacks",
+   "type": "choice",
+   "def": "",
+   "at": [
+    "app",
+    "readbacks"
+   ],
+   "options": [
+    [
+     "",
+     "Relaxed (default)"
+    ],
+    [
+     "0",
+     "Off"
+    ],
+    [
+     "2",
+     "Precise"
+    ]
+   ]
+  },
+  {
+   "id": "frames_ahead",
+   "tab": "Advanced",
+   "label": "Frames ahead of the GPU",
+   "type": "choice",
+   "def": "",
+   "at": [
+    "app",
+    "frames_ahead"
+   ],
+   "options": [
+    [
+     "",
+     "1 (default)"
+    ],
+    [
+     "2",
+     "2"
+    ],
+    [
+     "0",
+     "Unbounded"
+    ]
+   ]
+  }
+ ]
+}
