@@ -71,11 +71,11 @@ const SCAN = () => {
   return [...new Set(out)];
 };
 
-async function pages(width, height) {
-  const { browser, page: p, errors } = await open({ width, height, long: true });
+async function pages(width, height, scale = 1) {
+  const { browser, page: p, errors } = await open({ width, height, long: true, scale });
   await p.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation: none !important; }' }).catch(() => {});
   const bad = new Set();
-  const scan = async (label) => { await p.waitForTimeout(600); for (const x of await p.evaluate(SCAN)) bad.add(`${width}x${height} ${label} | ${x}`); };
+  const scan = async (label) => { await p.waitForTimeout(600); for (const x of await p.evaluate(SCAN)) bad.add(`${width * scale}x${height * scale} ${label} | ${x}`); };
   for (const t of TABS) { await p.click(`[data-tab="${t}"]`).catch(() => {}); await scan(t); }
   await p.click('[data-tab="settings"]').catch(() => {}); await p.waitForTimeout(600);
   for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key))) { await p.click(`[data-key="${k}"]`).catch(() => {}); await scan('settings ' + k); }

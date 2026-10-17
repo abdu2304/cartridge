@@ -4,6 +4,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 function playwright() {
   try { return require('playwright'); } catch {}
+  try { return require('playwright-core'); } catch {} // CI: the devDependency, with a Chromium from playwright-core install
   return require(path.join(execSync('npm root -g').toString().trim(), 'playwright'));
 }
 // covers and screenshots as small SVG data URIs, so no files are needed
@@ -68,10 +69,10 @@ function stub(ui, extra = {}, lib = null, answers = {}) {
 // open the built UI with a look: { theme, style } (style 'plain' | 'glass')
 // dist: another build to load (the visual check opens the last release's build too); freeze: a fixed clock and no motion
 // extra: top-level settings over the stub's (welcomed: null opens the welcome as on a new install, 0.9.52)
-async function open({ theme = 'cartridge', style = 'plain', bg = 'ribbons', width = 1280, height = 800, dist = '', freeze = false, ui = {}, long = false, touch = false, extra = {}, lib = null, answers = {}, routes = null, init = null } = {}) {
+async function open({ scale = 1, theme = 'cartridge', style = 'plain', bg = 'ribbons', width = 1280, height = 800, dist = '', freeze = false, ui = {}, long = false, touch = false, extra = {}, lib = null, answers = {}, routes = null, init = null } = {}) {
   const { chromium } = playwright();
   const browser = await chromium.launch({ executablePath: process.env.CHROMIUM || undefined, args: ['--allow-file-access-from-files'] });
-  const page = await browser.newPage({ viewport: { width, height }, hasTouch: touch });
+  const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: scale, hasTouch: touch }); // scale 2 at 1920x1080 = a 4K TV (Cartridge zooms 2x there)
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   if (freeze) await page.clock.setFixedTime(new Date('2026-01-15T10:30:00'));
