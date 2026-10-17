@@ -2783,6 +2783,8 @@ function patchState(romId) {
   }
   if (/^ps2$/i.test(r?.platform_slug || '') || /^ps2$/i.test(r?.platform_fs_slug || '')) return ps2PatchState(romId);
   if (/\bxbox360\b/i.test(slugs)) return xeniaPatchState(Number(romId), r); // 0.9.63
+  if (/\bswitch\b/i.test(slugs)) return switchCheatState(Number(romId), slugs); // 0.9.71
+  if (require('./raCheats').systemOf([r?.platform_slug, r?.platform_fs_slug])) return raCheatState(Number(romId), r, slugs); // 0.9.71
   if (!/ps3/i.test(`${r?.platform_slug} ${r?.platform_fs_slug}`)) return { emu: null };
   const where = installedMap[romId];
   if (!where) return { emu: 'rpcs3', why: 'Download the game first.' };
@@ -2794,6 +2796,27 @@ function patchState(romId) {
   if (!dir || !fs.existsSync(path.join(dir.patches, 'patch.yml'))) return { emu: 'rpcs3', serial, why: 'RPCS3’s patch list isn’t on this device yet. In RPCS3: Manage → Game Patches → Download latest patches. Then come back.' };
   const version = patchesMod.ps3Version(installs[romId]?.dir || where, rpcs3Hdds(), serial);
   return { emu: 'rpcs3', serial, version, dir };
+}
+// Cheats from their databases (0.9.71, handover Part 9 item 17): Switch through Eden's family or Ryujinx (switchCheats.js),
+// older consoles through RetroArch (raCheats.js). Only for the emulator the game is set to use.
+function switchCheatState(romId, slugs) {
+  const g = gameEmuOf(romId, slugs), list = require('./addons').emulators().filter((e) => e.for.includes('switch'));
+  const e = list.find((x) => x.id === g?.id) || list[0];
+  if (!e) return { emu: 'nxcheats', why: 'No Switch emulator’s settings were found on this device. Open Eden or Ryujinx once, then come back.' };
+  const tid = handlers['addons:gameIds']({ romId }).switchId;
+  if (!tid) return { emu: 'nxcheats', why: 'Cartridge couldn’t read this game’s title ID (prod.keys is needed for Switch games).' };
+  return { emu: 'nxcheats', emuName: e.name, serial: tid.toUpperCase(), dir: { mods: path.join(e.textures, e.id === 'ryujinx' ? tid.toLowerCase() : tid.toUpperCase()) }, ryujinx: e.id === 'ryujinx' };
+}
+function raCheatState(romId, r, slugs) {
+  const RC = require('./raCheats'), where = installedMap[romId];
+  const g = gameEmuOf(romId, slugs);
+  if (g?.id !== 'retroarch') return { emu: 'racheats', why: 'These cheats come from RetroArch’s database and work through RetroArch; this game starts with another emulator.' };
+  if (!where || where === MARKED) return { emu: 'racheats', why: 'Download the game first.' };
+  const ctx = newEmuCtx(romId, r, where, slugs);
+  if (!ctx || ctx.why) return { emu: 'racheats', why: ctx?.why || 'RetroArch wasn’t found for this game.' };
+  const cfgFile = path.join(ctx.cfgDir, 'retroarch.cfg'), system = RC.systemOf([r.platform_slug, r.platform_fs_slug]);
+  const files = RC.filesFor(system, [ctx.serial, r.fs_name, r.name]);
+  return { emu: 'racheats', serial: ctx.serial, dir: { cheats: RC.cheatDir(ctx.cfgDir, fs.readFileSync(cfgFile, 'utf8')), coreName: ctx.coreName, content: ctx.serial, system, files }, cfgFile };
 }
 // RPCS3's patch list, fetched the way RPCS3's "Download latest patches" does when it's missing or a
 // week old (owner, 0.9.16: show the patches RPCS3 has even if it was never asked to download them)
@@ -3207,6 +3230,9 @@ const EMU_PATCH = {
   cemu: { name: 'Cemu', list: (st, mine) => require('./cemuPacks').list({ root: st.dir.root, settings: st.dir.settings, titleIds: st.ids, name: st.title }, mine), set: (st, todo, mine) => { notRunning('cemu', 'Cemu'); const C = require('./cemuPacks'); const all = C.list({ root: st.dir.root, settings: st.dir.settings, titleIds: st.ids, name: st.title }, mine); C.set({ settings: st.dir.settings }, todo.map((t) => { const p = all.find((x) => x.key === t.key); return { ...t, presets: Object.fromEntries(Object.entries(p?.presets || {}).map(([k, v]) => [k, (t.want && v.includes(t.want[k]) ? t.want[k] : null) || p.chosen[k] || v[0]])) }; }), mine); return mine; } },
   // Xbox 360 (0.9.63): Xenia Canary's patch files; Xenia reads them when a game starts, and turning one on turns apply_patches on if it was off
   xenia: { name: 'Xenia', list: (st, mine) => require('./xeniaPatches').list(st.dir, st.serial, mine), set: (st, todo, mine) => { notRunning('xenia', 'Xenia'); const X = require('./xeniaPatches'); if (todo.some((t) => t.on) && X.ensureOn(st.cfg)) log('xenia apply_patches turned on'); return X.set(st.dir, todo, mine); } },
+  // 0.9.71: cheat databases. RetroArch writes retroarch.cfg when it quits, so neither is changed while it runs
+  racheats: { name: 'RetroArch', list: (st, mine) => require('./raCheats').list(st.dir, mine, { cacheDir: path.join(USER_DATA, 'cheats-libretro') }), set: async (st, todo, mine) => { notRunning('retroarch', 'RetroArch'); const RC = require('./raCheats'); const all = await RC.list(st.dir, mine, { cacheDir: path.join(USER_DATA, 'cheats-libretro') }); const rec = RC.set(st.dir, all, todo, mine); if (todo.some((t) => t.on) && RC.ensureApply(st.cfgFile)) log('retroarch apply_cheats_after_load turned on'); return rec; } },
+  nxcheats: { name: 'Switch', list: async (st, mine) => { const S = require('./switchCheats'); return S.list(st.dir.mods, st.serial, await S.download(st.serial, { cacheDir: path.join(USER_DATA, 'cheats-switch') }), mine); }, set: async (st, todo, mine) => { notRunning(st.ryujinx ? 'ryujinx' : 'eden', st.emuName); const S = require('./switchCheats'); return S.set(st.dir.mods, st.serial, await S.download(st.serial, { cacheDir: path.join(USER_DATA, 'cheats-switch') }), todo, mine); } },
   pcsx2: { name: 'PCSX2', list: (st, mine) => patchesMod.pcsx2List(st.dir, st.game, patchesMod.pcsx2ZipBuffer(patchesMod.pcsx2ZipSources(os.homedir(), steamMgr.appImagesFor('ps2', /pcsx2/i)), require('./detect').readAppImageFile), mine), set: (st, todo, mine) => patchesMod.pcsx2Set(st.dir, st.game, todo, mine) },
 };
 // D2: a Vita game through Vita3K (.pkg with its zRIF installs with no window; a .vpk or .zip
@@ -5476,7 +5502,8 @@ const handlers = {
     // Cemu (0.9.37): which title ID it matched by, and packs for this game that only list other regions
     let other = null;
     if (st.emu === 'cemu') { try { other = require('./cemuPacks').otherRegions({ root: st.dir.root, titleIds: st.ids, name: st.title }); } catch {} log('cemu packs', st.title, 'ids', (st.ids || []).join(',') || 'none', 'packs', list.length, other && Object.keys(other).length ? 'other regions ' + JSON.stringify(other) : ''); }
-    return { emu: st.emu, emuName: st.fork ? forkTitle(E.name, st.fork) : E.name, serial: st.serial, version: st.version, why, list, other, ids: st.emu === 'cemu' ? st.ids || [] : undefined };
+    const note = st.emu === 'nxcheats' && list.length ? (st.ryujinx ? 'Cartridge puts the cheats you pick in Ryujinx’s mods folder; turn them on in Ryujinx’s Manage Cheats.' : `Every cheat you pick is on in ${st.emuName}, in its Add-ons as “Cartridge Cheats”, for the game version they were written for.`) : st.emu === 'nxcheats' ? 'The Switch cheat database has nothing for this game.' : st.emu === 'racheats' && !list.length ? 'The libretro cheat database has nothing for this game.' : '';
+    return { emu: st.emu, emuName: st.emuName || (st.fork ? forkTitle(E.name, st.fork) : E.name), serial: st.serial, version: st.version, why: why || note, list, other, ids: st.emu === 'cemu' ? st.ids || [] : undefined };
   },
   // changes: [{ key, on }]. Patches turned on in RPCS3 itself are never turned off here.
   'patches:apply': async ({ romId, changes }) => {

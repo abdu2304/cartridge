@@ -58,7 +58,7 @@ const slug = computed(() => `${rom.value?.platform_slug || ''} ${rom.value?.plat
 const art = computed(() => (rom.value ? cover(rom.value) : ''));
 // 0.9.52: Nexus Mods (PS3 too) and ROM hacks (cartridge consoles) also live in the Mods tab
 const ADDONS = /\b(ps2|psx|ngc|gamecube|wii|psp|3ds|n3ds|switch|wiiu|ps4|ps3|nes|famicom|snes|sfam|n64|gb|gbc|gba|nds|genesis-slash-megadrive|sms|gamegear|turbografx16--1)\b/i, TEXTURES = /\b(ps2|psx|ngc|gamecube|wii|psp|3ds|n3ds)\b/i;
-const PATCHES = [[/ps3/i, 'RPCS3'], [/ps4/i, 'shadPS4'], [/\bps2\b/i, 'PCSX2'], [/\b(ngc|gamecube|gc|wii)\b/i, 'Dolphin'], [/\bpsp\b/i, 'PPSSPP'], [/\bwiiu\b/i, 'Cemu'], [/\bxbox360\b/i, 'Xenia']];
+const PATCHES = [[/ps3/i, 'RPCS3'], [/ps4/i, 'shadPS4'], [/\bps2\b/i, 'PCSX2'], [/\b(ngc|gamecube|gc|wii)\b/i, 'Dolphin'], [/\bpsp\b/i, 'PPSSPP'], [/\bwiiu\b/i, 'Cemu'], [/\bxbox360\b/i, 'Xenia'], [/\bswitch\b/i, 'Switch'], [/\b(nes|famicom|fds|snes|sfam|n64|gb|gbc|gba|nds|virtualboy|genesis-slash-megadrive|genesis|megadrive|sms|gamegear|segacd|sega32|saturn|dc|sg1000|psx|turbografx16--1|pce|turbografx-cd|atari2600|atari5200|atari7800|lynx|jaguar|ngp|ngpc|wonderswan|wonderswan-color|colecovision|intellivision|msx|msx2)\b/i, 'RetroArch']]; // 0.9.71: cheat databases
 const PATCH_EMU_OF = (s) => (PATCHES.find(([re]) => re.test(s)) || [])[1] || '';
 // Dolphin's kinds of code, as its game properties shows them
 const DOLPHIN = [{ k: 'p:OnFrame', l: 'Patches' }, { k: 'p:ActionReplay', l: 'AR Codes' }, { k: 'p:Gecko', l: 'Gecko Codes' }, { k: 'p:GraphicMods', l: 'Graphics Mods' }];
@@ -81,7 +81,7 @@ const tabs = computed(() => {
     if (l) for (const [k, label] of all) { const n = l.filter((p) => p.section === k).length; if (n || k === 'Graphics') out.push({ k: 'p:' + k, l: n ? `${label} · ${n}` : label }); }
   }
   else if (pe === 'shadPS4') out.push({ k: 'p:shadPS4', l: 'shadPS4 Patches' }, { k: 'p:GoldHEN', l: 'GoldHEN' }); // 0.9.23: its two lists, LB/RB between them
-  else if (pe) out.push({ k: 'p', l: pe === 'PPSSPP' ? 'Cheats' : 'Patches' });
+  else if (pe) out.push({ k: 'p', l: ['PPSSPP', 'Switch', 'RetroArch'].includes(pe) ? 'Cheats' : 'Patches' });
   if (/ps3/i.test(s)) out.push({ k: 'updates', l: 'Game Updates' });
   return out;
 });
