@@ -10,6 +10,7 @@ import '@fontsource-variable/space-grotesk';
 import '@fontsource-variable/lexend';
 import '@fontsource-variable/archivo/wdth.css';
 import './styles.css';
+import './tokens.css'; // Plain and Glass tokens, made from src/tokens.js (0.9.70)
 import App from './App.vue';
 import { installSprings, slidingPills, startGovernor } from './motion.js';
 import { startGlass } from './glassEngine.js';

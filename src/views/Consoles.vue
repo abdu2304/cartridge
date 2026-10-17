@@ -62,5 +62,5 @@ watch(() => store.libVersion, async () => { await nextTick(); ensureFocus(el.val
 .stats span { font-size: var(--t-xs); color: var(--faint, rgba(255, 255, 255, 0.5)); font-weight: 600; }
 .stats i { width: 1px; background: var(--line-2, rgba(255, 255, 255, 0.14)); }
 .sys-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 18px; }
-.sys-grid :deep(.systile) { width: auto; height: 168px; }
+.sys-grid :deep(.systile) { width: auto; height: auto; min-height: 168px; }
 </style>

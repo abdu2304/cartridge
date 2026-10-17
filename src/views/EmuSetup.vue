@@ -87,7 +87,7 @@
 
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref, nextTick } from 'vue';
-import { call, toast, go, choose, confirm, askText, pickFolder, store, romsOf, visiblePlatforms, saveConfig, openTour } from '../store.js';
+import { call, toast, go, choose, confirm, askText, pickFolder, store, romsOf, visiblePlatforms, saveConfig, openTour, plural } from '../store.js';
 import { addGame } from '../steam.js';
 import { useView } from '../useView.js';
 import { ensureFocus } from '../nav.js';
@@ -175,7 +175,7 @@ async function getBios(c) {
 async function scan(drives) {
   if (scanning.value) return;
   scanning.value = true; prog.value = null;
-  try { ov.value = await call('setup:scan', { drives: !!drives }); toast(`Found ${ov.value.scanned?.count || 0} emulators`, 'ok', 2600, 'mdiRadar'); }
+  try { ov.value = await call('setup:scan', { drives: !!drives }); toast(`Found ${plural(ov.value.scanned?.count || 0, 'emulator')}`, 'ok', 2600, 'mdiRadar'); }
   catch (e) { toast(e.message, 'error'); }
   scanning.value = false;
   await nextTick(); ensureFocus(el.value);

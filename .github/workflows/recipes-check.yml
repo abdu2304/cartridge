@@ -1,0 +1,40 @@
+name: Recipes check
+# Every night: does each Cartridge Verified recipe's newest release still have its files? Opens (or updates) one
+# issue labelled "recipes" when not, and closes it once everything passes again.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check recipes
+        id: check
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RECIPES_REPORT: report.md
+        run: node tools/recipes/check.js
+      - name: Open or update the issue
+        if: steps.check.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh label create recipes --color d93f0b --description "Cartridge Verified recipe checks" 2>/dev/null || true
+          n=$(gh issue list --label recipes --state open --json number --jq '.[0].number')
+          body="$(printf 'The nightly recipe check found a problem. Send the link to the session that keeps the recipes.\n\n'; cat report.md)"
+          if [ -n "$n" ]; then gh issue edit "$n" --body "$body"; else gh issue create --title "A Cartridge Verified recipe needs attention" --label recipes --body "$body"; fi
+      - name: Close the issue when everything passes
+        if: steps.check.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          for n in $(gh issue list --label recipes --state open --json number --jq '.[].number'); do gh issue close "$n" --comment "Every recipe has its files again."; done

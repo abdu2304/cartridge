@@ -303,6 +303,7 @@ body.surface-glass .glass, body.elements-glass .glass { background: var(--glass-
 .card .art img { width: 100%; height: 100%; object-fit: cover; object-position: center top; display: block; }
 .card .art::after { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07); pointer-events: none; }
 .card .ph { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-end; padding: 14px; gap: 6px; font-family: var(--display); font-weight: 700; font-size: var(--t-md); line-height: 1.2; background: var(--s2); }
+.card .ph .ph-t { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; overflow: hidden; overflow-wrap: anywhere; } /* 0.9.70 (worst case): a long name on a card with no cover stays inside it */
 .card .ph small { font-family: var(--body); font-weight: 500; font-size: var(--t-xs); color: var(--muted); }
 .card .title { font-size: var(--t-sm); font-weight: 500; line-height: 1.3; color: var(--text); padding: 0 2px; transition: color var(--tint); overflow-wrap: anywhere; }
 .card .sub { font-size: var(--t-xs); color: var(--muted); margin-top: -5px; padding: 0 2px;  overflow-wrap: anywhere; }
@@ -337,7 +338,7 @@ body.surface-glass .glass, body.elements-glass .glass { background: var(--glass-
 /* ---------- system tiles ---------- */
 /* Showcase: the console's colours edge to edge, a glossy top edge, the controller large on the right
    fading out to the left (never cut off at the edges). --sys-a / --sys-b come from SysTile. */
-.systile { position: relative; flex: none; width: 250px; height: 140px; border-radius: var(--r-lg); padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; color: #fff; /* 0.9.53: the card is always a deep colour, so its words stay white in Light too (they went dark and unreadable) */
+.systile { position: relative; flex: none; width: 250px; height: auto; min-height: 140px; border-radius: var(--r-lg); padding: 18px 20px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; color: #fff; /* 0.9.53: the card is always a deep colour, so its words stay white in Light too (they went dark and unreadable) */
   background: linear-gradient(135deg, color-mix(in srgb, var(--sys-a, #5b4dbf) 88%, black) 0%, color-mix(in srgb, var(--sys-a, #5b4dbf) 55%, var(--sys-b, #2d2566)) 55%, color-mix(in srgb, var(--sys-b, #2d2566) 45%, #07080d) 100%);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.1), 0 20px 40px -22px rgba(0, 0, 0, 0.9);
   transition: transform var(--spring-snappy-d) var(--spring-snappy), box-shadow var(--tint); will-change: transform; }
@@ -650,44 +651,8 @@ body.theme-oled .statusbar::before { background: linear-gradient(0deg, #000 0%, 
    (kept under 10% lightness), the backdrop is blurred denser and its colours kept rich (saturate, a little contrast,
    no brightening), and the glass gets its shape from its edges: a hairline catching the light on the lit side, a dark
    refraction line on the other, a faint top-down sheen inside, and a two-layer shadow (contact plus a deep one on the
-   pieces that float). Light keeps its own values below. */
-body.elements-glass {
-  /* 0.9.57 (owner: dark Glass looked grey, not black): nearly black smoke, more of it, so what's behind only tints it */
-  --lg-ob: color-mix(in srgb, rgb(var(--lg-tint)) 5%, rgb(4, 5, 8));
-  --lg-fill: color-mix(in srgb, var(--lg-ob) 84%, transparent);
-  --lg-fill-hover: color-mix(in srgb, var(--lg-ob) 92%, transparent);
-  --lg-pane: color-mix(in srgb, var(--lg-ob) 90%, transparent); /* sheets and pop-ups: smoked glass so long text reads */
-  --lg-blur: blur(28px) saturate(1.3) contrast(1.05) brightness(0.85);
-  --lg-rim-grad: linear-gradient(var(--lg-angle, 135deg), rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.14) 22%, rgba(255, 255, 255, 0.04) 50%, rgba(0, 0, 0, 0.3) 78%, rgba(0, 0, 0, 0.45) 100%);
-  --lg-bevel: inset 0 1px 0 rgba(255, 255, 255, 0.12), inset 1px 0 0 rgba(255, 255, 255, 0.06), inset 0 -1px 0 rgba(0, 0, 0, 0.45), inset -1px 0 0 rgba(0, 0, 0, 0.3);
-  --lg-drop: 0 4px 8px rgba(0, 0, 0, 0.5);
-  --lg-drop-deep: 0 4px 8px rgba(0, 0, 0, 0.5), 0 20px 40px rgba(0, 0, 0, 0.65);
-  --lg-gloss: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 40%, rgba(0, 0, 0, 0.25) 100%), linear-gradient(166deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 36%, rgba(255, 255, 255, 0) 36.4%);
-  --lg-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .5 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.12'/%3E%3C/svg%3E");
-  --lg-lit: rgb(var(--lg-hi)); /* prominent glass: the highlight colour, solid (0.9.57: 0.88 still read grey over black) */
-  --lg-lit-rim: linear-gradient(var(--lg-angle, 135deg), #fff 0%, rgba(255, 255, 255, 0.55) 30%, rgba(255, 255, 255, 0.3) 55%, rgba(255, 255, 255, 0.9) 100%);
-  /* 0.9.56 (owner: white shadows moving round whatever is focused in dark Glass): no white halo round focus any more,
-     only a fine edge and the same contact shadow as everything else */
-  --lg-lit-glow: 0 0 0 1px rgba(255, 255, 255, 0.35), 0 4px 10px rgba(0, 0, 0, 0.5);
-  --lg-on-lit: var(--lg-on-hi);
-  --lg-sel: var(--sel-bg); /* chosen (0.9.58, owner's pick A): a ring in the highlight colour (--sel-ring), as in Plain */
-}
-body.elements-glass.theme-light {
-  --lg-fill: rgba(255, 255, 255, 0.42);
-  --lg-fill-hover: rgba(255, 255, 255, 0.62);
-  --lg-pane: rgba(250, 250, 251, 0.62);
-  --lg-blur: blur(22px) saturate(1.7) brightness(1.04);
-  --lg-rim-grad: linear-gradient(var(--lg-angle, 135deg), #fff 0%, rgba(255, 255, 255, 0.7) 24%, rgba(0, 0, 0, 0.06) 50%, rgba(255, 255, 255, 0.6) 76%, #fff 100%);
-  --lg-bevel: inset 0 1px 1px #fff, inset 0 -1px 2px rgba(30, 30, 45, 0.12), inset 0 0 0 3px rgba(255, 255, 255, 0.25);
-  --lg-drop: 0 16px 40px -18px rgba(30, 30, 45, 0.32), 0 1px 3px rgba(30, 30, 45, 0.1);
-  --lg-drop-deep: var(--lg-drop);
-  --lg-gloss: linear-gradient(166deg, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0.2) 36%, rgba(255, 255, 255, 0) 36.4%);
-  --lg-lit: rgba(var(--lg-hi), 0.96); /* 0.9.49 (owner: black frosted buttons in Light): crisp dark, not a muddy see-through grey */
-  --lg-lit-rim: linear-gradient(var(--lg-angle, 135deg), rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.12) 40%, rgba(255, 255, 255, 0.5));
-  --lg-lit-glow: 0 10px 26px -12px rgba(30, 30, 45, 0.5);
-  --lg-on-lit: var(--lg-on-hi);
-  --lg-sel: rgba(255, 255, 255, 0.85);
-}
+   pieces that float). Light keeps its own values below. Since 0.9.70 the values themselves are in src/tokens.js (one table for Plain and
+   Glass), written to src/tokens.css by tools/tokens/gen.js. */
 /* the glass pieces: the Dock (when it's glass), search, sheets and pop-ups, toasts, buttons, switches */
 :where(body.elements-glass) :is(.top-search, .dialog, .toast, .btn) { position: relative; }
 body.elements-glass :is(.bar-pill.dock-glass .tabs, .top-search, .dialog, .toast, .btn, .seg) { isolation: isolate; }
@@ -753,16 +718,11 @@ body.elements-glass .seg-ink { border-radius: calc(var(--r-md) - 4px); }
 body.elements-glass :is(.btn, .seg button):is(:active, .pressed) { box-shadow: var(--lg-bevel), inset 0 0 24px rgba(255, 255, 255, 0.18), var(--lg-drop); }
 /* without blur: every layer stays, the fill gets denser so it still reads */
 body.elements-glass.light-fx :is(.tabs, .top-search, .dialog, .toast, .btn) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
-body.elements-glass.light-fx { --lg-fill: color-mix(in srgb, var(--lg-ob) 88%, transparent); --lg-fill-hover: color-mix(in srgb, var(--lg-ob) 94%, transparent); --lg-pane: color-mix(in srgb, var(--lg-ob) 96%, transparent); }
-body.elements-glass.light-fx.theme-light { --lg-fill: rgba(250, 250, 251, 0.88); --lg-fill-hover: #fff; --lg-pane: rgba(250, 250, 251, 0.97); }
 @media (prefers-reduced-transparency: reduce) {
   body.elements-glass :is(.tabs, .top-search, .dialog, .toast, .btn) { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
-  body.elements-glass { --lg-fill: color-mix(in srgb, var(--lg-ob) 94%, transparent); --lg-pane: color-mix(in srgb, var(--lg-ob) 98%, transparent); --lg-lit: rgb(var(--lg-hi)); }
+  /* the fills for this are in src/tokens.js (glassClear) */
 }
-@media (prefers-contrast: more) {
-  body.elements-glass { --lg-rim-grad: linear-gradient(rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.75)); }
-  body.elements-glass.theme-light { --lg-rim-grad: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)); }
-}
+/* prefers-contrast: more gives glass a solid rim: src/tokens.js (glassContrast, glassContrastLight) */
 
 /* ---- Plain (0.9.45, owner: "Plain mode and Glass mode, designed separately, never merged") ----
    Glass gets its character from light passing through it; Plain gets it from being solid, like a well-made matte
@@ -771,13 +731,7 @@ body.elements-glass.light-fx.theme-light { --lg-fill: rgba(250, 250, 251, 0.88);
      drop under them;
    - panels have a hairline all round, so a card and the rows inside it read as one piece;
    - tracks (a switch's row of options) sit sunk in, with the chosen option raised inside.
-   Light and OLED have their own rules above; these are for the dark colours. */
-body.style-plain:not(.theme-light):not(.theme-oled) {
-  --pl-edge: inset 0 0 0 1px rgba(255, 255, 255, 0.055);
-  --pl-top: inset 0 1px 0 rgba(255, 255, 255, 0.075);
-  --pl-raise: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 14px -6px rgba(0, 0, 0, 0.4);
-  --pl-sink: inset 0 1px 3px rgba(0, 0, 0, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.035);
-}
+   Light and OLED have their own rules above; these are for the dark colours. The --pl-* values are in src/tokens.js. */
 body.style-plain:not(.theme-light):not(.theme-oled) :is(.glass, .eg-con, .lrow, .toggle, .eg-emu):not(:focus):not(:focus-visible) { box-shadow: var(--pl-top), var(--pl-edge); }
 body.style-plain:not(.theme-light):not(.theme-oled) .btn:not(.primary):not(:focus):not(:focus-visible) { box-shadow: var(--pl-top), var(--pl-raise); }
 body.style-plain:not(.theme-light):not(.theme-oled) .btn.primary:not(:focus):not(:focus-visible) { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), var(--pl-raise); }
@@ -805,6 +759,5 @@ body.elements-glass:not(.motion-reduce) .modal-enter-from > .dialog:not(.sheet) 
 body.elements-glass:not(.motion-reduce) .modal-enter-active > .dialog:not(.sheet) { transition: transform var(--spring-soft-d) var(--spring-soft); }
 
 /* Glass-only see-through for small pieces outside the Liquid Glass set (0.9.48: Plain is solid, checked by
-   tools/ui-audit/styleModes.js): the collection badge and the welcome's keyboard */
-body.elements-glass { --chip-bg: rgba(255, 255, 255, 0.14); --kb-sleek-bg: rgba(14, 16, 22, 0.72); }
-body.elements-glass:not(.light-fx) { --chip-blur: blur(6px); --kb-sleek-blur: blur(28px) saturate(1.3); }
+   tools/ui-audit/styleModes.js): the collection badge and the welcome's keyboard, --chip-* and --kb-sleek-* in
+   src/tokens.js */

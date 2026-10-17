@@ -12,7 +12,7 @@
             <div v-if="mode !== 'platform'" class="eyebrow">{{ eyebrow }}</div>
             <h1>{{ title }}</h1>
             <div class="muted row" style="gap: 8px; font-size: 13px">
-              <span>{{ source.length }} games</span><span>·</span><span style="color: var(--green-l)">{{ installedCount }} on device</span>
+              <span>{{ plural(source.length, 'game') }}</span><span>·</span><span style="color: var(--green-l)">{{ installedCount }} on device</span>
               <!-- the folder path is no longer shown (owner, 0.9.21); only a missing folder is worth saying -->
               <template v-if="mode === 'platform' && !platform.target?.exists"><span>·</span><span>No folder set</span></template>
             </div>
@@ -74,7 +74,7 @@
         <aside class="detail glass" v-if="cur">
           <Transition name="fadeup" mode="out-in">
             <div :key="cur.id" class="detail-in">
-              <div class="d-cover"><img v-if="coverSrc" :src="coverSrc" /><div v-else class="noart">{{ cur.name }}</div></div>
+              <div class="d-cover"><img v-if="coverSrc" :src="coverSrc" :alt="cur.name" /><div v-else class="noart">{{ cur.name }}</div></div>
               <h2>{{ cur.name }}</h2>
               <div class="row" style="gap: 8px; flex-wrap: wrap">
                 <span v-if="isNew(cur)" class="chip new">NEW</span>
@@ -97,7 +97,7 @@
 
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue';
-import { store, go, back, platformById, romsOf, allRoms, collections, allCollections, collectionById, romsOfCollection, romsOfGenre, genres, visible, score, addToCollection, askText, pickFolder, call, download, toast, choose, confirm, bytes, year, isNew, cover, setBg, backdropOf, downloadFor, visiblePlatforms, romById } from '../store.js';
+import { store, go, back, platformById, romsOf, allRoms, collections, allCollections, collectionById, romsOfCollection, romsOfGenre, genres, visible, score, addToCollection, askText, pickFolder, call, download, toast, choose, confirm, bytes, year, isNew, cover, setBg, backdropOf, downloadFor, visiblePlatforms, romById, plural } from '../store.js';
 import { addGames } from '../steam.js';
 import { useView } from '../useView.js';
 import { ensureFocus } from '../nav.js';
@@ -368,7 +368,7 @@ async function downloadAll() {
   const todo = list.value.filter((r) => !store.installed[r.id]);
   const size = todo.reduce((s, r) => s + (r.fs_size_bytes || 0), 0);
   const space = mode.value === 'platform' ? await call('fs:space', platform.value.target?.path) : null;
-  if (!(await confirm(`Download ${todo.length} games?`, `${bytes(size)} total${space ? `\n${bytes(space.free)} free on that drive` : ''}`, 'Download all'))) return;
+  if (!(await confirm(`Download ${plural(todo.length, 'game')}?`, `${bytes(size)} total${space ? `\n${bytes(space.free)} free on that drive` : ''}`, 'Download all'))) return;
   for (const r of todo) await download(r, { checkSpace: false }); // the confirm above already showed the space
 }
 

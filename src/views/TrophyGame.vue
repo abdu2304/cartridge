@@ -50,7 +50,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue';
-import { store, call, go, cover, img, setBg, romById, GRADE, iconKey, iconChanged, choose, openModal, toast, logoOf, allRoms } from '../store.js';
+import { store, call, go, cover, img, setBg, romById, GRADE, iconKey, iconChanged, choose, openModal, toast, logoOf, allRoms, plural } from '../store.js';
 import { useView } from '../useView.js';
 import { focusFirst } from '../nav.js';
 import Icon from '../components/Icon.vue';
@@ -98,7 +98,7 @@ async function linkGame() {
   const slug = SLUG[g.value.src];
   const roms = allRoms().filter((r) => r.platform_slug === slug || r.platform_fs_slug === slug).sort((a, b) => a.name.localeCompare(b.name));
   if (!roms.length) return toast(`No ${g.value.platform} games in your library to link to.`, 'info', 4000);
-  const id = await choose({ sheet: true, title: 'Link to a Game', message: `${l.value.total} trophies${g.value.code ? ` · ${g.value.code}` : ''}`, options: roms.map((r) => ({ label: r.name, value: r.id, selected: r.id === g.value.romId, raw: true })) });
+  const id = await choose({ sheet: true, title: 'Link to a Game', message: `${plural(l.value.total, 'trophy', 'trophies')}${g.value.code ? ` · ${g.value.code}` : ''}`, options: roms.map((r) => ({ label: r.name, value: r.id, selected: r.id === g.value.romId, raw: true })) });
   if (!id) return;
   try { await call('trophies:link', { key: g.value.key, romId: id }); toast('Linked', 'ok', 2000, 'mdiLinkVariant'); await load(); } catch (e) { toast(e.message, 'error', 4000); }
 }

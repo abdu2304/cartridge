@@ -102,7 +102,7 @@
 // picked above: PS2 texture packs from the EmuCoreX catalog, other consoles' mods from GameBanana.
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { pushLayer, focusFirst } from '../nav.js';
-import { store, call, closeModal, toast, bytes, confirm, pickFolder, openModal, tab, saveConfig, choose } from '../store.js';
+import { store, call, closeModal, toast, bytes, confirm, pickFolder, openModal, tab, saveConfig, choose, plural } from '../store.js';
 import Icon from './Icon.vue';
 import Btn from './Btn.vue';
 
@@ -195,7 +195,7 @@ async function install(p, f) {
       const r = await call('addons:install', { romId: props.romId, emuRoot: emu.value.emuRoot, pack: JSON.parse(JSON.stringify(p)), file: f ? JSON.parse(JSON.stringify(f)) : null });
       // 0.9.57: why the page opens (a key only downloads for Premium), and the sign-in only the first time
       if (r?.page) { run.value = null; return toast(r.signedIn ? 'Press Slow Download on the page: Cartridge installs the file for this game.' : `Nexus Mods only lets Premium accounts download with ${r.keyed ? 'an API key' : 'Cartridge'}. Sign in on the page once (Cartridge remembers it), then press Slow Download: Cartridge installs the file for this game.`, 'info', 9000, 'mdiDownload'); }
-      toast(`Installed in ${emu.value.name}: ${r.files.toLocaleString()} files`, 'ok', 5000, 'mdiPuzzleOutline');
+      toast(`Installed in ${emu.value.name}: ${plural(r.files, 'file')}`, 'ok', 5000, 'mdiPuzzleOutline');
     } catch (e) { if (!/abort/i.test(e.message)) toast(e.message, 'error', 6000); }
     run.value = null; load(); return;
   }
@@ -231,7 +231,7 @@ async function useHack(p, mode) {
   finally { run.value = null; load(); }
 }
 async function remove(r) {
-  if (!(await confirm('Delete this add-on?', `${r.name}\n\nOnly the ${r.count} files Cartridge put in ${r.emuName}’s folder are deleted.`, 'Delete', true))) return reopen();
+  if (!(await confirm('Delete this add-on?', `${r.name}\n\nOnly the ${plural(r.count, 'file')} Cartridge put in ${r.emuName}’s folder are deleted.`, 'Delete', true))) return reopen();
   try { await call('addons:remove', { key: r.key }); toast('Add-on deleted', 'ok', 2500); } catch (e) { toast(e.message, 'error', 5000); }
   reopen(); load();
 }

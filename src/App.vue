@@ -123,7 +123,7 @@
 
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick, defineAsyncComponent } from 'vue';
-import { store, loadConfig, loadLibrary, loadArt, back, tab, go, call, toast, choose, saveConfig, builtinKb, askText, GRADE, activeTabs, TAB_DEFS, romById, isFavourite, download, playGame } from './store.js';
+import { store, loadConfig, loadLibrary, loadArt, back, tab, go, call, toast, choose, saveConfig, builtinKb, askText, GRADE, activeTabs, TAB_DEFS, romById, isFavourite, download, playGame, plural } from './store.js';
 import { pushLayer, focusFirst, input, gameEnded } from './nav.js';
 import { governorAway } from './motion.js';
 import { setSoundEnabled, setSoundStyle, sfx } from './sfx.js';
@@ -454,7 +454,7 @@ watch(() => store.config?.ui && JSON.stringify(store.config.ui), () => { applyTh
 // sync result toasts
 watch(() => store.sync, (s) => {
   if (s.state === 'done') {
-    if (s.firstSync) toast(`Library synced · ${s.total} games`, 'ok', 3400, 'mdiSync');
+    if (s.firstSync) toast(`Library synced · ${plural(s.total, 'game')}`, 'ok', 3400, 'mdiSync');
     else if (s.added) { toast(`${s.added} new game${s.added > 1 ? 's' : ''} from your server`, 'ok', 5000, 'mdiNewBox'); sfx.done(); }
     else if (store.manualSync) toast('Library is up to date', 'ok', 2400, 'mdiSync');
     store.manualSync = false;

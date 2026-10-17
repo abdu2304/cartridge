@@ -46,7 +46,7 @@
 // The steps are Install (the port, for this system), Your Copy (from your library, downloaded if needed), then Play;
 // Settings opens the port's own settings in Cartridge. Nested pop-ups save this sheet's resolve and reopen it.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { store, call, toast, closeModal, choose, confirm, romById, cover, bgJob, ago, pickFolder, openModal, download } from '../store.js';
+import { store, call, toast, closeModal, choose, confirm, romById, cover, bgJob, ago, pickFolder, openModal, download, plural } from '../store.js';
 import { pushLayer, focusFirst } from '../nav.js';
 import Icon from './Icon.vue';
 
@@ -83,7 +83,7 @@ const step = computed(() => {
     return { title: 'Your Copy', sub: `${x.wants.title} isn’t in your library. Pick its folder on this device.`, button: 'Pick a Folder', icon: 'mdiFolderOpenOutline' };
   }
   if (x.state === 'setup') return { title: 'Finish Setting Up', sub: 'Your copy is picked; its settings and start still need writing.', button: 'Set Up', icon: 'mdiCogPlayOutline' };
-  return x.state === 'update' ? { title: 'An Update Is Out', sub: `${x.installed.tag} now, ${x.latest?.tag} out. Your saves are backed up first and this version is kept.` } : { title: 'Ready to Play', sub: `${x.installed.tag} · ${x.changed ? `${x.changed} of ${x.settingsCount} settings changed` : `${x.settingsCount} settings, all at the port’s own`}` };
+  return x.state === 'update' ? { title: 'An Update Is Out', sub: `${x.installed.tag} now, ${x.latest?.tag} out. Your saves are backed up first and this version is kept.` } : { title: 'Ready to Play', sub: `${x.installed.tag} · ${x.changed ? `${x.changed} of ${x.settingsCount} settings changed` : `${plural(x.settingsCount, 'setting')}, all at the port’s own`}` };
 });
 let resolveOuter = null, waitCopy = false;
 const reopen = () => { if (store.modal?.type !== 'verified') store.modal = { type: 'verified', props: { id: props.id }, resolve: resolveOuter }; };

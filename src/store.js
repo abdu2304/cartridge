@@ -114,6 +114,8 @@ export function tab(name) {
 
 // ---------------- toasts
 let tid = 1;
+// "1 game", "2 games" (0.9.70, break-ui sweep: counts read "1 games" in places)
+export const plural = (n, one, many = one + 's') => `${Number(n || 0).toLocaleString()} ${Number(n) === 1 ? one : many}`;
 export function toast(msg, kind = 'info', ms = 3400, icon) {
   if (kind === 'error' && msg === NO_NET) icon = 'mdiCloseCircle'; // the opposite of the green check
   const t = { id: tid++, msg, kind, icon: icon || { ok: 'mdiCheck', error: 'mdiAlertCircleOutline', info: 'mdiInformationVariant' }[kind] };

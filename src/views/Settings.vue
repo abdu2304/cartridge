@@ -429,7 +429,7 @@
           <template v-else-if="sec === 'ra'">
             <div class="row"><span class="lbl">On Home</span><div class="seg"><button v-for="m in homeAchOpts" :key="m.v" data-focus :class="{ on: homeAch === m.v }" @click="saveConfig({ ui: { homeAch: m.v } })">{{ m.l }}</button></div></div>
             <p class="muted small" style="margin-top: -6px">A row of your newest achievements and trophies on Home, newest first.</p>
-            <div class="subh"><img src="../assets/ra-logo.png" class="ra-mk" />RetroAchievements</div>
+            <div class="subh"><img src="../assets/ra-logo.png" class="ra-mk" alt="" />RetroAchievements</div>
             <template v-if="!store.config.ra?.user">
               <p class="muted">Sign in to RetroAchievements to see your unlocks in the Achievements tab and on every game that supports them.</p>
               <div class="row" style="gap: 16px; align-items: flex-end">
@@ -506,7 +506,7 @@
           <template v-else-if="sec === 'steam'">
             <!-- not in Steam yet: adding Cartridge comes first; once added it moves to the bottom (0.9.3 L) -->
             <div v-if="selfAdded === false && steamReady" class="about glass">
-              <img src="../../steam-art/grid.png" class="steam-grid" />
+              <img src="../../steam-art/grid.png" class="steam-grid" alt="Cartridge in Steam" />
               <div style="display: flex; flex-direction: column; gap: 10px">
                 <div style="font-family: var(--display); font-size: 22px; font-weight: 700">Add Cartridge to Game Mode</div>
                 <div class="muted small">Creates a Steam shortcut for this AppImage with the Cartridge cover, banner, logo and icon, so it sits in your library like any other game. Steam closes and reopens to pick it up, so do this from Desktop Mode.</div>
@@ -519,7 +519,7 @@
             <template v-if="selfAdded && steamReady">
             <div class="subh" style="margin-top: 10px">Cartridge</div>
             <div class="about glass">
-              <img src="../../steam-art/grid.png" class="steam-grid" />
+              <img src="../../steam-art/grid.png" class="steam-grid" alt="Cartridge in Steam" />
               <div style="display: flex; flex-direction: column; gap: 10px">
                 <div style="font-family: var(--display); font-size: 22px; font-weight: 700">Cartridge is in Steam</div>
                 <span class="status ok" style="align-self: flex-start"><Icon name="mdiCheck" :size="14" />Added to Steam</span>
@@ -600,7 +600,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { store, call, go, tab, saveConfig, pickFolder, choose, confirm, toast, openModal, bytes, ago, resync, scanServer, allRoms, romById, cover, resetLogos, askText, activeTabs, TAB_DEFS, consoleName, openTour } from '../store.js';
+import { store, call, go, tab, saveConfig, pickFolder, choose, confirm, toast, openModal, bytes, ago, resync, scanServer, allRoms, romById, cover, resetLogos, askText, activeTabs, TAB_DEFS, consoleName, openTour, plural } from '../store.js';
 import { useView } from '../useView.js';
 import { input, focusFirst, setPointerPref, setRumble, rumble, stopScroll } from '../nav.js';
 import { THEMES, STYLES, styleOf, dockOf, TEXTS, FONTS, CARD_SHAPES, CARD_SIZES, DENSITIES, themeFrom, themeOf, paletteOf, autoColors } from '../themes.js';
@@ -957,7 +957,7 @@ async function loadHidden() {
   if (!keys.length) { hiddenGames.value = []; return; }
   const ov = await call('trophies:overview').catch(() => null);
   const byKey = new Map((ov?.games || []).map((g) => [g.key, g]));
-  hiddenGames.value = keys.map((k) => { const g = byKey.get(k); return { key: k, title: g?.title || k, sub: g ? `${g.total ? `${g.earned || 0} of ${g.total} trophies` : ''}` : 'Not on this device right now' }; });
+  hiddenGames.value = keys.map((k) => { const g = byKey.get(k); return { key: k, title: g?.title || k, sub: g ? `${g.total ? `${g.earned || 0} of ${plural(g.total, 'trophy', 'trophies')}` : ''}` : 'Not on this device right now' }; });
 }
 async function unhideGame(h) {
   const list = await call('trophies:hide', { key: h.key, hidden: false });
@@ -1041,7 +1041,7 @@ function presentText(id) {
   return f.map((x) => `${x.mods ? 'Mods' : 'Texture pack'} in ${x.name}, ${BY_TEXT[x.by]}${!x.mods && !x.on ? ' (textures are off there)' : ''}`).join(' · ');
 }
 async function removeAddon(a) {
-  if (!(await confirm('Delete this add-on?', `${a.name} (${a.game})\n\nOnly the ${a.count} files Cartridge put in ${a.emuName}’s folder are deleted.`, 'Delete', true))) return;
+  if (!(await confirm('Delete this add-on?', `${a.name} (${a.game})\n\nOnly the ${plural(a.count, 'file')} Cartridge put in ${a.emuName}’s folder are deleted.`, 'Delete', true))) return;
   try { await call('addons:remove', { key: a.key }); toast('Add-on removed', 'ok', 2500); } catch (e) { toast(e.message, 'error', 5000); }
   loadAddons();
 }
