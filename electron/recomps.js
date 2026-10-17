@@ -3,10 +3,10 @@
 // static recompilation, decompilation or a rebuild from scratch (Zelda 64: Recompiled, Ship of Harkinian, Unleashed
 // Recompiled). Each needs the player's own copy of the game, never an emulator.
 //
-// The catalogue (electron/recomps.json) was built from PCGamingWiki's "List of unofficial ports" (the owner's saved
-// page, every link checked; its status notes ignored as the owner asked), with the projects behind entries that had
-// no link found on GitHub. A copy is fetched from Cartridge's repository once a day so new entries arrive without an
-// app update, and PCGamingWiki's page is read too: projects new there are added silently, marked found.
+// Since 0.9.70 (owner: a curated list, "Cartridge Verified") the list is the recipes in electron/recipes/ (one per
+// game, docs/recipes.md), read once a day from Cartridge's repository so new ports arrive without an app update.
+// Verified ports are installed, given the player's copy, configured and started by Cartridge (recipes.js); recomps
+// added from a GitHub link and ones kept from the old catalogue are Unverified and set themselves up.
 //
 // What Cartridge does with one: download its build (Linux first, Windows through Proton only when there is no Linux
 // build, never Android, macOS or ARM), put it in <Emulation>/recomp/<console>/<name>, hand it the game file the way
@@ -14,7 +14,7 @@
 // own shortcut in a "Recomps" collection. Updates are never automatic: saves are backed up first, the release it
 // replaces is kept beside it (forkVersions.js) for Roll Back, and saves are checked afterwards.
 //
-// The pure parts (matching, picking a build, the wiki parser, save paths, hashes) are exported for
+// The pure parts (matching, picking a build, save paths, hashes) are exported for
 // test/recomps.test.js; the engine takes its outside world through ctx.
 const fs = require('fs');
 const fsp = fs.promises;

@@ -1,6 +1,6 @@
 > **Read first (owner, 6 Oct 2026):** Plain and Glass are two separate modes, never merged. One Style setting (Plain or Glass) covers the whole app; design every element for both, and never let a change for one leak into the other. Details in CLAUDE.md.
 
-# Handover: everything from 0.9.55 to 0.9.69
+# Handover: everything from 0.9.55 to 0.9.70
 
 To the Claude on the next account, from the Claude on this one.
 
@@ -22,14 +22,14 @@ The repo is public. Nothing private is in this document. Keep it that way.
 
 ## Part 1. Where things stand right now
 
-- **Latest release:** v0.9.69 "Cartridge 0.9.69 · Recomps, Finished" (16 Oct 2026; Part 16): save backups you can put back, Check It and a setup step for link recomps, the copy checked before install, stricter automatic finds, a daily switch, a clean-up. Before it v0.9.68 "Cartridge 0.9.68 · Set Up Right" (16 Oct 2026; Part 15): the freeze fix, the Steam card and recomps setting themselves up (made 14 Oct, unreleased until then) plus a full debugging pass. Before it v0.9.67 "Cartridge 0.9.67 · Follow Through" (14 Oct 2026; Part 14). Before it v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). PRs: v0.9.63 #82, v0.9.64 #83, v0.9.65 #84, v0.9.66 #85, handover catch-ups #86 and #87 (docs only), v0.9.67 #88, v0.9.68 #89, v0.9.69 the PR after it.
+- **Latest release:** v0.9.70 "Cartridge 0.9.70 · Cartridge Verified" (17 Oct 2026; Part 17): recomps rebuilt as a curated list of verified ports (five PS4 ports), port settings in Cartridge, the skills work (worst-case, accessibility, tokens, GSAP test switch) and a controller playtest. Before that v0.9.69 "Cartridge 0.9.69 · Recomps, Finished" (16 Oct 2026; Part 16): save backups you can put back, Check It and a setup step for link recomps, the copy checked before install, stricter automatic finds, a daily switch, a clean-up. Before it v0.9.68 "Cartridge 0.9.68 · Set Up Right" (16 Oct 2026; Part 15): the freeze fix, the Steam card and recomps setting themselves up (made 14 Oct, unreleased until then) plus a full debugging pass. Before it v0.9.67 "Cartridge 0.9.67 · Follow Through" (14 Oct 2026; Part 14). Before it v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). PRs: v0.9.63 #82, v0.9.64 #83, v0.9.65 #84, v0.9.66 #85, handover catch-ups #86 and #87 (docs only), v0.9.67 #88, v0.9.68 #89, v0.9.69 the PR after it.
 - **Branch:** `claude/relaxed-fermat-30pigp`, merged into `main` by a PR for every release (merge commit, not squash). After a merge, reset the branch to `main` (`git fetch origin main && git checkout -B claude/relaxed-fermat-30pigp origin/main`) before new work.
-- **package.json:** `version` = `versionName` = 0.9.69, `releaseName` "Cartridge 0.9.69". The lockfile's version field is stale and always was; leave it.
-- **Tests:** 356 pass at 0.9.69, 354 at 0.9.68 (347 at 0.9.67, 343 at 0.9.66; fileIds added and recomps grown in 0.9.68) (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink, recomps, onlinePlay (fake RPCN server inside); saveSync and gameSettings grew a lot.
+- **package.json:** `version` = `versionName` = 0.9.70, `releaseName` "Cartridge 0.9.70". The lockfile's version field is stale and always was; leave it.
+- **Tests:** 365 pass at 0.9.70 (recipes and tokens added; the catalogue tests went with the catalogue), 356 at 0.9.69, 354 at 0.9.68 (347 at 0.9.67, 343 at 0.9.66; fileIds added and recomps grown in 0.9.68) (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink, recomps, onlinePlay (fake RPCN server inside); saveSync and gameSettings grew a lot.
 - **Before every release:** `npm test`, `npx vite build`, the launch check (`CARTRIDGE_SMOKE=1 HOME=$(mktemp -d) xvfb-run -a node_modules/electron/dist/electron . --no-sandbox` must print `SMOKE OK`), `npm run audit:ui` (focus and contrast in six looks, clipping, the tour twice; all zero at 0.9.63 to 0.9.67; it takes about 15 minutes, so run it in the background). Never rebuild `dist` while the audit runs: it reads `dist` and crashes mid-run.
 - **Standing instruction:** when an update is finished, built and launch-checked, open the PR and merge it without asking. A version change on `main` publishes the release to every user.
 
-- **Recomp catalogue updates without a release:** every Cartridge fetches `https://raw.githubusercontent.com/abdu2304/cartridge/main/electron/recomps.json` once a day (`catalogueUrl` in main.js) and uses it when its `updated` date is newer than the shipped one. So a catalogue fix merged to `main` reaches every user within a day, with no version bump, but only if `updated` moves on (`node tools/recomps/build.js <batch files> --updated <date>`). A broken catalogue on `main` also reaches everyone: run `npm test` (test/recomps.test.js) before merging one.
+- **Verified recipes update without a release (0.9.70):** every Cartridge fetches `electron/recipes/index.json` from `main` once a day (`recipesUrl` in main.js) and uses it when its `rev` is newer. (Until 0.9.69 it was the catalogue `electron/recomps.json`, now removed.) Old note: and uses it when its `updated` date is newer than the shipped one. So a catalogue fix merged to `main` reaches every user within a day, with no version bump, but only if `updated` moves on (`node tools/recomps/build.js <batch files> --updated <date>`). A broken catalogue on `main` also reaches everyone: run `npm test` (test/recomps.test.js) before merging one.
 
 **What comes next (agreed with the owner, in this order):**
 1. ~~0.9.65 · Recomps~~ and ~~0.9.66 · Online Play~~: both shipped together as 0.9.65 (Parts 11 and 12).
@@ -37,8 +37,9 @@ The repo is public. Nothing private is in this document. Keep it that way.
 3. ~~The three Part 7 items left after 0.9.66~~: shipped as 0.9.67 with two bug fixes (Part 14). Everything still not done, checked three times, is in Part 9.
 4. ~~A full debugging pass~~ (owner, on another account after a catch-up): shipped as 0.9.68 (Part 15).
 5. ~~Recomps, Finished~~ (Part 9 items 1, 2, 4, 5, 6, 9, 10 and 13): shipped as 0.9.69 (Part 16).
-6. Owner device tests (end of Parts 11 to 16), then whatever the owner picks from Part 9's list. The owner said on 14 Oct they were sending more bugs; none had arrived by 0.9.68.
-7. Keep this handover updated after each.
+6. ~~One update with everything from the skills review and verified recomps~~: shipped as 0.9.70 (Part 17). The owner's picks from the option board (shader backgrounds, Settings layouts) come next.
+7. Owner device tests (end of Parts 11 to 17), then whatever the owner picks from Part 9's list. The owner said on 14 Oct they were sending more bugs; none had arrived by 0.9.68.
+8. Keep this handover updated after each.
 
 **Waiting on the owner:** the 0.9.68 tests (end of Part 15: Place recomps, Zelda 64's own wizard, Game Mode start with no dimming); device tests listed in Part 9 (from 0.9.63 to 0.9.66); KytyPS5 log after 0.9.63 if it still fails; the Unit 13 freeze test with frame generation off; which of Part 9's not-done items to build next (they built items 1 to 3 of the old list as 0.9.67 and asked for a triple check of the rest).
 
@@ -99,6 +100,7 @@ Everything in the earlier handovers still applies. New in this stretch:
 | 0.9.67 | Follow Through | recomp setup watched as a background job with a measured bar, Online Play reports settings an update renamed, files parsed before and read back after every Online Play write; fixed: recomp save notes read as real paths (Proton, Flatpak), It's Set Up shown when needed (Part 14) |
 | 0.9.69 | Recomps, Finished | recomp save backups with Put Back, Check It and It's Set Up for link recomps, guessed save backups, copy checked before install, automatic finds vetted, daily switch, Flatpak update start, clean-up (Part 16) |
 | 0.9.68 | Set Up Right | freeze about 30 s after start (game IDs in a worker, memoised lookups), recomp Place setup by real paths (`setup.to`), recomp launch and one-off setup arguments, picker recomps set themselves up, the Steam card's controller (Part 15) |
+| 0.9.70 | Cartridge Verified | recomps as a curated list of verified ports (Bloodborne, Uncharted, God of War III, inFAMOUS Second Son, P.T.), port settings, Proton without Steam, nightly recipe watchdog, worst-case and accessibility audits, one token table, GSAP test switch, controller playtest |
 | 0.9.66 | Loose Ends | RPCN accounts made in Cartridge, ShadNet sign-up in its own window, RPCS3 Repair before Online Play writes, Online Play on emulator pages, recomp project details, link guesses, recomp updates started once before they're kept (Part 13) |
 
 ---
@@ -114,6 +116,8 @@ Everything in the earlier handovers still applies. New in this stretch:
 - **Shared UI bits:** `.seg.strip` (styles.css + `strip()` in `src/motion.js`), `src/gameSuggest.js`.
 - **Recomps (0.9.65 to 0.9.67):** `electron/recomps.js` (engine, `details`, `guessFromText`, `readmePicture`, `plainNotes`, `watchSetup`, `savePaths`/`saveDirs`), `electron/recomps.json` (catalogue) built by `tools/recomps/build.js` (record in `docs/recomps.md`), `electron/recompAchievements.js`, main `recomps:*` and `trialRun`, steamManager recomp shortcuts, `src/components/SteamTile.vue`, `Recomps.vue`, `RecompSheet.vue`, `src/views/RecompsView.vue`.
 - **Game IDs off the main thread (0.9.68):** `electron/fileIds.js` (readers with nothing from main's state, `createReader`), `electron/idWorker.js`; `gameId` `extractAsync`; `steamManager.warmSerials`. Memos in `steamManager` (`candMemo`, `binMemo`) and `trophies.emulationRoots` (`rootsMemo`).
+- **Cartridge Verified (0.9.70):** `electron/recipes/*.json` + `index.json`, `electron/recipes.js` (pure), `electron/protonRunner.js`, verified parts of `electron/recomps.js`, `src/components/VerifiedSheet.vue`, `tools/recipes/{index,check}.js`; docs/recipes.md.
+- **Design tooling (0.9.70):** `src/tokens.js` → `src/tokens.css` (`tools/tokens/gen.js`), `src/gsapEngine.js`, `tools/ui-audit/{worst,a11y,playtest,motionBench}.js`.
 - **Online Play (0.9.65, 0.9.66):** `electron/onlinePlay.js` (engine), `electron/onlineAdapters.js` (one adapter per emulator, with its source), `electron/onlineFormats.js` (one-key writers), `electron/sha3.js` (pure SHA3/PBKDF2), `electron/rpcnClient.js` (RPCN accounts), main `online:*`, `src/components/OnlinePlay.vue`, the Online Play rows in Game.vue and EmuGet.vue.
 
 ---
@@ -542,3 +546,25 @@ The owner, after I offered the Part 9 recomp items as one update: "Okay go clean
 3. Install a recomp whose listed version your copy doesn't match: the warning before the download.
 4. Turn Check for New Recomps Every Day off and back on.
 
+
+## Part 17. 0.9.70 · Cartridge Verified (17 Oct 2026)
+
+**Asked:** "do all of these as one update": recomps rebuilt as a curated, per-game "Cartridge Verified" list starting with five links (pt-pc, uncharted_pc, gow3_pc, bloodborne_pc, iss_pc), install from a GitHub link kept; my skills recommendations; a controller playtest "like a real professional" after the update.
+
+**What was done:**
+1. **Recipes.** Each port's launcher source was read for its settings file, game folder rules, saves and start arguments, and turned into `electron/recipes/<id>.json`. Cartridge renders the launcher's settings, writes a start script per start, and runs Windows builds through umu-run or Steam's Proton in the sniper runtime with its own prefix. inFAMOUS needs 1.07: a symlink view lays the update over the base game. P.T. runs its own headless installer. How to add one: docs/recipes.md.
+2. **Recomps UI.** Verified first, one state and one main button (VerifiedSheet), port settings through Game Settings, From a GitHub Link below (Unverified). The catalogue, PCGamingWiki finds and vetting were removed; old installs stay as Unverified.
+3. **Watchdog.** Nightly `recipes-check.yml` opens an issue when a port's newest release lacks a file.
+4. **Skills work.** Worst-case library audit (plural bugs, card clipping fixed), accessibility audit (names and alt text), the token table for Plain and Glass (computed values compared identical in six looks, with and without light effects), GSAP behind a test switch (bench: equal at normal speed, CAE better at 4x slowdown, so off by default), and an option board for shader backgrounds and Settings layouts (nothing built).
+5. **Playtest.** `tools/ui-audit/playtest.js` as five players, about 900 presses: no lost focus, dead ends or B traps. Fixes from its screenshots; wishes left for the owner in docs/playtest-0.9.70.md.
+
+**What broke and how it was caught:** moving the Glass tokens after styles.css would have let the base values beat the reduced-transparency and high-contrast overrides (same specificity, now later); caught by grepping every setter, the overrides became looks in the table. The playtest first reported every tab unreachable because `window.__cartStore` had no route (the worst-case audit's game pages had silently not opened for the same reason); both fixed.
+
+**Not verified:** any port actually playing (no GPU or games in the container), Proton runs, GSAP on a Deck.
+
+**Owner device tests:**
+1. Install each port you own; for Uncharted, all three Play buttons and the three Steam shortcuts.
+2. Change a port setting in Cartridge and see it in the game.
+3. inFAMOUS with update 1.07 on the device.
+4. GSAP Motion (Test) on and off with the Performance Overlay; say which feels better.
+5. Pick from the option board.

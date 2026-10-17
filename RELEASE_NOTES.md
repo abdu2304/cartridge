@@ -1,16 +1,20 @@
-## Cartridge 0.9.69 · Recomps, Finished
+## Cartridge 0.9.70 · Cartridge Verified
 
 ### New
-- **Save backups you can put back.** A recomp's page now lists the save backups Cartridge made before each update, version switch and removal (**Save Backups**). Pick one to put back. The saves there now are backed up first, so you can change your mind. Files made since stay where they are. It never runs while the recomp is open.
-- **Check It for recomp links.** Paste a GitHub or GitLab link and Cartridge shows the project, its stars, whether it's a fork, its newest release and the build it would install, before anything is added or downloaded. It also says plainly when there's nothing it can install.
-- **Your copy is checked before installing.** When a recomp lists the version it needs, the copy in your library is checked before the download. If it doesn't match, Cartridge says so and you choose whether to install anyway.
-- **Check for New Recomps Every Day can be turned off.** It's on the Recomps page. Check for New still works when it's off.
+- **Cartridge Verified PC ports.** Recomps are now a short list Cartridge checks one game at a time, starting with five PS4 ports: Bloodborne, Uncharted: The Nathan Drake Collection, God of War III Remastered, inFAMOUS Second Son and P.T. For each one Cartridge installs the port, takes your own copy of the game from your library (or a folder you pick), writes the port's settings and starts it. Linux and Windows builds work the same way: Windows builds run through umu-launcher or Steam's own Proton, without Steam having to be open.
+- **One state, one button.** Each port shows where it stands (Install, Your Copy, Set Up, Ready to Play, An Update Is Out, Repair) with the one thing to do next. Uncharted gets a Play button and a Steam shortcut for each of its three games.
+- **Port settings in Cartridge.** Every setting from each port's own launcher (frame rate, resolution, upscaling, effects and more) is in Game Settings, saved where the port reads it, so starting from Steam uses them too.
+- **inFAMOUS update put in place for you.** When update 1.07 is on your device, Cartridge lays it over the 1.00 game without copying or changing your files.
+- **GSAP Motion (Test)** in Settings → Help and About: runs the cover's flight to the game page, Start's tiles while you arrange them and the welcome's opening on GSAP, to compare with Cartridge's own engine. Off by default.
 
 ### Changed
-- **Recomps from a link have a setup step.** They no longer count as ready the moment they're installed. Open one, follow its own steps, then press It's Set Up. Recomps found automatically work the same way.
-- **Recomps from a link back up their saves.** Before an update or removal, Cartridge backs up what the recomp wrote beside itself and its folders in ~/.config and ~/.local/share. It leaves out the release's own files and anything over 256 MB. These guessed folders are only backed up, never sent to Save Sync.
-- **Only usable recomps are found automatically.** A project found on PCGamingWiki is only added when its newest release has a Linux or Windows build and it isn't a fork.
-- **Flatpak recomps are started once after an update,** like Linux builds. If one can't start, Cartridge says so. Flatpak keeps no earlier version to go back to.
+- **The researched list of 96 recomps is gone,** and so is the daily search for new ones. Recomps you installed from it stay, marked Unverified. Ports from a GitHub link still install as before, also marked Unverified.
+- **New verified ports arrive without an update:** Cartridge reads the list once a day.
 
 ### Fixed
-- Small clean-ups: unused code removed, nothing you'll see.
+- Counts of one read in the plural in many places ("1 games", "Found 1 emulators", "1 minutes ago").
+- A console card cut off its game count under a long console name; long names ran off game cards with no cover.
+- A game whose screenshot and cover both failed to load showed a broken-picture icon across its page.
+- Find a Setting: the "Steam + X" tip broke apart into columns.
+- Settings → Games Folders: a folder's path ran into its free space.
+- Screenshots on the game page, the game cover in the library and two pictures in Settings now have names for screen readers.
