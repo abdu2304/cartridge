@@ -1,20 +1,27 @@
-## Cartridge 0.9.70 · Cartridge Verified
+## Cartridge 0.9.71 · Every Promise Kept
 
 ### New
-- **Cartridge Verified PC ports.** Recomps are now a short list Cartridge checks one game at a time, starting with five PS4 ports: Bloodborne, Uncharted: The Nathan Drake Collection, God of War III Remastered, inFAMOUS Second Son and P.T. For each one Cartridge installs the port, takes your own copy of the game from your library (or a folder you pick), writes the port's settings and starts it. Linux and Windows builds work the same way: Windows builds run through umu-launcher or Steam's own Proton, without Steam having to be open.
-- **One state, one button.** Each port shows where it stands (Install, Your Copy, Set Up, Ready to Play, An Update Is Out, Repair) with the one thing to do next. Uncharted gets a Play button and a Steam shortcut for each of its three games.
-- **Port settings in Cartridge.** Every setting from each port's own launcher (frame rate, resolution, upscaling, effects and more) is in Game Settings, saved where the port reads it, so starting from Steam uses them too.
-- **inFAMOUS update put in place for you.** When update 1.07 is on your device, Cartridge lays it over the 1.00 game without copying or changing your files.
-- **GSAP Motion (Test)** in Settings → Help and About: runs the cover's flight to the game page, Start's tiles while you arrange them and the welcome's opening on GSAP, to compare with Cartridge's own engine. Off by default.
+- **Update channels.** Settings → Downloads and Updates → Cartridge Updates has an Update Channel: Stable (the default), Beta (new things before they're released, every few days) or Nightly (built every night from the newest work, for testing). Choose a Version lists every release of each channel, so you can go back to any one.
+- **Safe start and settings backups.** If Cartridge closes unexpectedly twice in a row as it starts, it opens once with plain looks and tells you, so you can keep them or go back to your own. Your settings are backed up before every update (ten kept): Help and About → Your Settings puts one back, saves your settings to a file or loads them from one (sign-ins and keys are left out of the file).
+- **Settings as cards.** Settings opens on a card for each section, each saying where it stands (connected, updates waiting, Save Sync on, your style and colour, the update channel). A opens one across the whole screen; B comes back to the cards.
+- **Two backgrounds drawn by the graphics chip:** Aurora Veil (curtains of light along the top edge) and Horizon Grid (a floor of lines rolling to a low sun), both in your theme colour. Without the graphics chip they fall back to Aurora and Tide.
+- **Play With.** A game that has a Cartridge Verified PC port can be played either way: Play With on its page picks the emulator or the port, and the main button follows your choice.
+- **Trophies from PC ports.** Bloodborne, Uncharted, God of War III and inFAMOUS show what you unlock in Achievements, named from your own copy of the game when Cartridge finds its trophy key, else from the port's list.
+- **Cheats for more consoles.** Game Add-ons → Cheats for Switch games (Eden and its family, Ryujinx) from the Switch cheat database, and for older consoles played through RetroArch from the libretro cheat database. Pick the cheats you want; Cartridge writes them where the emulator reads them.
+- **Games on several drives, finished.** A drive per console (Storage → Drive per Console), Move to Another Drive in a game's More → Options with its Steam shortcut following, games on an unplugged drive shown as "On <drive>, which isn't plugged in" instead of not downloaded, and Emulator Storage in Storage with how much each emulator's folders hold.
+- **A Saves widget for Start:** how many saves are synced, when, and anything waiting on you.
+- **More Online Play settings:** Eden's lobby server, web service token and network adapter; Azahar's room token; Ryujinx's connection through the server, network adapter and games' internet access; listing your Dolphin sessions in its lobby.
+- **PC Ports in the Library:** a Has a PC Port filter in Show, and PC Ports in More.
 
 ### Changed
-- **The researched list of 96 recomps is gone,** and so is the daily search for new ones. Recomps you installed from it stay, marked Unverified. Ports from a GitHub link still install as before, also marked Unverified.
-- **New verified ports arrive without an update:** Cartridge reads the list once a day.
+- **Cartridge Verified ports show the game's cover,** or the project's own picture when the game isn't in your library, instead of a controller icon. A port played through by Cartridge's author is marked Played.
+- **Uncharted's sheet has one Play button;** LB/RB (or a tap on the game's name) picks which of the three games.
+- **Games with no cover** show their name once, under the card.
+- **The Quick Menu** is as tall as what it holds, with no gap above Quit.
+- **Port downloads are checked** against the file GitHub publishes, and thrown away if they don't match.
+- **Windows PC ports are started once after an update,** through Proton, before the update is kept (Linux builds already were).
+- **The list of emulator forks** (PrimeHack, Slippi, BB Launcher and others) now comes from Cartridge's repository once a day, so new forks are known without an update.
 
 ### Fixed
-- Counts of one read in the plural in many places ("1 games", "Found 1 emulators", "1 minutes ago").
-- A console card cut off its game count under a long console name; long names ran off game cards with no cover.
-- A game whose screenshot and cover both failed to load showed a broken-picture icon across its page.
-- Find a Setting: the "Steam + X" tip broke apart into columns.
-- Settings → Games Folders: a folder's path ran into its free space.
-- Screenshots on the game page, the game cover in the library and two pictures in Settings now have names for screen readers.
+- The show-password button in text fields had no name for screen readers.
+- Help and About showed an empty Data folder before Cartridge had reported it.

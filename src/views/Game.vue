@@ -78,7 +78,7 @@
         </div>
         <div class="g-cover">
           <img v-if="coverSrc && !coverFail" :src="coverSrc" @error="coverFail = true" />
-          <div v-else class="noart">{{ base.name }}</div>
+          <div v-else class="noart" :class="{ long: (base.name || '').length > 40 }">{{ base.name }}</div>
         </div>
       </section>
 
@@ -878,7 +878,8 @@ onMounted(async () => {
 .dest .muted { white-space: nowrap; }
 .g-cover { flex: none; width: 250px; margin-top: -200px; z-index: 2; aspect-ratio: 2/3; border-radius: var(--r-md); overflow: hidden; box-shadow: var(--shadow-pop); background: var(--s2); }
 .g-cover img { width: 100%; height: 100%; object-fit: cover; }
-.noart { height: 100%; display: grid; place-items: center; padding: 20px; text-align: center; font-family: var(--display); font-size: var(--t-lg); }
+.noart { height: 100%; display: grid; place-items: center; padding: 20px; text-align: center; font-family: var(--display); font-size: var(--t-lg); line-height: 1.2; overflow-wrap: anywhere; }
+.noart.long { font-size: var(--t-sm); padding: 12px; } /* 0.9.71 worst case: a long name stays inside the cover box */
 .g-body { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 40px; padding: var(--s-4) var(--s-7); }
 .col { min-width: 0; }
 .summary { margin: 0; line-height: 1.65; color: var(--muted); font-size: var(--t-md); white-space: pre-line; max-width: 820px; }

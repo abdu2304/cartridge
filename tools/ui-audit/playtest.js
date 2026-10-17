@@ -79,6 +79,8 @@ async function run() {
     await p.click('[data-tab="settings"]').catch(() => {}); await p.waitForTimeout(500);
     const secs = await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key));
     for (const s of secs) {
+      // a row may lead to another tab (Achievements' Open Achievements): back to Settings, then to its cards
+      if ((await p.evaluate(WHERE)).route !== 'settings') { await p.click('[data-tab="settings"]').catch(() => {}); await p.waitForTimeout(400); }
       await p.evaluate(() => document.querySelector(".hub-back")?.click()); await p.waitForTimeout(200);
       await p.click(`[data-key="${s}"]`).catch(() => {}); await p.waitForTimeout(300);
       await press('ArrowRight'); await walk(who, 20);
