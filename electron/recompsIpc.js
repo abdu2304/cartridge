@@ -193,7 +193,7 @@ module.exports = function recompsIpc(m) {
 
   const handlers = {
   // ---- recomps (0.9.65)
-  'recomps:list': () => { const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) if (e.installed) { const key = e.starts?.length > 1 ? `${e.id}:${e.starts[0].id}` : e.id; const sc = (() => { try { return m.steamMgr.recompShortcut(key); } catch { return null; } })(); e.installed.steam = sc ? sc.appid : null; } return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
+  'recomps:list': () => { const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) if (e.installed) { const key = e.starts?.length > 1 ? `${e.id}:${e.starts[0].id}` : e.id; const sc = (() => { try { return m.steamMgr.recompShortcut(key); } catch { return null; } })(); e.installed.steam = sc ? sc.appid : null; e.installed.steamQueued = !sc && !!m.steamMgr.recompQueued?.(key); } return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
   // the recomps of one library game (game page More, 0.9.65)
   'recomps:forRom': ({ romId }) => { const rom = romIndexMain().get(Number(romId)); if (!rom) return []; return recomps().list({ roms: [rom] }).entries.filter((e) => e.roms.includes(rom.id)).map((e) => ({ id: e.id, name: e.name, installed: e.installed, from: e.from, state: e.state || null })); },
   'recomps:check': ({ id, force }) => recomps().check(id, { force }),
@@ -343,7 +343,9 @@ module.exports = function recompsIpc(m) {
   // ---- Cartridge Verified (0.9.70): your copy from the library (or a folder you pick), checked and set up; the
   // port's settings in Cartridge; Proton found for Windows builds
   'recomps:copies': ({ id }) => verifiedCopies(id),
-  'recomps:prepare': async ({ id, dir }) => {
+  // update: a folder you picked for the update it needs (0.9.72 playtest: inFAMOUS said "pick the game again" with
+  // nothing to pick the update with); it's tried before the folders beside the game
+  'recomps:prepare': async ({ id, dir, update }) => {
     const R = recomps(), e = R.byId(id);
     if (e?.from !== 'verified') throw new Error('That isn’t a Cartridge Verified game.');
     let use = dir;
@@ -352,9 +354,16 @@ module.exports = function recompsIpc(m) {
       if (!copies.length) return { ok: false, noCopy: true, why: `${e.recipe.game.title} isn’t on this device yet. Download it from your library first.` };
       use = copies[0].path;
     }
-    const r = await R.setVerifiedGame(id, use, { candidates: updateCandidates(use), onProgress: (m) => broadcast('recomp-prep', { id, ...m }) });
+    const r = await R.setVerifiedGame(id, use, { candidates: [...(update ? [update] : []), ...updateCandidates(use)], onProgress: (m) => broadcast('recomp-prep', { id, ...m }) });
     recompTrophies();
-    return r;
+    // set up with Steam's automatic adding on: its shortcuts go in too, as a downloaded game's do (0.9.72 playtest)
+    if (r.ok && !r.notInstalled && m.config.steam?.autoAdd) {
+      try {
+        const specs = verifiedShortcutSpecs(id);
+        if (!specs.some((sp) => m.steamMgr.recompShortcut(sp.id))) { m.steamMgr.queueAdd(specs.map((sp) => ({ recomp: sp }))); m.steamMgr.applySoon(); r.steamQueued = specs.length; }
+      } catch (er) { log('verified auto steam', id, er.message); }
+    }
+    return { ...r, dir: use };
   },
   'recomps:settings': ({ id }) => recomps().settings(id),
   'recomps:setSettings': async ({ id, changes }) => { const d = await recomps().setSettings(id, changes); log('verified settings', id, (changes || []).map((x) => `${x.id}=${x.value}`).join(' ')); return d; },

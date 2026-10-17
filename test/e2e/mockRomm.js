@@ -14,7 +14,7 @@ function bmp(w, h, seed) {
 }
 const PLATS = [[1, 'snes', 'Super Nintendo'], [2, 'psx', 'PlayStation'], [3, 'n64', 'Nintendo 64'], [4, 'ps2', 'PlayStation 2']];
 
-function library(games = 120) {
+function library(games = 120, extra = {}) {
   const F = {}, ROMS = [];
   const file = (id, dir, name, data, opts = {}) => { F[id] = { name, data, ...opts }; const rec = opts.recorded || data; return { id, file_name: name, full_path: `${dir}/${name}`, file_size_bytes: rec.length, md5_hash: md5(rec), sha1_hash: null, crc_hash: null }; };
   const rom = (id, [pid, slug, disp], name, files, multi) => ({ id, name, fs_name: multi ? name : files[0].file_name, fs_name_no_ext: name, platform_id: pid, platform_slug: slug, platform_fs_slug: slug, platform_display_name: disp, fs_size_bytes: files.reduce((s, f) => s + f.file_size_bytes, 0), full_path: `${slug}/${multi ? name : files[0].file_name}`, has_simple_single_file: !multi, has_nested_single_file: false, files, summary: `${name} is a test game.`, regions: ['USA'], genres: ['Action'], created_at: new Date(Date.now() - id * 3600e3).toISOString(), metadatum: {}, merged_screenshots: [], path_cover_small: `/assets/cov/${id}.bmp`, path_cover_large: `/assets/cov/${id}.bmp` });
@@ -23,12 +23,15 @@ function library(games = 120) {
   ROMS.push(rom(2, PLATS[0], 'Stale Game', [file(102, 'snes', 'Stale Game.sfc', Buffer.alloc(200000, 'b'), { recorded: Buffer.alloc(200000, 'B') })]));
   ROMS.push(rom(3, PLATS[1], 'Disc Game', [file(103, 'psx/Disc Game', 'Disc Game.cue', Buffer.from('FILE "Disc Game.bin" BINARY\n')), file(104, 'psx/Disc Game', 'Disc Game.bin', Buffer.alloc(300000, 'd'))], true));
   for (let i = 0; i < games; i++) { const p = PLATS[i % PLATS.length]; ROMS.push(rom(1000 + i, p, `Test Game ${i}`, [file(5000 + i, p[1], `Test Game ${i}.bin`, Buffer.alloc(1000, i & 255))])); }
-  const plats = PLATS.map(([id, slug, name]) => ({ id, slug, fs_slug: slug, name, display_name: name, rom_count: ROMS.filter((r) => r.platform_id === id).length }));
+  // extra.ps4: [{ name, id }] PS4 games as RomM keeps them (a zip named with the title ID), for the playtest rig
+  const pl = [...PLATS];
+  if (extra.ps4?.length) { const P = [5, 'ps4', 'PlayStation 4']; pl.push(P); extra.ps4.forEach((g, i) => ROMS.push(rom(900 + i, P, g.name, [file(9000 + i, 'ps4', `${g.name} [${g.id}].zip`, Buffer.alloc(2000, i))]))); }
+  const plats = pl.map(([id, slug, name]) => ({ id, slug, fs_slug: slug, name, display_name: name, rom_count: ROMS.filter((r) => r.platform_id === id).length }));
   return { F, ROMS, plats };
 }
 
-function start({ port = 0, games = 120 } = {}) {
-  const { F, ROMS, plats } = library(games);
+function start({ port = 0, games = 120, extra = {} } = {}) {
+  const { F, ROMS, plats } = library(games, extra);
   const served = {}, covers = {};
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x'), p = u.pathname;

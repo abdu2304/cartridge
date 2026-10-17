@@ -92,7 +92,7 @@ function vStatus(e) {
   const job = bgJob('recomp:' + e.id) || bgJob('recompprep:' + e.id);
   if (job) return { text: job.pct != null ? `${job.pct}%` : job.text || 'Working', cls: 'none', icon: 'mdiSync' };
   const [text, cls, icon] = VSTATE[e.state] || VSTATE.get;
-  return { text: e.state === 'get' && e.roms.length ? 'Your Game' : text, cls, icon: e.state === 'get' && e.roms.length ? 'mdiGamepadVariant' : icon };
+  return { text: e.state === 'get' && e.roms.length ? 'Get · You Have the Game' : text, cls, icon: e.state === 'get' && e.roms.length ? 'mdiGamepadVariant' : icon };
 }
 function vSub(e) {
   const con = data.value?.consoles?.[e.games[0]?.console] || '';

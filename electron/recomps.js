@@ -995,7 +995,7 @@ function createRecomps(ctx) {
     let use = dir, update = null;
     if (!chk.ok && chk.needsUpdate) {
       const u = RC.findUpdate(r, dir, candidates, { sfo });
-      if (!u || RC.verCmp(u.version, chk.needsUpdate) < 0) return { ok: false, problems: chk.problems, needsUpdate: chk.needsUpdate, why: `${r.name} needs update ${chk.needsUpdate}. ${u ? `The update on this device is ${u.version}.` : 'Put the update’s folder (its dump, with sce_sys inside) beside the game, or download it from your library, then pick the game again.'}` };
+      if (!u || RC.verCmp(u.version, chk.needsUpdate) < 0) return { ok: false, problems: chk.problems, needsUpdate: chk.needsUpdate, why: `${r.name} needs update ${chk.needsUpdate}. ${u ? `The update on this device is ${u.version}.` : 'Pick the update’s folder (its dump, with sce_sys inside), or put it beside the game.'}` };
       if (!rec) return { ok: false, why: 'Install it first.' };
       onProgress({ step: 'view' });
       use = await buildView(rec, dir, u.dir);

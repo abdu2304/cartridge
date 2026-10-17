@@ -1064,7 +1064,7 @@ module.exports = function createSteamManager(ctx) {
       // the Recomps collection (owner: "two shortcuts, kept separate")
       if (a.recomp) {
         const r = a.recomp;
-        if (!exists(r.exe)) { skipped.push({ name: r.name, why: 'The recomp isn’t installed any more.' }); continue; }
+        if (!exists(r.exe)) { skipped.push({ recomp: r.id, name: r.name, why: 'The recomp isn’t installed any more.' }); continue; }
         const win = /\.exe$/i.test(r.exe);
         let target = q(r.exe), launch = r.args || '';
         if (FLATPAK_STEAM && !win) ({ target, launch } = hostLaunch(r.exe, launch, r.start));
@@ -1193,7 +1193,18 @@ module.exports = function createSteamManager(ctx) {
   async function apply({ restart = true } = {}) {
     await warmSerials(); // 0.9.68: serials read off the main thread first
     const p = plan();
-    if (!p.entries.length && !p.removing.length) throw new Error('Nothing to apply');
+    if (!p.entries.length && !p.removing.length) {
+      // 0.9.72 playtest: a queued game that can't be added (gone from the device, no emulator) kept "1 change waiting"
+      // showing while Apply said only "Nothing to apply". Those leave the queue, and the reason is said.
+      if (p.skipped.length) {
+        const gone = new Set(p.skipped.map((x) => (x.recomp ? 'r:' + x.recomp : x.romId)));
+        queue.add = queue.add.filter((a) => !gone.has(a.recomp ? 'r:' + a.recomp.id : a.romId));
+        saveQueue();
+        const s = p.skipped[0], why = s.name ? s.why : s.why === 'not on this device any more' ? 'A game in the list isn’t on this device' : s.why.replace(/^[a-z]/, (c) => c.toUpperCase());
+        throw new Error(`${s.name ? s.name + ': ' : ''}${why}${/[.]$/.test(why) ? '' : '.'}${p.skipped.length > 1 ? ` ${p.skipped.length - 1} more couldn’t be added either.` : ''} Taken off the list.`);
+      }
+      throw new Error('Nothing to apply');
+    }
     const f = files(p.account);
     const stamp = new Date().toISOString().replace(/[:.]/g, '-');
     // artwork can be written while Steam runs (it reads the grid folder when it starts). It comes
@@ -1835,6 +1846,12 @@ module.exports = function createSteamManager(ctx) {
   writeScript();
   // recomps (0.9.65): the shortcut Cartridge made for one (its appid as Steam has it now, live adds included), and
   // starting any shortcut by appid (a Windows recomp's setup runs through Proton, so through Steam)
+  // RetroArch on this device in any form, with or without cores (0.9.72 playtest: Get Emulators offered a Flatpak with
+  // no cores yet as a download); the same places candidatesNow looks
+  const retroarchHere = () => flatpakApps().includes('org.libretro.RetroArch') || APP_DIRS().some((d) => ls(d).some((n) => /^retroarch.*\.appimage$/i.test(n)))
+    || foundFor('retroarch').length > 0 || !!findBin(['retroarch']) || steamRoots().some((r) => exists(path.join(r, 'steamapps/common/RetroArch/retroarch')));
+  // a recomp's shortcut waiting in the queue (0.9.72 playtest: the port sheet says it's on its way to Steam)
+  const recompQueued = (id) => queue.add.some((a) => a.recomp?.id === id);
   function recompShortcut(id) {
     const env = environment(), have = env.account ? new Set(shortcutsOf(env.account).map((x) => x.appid >>> 0)) : new Set();
     const hit = Object.entries(reg).find(([a, r]) => r.recomp === id && (have.has(Number(a) >>> 0) || r.live));
@@ -1859,7 +1876,7 @@ module.exports = function createSteamManager(ctx) {
   }
   const liveNow = async () => { const env = environment(); return !!(env.account && (await live.available(env.account.root).catch(() => false))); };
   const api = {
-    recompShortcut, runAppid, recompRepoint, liveNow, applySoon,
+    recompShortcut, recompQueued, retroarchHere, runAppid, recompRepoint, liveNow, applySoon,
     overview, preview, apply, undo, restartSteam, removeAllOurs, queueAdd, queueRemove, queueClear, queueInfo, test, setTemplate, setMode, verifyCollections,
     collections: () => { const env = environment(); return env.account ? readCollections(env.account) : []; },
     // live changes: is Steam's interface reachable, and turning on its local debugging port
