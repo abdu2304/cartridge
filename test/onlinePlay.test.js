@@ -89,6 +89,21 @@ test('Eden writes Qt’s \\default pairs; Ryujinx a number; Dolphin its ini; Aza
   // Dolphin: sections added in its own spacing
   await eng.set('dolphin', 'bba', true); await eng.set('dolphin', 'netplay', true);
   assert.match(fs.readFileSync(dol, 'utf8'), /\[Core\]\nCPUCore = 1\nSerialPort1 = 12[\s\S]*\[NetPlay\]\nTraversalChoice = traversal/);
+  // 0.9.71: the settings found in research: Eden's lobby, token and adapter (with their \default pairs), Ryujinx's
+  // relay and internet access as booleans, Dolphin's lobby listing, Azahar's room token
+  await eng.field('eden', 'rooms', 'lobby', 'lobby.example.org'); await eng.field('eden', 'rooms', 'token', 'abcdefgh12345678'); await eng.field('eden', 'rooms', 'iface', 'wlan0');
+  const et2 = fs.readFileSync(eden, 'utf8');
+  assert.match(et2, /web_api_url=lobby\.example\.org\nweb_api_url\\default=false/); assert.match(et2, /eden_token=abcdefgh12345678/); assert.match(et2, /network_interface=wlan0/);
+  assert.strictEqual(kind('eden', 'rooms').fields.find((f) => f.key === 'lobby').value, 'lobby.example.org');
+  await eng.field('ryujinx', 'ldn', 'relay', 'true'); await eng.field('ryujinx', 'ldn', 'net', 'false');
+  const rj = JSON.parse(fs.readFileSync(ryu, 'utf8'));
+  assert.strictEqual(rj.multiplayer_disable_p2p, true); assert.strictEqual(rj.enable_internet_access, false);
+  assert.strictEqual(kind('ryujinx', 'ldn').fields.find((f) => f.key === 'relay').value, 'Through the Server');
+  await eng.field('dolphin', 'netplay', 'index', 'True');
+  assert.match(fs.readFileSync(dol, 'utf8'), /UseIndex = True/);
+  await assert.rejects(() => eng.field('azahar', 'rooms', 'token', 'a b'), /token/);
+  await eng.field('azahar', 'rooms', 'token', 'roomtoken123');
+  assert.match(fs.readFileSync(path.join(home, '.config/azahar-emu/qt-config.ini'), 'utf8'), /network_token=roomtoken123/);
   // Azahar: no switch, Pretendo files reported
   const pre = kind('azahar', 'pretendo');
   assert.strictEqual(pre.info, true); assert.strictEqual(pre.ready, false); assert.match(pre.note, /SecureInfo_A/); assert.doesNotMatch(pre.note, /otp\.bin/);
