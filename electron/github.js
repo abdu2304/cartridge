@@ -8,7 +8,7 @@ const UA = { 'User-Agent': 'Cartridge', Accept: 'application/vnd.github+json' };
 // -> { tag, date, assets: [{ name, url, size }] } (size 0 when only the page was read)
 // want(assets) (0.9.65, owner: KytyPS5's newest builds had no Linux file): the newest release whose files pass it,
 // looking back through the last few, so a project whose newest build failed for Linux still gives its last good one
-const asRel = (j) => ({ tag: j.tag_name, date: j.published_at || j.created_at || '', pre: !!j.prerelease, assets: (j.assets || []).map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size || 0, date: a.updated_at })) });
+const asRel = (j) => ({ tag: j.tag_name, date: j.published_at || j.created_at || '', pre: !!j.prerelease, assets: (j.assets || []).map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size || 0, date: a.updated_at, digest: /^sha256:[0-9a-f]{64}$/.test(a.digest || '') ? a.digest : null })) }); // digest: GitHub's SHA-256 of the file (0.9.71)
 async function release(repo, { tag, pre, want, fetchImpl = webFetch } = {}) {
   const list = !tag && (pre || want);
   const api = `https://api.github.com/repos/${repo}/releases${tag ? `/tags/${tag}` : list ? '?per_page=12' : '/latest'}`;

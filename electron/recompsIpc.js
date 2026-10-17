@@ -127,7 +127,10 @@ module.exports = function recompsIpc(m) {
   function recompTrophies() {
     try {
       const R = recomps(), items = [];
-      for (const e of R.catalogue().entries) { const rec = R.record(e.id); if (rec?.dir) items.push({ id: e.id, name: e.name, game: e.games?.[0]?.title || e.name, program: rec.program, dir: rec.dir, flatpak: rec.flatpak || null, ach: e.achievements && typeof e.achievements === 'object' ? e.achievements : null }); }
+      const RC = require('./recipes');
+      // Cartridge Verified ports name their trophy files in the recipe (0.9.71); their templates are filled in here
+      const achOf = (e, rec) => { if (!e.recipe) return e.achievements && typeof e.achievements === 'object' ? e.achievements : null; try { const b = RC.chooseBuild(e.recipe, { pick: rec.build, runner: true }); return RC.achievementsOf(e.recipe, b, rec, RC.varsFor(e.recipe, b, rec)); } catch { return null; } };
+      for (const e of R.catalogue().entries) { const rec = R.record(e.id); if (rec?.dir) items.push({ id: e.id, name: e.name, game: e.games?.[0]?.title || e.name, program: rec.program, dir: rec.dir, flatpak: rec.flatpak || null, ach: achOf(e, rec) }); }
       require('./trophies').setRecomps(items);
       // 0.9.68: the trophy service started knowing no recomps; it reads every trophy file again (on the main thread)
       // only when the installed recomps changed, not 25 s after every start

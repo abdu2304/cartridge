@@ -369,6 +369,15 @@ function guessFromText(text, roms = [], consoles = {}) {
   return { console: con || best?.console || null, title: best?.title || null, romId: best?.romId || null };
 }
 
+// a downloaded release file checked against GitHub's SHA-256 of it (0.9.71; GitHub lists one for every release file
+// since 2025, older releases have none and pass), read as a stream so the main thread never waits on a big file
+async function checkDigest(file, digest) {
+  if (!digest) return;
+  const want = String(digest).replace(/^sha256:/, '');
+  const h = require('crypto').createHash('sha256');
+  await new Promise((ok, bad) => fs.createReadStream(file).on('data', (c) => h.update(c)).on('end', ok).on('error', bad));
+  if (h.digest('hex') !== want) { fs.rmSync(file, { force: true }); throw new Error('The download didn’t match the checksum GitHub gives for it, so it was thrown away. Try again; if it happens again, the release itself may be broken.'); }
+}
 function createRecomps(ctx) {
   const { dataDir, log = () => {} } = ctx;
   const F = (n) => path.join(dataDir, n);
@@ -640,6 +649,7 @@ function createRecomps(ctx) {
     try {
       let got = 0;
       await ctx.download(b.asset.url, tmp, (n) => { got += n; onProgress({ step: 'download', pct: b.asset.size ? Math.min(99, Math.floor((got / b.asset.size) * 100)) : null, got }); }, signal);
+      await checkDigest(tmp, b.asset.digest);
       onProgress({ step: 'unpack', pct: null });
       fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
       // the name says what it is; without an ending, its first bytes do
@@ -948,6 +958,7 @@ function createRecomps(ctx) {
       fs.mkdirSync(path.dirname(setup), { recursive: true });
       let got = 0;
       await ctx.download(b.asset.url, setup + '.part', (n) => { got += n; onProgress({ step: 'download', pct: b.asset.size ? Math.min(99, Math.floor((got / b.asset.size) * 100)) : null, got }); }, signal);
+      try { await checkDigest(setup + '.part', b.asset.digest); } catch (er) { fs.rmSync(setup + '.part', { force: true }); throw er; }
       fs.renameSync(setup + '.part', setup); fs.chmodSync(setup, 0o755);
       if (prev?.installer && prev.installer !== setup) fs.rmSync(prev.installer, { force: true });
       installs[e.id] = { ...(prev || {}), id: e.id, repo: e.repo, dir: dest, program: path.join(dest, build.program), kind: 'linux', build: build.os, installer: setup, installedTag: prev?.installedTag || null, tag: rel.tag, date: rel.date, files: [], channel: 'stable', at: Date.now(), asset: b.asset.name };
@@ -1106,4 +1117,4 @@ function createRecomps(ctx) {
   return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : saveDirs(e, installs[id]); }, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes };
 }
 
-module.exports = { guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
+module.exports = { checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };

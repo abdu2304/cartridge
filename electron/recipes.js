@@ -32,6 +32,10 @@ function validate(r) {
   const bad = [];
   if (!r || typeof r !== 'object') return ['not an object'];
   if (r.schema !== 1) bad.push('schema is not 1');
+  // a draft (tools/recipes/draft.js) never loads: every TODO must be filled in and the todo list removed
+  if (r.todo) bad.push('todo list still there');
+  const todo = []; (function walk(v, at) { if (typeof v === 'string') { if (/^TODO\b/.test(v)) todo.push(at); } else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, at ? `${at}.${k}` : k); })(r, '');
+  for (const at of todo) bad.push(`${at} is TODO`);
   if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(r.id || '')) bad.push('id');
   if (!r.name) bad.push('name');
   if (!/^github:[\w.-]+\/[\w.-]+$/.test(r.repo || '')) bad.push('repo');
@@ -42,6 +46,11 @@ function validate(r) {
     try { new RegExp(b.asset); } catch { bad.push(`build asset ${b.asset}`); }
     if (!b.program || /[/\\]\.\.|^\//.test(b.program)) bad.push(`build program ${b.program}`);
     for (const [k, f] of Object.entries(b.files || {})) if (!['app', 'ini'].includes(k) || !['json', 'flat', 'ini'].includes(f.format) || !/^\{(dir|config|data|appdata)\}\//.test(f.path || '')) bad.push(`build file ${k}`);
+  }
+  if (r.achievements) {
+    const a = r.achievements;
+    for (const f of a.files || []) if (!/^\{(dir|config|data|appdata)\}\//.test(f)) bad.push(`achievements file ${f}`);
+    for (const t of a.list || []) if (!Array.isArray(t) || !Number.isInteger(t[0]) || !t[1] || !['P', 'G', 'S', 'B'].includes(t[3])) bad.push(`achievements list ${t?.[0]}`);
   }
   const ids = new Set();
   for (const s of r.settings || []) {
@@ -205,19 +214,31 @@ function script(r, build, rec, start, runner, vars, { env = {} } = {}) {
   if (start.copy) L.push(`mkdir -p ${q(path.dirname(start.copy.to))} && cp -f ${q(start.copy.from)} ${q(start.copy.to)}`);
   for (const [k, x] of Object.entries({ ...(r.env || {}), ...env })) if (/^[A-Z_][A-Z0-9_]*$/.test(k)) L.push(`export ${k}=${q(expand(x, vars))}`);
   L.push(`cd ${q(path.dirname(program))}`);
-  if (build.os === 'linux') { L.push(`exec ${q(program)}${args ? ' ' + args : ''} "$@"`); return L.join('\n') + '\n'; }
+  // 0.9.71: a port that prints its trophy unlocks ("Runtime: trophy N unlocked") has its output kept in
+  // .cartridge/output.log for Achievements; past 5 MB only the trophy lines are kept
+  const out = r.achievements?.output ? outputLog(rec) : null;
+  if (out) L.push(`[ -f ${q(out)} ] && [ "$(wc -c < ${q(out)})" -gt 5000000 ] && { grep -a 'Runtime: trophy' ${q(out)} > ${q(out + '.t')}; mv -f ${q(out + '.t')} ${q(out)}; }`);
+  const run = (cmd) => L.push(out ? `${cmd} 2>&1 | tee -a ${q(out)}` : `exec ${cmd}`);
+  if (build.os === 'linux') { run(`${q(program)}${args ? ' ' + args : ''} "$@"`); return L.join('\n') + '\n'; }
   if (!runner) throw new Error('Proton isn’t installed, and this game’s port is a Windows build.');
   const pfx = vars.prefix;
   if (runner.kind === 'umu') {
     L.push(`export WINEPREFIX=${q(path.join(pfx, 'pfx'))} GAMEID=0 STORE=none`);
     if (runner.proton) L.push(`export PROTONPATH=${q(runner.proton)}`);
-    L.push(`exec ${q(runner.umu)} ${q(program)}${args ? ' ' + args : ''} "$@"`);
+    run(`${q(runner.umu)} ${q(program)}${args ? ' ' + args : ''} "$@"`);
   } else {
     L.push(`export STEAM_COMPAT_DATA_PATH=${q(pfx)} STEAM_COMPAT_CLIENT_INSTALL_PATH=${q(runner.steam || '')}`);
     const proton = `${q(path.join(runner.proton, 'proton'))} waitforexitandrun ${q(program)}${args ? ' ' + args : ''} "$@"`;
-    L.push(runner.sniper ? `exec ${q(path.join(runner.sniper, '_v2-entry-point'))} --verb=waitforexitandrun -- ${proton}` : `exec ${proton}`);
+    run(runner.sniper ? `${q(path.join(runner.sniper, '_v2-entry-point'))} --verb=waitforexitandrun -- ${proton}` : proton);
   }
   return L.join('\n') + '\n';
+}
+const outputLog = (rec) => path.join(rec.dir, '.cartridge', 'output.log');
+// where a port's trophy unlocks are (0.9.71): its own files (templates filled in) and the kept output
+function achievementsOf(r, build, rec, vars) {
+  const a = r.achievements;
+  if (!a || !rec?.dir) return null;
+  return { format: 'ps4', files: [...(a.files || []).map((f) => expand(f, vars)), ...(a.output ? [outputLog(rec)] : [])], list: a.list || null, game: rec.game?.path || null };
 }
 // the same runner once with wineboot, so Proton makes the prefix before Cartridge puts settings.json in it
 function prefixCommand(runner, vars) {
@@ -272,4 +293,4 @@ function viewPlan(base, update, { list }) {
   return [...plan].map(([rel, from]) => ({ rel, from }));
 }
 
-module.exports = { SHIPPED, validate, load, chooseBuild, winPath, varsFor, expand, settingsFor, effective, typed, untyped, check, render, readBack, flat, script, prefixCommand, checkGame, findUpdate, viewPlan, verCmp, prefixOf };
+module.exports = { achievementsOf, outputLog, SHIPPED, validate, load, chooseBuild, winPath, varsFor, expand, settingsFor, effective, typed, untyped, check, render, readBack, flat, script, prefixCommand, checkGame, findUpdate, viewPlan, verCmp, prefixOf };

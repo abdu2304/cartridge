@@ -404,6 +404,27 @@ function cachedTrophyDefs(u, np) {
   } catch { return null; }
   return out;
 }
+// a PS4 port's trophy list from the player's own copy (0.9.71): the game's trophy00.trp, decrypted with the trophy key
+// of any shadPS4 set up here (as shadPS4 does), cached like shadPS4's lists. [{ id, name, desc, grade, icon }] or null
+const SHAD_USERS = () => { const h = os.homedir(), d = process.env.XDG_DATA_HOME || path.join(h, '.local/share'); return [path.join(d, 'shadPS4'), path.join(h, '.config/shadPS4'), path.join(h, '.var/app/net.shadps4.shadPS4/data/shadPS4')]; };
+function portTrophyDefs(gameDir) {
+  const np = npOfGame(gameDir);
+  if (!np) return null;
+  let base = trpCacheDir && exists(path.join(trpCacheDir, np, 'Xml')) ? path.join(trpCacheDir, np) : null;
+  if (!base && trpCacheDir) {
+    const key = SHAD_USERS().map((u) => shadTrophyKey(u)).find(Boolean);
+    if (!key) return null;
+    let files; try { files = readTrp(fs.readFileSync(path.join(gameDir, 'sce_sys', 'trophy', 'trophy00.trp')), np, key); } catch { return null; }
+    if (!files || !Object.keys(files).some((n) => /\.XML$/i.test(n))) return null;
+    base = path.join(trpCacheDir, np);
+    try { for (const [n, b] of Object.entries(files)) { const sub = /\.PNG$/i.test(n) ? 'Icons' : 'Xml'; fs.mkdirSync(path.join(base, sub), { recursive: true }); fs.writeFileSync(path.join(base, sub, n), b); } } catch { return null; }
+  }
+  if (!base) return null;
+  const x = path.join(base, 'Xml');
+  const d = parseTrophyXml(readText(path.join(x, 'TROP_01.XML'))) || parseTrophyXml(readText(path.join(x, 'TROP.XML')));
+  if (!d) return null;
+  return d.trophies.map((t) => ({ id: t.id, name: t.name || `Trophy ${t.id}`, desc: t.desc || '', grade: t.grade || null, icon: iconToken(path.join(base, 'Icons', `TROP${String(t.id).padStart(3, '0')}.PNG`)) || '' }));
+}
 const tsMs = (v) => { const n = Number(v); if (!n) return null; return n > 1e14 ? Math.round(n / 1000) : n > 1e11 ? n : n * 1000; };
 function parseShadps4(userDir) {
   const games = new Map();
@@ -778,4 +799,4 @@ function signature(dirs) {
   return s;
 }
 
-module.exports = { setRecomps, readUcp, setPs5Games, rememberTitle, readTrp, shadTrophyKey, setTrpCacheDir, APP_DIRS, emulationRoots, registerIcon: iconToken, shadKeyState, watchPaths, SOURCES, DETECT, validate, scan, readSource, signature, iconPath, setIconCacheDir, readTropusrPS3, readTropusrVita, parseTrophyXml, parseGpd, readXdbf };
+module.exports = { portTrophyDefs, setRecomps, readUcp, setPs5Games, rememberTitle, readTrp, shadTrophyKey, setTrpCacheDir, APP_DIRS, emulationRoots, registerIcon: iconToken, shadKeyState, watchPaths, SOURCES, DETECT, validate, scan, readSource, signature, iconPath, setIconCacheDir, readTropusrPS3, readTropusrVita, parseTrophyXml, parseGpd, readXdbf };
