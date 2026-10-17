@@ -7,6 +7,10 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 17 Oct 2026 · 0.9.75 · Found by What's Inside
+
+**Asked (photo):** P.T. unpacked by hand didn't show. PS4/PS5 folders are now recognised by their param.sfo (handover Part 22); e2e reproduces it.
+
 ## 17 Oct 2026 · 0.9.74 · Unpacked Again
 
 **Asked:** zip extraction for PS4 broken, check PS3 and other systems. Fixed and widened (handover Part 21); e2e covers six cases.
