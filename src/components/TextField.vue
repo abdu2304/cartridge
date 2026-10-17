@@ -4,7 +4,7 @@
     <div class="box input-box" @click="inp?.focus()">
       <Icon v-if="icon" :name="icon" :size="18" style="color: var(--muted)" />
       <input ref="inp" class="tf-input" data-focus :data-key="fkey" :value="modelValue" :readonly="osk" :type="password && !reveal ? 'password' : 'text'" :inputmode="mode === 'url' ? 'url' : 'text'" :placeholder="placeholder" autocomplete="off" autocapitalize="off" spellcheck="false" @click="openOsk" @input="(e) => emit('update:modelValue', e.target.value)" @change="(e) => emit('update:modelValue', e.target.value.trim())" />
-      <button v-if="password" type="button" class="tf-reveal" tabindex="-1" @click.stop="reveal = !reveal"><Icon :name="reveal ? 'mdiEyeOff' : 'mdiEye'" :size="18" /></button>
+      <button v-if="password" type="button" class="tf-reveal" tabindex="-1" :aria-label="reveal ? 'Hide' : 'Show'" @click.stop="reveal = !reveal"><Icon :name="reveal ? 'mdiEyeOff' : 'mdiEye'" :size="18" /></button>
       <button type="button" class="tf-paste" data-focus title="Paste" @click.stop="paste"><Icon name="mdiContentPaste" :size="17" /><span>Paste</span></button>
     </div>
   </div>

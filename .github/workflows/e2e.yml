@@ -1,0 +1,62 @@
+name: End to end
+
+# 0.9.71: the real app against a fake RomM in a fake home on every push to a work branch and every pull request
+# (test/e2e/run.js: start, library sync, game page, downloads with checksums, every tab and Settings section, update
+# channel, recovery marker, time budgets in test/e2e/budgets.json), once more with a 20,000-game library.
+# Pull requests also run the UI audits (focus, contrast, clipping at 1280x800, 1080p and 4K, worst case,
+# accessibility, the tour) and the controller playtest.
+on:
+  push:
+    branches: ['claude/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vite build
+      - name: Display
+        run: sudo apt-get update -q && sudo apt-get install -y -q xvfb
+      - name: End to end
+        run: xvfb-run -a node test/e2e/run.js
+      - name: End to end, 20,000 games
+        run: E2E_GAMES=20000 xvfb-run -a node test/e2e/run.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e
+          path: .ui-audit/e2e.json
+          retention-days: 14
+
+  audits:
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx vite build
+      - name: Chromium for the audits
+        run: npx playwright-core install --with-deps chromium
+      - name: UI audits
+        run: node tools/ui-audit/run.js
+      - name: Settings, row by row
+        run: node tools/ui-audit/rows.js
+      - name: Controller playtest
+        run: node tools/ui-audit/playtest.js

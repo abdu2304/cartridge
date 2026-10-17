@@ -87,10 +87,19 @@ EMU.ares.for = Object.keys(EMU.ares.system);
 // Forks that announce themselves in their name (0.9.3): found copies matching these are listed as
 // that fork, after the emulator itself, and never used unless picked. Anything else can be named a
 // fork of an emulator in Emulator setup ("Which one?").
-const FORKS = {
-  shadps4: [[/gr2/i, 'shadPS4 GR2'], [/bb[\s._-]?launcher/i, 'BB Launcher']],
-  dolphin: [[/primehack/i, 'PrimeHack'], [/slippi/i, 'Slippi Dolphin']],
-};
+// 0.9.71 (handover Part 9 item 18): the list lives in forks.json, and a newer copy fetched from Cartridge's repository
+// (main.js, daily) replaces it through setForks, so a new fork needs no release. Patterns are case-insensitive.
+const FORKS = {};
+function setForks(data) {
+  const list = Array.isArray(data?.forks) ? data.forks : [];
+  const next = {};
+  for (const f of list) { try { if (f?.of && f.name && f.match) (next[f.of] ||= []).push([new RegExp(f.match, 'i'), String(f.name)]); } catch {} }
+  if (!Object.keys(next).length) return false;
+  for (const k of Object.keys(FORKS)) delete FORKS[k];
+  Object.assign(FORKS, next);
+  return true;
+}
+setForks(require('./forks.json'));
 // Members of one family sold under one entry above, shown by their real name (0.9.3: a Citra
 // install isn't "Azahar"). Matched on the program, script or Flatpak id.
 const REAL_NAMES = {
@@ -168,4 +177,4 @@ function argsFor(id, key, src, version) {
 }
 const coreName = (c) => CORE_NAMES[c] || c.replace(/_/g, ' ');
 
-module.exports = { EMU, CORES, RA_FIRST, emulatorsFor, argsFor, coreName, DISC_FIRST, GAME_EXT, DIR_GAMES, FORKS, forkOf, realName };
+module.exports = { EMU, CORES, RA_FIRST, emulatorsFor, argsFor, coreName, DISC_FIRST, GAME_EXT, DIR_GAMES, FORKS, forkOf, realName, setForks };

@@ -71,14 +71,14 @@ const SCAN = () => {
   return [...new Set(out)];
 };
 
-async function pages(width, height) {
-  const { browser, page: p, errors } = await open({ width, height, long: true });
+async function pages(width, height, scale = 1) {
+  const { browser, page: p, errors } = await open({ width, height, long: true, scale });
   await p.addStyleTag({ content: '*, *::before, *::after { transition: none !important; animation: none !important; }' }).catch(() => {});
   const bad = new Set();
-  const scan = async (label) => { await p.waitForTimeout(600); for (const x of await p.evaluate(SCAN)) bad.add(`${width}x${height} ${label} | ${x}`); };
+  const scan = async (label) => { await p.waitForTimeout(600); for (const x of await p.evaluate(SCAN)) bad.add(`${width * scale}x${height * scale} ${label} | ${x}`); };
   for (const t of TABS) { await p.click(`[data-tab="${t}"]`).catch(() => {}); await scan(t); }
   await p.click('[data-tab="settings"]').catch(() => {}); await p.waitForTimeout(600);
-  for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key))) { await p.click(`[data-key="${k}"]`).catch(() => {}); await scan('settings ' + k); }
+  for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key))) { await p.evaluate(() => document.querySelector(".hub-back")?.click()); await p.waitForTimeout(200); await p.click(`[data-key="${k}"]`).catch(() => {}); await scan('settings ' + k); }
   await p.click('[data-tab="library"]').catch(() => {}); await p.waitForTimeout(800); await p.locator('.card').first().click().catch(() => {}); await scan('game page');
   // 0.9.60: the pages and pop-ups the audits never visited (owner's photos: a trophy page, the keyboard's suggestions)
   await p.click('[data-tab="achievements"]').catch(() => {}); await p.waitForTimeout(700); await p.locator('.aa-row, .aa-card, [data-key^="ach-"]').first().click().catch(() => {}); await scan('trophy game page');

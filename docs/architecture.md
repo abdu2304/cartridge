@@ -41,6 +41,17 @@ main, `window.cart.on()` in the UI).
 | Downloads | `electron/dlWorker.js`, `main.js` | one worker per download, resume, checksums, speed limit | |
 | UI audits | `tools/ui-audit/` | focus and contrast checks in every look, the clipping check (text cut by its box, every page and widget), the Plain/Glass separation check (in `npm test`), and screenshots compared with the last release (not shipped) | `tools/ui-audit/README.md` |
 
+## Splitting main.js (0.9.71)
+
+`electron/main.js` grew past 6,500 lines. It is being split by area, one at a time, with no change in behaviour:
+
+1. Move the area's IPC handlers and its helper functions into `electron/<area>Ipc.js`, as `module.exports = function (m) { ...; return { handlers, ...names main still calls } }`.
+2. Run ESLint's `no-undef` on the new file: every name it lists is something main.js shares. Functions are called through `m` (a wrapper per name, so one defined later in main.js is found when used); state that changes is a getter on main's `MAIN` object, read when used, never copied at start.
+3. In main.js the handlers become `...<AREA>.handlers` and the names main still calls stay as one-line forwarders (`function recomps() { return RIPC.recomps(); }`), so nothing else moves.
+4. `npm test`, the launch check and `test/e2e/run.js` (which calls the moved handlers through the real app) must pass.
+
+Done: recomps and Cartridge Verified (`electron/recompsIpc.js`). Next by size: Steam (52 handlers), Get Emulators (23), add-ons (16), Syncthing (14).
+
 ## Libraries
 
 Shipped: Vue 3, `@mdi/js` icons, `@fontsource-variable/*` and Roboto fonts (SIL OFL), `qrcode` (pairing),

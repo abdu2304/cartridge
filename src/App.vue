@@ -410,6 +410,7 @@ onMounted(async () => {
   // a dot on Settings and a list in Settings → Emulators, not a pop-up (0.9.3)
   setTimeout(() => { if (store.config.configured) call('issues:list').then((l) => (store.issues = l.length)).catch(() => {}); }, 8000);
   setTimeout(setupNotice, 3500);
+  if (store.config.safeMode) setTimeout(safeNotice, 1500);
   gpuCheck();
   if (store.config.configured) call('server:status').then((c) => (store.connection = c)).catch(() => {});
 });
@@ -427,6 +428,16 @@ async function gpuCheck() {
   ] });
   if (v === 'keep') { await call('app:gpuKeep', { keep: true }); store.config.gpuKept = true; toast('GPU Always kept', 'ok', 2500, 'mdiCheck'); }
   else if (v === 'auto') call('app:gpuKeep', { keep: false });
+}
+// safe start (0.9.71, electron/recovery.js): Cartridge closed on its own twice in a row while starting, so this start
+// uses safe looks, held in memory only. Keep them, or go back to yours.
+async function safeNotice() {
+  if (!store.config?.safeMode) return;
+  const v = await choose({ title: 'Started in Safe Mode', message: 'Cartridge closed on its own twice while starting, so this time it opened with simple looks: Plain, a still background and light effects. Your own settings are untouched.\n\nIf it keeps working like this, keep these looks. Otherwise go back to yours and send a report from Settings → Help and About.', options: [
+    { label: 'Keep These Looks', value: 'keep', icon: 'mdiShieldCheckOutline' },
+    { label: 'Go Back to My Settings', value: 'back', icon: 'mdiUndo' },
+  ] });
+  store.config = await call(v === 'keep' ? 'recovery:keepSafe' : 'recovery:leaveSafe');
 }
 async function setupNotice() {
   // 0.9.15: people who were set up before get the new welcome offered once (it includes the system scan)

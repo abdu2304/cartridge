@@ -1,0 +1,84 @@
+name: Beta and nightly
+
+# Beta and Nightly update channels (0.9.71). Published as GitHub pre-releases, so Stable never sees them; Cartridge's
+# Settings → Downloads and Updates → Update Channel picks which one a device follows (electron/updateChannels.js).
+#   Nightly: every night, from the newest work (the most recently changed of main and the claude/ branches), only when
+#            that commit has no nightly yet. Version: next patch + -nightly.<date>.<run> (0.9.71-nightly.20261018.7).
+#   Beta:    started by hand (Actions → Beta and nightly → Run workflow, channel beta) on the branch to try.
+#            Version: next patch + -beta.<run>, notes from RELEASE_NOTES.md.
+# Same gate as a release: tests, build, launch check. Only the newest 7 nightlies are kept.
+on:
+  schedule:
+    - cron: '23 2 * * *'
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'beta or nightly'
+        required: true
+        default: beta
+        type: choice
+        options: [beta, nightly]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Pick channel and commit
+        id: pick
+        run: |
+          CH="${{ github.event.inputs.channel || 'nightly' }}"
+          if [ "$CH" = nightly ] && [ "${{ github.event_name }}" = schedule ]; then
+            # the newest work: whichever of main and the claude/ branches changed last
+            REF=$(git for-each-ref --sort=-committerdate --format='%(refname)' refs/remotes/origin/main 'refs/remotes/origin/claude/*' | head -1)
+            git checkout -q "$REF"
+          fi
+          git fetch -q --tags
+          if [ "$CH" = nightly ] && git tag --points-at HEAD | grep -q -- '-nightly\.'; then echo "skip=1" >> "$GITHUB_OUTPUT"; echo "This commit already has a nightly."; fi
+          echo "channel=$CH" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        if: steps.pick.outputs.skip != '1'
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.pick.outputs.skip != '1'
+        run: npm ci
+      - name: Tests
+        if: steps.pick.outputs.skip != '1'
+        run: npm test
+      - name: Version and channel
+        if: steps.pick.outputs.skip != '1'
+        run: |
+          node tools/release/prerelease.js "${{ steps.pick.outputs.channel }}" "${{ github.run_number }}"
+          echo "VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+      - name: Build AppImage
+        if: steps.pick.outputs.skip != '1'
+        run: npm run dist
+      - name: Launch check (must open and render before anything is published)
+        if: steps.pick.outputs.skip != '1'
+        run: |
+          sudo apt-get update -q && sudo apt-get install -y -q xvfb libfuse2t64 || sudo apt-get install -y -q xvfb libfuse2
+          cd release
+          CARTRIDGE_SMOKE=1 APPIMAGE_EXTRACT_AND_RUN=1 timeout 90 xvfb-run -a ./Cartridge-x86_64.AppImage 2>&1 | tee smoke.log
+          grep -q "SMOKE OK" smoke.log
+      - name: Tag this commit
+        if: steps.pick.outputs.skip != '1'
+        run: |
+          git tag "v$VERSION" && git push -q origin "v$VERSION"
+      - name: Publish as a pre-release
+        if: steps.pick.outputs.skip != '1'
+        run: npm run release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Keep the newest 7 nightlies
+        if: steps.pick.outputs.skip != '1' && steps.pick.outputs.channel == 'nightly'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh api "repos/${{ github.repository }}/releases?per_page=100" --jq '[.[] | select(.tag_name | test("-nightly\\."))] | sort_by(.created_at) | reverse | .[7:] | .[] | "\(.id) \(.tag_name)"' |
+          while read -r id tag; do gh api -X DELETE "repos/${{ github.repository }}/releases/$id"; git push -q origin ":refs/tags/$tag" || true; done

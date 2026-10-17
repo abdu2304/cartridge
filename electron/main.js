@@ -96,6 +96,15 @@ if (rawVersion < 3 && config.configured) {
   try { fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 }); } catch {}
 }
 
+// Recovery (0.9.71, electron/recovery.js): safe start after two starts in a row that never finished, settings backups
+// (daily, before updates, imports and restores), export and import, unexpected closes for Report a Problem
+const RECOVERY = require('./recovery');
+const recovery = RECOVERY.createRecovery({ dir: USER_DATA, version: (() => { try { return require('../package.json').version; } catch { return ''; } })() });
+let safeStart = { safe: false, unclean: 0 }; // started below, once this is the one running copy (a second copy hands over)
+try { recovery.backup(CONFIG_FILE, 'daily'); } catch {}
+// what the UI sees: in a safe start the looks are the safe ones, held here only, never saved over the person's own
+const shownConfig = () => (safeStart.safe ? { ...config, ui: recovery.safeUi(config.ui || {}), safeMode: true } : config);
+
 // ---------------------------------------------------------------- log
 // (How Cartridge picks GPU or software rendering is further down: isGamescope, launchedBySteam,
 // biggestDisplay and forceSoftware. In short: software in Game Mode or under Steam on small
@@ -128,6 +137,8 @@ if (!process.env.CARTRIDGE_SMOKE && !process.env.CARTRIDGE_MULTI) {
   } else {
     const beatNow = () => { try { fs.writeFileSync(BEAT_FILE, JSON.stringify({ pid: process.pid, t: Date.now() })); } catch {} };
     beatNow(); setInterval(beatNow, 5000).unref?.();
+    safeStart = recovery.start();
+    if (safeStart.safe) log('safe start: the last', safeStart.unclean, 'starts never finished');
     app.on('second-instance', (_e, argv, _cwd, data) => {
       if (win && !win.isDestroyed()) { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
       const g = data?.game ?? argGame(argv);
@@ -645,7 +656,9 @@ function downloadDir(p, need = 0, root = null) {
   const roots = extraRoots().filter((r) => isDir(r));
   if (!roots.length || config.paths[p.slug]) return main; // one drive, or a folder you set for this console
   const opts = [main, ...roots.map((r) => rootFolder(r, p))].filter(Boolean);
-  const want = root || (config.downloadRoot && config.downloadRoot !== 'most' ? config.downloadRoot : null);
+  // 0.9.71: a drive picked for this console (Storage → Drive per Console) wins over the general choice while it's plugged in
+  const mine = config.consoleRoots?.[p.slug];
+  const want = root || (mine && isDir(mine) ? mine : null) || (config.downloadRoot && config.downloadRoot !== 'most' ? config.downloadRoot : null);
   // the main games folder (config.romsRoot) holds main, which may sit under another path than romsRoot's (a console
   // folder set by name), so the main root picks main itself
   const pick = want ? (path.resolve(want) === path.resolve(config.romsRoot || '') ? main : opts.find((d) => path.resolve(d).startsWith(path.resolve(want) + path.sep))) : null;
@@ -724,11 +737,31 @@ function publicLibrary() {
   };
 }
 
+// 0.9.71 (plan-multidrive): which games folder each installed game was last seen in, so a game on a drive that's
+// unplugged shows as "On <drive>, not plugged in" instead of simply not downloaded
+const SEEN_FILE = path.join(USER_DATA, 'seen-roots.json');
+const seenRoots = loadJson(SEEN_FILE, {}); // romId -> games folder (an extra root)
+let awayMap = {};
+function noteRoots(out) {
+  const roots = extraRoots(), real = (x) => path.resolve(x) + path.sep;
+  let changed = false;
+  for (const [id, p] of Object.entries(out)) { if (p === MARKED) continue; const r = roots.find((x) => path.resolve(p).startsWith(real(x))) || null; if ((seenRoots[id] || null) !== r) { if (r) seenRoots[id] = r; else delete seenRoots[id]; changed = true; } }
+  const away = {};
+  for (const [id, r] of Object.entries(seenRoots)) {
+    if (out[id]) continue;
+    if (!roots.includes(r)) { delete seenRoots[id]; changed = true; continue; } // that drive was taken off the list
+    if (!isDir(r)) away[id] = { root: r, drive: (config.extraRoots || []).find((x) => x.path === r)?.label || path.basename(path.dirname(path.dirname(r))) || r };
+  }
+  if (changed) saveJson(SEEN_FILE, seenRoots, false);
+  awayMap = away;
+  broadcast('roots-away', away);
+}
 function computeInstalled() {
   const out = {};
   if (!library) return out;
   for (const p of library.platforms) Object.assign(out, installedState(library.roms[p.id] || [], p));
   installedMap = out;
+  try { noteRoots(out); } catch (e) { log('seen roots', e.message); }
   try { identity.bump(); } catch {} // the game identity index follows what's on the device (defined further down)
   playSyncAt = 0; // play time can be matched to games now: sync again
   broadcast('installed', out);
@@ -2320,6 +2353,9 @@ function afterInstall(romId) {
 const patchesMod = require('./patches');
 const cheatsMod = require('./cheats');
 const webFetch = require('./webFetch'); // outside services through Chromium's network stack (0.9.17: 403s)
+// 0.9.71: a fork list fetched since the release (forks-refresh) replaces the shipped one when it's newer
+const FORKS_FILE = path.join(USER_DATA, 'forks.json');
+try { const kept = loadJson(FORKS_FILE, null); if ((kept?.rev || 0) > (require('./forks.json').rev || 0)) require('./emulators').setForks(kept); } catch {}
 // add-ons Cartridge installed (0.9.17): { key: { dest, files, ... } }; Remove deletes only those files
 // The web and mods engines (0.9.52): one place for outside services, one shape for every mod source (web.js, modEngine.js)
 let webEngine = null, modEngine = null;
@@ -2772,6 +2808,8 @@ function patchState(romId) {
   }
   if (/^ps2$/i.test(r?.platform_slug || '') || /^ps2$/i.test(r?.platform_fs_slug || '')) return ps2PatchState(romId);
   if (/\bxbox360\b/i.test(slugs)) return xeniaPatchState(Number(romId), r); // 0.9.63
+  if (/\bswitch\b/i.test(slugs)) return switchCheatState(Number(romId), slugs); // 0.9.71
+  if (require('./raCheats').systemOf([r?.platform_slug, r?.platform_fs_slug])) return raCheatState(Number(romId), r, slugs); // 0.9.71
   if (!/ps3/i.test(`${r?.platform_slug} ${r?.platform_fs_slug}`)) return { emu: null };
   const where = installedMap[romId];
   if (!where) return { emu: 'rpcs3', why: 'Download the game first.' };
@@ -2783,6 +2821,27 @@ function patchState(romId) {
   if (!dir || !fs.existsSync(path.join(dir.patches, 'patch.yml'))) return { emu: 'rpcs3', serial, why: 'RPCS3’s patch list isn’t on this device yet. In RPCS3: Manage → Game Patches → Download latest patches. Then come back.' };
   const version = patchesMod.ps3Version(installs[romId]?.dir || where, rpcs3Hdds(), serial);
   return { emu: 'rpcs3', serial, version, dir };
+}
+// Cheats from their databases (0.9.71, handover Part 9 item 17): Switch through Eden's family or Ryujinx (switchCheats.js),
+// older consoles through RetroArch (raCheats.js). Only for the emulator the game is set to use.
+function switchCheatState(romId, slugs) {
+  const g = gameEmuOf(romId, slugs), list = require('./addons').emulators().filter((e) => e.for.includes('switch'));
+  const e = list.find((x) => x.id === g?.id) || list[0];
+  if (!e) return { emu: 'nxcheats', why: 'No Switch emulator’s settings were found on this device. Open Eden or Ryujinx once, then come back.' };
+  const tid = handlers['addons:gameIds']({ romId }).switchId;
+  if (!tid) return { emu: 'nxcheats', why: 'Cartridge couldn’t read this game’s title ID (prod.keys is needed for Switch games).' };
+  return { emu: 'nxcheats', emuName: e.name, serial: tid.toUpperCase(), dir: { mods: path.join(e.textures, e.id === 'ryujinx' ? tid.toLowerCase() : tid.toUpperCase()) }, ryujinx: e.id === 'ryujinx' };
+}
+function raCheatState(romId, r, slugs) {
+  const RC = require('./raCheats'), where = installedMap[romId];
+  const g = gameEmuOf(romId, slugs);
+  if (g?.id !== 'retroarch') return { emu: 'racheats', why: 'These cheats come from RetroArch’s database and work through RetroArch; this game starts with another emulator.' };
+  if (!where || where === MARKED) return { emu: 'racheats', why: 'Download the game first.' };
+  const ctx = newEmuCtx(romId, r, where, slugs);
+  if (!ctx || ctx.why) return { emu: 'racheats', why: ctx?.why || 'RetroArch wasn’t found for this game.' };
+  const cfgFile = path.join(ctx.cfgDir, 'retroarch.cfg'), system = RC.systemOf([r.platform_slug, r.platform_fs_slug]);
+  const files = RC.filesFor(system, [ctx.serial, r.fs_name, r.name]);
+  return { emu: 'racheats', serial: ctx.serial, dir: { cheats: RC.cheatDir(ctx.cfgDir, fs.readFileSync(cfgFile, 'utf8')), coreName: ctx.coreName, content: ctx.serial, system, files }, cfgFile };
 }
 // RPCS3's patch list, fetched the way RPCS3's "Download latest patches" does when it's missing or a
 // week old (owner, 0.9.16: show the patches RPCS3 has even if it was never asked to download them)
@@ -3196,6 +3255,9 @@ const EMU_PATCH = {
   cemu: { name: 'Cemu', list: (st, mine) => require('./cemuPacks').list({ root: st.dir.root, settings: st.dir.settings, titleIds: st.ids, name: st.title }, mine), set: (st, todo, mine) => { notRunning('cemu', 'Cemu'); const C = require('./cemuPacks'); const all = C.list({ root: st.dir.root, settings: st.dir.settings, titleIds: st.ids, name: st.title }, mine); C.set({ settings: st.dir.settings }, todo.map((t) => { const p = all.find((x) => x.key === t.key); return { ...t, presets: Object.fromEntries(Object.entries(p?.presets || {}).map(([k, v]) => [k, (t.want && v.includes(t.want[k]) ? t.want[k] : null) || p.chosen[k] || v[0]])) }; }), mine); return mine; } },
   // Xbox 360 (0.9.63): Xenia Canary's patch files; Xenia reads them when a game starts, and turning one on turns apply_patches on if it was off
   xenia: { name: 'Xenia', list: (st, mine) => require('./xeniaPatches').list(st.dir, st.serial, mine), set: (st, todo, mine) => { notRunning('xenia', 'Xenia'); const X = require('./xeniaPatches'); if (todo.some((t) => t.on) && X.ensureOn(st.cfg)) log('xenia apply_patches turned on'); return X.set(st.dir, todo, mine); } },
+  // 0.9.71: cheat databases. RetroArch writes retroarch.cfg when it quits, so neither is changed while it runs
+  racheats: { name: 'RetroArch', list: (st, mine) => require('./raCheats').list(st.dir, mine, { cacheDir: path.join(USER_DATA, 'cheats-libretro') }), set: async (st, todo, mine) => { notRunning('retroarch', 'RetroArch'); const RC = require('./raCheats'); const all = await RC.list(st.dir, mine, { cacheDir: path.join(USER_DATA, 'cheats-libretro') }); const rec = RC.set(st.dir, all, todo, mine); if (todo.some((t) => t.on) && RC.ensureApply(st.cfgFile)) log('retroarch apply_cheats_after_load turned on'); return rec; } },
+  nxcheats: { name: 'Switch', list: async (st, mine) => { const S = require('./switchCheats'); return S.list(st.dir.mods, st.serial, await S.download(st.serial, { cacheDir: path.join(USER_DATA, 'cheats-switch') }), mine); }, set: async (st, todo, mine) => { notRunning(st.ryujinx ? 'ryujinx' : 'eden', st.emuName); const S = require('./switchCheats'); return S.set(st.dir.mods, st.serial, await S.download(st.serial, { cacheDir: path.join(USER_DATA, 'cheats-switch') }), todo, mine); } },
   pcsx2: { name: 'PCSX2', list: (st, mine) => patchesMod.pcsx2List(st.dir, st.game, patchesMod.pcsx2ZipBuffer(patchesMod.pcsx2ZipSources(os.homedir(), steamMgr.appImagesFor('ps2', /pcsx2/i)), require('./detect').readAppImageFile), mine), set: (st, todo, mine) => patchesMod.pcsx2Set(st.dir, st.game, todo, mine) },
 };
 // D2: a Vita game through Vita3K (.pkg with its zRIF installs with no window; a .vpk or .zip
@@ -3241,18 +3303,20 @@ let autoUpdater = null;
 let VERSION_NAME = null;
 try { VERSION_NAME = require('../package.json').versionName || null; } catch {}
 const versionName = () => VERSION_NAME || app.getVersion();
-const nameOf = (i) => String(i?.releaseName || '').replace(/^Cartridge\s+/i, '').trim() || i?.version;
+const nameOf = (i) => (UC.channelOf(i?.version) !== 'stable' && UC.channelOf(i?.version) ? UC.nameOf('v' + i.version) : String(i?.releaseName || '').replace(/^Cartridge\s+/i, '').trim() || i?.version);
+const UC = require('./updateChannels');
 function setupUpdater() {
   if (!app.isPackaged || !process.env.APPIMAGE) return; // only the real AppImage can replace itself
   try { ({ autoUpdater } = require('electron-updater')); } catch { return; }
   autoUpdater.autoDownload = !config.updateHold; // after a roll back, no automatic update until the user asks (0.9.17)
   autoUpdater.autoInstallOnAppQuit = true;
+  UC.apply(autoUpdater, config.updateChannel, { switched: !!config.updateSwitched }); // 0.9.71: Stable, Beta or Nightly
   const set = (s) => { updateState = s; broadcast('update', { ...s, supported: true }); };
   autoUpdater.on('checking-for-update', () => set({ state: 'checking' }));
   autoUpdater.on('update-available', (i) => set({ state: 'downloading', version: nameOf(i), percent: 0 }));
   autoUpdater.on('download-progress', (p) => set({ ...updateState, state: 'downloading', percent: Math.round(p.percent) }));
   autoUpdater.on('update-not-available', () => set({ state: 'current', version: versionName() }));
-  autoUpdater.on('update-downloaded', (i) => set({ state: 'ready', version: nameOf(i) }));
+  autoUpdater.on('update-downloaded', (i) => { try { recovery.backup(CONFIG_FILE, 'update'); } catch {} set({ state: 'ready', version: nameOf(i) }); if (config.updateSwitched) { delete config.updateSwitched; saveConfig(); } });
   autoUpdater.on('error', (e) => set({ state: 'error', error: String(e?.message || e).slice(0, 200) }));
   const check = () => autoUpdater.checkForUpdates().catch(() => {});
   setTimeout(check, 8000);
@@ -3335,7 +3399,8 @@ function createWindow() {
   win.setMenuBarVisibility(false);
   if (process.env.VITE_DEV) win.loadURL('http://localhost:5173');
   else win.loadFile(path.join(__dirname, '../dist/index.html'));
-  win.webContents.on('render-process-gone', (_e, d) => log('renderer gone', d.reason, d.exitCode));
+  win.webContents.on('render-process-gone', (_e, d) => { log('renderer gone', d.reason, d.exitCode); if (d.reason !== 'clean-exit') recovery.note(`the screen closed (${d.reason})`); });
+  win.webContents.once('did-finish-load', () => setTimeout(() => recovery.ok(), 15000)); // started properly (recovery.js)
   win.webContents.on('did-start-loading', () => { imgReady = false; }); // the image worker comes back with the page
   // CI launch check: exit 0 only if the UI actually rendered
   if (process.env.CARTRIDGE_SMOKE) {
@@ -3368,6 +3433,13 @@ function createWindow() {
     // recomps' releases checked once a day, silently (owner: "without consuming many resources")
     scheduler.add('recomp-folders', { once: true, firstAfter: 25000, deferWhilePlaying: true, run: async () => { try { recomps().ensureFolders(); } catch (e) { log('recomp folders', e.message); } recompTrophies(); } });
     scheduler.add('recomps-refresh', { every: 24 * 3600e3, firstAfter: 5 * 60000, deferWhilePlaying: true, run: async () => { if (config.recomps?.daily === false) return; /* 0.9.69: Settings → Recomps, Check Every Day */ const r = await recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }); log('recomps refreshed', JSON.stringify(r)); } });
+    // 0.9.71: the fork list from Cartridge's repository (a newer rev than the one shipped or kept wins)
+    scheduler.add('forks-refresh', { every: 24 * 3600e3, firstAfter: 6 * 60000, deferWhilePlaying: true, run: async () => {
+      const res = await webFetch('https://raw.githubusercontent.com/abdu2304/cartridge/main/electron/forks.json', { signal: AbortSignal.timeout(20000) });
+      if (!res.ok) throw new Error('forks.json answered ' + res.status);
+      const d = await res.json(), have = loadJson(FORKS_FILE, null) || require('./forks.json');
+      if ((d?.rev || 0) > (have?.rev || 0) && require('./emulators').setForks(d)) { saveJson(FORKS_FILE, d); log('forks list updated to rev', d.rev); }
+    } });
     scheduler.add('bios-check', { once: true, firstAfter: 45000, deferWhilePlaying: true, run: () => biosSetup({ install: true }).catch(() => {}) }); // 0.9.38: firmware too, when an emulator lacks it
   }
   win.webContents.once('did-finish-load', () => log('ui loaded', Date.now() - startedAt + 'ms', 'window=' + win.getContentSize().join('x'), 'zoom=' + currentZoom()));
@@ -4027,7 +4099,12 @@ const handlers09 = {
   'setup:confirm': ({ path: f, id }) => steamMgr.confirm(f, id),
   'setup:fork': ({ path: f, of, name }) => steamMgr.markFork(f, of, name),
   'setup:use': ({ key, file, as, args }) => steamMgr.useFile(key, file, { as, args }),
-  'setup:report': () => steamMgr.setupReport(),
+  'setup:report': () => {
+    // 0.9.71: unexpected closes and a safe start go in too (times, reasons and versions only)
+    const c = recovery.closes();
+    const extra = c.length || safeStart.safe ? `\n\nUnexpected closes (newest first)${safeStart.safe ? ', this start is in safe mode' : ''}:\n${c.map((x) => `- ${new Date(x.at).toISOString().slice(0, 16).replace('T', ' ')} ${x.what} (${x.version})`).join('\n') || '- none'}` : '';
+    return steamMgr.setupReport() + extra;
+  },
   // give a Flatpak emulator your games folder (asked first in Setup): only its Flatpak permissions change
   'setup:flatpakAllow': async ({ id, dir }) => {
     if (!/^[A-Za-z0-9_.-]+$/.test(String(id || '')) || !path.isAbsolute(String(dir || ''))) throw new Error('Not a Flatpak app or folder');
@@ -4144,12 +4221,20 @@ const handlers09 = {
     return out;
   },
 };
+// What the moved areas share with main.js (0.9.71, the split by area): functions, and getters for state that changes
+const MAIN = {
+  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob,
+  get broadcast() { return broadcast; }, get webFetch() { return webFetch; }, get romName() { return romName; }, get isDir() { return isDir; }, get romIndexMain() { return romIndexMain; },
+  get steamMgr() { return steamMgr; }, get installedMap() { return installedMap; }, get library() { return library; }, get runOn() { return runOn; }, get gameFocus() { return gameFocus; }, get trophySvc() { return trophySvc; },
+  USER_DATA,
+};
+const RIPC = require('./recompsIpc')(MAIN);
 const handlers = {
   ...trophySvc.handlers,
   ...handlers09,
   ...colHandlers,
   ...handlers08,
-  'config:get': () => config,
+  'config:get': () => shownConfig(),
   'wallpaper:set': async ({ file }) => {
     const ext = path.extname(file || '').toLowerCase();
     if (!['.png', '.jpg', '.jpeg', '.webp'].includes(ext)) throw new Error('Pick a PNG, JPG or WebP image');
@@ -4283,7 +4368,32 @@ const handlers = {
     if (patch.ui && 'scale' in patch.ui) applyZoom();
     if ('sgdbKey' in patch) { for (const k of Object.keys(logoCache)) if (!logoCache[k].file) delete logoCache[k]; saveLogoCache(); }
     if ('romsRoot' in patch && library) { broadcast('library', publicLibrary()); computeInstalled(); }
-    return config;
+    return shownConfig();
+  },
+  // recovery (0.9.71)
+  'recovery:state': () => ({ safe: safeStart.safe, unclean: safeStart.unclean, closes: recovery.closes(), backups: recovery.backupList() }),
+  'recovery:keepSafe': () => { config.ui = recovery.safeUi(config.ui || {}); saveConfig(); safeStart = { safe: false, unclean: 0 }; log('safe start: kept'); return config; },
+  'recovery:leaveSafe': () => { safeStart = { safe: false, unclean: 0 }; log('safe start: back to own settings'); return config; },
+  'recovery:restore': ({ name }) => {
+    const v = recovery.backupRead(name);
+    recovery.backup(CONFIG_FILE, 'restore');
+    config = deepMerge(DEFAULT_CONFIG, v); saveConfig(); log('settings restored from', name);
+    setTimeout(() => relaunch(), 500);
+    return true;
+  },
+  'settings:export': async ({ dir }) => {
+    if (!dir || !fs.existsSync(dir)) throw new Error('Pick a folder to save the file in.');
+    const file = path.join(dir, `Cartridge settings ${new Date().toISOString().slice(0, 10)}.json`);
+    await fsp.writeFile(file, JSON.stringify(RECOVERY.exportOf(config, app.getVersion()), null, 2));
+    return file;
+  },
+  'settings:import': async ({ file }) => {
+    let v; try { v = JSON.parse(await fsp.readFile(file, 'utf8')); } catch { throw new Error('That file can’t be read.'); }
+    const next = RECOVERY.importInto(config, v);
+    recovery.backup(CONFIG_FILE, 'import');
+    config = deepMerge(DEFAULT_CONFIG, next); saveConfig(); log('settings imported');
+    setTimeout(() => relaunch(), 500);
+    return true;
   },
   'config:setPath': ({ slug, path: p }) => {
     if (p) config.paths[slug] = p; else delete config.paths[slug];
@@ -5064,173 +5174,7 @@ const handlers = {
     customPending = null;
     return finishCustom({ ...p, file, files: p.relFiles });
   },
-  // ---- recomps (0.9.65)
-  'recomps:list': () => { const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) if (e.installed) { const key = e.starts?.length > 1 ? `${e.id}:${e.starts[0].id}` : e.id; const sc = (() => { try { return steamMgr.recompShortcut(key); } catch { return null; } })(); e.installed.steam = sc ? sc.appid : null; } return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
-  // the recomps of one library game (game page More, 0.9.65)
-  'recomps:forRom': ({ romId }) => { const rom = romIndexMain().get(Number(romId)); if (!rom) return []; return recomps().list({ roms: [rom] }).entries.filter((e) => e.roms.includes(rom.id)).map((e) => ({ id: e.id, name: e.name, installed: e.installed, from: e.from, state: e.state || null })); },
-  'recomps:check': ({ id, force }) => recomps().check(id, { force }),
-  // 0.9.66: the project's stars, newest version, release notes and first README picture (read once a day)
-  'recomps:details': ({ id, fresh }) => recomps().details(id, { fresh }),
-  // 0.9.66: what a link is for, guessed from its project's name and description against your library; you confirm
-  'recomps:guess': async ({ link }) => {
-    const C = require('./customEmu'), gh = C.repoOf(link);
-    const gl = !gh && /^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([\w.-]+)\/([\w.-]+)/i.exec(String(link || ''));
-    if (!gh && !gl) return null;
-    const repo = gh || `${gl[1]}/${gl[2].replace(/\.git$/i, '')}`;
-    const H = { headers: { 'User-Agent': 'Cartridge', Accept: 'application/json' }, signal: AbortSignal.timeout(12000) };
-    const j = await webFetch(gh ? `https://api.github.com/repos/${repo}` : `https://gitlab.com/api/v4/projects/${encodeURIComponent(repo)}`, H).then((r) => (r.ok ? r.json() : null)).catch(() => null);
-    const R = require('./recomps');
-    const g = R.guessFromText(`${repo.split('/')[1]} ${j?.description || ''} ${(j?.topics || j?.tag_list || []).join(' ')}`, libraryRoms(), R.CONSOLES);
-    return { ...g, description: j?.description || '' };
-  },
-  'recomps:install': async ({ id, channel, build }) => {
-    if (recompRun) throw new Error(`${recomps().byId(recompRun.id)?.name || 'Another recomp'} is downloading. Wait for it to finish.`);
-    const ac = new AbortController(); recompRun = { id, ac };
-    try {
-      const r = await recomps().install(id, { channel, build, signal: ac.signal, onProgress: (m) => broadcast('recomp-progress', { id, ...m }) });
-      recompTrophies();
-      // an update that moved its program: the Steam shortcut follows in place when Steam can be reached
-      if (r.programMoved) { try { const sp = recompShortcutSpec(id); await steamMgr.recompRepoint(id, { exe: sp.exe, start: sp.start, lo: sp.args }); } catch (e) { log('recomp shortcut repoint', e.message); } }
-      return r;
-    } finally { recompRun = null; }
-  },
-  'recomps:cancel': () => { recompRun?.ac.abort(); return true; },
-  'recomps:versions': ({ id }) => recomps().versions(id),
-  'recomps:useVersion': ({ id, tag }) => recomps().useVersion(id, tag),
-  'recomps:dropVersion': ({ id, tag }) => recomps().dropVersion(id, tag),
-  'recomps:channel': ({ id, channel }) => recomps().setChannel(id, channel),
-  'recomps:backups': ({ id }) => recomps().backups(id),
-  'recomps:restore': ({ id, stamp }) => recomps().restoreBackup(id, stamp), // 0.9.69
-  'recomps:remove': async ({ id, steam }) => {
-    // a verified game can have one shortcut per start (Uncharted's three games): their keys, before the record goes
-    const keys = [id, ...(recomps().record(id)?.starts || []).map((st) => `${id}:${st.id}`)];
-    const r = await recomps().remove(id);
-    recompTrophies();
-    // its Steam shortcut goes too when asked (owner's rule for removals: say what happens, nothing silent)
-    const scs = steam ? keys.map((k) => steamMgr.recompShortcut(k)).filter(Boolean) : [];
-    const sc = scs[0] || null;
-    if (sc) { steamMgr.queueRemove(scs.map((x) => x.appid)); if (await steamMgr.liveNow()) await steamMgr.apply({ restart: false }).catch((e) => log('recomp steam remove', e.message)); }
-    return { ...r, steamRemoved: !!sc };
-  },
-  // the player's copy for it: from the library when it's on this device (the file inside a game folder that has the
-  // right ending), else picked by hand
-  'recomps:gameFiles': ({ id }) => {
-    const R = recomps(), e = R.byId(id);
-    if (!e) return [];
-    const ext = (e.needs?.ext || []).map((x) => String(x).toLowerCase()), out = [];
-    for (const rid of require('./recomps').matchRoms(e, libraryRoms())) {
-      const where = installedMap[rid];
-      if (!where) continue;
-      let file = where;
-      if (isDir(where) && e.needs?.files !== 'folder') {
-        const inside = require('./forkVersions').filesOf(where).filter((r2) => !ext.length || ext.includes(path.extname(r2).slice(1).toLowerCase()));
-        if (!inside.length) continue;
-        file = path.join(where, inside.sort((a, b) => a.split('/').length - b.split('/').length)[0]);
-      }
-      out.push({ romId: rid, name: romName(rid), file });
-    }
-    return out;
-  },
-  // 0.9.69 (agreed plan 7.1 #9): your library's copies checked before installing, so a wrong version is said before a
-  // download. Only when the catalogue lists file types or hashes; [] when there's nothing to check against
-  'recomps:checkCopies': async ({ id }) => {
-    const R = recomps(), e = R.byId(id), M = require('./recomps');
-    if (!e?.needs || !(e.needs.ext?.length || e.needs.md5?.length || e.needs.sha1?.length)) return [];
-    const out = [];
-    for (const g of handlers['recomps:gameFiles']({ id }).slice(0, 4)) { const c = await M.checkGame(e, g.file).catch((er) => ({ ok: false, why: er.message })); out.push({ name: g.name, file: g.file, ok: !!c.ok, why: c.why || '' }); }
-    return out;
-  },
-  'recomps:setGame': async ({ id, file, force }) => {
-    const R = recomps(), r = await R.setGame(id, file, { force });
-    // a one-off setup command (Doom64EX's -wadgen, WiiCompiled's install): run now, watched until its done file is there
-    if (r.ok && r.run) {
-      const rec = R.record(id);
-      if (rec.kind === 'windows') { r.note = 'Start it once through Steam to finish setting up.'; return r; }
-      await startRecomp(id, rec, r.run);
-      setTimeout(() => recompSetupWatch(id), 4000);
-    }
-    return r;
-  },
-  'recomps:done': ({ id }) => recomps().markDone(id),
-  // Add to Steam: queued and applied straight away when Steam can be changed while it runs; otherwise it waits for
-  // Apply in Settings → Steam (Steam restarts for that), and the screen says so
-  'recomps:steam': async ({ id }) => {
-    if (recomps().byId(id)?.from === 'verified') {
-      const specs = verifiedShortcutSpecs(id);
-      steamMgr.queueAdd(specs.map((sp) => ({ recomp: sp })));
-      if (await steamMgr.liveNow()) { await steamMgr.apply({ restart: false }); const sc = steamMgr.recompShortcut(specs[0].id); return { added: true, appid: sc?.appid || null, count: specs.length }; }
-      return { queued: true, count: specs.length };
-    }
-    const spec = recompShortcutSpec(id);
-    steamMgr.queueAdd([{ recomp: spec }]);
-    if (await steamMgr.liveNow()) {
-      await steamMgr.apply({ restart: false });
-      const sc = steamMgr.recompShortcut(id);
-      if (sc) recomps().setAppid(id, sc.appid);
-      return { added: true, appid: sc?.appid || null };
-    }
-    return { queued: true };
-  },
-  // open it: a Linux build directly (its folder as the working folder), a Windows build through its Steam shortcut so
-  // Proton uses the same prefix as play (owner: Windows setup must run through Proton)
-  'recomps:open': async ({ id, start }) => {
-    const R = recomps(), rec = R.record(id), e = R.byId(id);
-    if (e?.from === 'verified') return openVerified(id, start);
-    if (!rec || !fs.existsSync(rec.program)) throw new Error('Install it first.');
-    // 0.9.67: a recomp that isn't set up yet builds its own files on this start: watched as a background job
-    if (!R.ready(id)) setTimeout(() => recompSetupWatch(id), 4000);
-    if (rec.kind === 'windows') {
-      const sc = steamMgr.recompShortcut(id);
-      if (!sc) throw new Error(`${e.name} is a Windows build, so it runs through Proton: add it to Steam first, then open it.`);
-      return steamMgr.runAppid(sc.appid);
-    }
-    return startRecomp(id, rec, R.launchArgs(id));
-  },
-  'recomps:refresh': () => recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }),
-  // from a link (not in the list): what it is first, then added with the console and game you say
-  // Check It for a recomp link (0.9.69, agreed plan 7.1 #16): the project, its newest release and the build Cartridge
-  // would take, before anything is added or downloaded
-  'recomps:preview': async ({ link }) => {
-    const C = require('./customEmu'), R = require('./recomps'), gh = C.repoOf(link);
-    const gl = !gh && /^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([\w.-]+)\/([\w.-]+)/i.exec(String(link || ''));
-    if (!gh && !gl) throw new Error('That isn’t a GitHub or GitLab project link. It looks like github.com/owner/project.');
-    const repo = gh ? 'github:' + gh : `gitlab:${gl[1]}/${gl[2].replace(/\.git$/i, '')}`, path2 = repo.split(':')[1];
-    const H = { headers: { 'User-Agent': 'Cartridge', Accept: 'application/json' }, signal: AbortSignal.timeout(15000) };
-    const [rel, info] = await Promise.all([
-      R.releaseOf({ repo }, { fetchImpl: webFetch }).catch((e) => ({ error: e.message })),
-      webFetch(gh ? `https://api.github.com/repos/${path2}` : `https://gitlab.com/api/v4/projects/${encodeURIComponent(path2)}`, H).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    ]);
-    const b = rel && !rel.error ? R.pickBuild(rel.assets, {}) : null;
-    return { repo, tag: rel?.tag || null, date: rel?.date || null, error: rel?.error || null, file: b?.asset?.name || null, size: b?.asset?.size || 0, kind: b?.kind || null, stars: info ? info.stargazers_count ?? info.star_count ?? null : null, description: info?.description || '', fork: !!(info?.fork || info?.forked_from_project), known: !!recomps().catalogue().entries.find((e) => e.repo?.toLowerCase() === repo.toLowerCase()) };
-  },
-  'recomps:addLink': async ({ link, console: con, title, description }) => {
-    const C = require('./customEmu'), gh = C.repoOf(link);
-    const gl = !gh && /^(?:https?:\/\/)?(?:www\.)?gitlab\.com\/([\w.-]+)\/([\w.-]+)/i.exec(String(link || ''));
-    const repo = gh ? 'github:' + gh : gl ? `gitlab:${gl[1]}/${gl[2].replace(/\.git$/i, '')}` : null;
-    if (!repo) throw new Error('That isn’t a GitHub or GitLab project link.');
-    const r = recomps().addLink({ repo, console: con, title, name: repo.split('/').pop(), description: String(description || '').slice(0, 300) });
-    return r;
-  },
-  'recomps:folders': () => ({ made: recomps().ensureFolders(), roots: emulationFolders().map((d) => path.join(d, 'recomp')) }),
-  // ---- Cartridge Verified (0.9.70): your copy from the library (or a folder you pick), checked and set up; the
-  // port's settings in Cartridge; Proton found for Windows builds
-  'recomps:copies': ({ id }) => verifiedCopies(id),
-  'recomps:prepare': async ({ id, dir }) => {
-    const R = recomps(), e = R.byId(id);
-    if (e?.from !== 'verified') throw new Error('That isn’t a Cartridge Verified game.');
-    let use = dir;
-    if (!use) {
-      const copies = verifiedCopies(id).filter((c) => c.here);
-      if (!copies.length) return { ok: false, noCopy: true, why: `${e.recipe.game.title} isn’t on this device yet. Download it from your library first.` };
-      use = copies[0].path;
-    }
-    const r = await R.setVerifiedGame(id, use, { candidates: updateCandidates(use), onProgress: (m) => broadcast('recomp-prep', { id, ...m }) });
-    recompTrophies();
-    return r;
-  },
-  'recomps:settings': ({ id }) => recomps().settings(id),
-  'recomps:setSettings': async ({ id, changes }) => { const d = await recomps().setSettings(id, changes); log('verified settings', id, (changes || []).map((x) => `${x.id}=${x.value}`).join(' ')); return d; },
-  'recomps:runner': () => { const r = require('./protonRunner').find({ roots: (() => { try { return steamMgr.steamRoots(); } catch { return []; } })() }); return r ? { kind: r.kind, name: r.name } : null; },
+  ...RIPC.handlers, // recomps and Cartridge Verified (0.9.71: electron/recompsIpc.js)
   'emuget:cancel': () => { emuGetRun?.abort.abort(); return true; },
   // emulator updates (0.9.16): each installed copy, its version and whether a newer one is out
   // 0.9.37 (owner: slow to open, and RPCS3 said it had an update while Cartridge said up to date): cached answers
@@ -5590,7 +5534,8 @@ const handlers = {
     // Cemu (0.9.37): which title ID it matched by, and packs for this game that only list other regions
     let other = null;
     if (st.emu === 'cemu') { try { other = require('./cemuPacks').otherRegions({ root: st.dir.root, titleIds: st.ids, name: st.title }); } catch {} log('cemu packs', st.title, 'ids', (st.ids || []).join(',') || 'none', 'packs', list.length, other && Object.keys(other).length ? 'other regions ' + JSON.stringify(other) : ''); }
-    return { emu: st.emu, emuName: st.fork ? forkTitle(E.name, st.fork) : E.name, serial: st.serial, version: st.version, why, list, other, ids: st.emu === 'cemu' ? st.ids || [] : undefined };
+    const note = st.emu === 'nxcheats' && list.length ? (st.ryujinx ? 'Cartridge puts the cheats you pick in Ryujinx’s mods folder; turn them on in Ryujinx’s Manage Cheats.' : `Every cheat you pick is on in ${st.emuName}, in its Add-ons as “Cartridge Cheats”, for the game version they were written for.`) : st.emu === 'nxcheats' ? 'The Switch cheat database has nothing for this game.' : st.emu === 'racheats' && !list.length ? 'The libretro cheat database has nothing for this game.' : '';
+    return { emu: st.emu, emuName: st.emuName || (st.fork ? forkTitle(E.name, st.fork) : E.name), serial: st.serial, version: st.version, why: why || note, list, other, ids: st.emu === 'cemu' ? st.ids || [] : undefined };
   },
   // changes: [{ key, on }]. Patches turned on in RPCS3 itself are never turned off here.
   'patches:apply': async ({ romId, changes }) => {
@@ -5774,6 +5719,52 @@ const handlers = {
   },
   'roots:remove': ({ dir } = {}) => { config.extraRoots = (config.extraRoots || []).filter((r) => r.path !== dir); if (config.downloadRoot === dir) config.downloadRoot = 'most'; saveConfig(); computeInstalled(); return true; },
   'roots:to': ({ to } = {}) => { config.downloadRoot = to || 'most'; saveConfig(); return true; },
+  // 0.9.71 (plan-multidrive): a drive for one console's downloads ('' = as the rest)
+  'roots:console': ({ slug, root } = {}) => { config.consoleRoots = { ...(config.consoleRoots || {}) }; if (root) config.consoleRoots[slug] = root; else delete config.consoleRoots[slug]; saveConfig(); return config.consoleRoots; },
+  'roots:away': () => awayMap,
+  // a downloaded game moved to another games folder, its Steam shortcut following (renamed in one go on the same drive,
+  // else copied, checked by size, and only then the old copy removed); never over anything, never while it runs
+  'library:moveGame': async ({ romId, root } = {}) => {
+    romId = Number(romId);
+    const from = installedMap[romId], r = romIndexMain().get(romId);
+    if (!r || !from || from === MARKED || !fs.existsSync(from)) throw new Error('This game isn’t on this device.');
+    if (!root || !isDir(root)) throw new Error('That games folder isn’t there.');
+    const p = (library?.platforms || []).find((x) => x.id === r.platform_id) || { slug: r.platform_slug, fs_slug: r.platform_fs_slug };
+    const destDir = path.resolve(root) === path.resolve(config.romsRoot || '') ? platformPath(p).path : rootFolder(root, p);
+    const to = path.join(destDir, path.basename(from));
+    if (path.resolve(to) === path.resolve(from)) throw new Error('It’s already in that folder.');
+    if (fs.existsSync(to)) throw new Error(`There’s already a ${path.basename(from)} there.`);
+    if (runOn) throw new Error('Close the game that’s running first.');
+    const size = (x) => { try { const st = fs.statSync(x); if (!st.isDirectory()) return st.size; return fs.readdirSync(x).reduce((n, c) => n + size(path.join(x, c)), 0); } catch { return 0; } };
+    const total = size(from);
+    const sp = await handlers['fs:space'](destDir);
+    if (sp && sp.free < total + 5e8) throw new Error(`Not enough room there: it needs ${(total / 1e9).toFixed(1)} GB.`);
+    fs.mkdirSync(destDir, { recursive: true });
+    {
+      try { fs.renameSync(from, to); }
+      catch (e) {
+        if (e.code !== 'EXDEV') throw e;
+        await fs.promises.cp(from, to, { recursive: true, errorOnExist: true, force: false });
+        if (size(to) !== total) { fs.rmSync(to, { recursive: true, force: true }); throw new Error('The copy didn’t match the game, so nothing was moved.'); }
+        fs.rmSync(from, { recursive: true, force: true });
+      }
+      if (manifest[romId]) { manifest[romId] = { ...manifest[romId], path: to }; saveManifest(); }
+      computeInstalled();
+      let steam = false; try { await steamMgr.refreshGame(romId, { force: true }); steam = true; } catch (e) { log('move: steam shortcut', e.message); }
+      log('game moved', from, '->', to);
+      return { to, steam };
+    }
+  },
+  // emulator storage folders (RPCS3's dev_hdd0 and the rest) with their sizes, for Storage (each changed in its own Folders sheet)
+  'roots:emuStorage': async () => {
+    const P = require('./emuPaths'), out = [];
+    const sizeOf = async (d) => { let n = 0, seen = 0; const walk = async (x) => { if (seen++ > 200000) return; let st; try { st = await fs.promises.lstat(x); } catch { return; } if (st.isSymbolicLink()) return; if (!st.isDirectory()) { n += st.size; return; } let kids = []; try { kids = await fs.promises.readdir(x); } catch {} for (const k of kids) await walk(path.join(x, k)); }; await walk(d); return n; };
+    for (const id of Object.keys(P.NAMES || {})) {
+      let d; try { d = P.describe(id); } catch { continue; }
+      for (const it of d?.items || []) if (it.path && !it.list && isDir(it.path)) out.push({ id, name: d.name, label: it.label, path: it.path, size: await sizeOf(it.path) });
+    }
+    return out.filter((x) => x.size > 0).sort((a, b) => b.size - a.size);
+  },
   'fs:space': async (dir) => {
     let d = dir;
     while (d && !isDir(d)) { const up = path.dirname(d); if (up === d) break; d = up; }
@@ -5918,23 +5909,34 @@ const handlers = {
     const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH']) delete env[k];
     try { require('child_process').spawn('xdg-open', ['steam://open/keyboard?Mode=0'], { detached: true, stdio: 'ignore', env }).on('error', () => {}).unref(); return true; } catch { return false; }
   },
-  'update:get': () => ({ ...updateState, current: versionName(), supported: !!autoUpdater }),
+  'update:get': () => ({ ...updateState, current: versionName(), supported: !!autoUpdater, channel: UC.pick(config.updateChannel), channels: UC.CHANNELS }),
+  // 0.9.71: switch channel and look at once; going from Nightly or Beta to Stable may install a lower number, once
+  'update:setChannel': async ({ channel }) => {
+    const c = UC.pick(channel);
+    if (c === UC.pick(config.updateChannel)) return { channel: c };
+    config.updateChannel = c; config.updateSwitched = true; delete config.updateHold; saveConfig();
+    log('update channel', c);
+    if (!autoUpdater) return { channel: c };
+    UC.apply(autoUpdater, c, { switched: true }); autoUpdater.autoDownload = true;
+    autoUpdater.checkForUpdates().catch(() => {});
+    return { channel: c };
+  },
   'update:check': async () => { if (!autoUpdater) throw new Error('Updates work in the AppImage build only'); if (config.updateHold) { delete config.updateHold; saveConfig(); autoUpdater.autoDownload = true; } await autoUpdater.checkForUpdates(); return updateState; },
   'update:install': () => { if (updateState.state === 'ready') autoUpdater.quitAndInstall(true, true); },
   // Roll back (0.9.17): Cartridge's earlier releases on GitHub, and one of them in place of this AppImage
   'update:releases': async () => {
-    const r = await webFetch('https://api.github.com/repos/abdu2304/cartridge/releases?per_page=20', { headers: { 'User-Agent': 'Cartridge', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(20000) }).catch(() => null);
-    if (r?.ok) return (await r.json()).filter((x) => !x.draft && (x.assets || []).some((a) => a.name === 'Cartridge-x86_64.AppImage')).map((x) => ({ tag: x.tag_name, name: String(x.name || x.tag_name).replace(/^Cartridge\s+/i, ''), date: x.published_at, current: x.tag_name === 'v' + app.getVersion() }));
+    const r = await webFetch('https://api.github.com/repos/abdu2304/cartridge/releases?per_page=60', { headers: { 'User-Agent': 'Cartridge', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(20000) }).catch(() => null);
+    if (r?.ok) return UC.list(await r.json(), app.getVersion());
     // GitHub's API limit: the releases page instead
     const p = await webFetch('https://github.com/abdu2304/cartridge/releases', { headers: { 'User-Agent': 'Mozilla/5.0 Cartridge' }, signal: AbortSignal.timeout(20000) });
     if (!p.ok) throw new Error(`GitHub answered ${p.status}. Try again in a while.`);
-    const tags = [...new Set([...(await p.text()).matchAll(/\/abdu2304\/cartridge\/releases\/tag\/(v[\d.]+)/g)].map((m) => m[1]))];
-    return tags.map((t) => ({ tag: t, name: t.slice(1), date: '', current: t === 'v' + app.getVersion() }));
+    const tags = [...new Set([...(await p.text()).matchAll(/\/abdu2304\/cartridge\/releases\/tag\/(v[\w.-]+)/g)].map((m) => m[1]))].filter(UC.validTag);
+    return tags.map((t) => ({ tag: t, channel: UC.channelOf(t), name: UC.nameOf(t), date: '', current: t === 'v' + app.getVersion() }));
   },
   'update:rollback': async ({ tag }) => {
     const file = process.env.APPIMAGE;
     if (!file || !app.isPackaged) throw new Error('Rolling back works in the AppImage only.');
-    if (!/^v\d+(\.\d+){1,3}$/.test(tag || '')) throw new Error('That isn’t a Cartridge release.');
+    if (!UC.validTag(tag)) throw new Error('That isn’t a Cartridge release.');
     const tmp = file + '.cartridge-new';
     let got = 0;
     await downloadTo(`https://github.com/abdu2304/cartridge/releases/download/${tag}/Cartridge-x86_64.AppImage`, tmp, { abort: new AbortController() }, (n) => { got += n; broadcast('update', { ...updateState, state: 'rollback', got }); }, { plain: true });
@@ -5991,6 +5993,7 @@ const emuLabel = (id) => require('./emulators').EMU[String(id || '').split('@')[
 const romName = (id) => romIndexMain().get(Number(id))?.name || 'Game';
 let customJob = '';
 const JOBS = {
+  'library:moveGame': (a) => ({ key: 'move:' + a.romId, kind: 'Moving a Game', title: romName(a.romId), icon: 'mdiFolderMoveOutline' }), // 0.9.71
   'emuup:run': (a) => ({ key: 'emu:' + (a.path || a.fp), kind: a.force ? 'Emulator Download' : 'Emulator Update', title: emuLabel(a.id), emu: a.id, icon: 'mdiUpdate' }),
   'emuget:install': (a) => ({ key: `get:${a.key}:${a.id}`, kind: 'Emulator', title: emuLabel(a.id), emu: a.id, icon: 'mdiDownload' }),
   'emuget:custom': (a) => { const repo = require('./customEmu').repoOf(a.link) || String(a.link || ''); customJob = 'custom:' + repo; return { key: customJob, kind: 'Emulator from GitHub', title: repo.split('/').pop() || repo, icon: 'mdiGithub' }; },
@@ -6197,6 +6200,7 @@ app.whenReady().then(() => {
 });
 app.on('child-process-gone', (_e, d) => {
   log('child gone', d.type, d.reason, d.exitCode);
+  if (d.type === 'GPU' && !['clean-exit', 'killed'].includes(d.reason)) recovery.note(`the graphics process stopped (${d.reason})`);
   // If the GPU dies early, remember it and restart without the GPU so the window is never blank
   if (d.type === 'GPU' && useGpu && d.reason !== 'clean-exit' && Date.now() - startedAt < 20000) {
     log('gpu failed at startup, relaunching in software mode for this launch');
@@ -6214,6 +6218,7 @@ app.on('before-quit', () => {
   if (quitting) return;
   quitting = true;
   log('quit');
+  recovery.ok(); // a normal quit is never a crash
   setTimeout(() => app.exit(0), 3000).unref?.();
   try { trophySvc.stop(); } catch {}
   for (const it of queue) try { it.abort?.abort(); } catch {}
@@ -6254,182 +6259,10 @@ function emulationFolders() {
   try { const emu = readEmuDeckSettings(); if (emu.emulationPath) add(emu.emulationPath); } catch {}
   return out;
 }
-let recompsEng = null;
-// 0.9.67 (agreed plan 7.1 #10): the recomp's own building on its first starts, as a background job with a measured bar:
-// bytes written in its folders, against the finished size when the catalogue knows it; done when its done file appears
-// a Linux recomp started from its own folder, with the arguments given (0.9.68: one place for Open and a one-off
-// setup run; Open used to leave out the catalogue's own arguments, PGR4's GPU options and WiiCompiled's launch-base)
-function startRecomp(id, rec, args) {
-  const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
-  const runLog = path.join(USER_DATA, 'emulator-runs', `recomp-${id}.log`);
-  let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
-  const extra = (args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
-  const p = require('child_process').spawn(rec.program, extra, { cwd: path.dirname(rec.program), env, detached: true, stdio: ['ignore', fd, fd] });
-  if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
-  return new Promise((ok, bad) => {
-    p.once('error', (er) => bad(new Error(er.code === 'EACCES' ? 'It isn’t allowed to run (its file isn’t executable).' : `It didn’t start: ${er.message}`)));
-    p.once('spawn', () => { log('recomp opened', id, args ? 'with arguments' : ''); if (isGamescope()) { broadcast('background', { away: true }); p.once('exit', () => { broadcast('background', { away: false }); refocus(); }); } p.unref(); ok({ via: 'direct' }); });
-  });
-}
-async function recompSetupWatch(id) {
-  const R = recomps(), e = R.byId(id), key = 'recompsetup:' + id;
-  if (!e || R.ready(id)) return;
-  let started = false;
-  const mb = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`);
-  try {
-    const r = await R.watchSetup(id, { onProgress: (m) => { if (!started) { started = true; bgJob(key, { key, kind: 'Recomp Setup', title: e.name, icon: 'mdiCogOutline', state: 'run', pct: null, text: '', error: '' }); } bgJob(key, { pct: m.pct, text: `${mb(m.got)} written` }); } });
-    if (!started) return;
-    if (r.done) { bgJob(key, { state: 'done', pct: 100, text: 'Set up' }); broadcast('recomp-ready', { id }); }
-    else bgJob(key, { state: 'error', error: r.timeout ? 'Still not set up after 45 minutes. Open it again to carry on.' : `${e.name} closed before it finished setting up. Open it again to carry on.` });
-  } catch (er) { log('recomp setup watch', id, er.message); if (started) bgJob(key, { state: 'error', error: er.message }); }
-}
-function recomps() {
-  if (recompsEng) return recompsEng;
-  const D = require('./detect');
-  recompsEng = require('./recomps').createRecomps({
-    dataDir: USER_DATA, log,
-    fetchImpl: webFetch,
-    download: async (url, dest, onBytes, signal) => { const it = { abort: new AbortController() }; signal?.addEventListener?.('abort', () => it.abort.abort()); await downloadTo(url, dest, it, onBytes, { plain: true }); },
-    unpackTo: (archive, dir) => unpackTo(archive, dir),
-    appImageType: (f) => D.appImageType(f), isElf: (f) => D.isElf(f),
-    isRunning: (f) => progRunning(f),
-    trash: (p) => toTrash(p),
-    // 0.9.66: the new release of an update started once, for a few seconds, then closed. It fails only when it can't
-    // run at all here: missing libraries (127/126, "error while loading shared libraries"), a crash signal, or (once
-    // set up) a non-zero exit straight away. Never during a game.
-    trialRun: ({ program, args, cwd, ready }) => new Promise((resolve) => {
-      if (gameFocus.away || runOn) return resolve({ skipped: 'playing' });
-      const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
-      const extra = (args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
-      let out = '', done = false, p;
-      const end = (r) => { if (done) return; done = true; clearTimeout(t); try { process.kill(-p.pid, 'SIGTERM'); } catch {} setTimeout(() => { try { process.kill(-p.pid, 'SIGKILL'); } catch {} }, 1500); if (isGamescope()) { broadcast('background', { away: false }); refocus(); } log('recomp trial', program, JSON.stringify(r)); resolve(r); };
-      try { p = require('child_process').spawn(program, extra, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return resolve({ failed: true, why: e.message }); }
-      if (isGamescope()) broadcast('background', { away: true });
-      const keep = (b) => { out = (out + b).slice(-4000); };
-      p.stdout.on('data', keep); p.stderr.on('data', keep);
-      p.once('error', (e) => end({ failed: true, why: e.code === 'EACCES' ? 'It isn’t allowed to run (its file isn’t executable).' : e.message }));
-      p.once('exit', (code, sig) => {
-        const lib = /error while loading shared libraries: ([^:\s]+)/.exec(out);
-        if (lib) return end({ failed: true, why: `It needs ${lib[1]}, which this system doesn’t have.` });
-        if (code === 126 || code === 127) return end({ failed: true, why: 'This system can’t run it.' });
-        if (/^SIG(SEGV|ABRT|ILL|BUS|FPE)$/.test(sig || '')) return end({ failed: true, why: `It crashed as it started (${sig}).` });
-        if (ready && code) return end({ failed: true, why: `It closed straight away (exit ${code}).` });
-        end({ ok: true, exited: code });
-      });
-      const t = setTimeout(() => end({ ok: true, ran: true }), 6000);
-    }),
-    // a Flatpak bundle installed for this user (flatpak install --bundle); its app ID from the bundle's name
-    flatpakBundle: (file) => new Promise((ok, bad) => {
-      const appId = path.basename(file).replace(/\.flatpak$/i, '');
-      if (!/^[A-Za-z][\w-]*(\.[\w-]+){2,}$/.test(appId)) return bad(new Error('The Flatpak in the release has an unexpected name.'));
-      require('child_process').execFile('flatpak', ['install', '--user', '--noninteractive', '-y', '--bundle', file], { timeout: 15 * 60e3, env: { ...process.env, LD_PRELOAD: '', LD_LIBRARY_PATH: '' } }, (er, out, err) => (er ? bad(new Error(`Flatpak couldn’t install it: ${String(err || er.message).trim().split('\n').pop()}`)) : ok(appId)));
-    }),
-    flatpakRemove: (appId) => new Promise((ok) => require('child_process').execFile('flatpak', ['uninstall', '--user', '--noninteractive', '-y', appId], { timeout: 5 * 60e3 }, () => ok())),
-    search: (q2) => require('./github').search(q2),
-    recompRoot: () => path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'),
-    recompRoots: () => emulationFolders().map((d) => path.join(d, 'recomp')),
-    // Cartridge Verified (0.9.70): newer recipes from the repository, the Proton runner for Windows builds, and the
-    // port's own installer or Proton's wineboot run and waited for (off the main thread: spawned, never execSync)
-    recipesUrl: 'https://raw.githubusercontent.com/abdu2304/cartridge/main/electron/recipes/index.json',
-    runner: () => require('./protonRunner').find({ roots: (() => { try { return steamMgr.steamRoots(); } catch { return []; } })() }),
-    runProgram: (cmd, args, { cwd, env: extra = {}, timeoutMs = 10 * 60e3 } = {}) => new Promise((ok, bad) => {
-      const env = { ...process.env, ...extra }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
-      let tail = '';
-      const p = require('child_process').spawn(cmd, args, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
-      const keep = (b) => { tail = (tail + b).slice(-3000); };
-      p.stdout.on('data', keep); p.stderr.on('data', keep);
-      const t = setTimeout(() => { try { process.kill(-p.pid, 'SIGTERM'); } catch {} bad(new Error('It took too long and was stopped.')); }, timeoutMs);
-      p.once('error', (e) => { clearTimeout(t); bad(new Error(e.code === 'EACCES' ? 'It isn’t allowed to run.' : e.message)); });
-      p.once('exit', (code) => { clearTimeout(t); log('verified run', path.basename(cmd), args[0] || '', 'exit', code); if (code === 0) ok(tail); else bad(new Error(tail.trim().split('\n').pop() || `It stopped (exit ${code}).`)); });
-    }),
-  });
-  return recompsEng;
-}
-// Save Sync's units plus each installed recomp's save folders (0.9.65, owner: "Save Sync covers recomps"): one unit per
-// folder the catalogue names, slot cartridge:recomp:dir:<id>, filed under the game in your library (a recomp whose
-// game isn't in the library has nowhere in RomM to keep its saves, so it shows as not matched)
-function ssUnits(opts) {
-  const out = require('./saveSync').units(opts);
-  try {
-    const R = recomps(), RC = require('./recomps'), roms = libraryRoms();
-    for (const e of R.catalogue().entries) {
-      const rec = R.record(e.id);
-      if (!rec || !(e.saves?.length || e.from === 'verified')) continue;
-      const romIds = RC.matchRoms(e, roms);
-      R.saveDirs(e.id).filter((d) => path.resolve(d) !== path.resolve(rec.dir)).forEach((d, i) => {
-        const key = i ? `${e.id}-${i}` : e.id;
-        // a folder, or one save file (zelda3's saves/zelda3.srm): by what's there, else by the name having an ending
-        const kind = isDir(d) ? 'dir' : fs.existsSync(d) || path.extname(d) ? 'file' : 'dir';
-        out.push({ key, emu: 'recomp', kind, path: d, base: rec.dir, label: e.name, sub: '', romId: romIds[0] ?? null, romIds, card: false, slot: require('./saveSync').slotOf('recomp', key, kind), prog: rec.flatpak || rec.program, recomp: e.id });
-      });
-    }
-  } catch (er) { log('recomp save units', er.message); }
-  return out;
-}
-// installed recomps handed to the trophy reader (0.9.65): the ones that record achievements show in Achievements
-let recompTroSig = '[]';
-function recompTrophies() {
-  try {
-    const R = recomps(), items = [];
-    for (const e of R.catalogue().entries) { const rec = R.record(e.id); if (rec?.dir) items.push({ id: e.id, name: e.name, game: e.games?.[0]?.title || e.name, program: rec.program, dir: rec.dir, flatpak: rec.flatpak || null, ach: e.achievements && typeof e.achievements === 'object' ? e.achievements : null }); }
-    require('./trophies').setRecomps(items);
-    // 0.9.68: the trophy service started knowing no recomps; it reads every trophy file again (on the main thread)
-    // only when the installed recomps changed, not 25 s after every start
-    const sig = JSON.stringify(items);
-    if (sig === recompTroSig) return;
-    recompTroSig = sig;
-    trophySvc.redetect?.()?.catch?.(() => {});
-  } catch (er) { log('recomp achievements', er.message); }
-}
-// the library's games as one list, made once per library (recomp matching indexes it by identity)
-let libRomsMemo = { roms: null, list: [] };
-const libraryRoms = () => { const r = library?.roms || null; if (libRomsMemo.roms !== r) libRomsMemo = { roms: r, list: r ? Object.values(r).flat() : [] }; return libRomsMemo.list; };
-let recompRun = null;
-// a recomp's Steam shortcut: its program, its folder as Start In, its arguments; art from the game when it's in the library
-// ---- Cartridge Verified (0.9.70)
-// your copies of a verified game: the library's matching games, on this device or not, with where they are
-function verifiedCopies(id) {
-  const R = recomps(), e = R.byId(id);
-  if (!e) return [];
-  return require('./recomps').matchRoms(e, libraryRoms()).map((rid) => { const where = installedMap[rid] || null; return { romId: rid, name: romName(rid), path: where, here: !!(where && fs.existsSync(where)) }; });
-}
-// folders that may hold an update for a game: beside it, inside it (one level) and the library's other PS4 copies
-function updateCandidates(dir) {
-  const out = new Set(), kids = (d) => { try { return fs.readdirSync(d, { withFileTypes: true }).filter((x) => x.isDirectory() || x.isSymbolicLink()).map((x) => path.join(d, x.name)); } catch { return []; } };
-  for (const d of [...kids(path.dirname(dir)), ...kids(dir)]) out.add(d);
-  for (const r of libraryRoms()) if (/^ps4/i.test(r.platform_slug || '') && installedMap[r.id]) { out.add(installedMap[r.id]); for (const d of kids(installedMap[r.id])) out.add(d); }
-  return [...out].slice(0, 600);
-}
-// a verified game started: its start script (one per game for Uncharted), the window stepping aside in Game Mode
-async function openVerified(id, start) {
-  const R = recomps(), rec = R.record(id), e = R.byId(id);
-  if (!rec) throw new Error('Install it first.');
-  if (!R.ready(id)) throw new Error(rec.game?.path ? `${e.name} isn’t set up yet. Press Set Up.` : `Pick your copy of ${e.recipe.game.title} first.`);
-  const st = rec.starts.find((x) => x.id === start) || rec.starts[0];
-  const runLog = path.join(USER_DATA, 'emulator-runs', `verified-${id}.log`);
-  let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
-  const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
-  const p = require('child_process').spawn('/bin/sh', [st.script], { cwd: rec.dir, env, detached: true, stdio: ['ignore', fd, fd] });
-  if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
-  return new Promise((ok, bad) => {
-    p.once('error', (er) => bad(new Error(`It didn’t start: ${er.message}`)));
-    p.once('spawn', () => { log('verified opened', id, st.id); if (isGamescope()) { broadcast('background', { away: true }); p.once('exit', () => { broadcast('background', { away: false }); refocus(); }); } p.unref(); ok({ via: 'script', start: st.id }); });
-  });
-}
-// one Steam shortcut per start: its start script as the program (Proton, settings and the right game are in it),
-// art from your copy in the library
-function verifiedShortcutSpecs(id) {
-  const R = recomps(), e = R.byId(id), rec = R.record(id);
-  if (!e || !rec?.starts?.length) throw new Error('Set it up first.');
-  const romIds = require('./recomps').matchRoms(e, libraryRoms());
-  return rec.starts.map((st) => ({ id: rec.starts.length > 1 ? `${id}:${st.id}` : id, name: st.name, exe: st.script, start: rec.dir, args: '', game: e.recipe.game.title, artRomId: romIds[0] ?? null }));
-}
-function recompShortcutSpec(id) {
-  const R = recomps(), e = R.byId(id), rec = R.record(id);
-  if (!e || !rec) throw new Error('Install it first.');
-  const romIds = require('./recomps').matchRoms(e, libraryRoms());
-  return { id, name: e.name, exe: rec.program, start: path.dirname(rec.program), args: R.launchArgs(id), game: e.games?.[0]?.title || e.name, artRomId: romIds[0] ?? null };
-}
+// recomps and Cartridge Verified ports: electron/recompsIpc.js (0.9.71); these names stay callable from here
+function recomps() { return RIPC.recomps(); }
+function ssUnits(opts) { return RIPC.ssUnits(opts); }
+function recompTrophies() { return RIPC.recompTrophies(); }
 
 // Get Emulators' list, as rows per console (sync: the installer's fresh check uses it)
 function emugetRows() {

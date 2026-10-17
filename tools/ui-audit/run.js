@@ -16,6 +16,8 @@ const { LOOKS } = require('./harness.js');
   }
   let cut = 0;
   for (const [w, h] of [[1280, 800], [1920, 1080]]) for (const r of [await clipping.pages(w, h), await clipping.widgets(w, h)]) { cut += r.bad.length; for (const x of r.bad) console.log('  CUT   ' + x); }
+  // 0.9.71: a 4K TV (Cartridge zooms 2x there: 1920x1080 laid out, drawn at 3840x2160)
+  { const r = await clipping.pages(1920, 1080, 2); cut += r.bad.length; for (const x of r.bad) console.log('  CUT   ' + x); }
   console.log(`== clipping: ${cut} cut text${cut === 1 ? '' : 's'}`);
   // 0.9.70: the worst-case library (break-ui): cut text and words nobody should read (NaN, undefined, "1 games")
   let worse = 0;

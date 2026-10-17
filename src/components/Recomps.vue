@@ -11,6 +11,8 @@
           <img v-if="coverOf(e)" class="rc-cover" :src="coverOf(e)" alt="" loading="lazy" />
           <span v-else class="rc-cover rc-none"><Icon name="mdiGamepadVariantOutline" :size="22" /></span>
           <span class="l-mid"><b>{{ e.name }}</b><span class="l-sub">{{ vSub(e) }}</span></span>
+          <!-- played through on a device by Cartridge's author (the recipe's verified.played, set only when they say so) -->
+          <span v-if="e.verified?.played" class="status ok" title="Played through on a device"><Icon name="mdiGamepadVariant" :size="14" />Played</span>
           <span class="l-end"><span class="status" :class="vStatus(e).cls"><Icon v-if="vStatus(e).icon" :name="vStatus(e).icon" :size="14" />{{ vStatus(e).text }}</span></span>
         </button>
       </section>
@@ -43,7 +45,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { store, call, toast, openModal, choose, askText, romById, cover, bgJob, saveConfig } from '../store.js';
+import { store, call, toast, openModal, choose, askText, romById, cover, img, bgJob, saveConfig } from '../store.js';
 import Toggle from './Toggle.vue';
 import Icon from './Icon.vue';
 import LinkInput from './LinkInput.vue';
@@ -96,7 +98,14 @@ function vSub(e) {
   const con = data.value?.consoles?.[e.games[0]?.console] || '';
   return [con, `By ${e.by.split(/[,(]/)[0].trim()}`, e.builds.some((b) => b.os === 'linux') ? 'Linux build' : 'Windows build, through Proton'].filter(Boolean).join(' · ');
 }
-function coverOf(e) { const r = e.roms.length && romById(e.roms[0]); return r ? cover(r) : ''; }
+// your copy's cover; else the project's own picture from its README (0.9.71 playtest: a plain controller icon said nothing)
+const pics = ref({});
+function coverOf(e) {
+  const r = e.roms.length && romById(e.roms[0]);
+  if (r) return cover(r);
+  if (!(e.id in pics.value)) { pics.value[e.id] = ''; call('recomps:details', { id: e.id }).then((d) => { if (d?.picture) pics.value[e.id] = img(d.picture, 240); }).catch(() => {}); }
+  return pics.value[e.id];
+}
 function subOf(e) {
   const g = e.games.map((x) => x.title).join(', ');
   return [g, ORIGIN[e.origin] || '', e.from === 'kept' ? 'Installed from the old list' : 'Added from a link'].filter(Boolean).join(' · ');

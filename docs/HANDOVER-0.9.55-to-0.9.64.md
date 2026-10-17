@@ -22,10 +22,10 @@ The repo is public. Nothing private is in this document. Keep it that way.
 
 ## Part 1. Where things stand right now
 
-- **Latest release:** v0.9.70 "Cartridge 0.9.70 · Cartridge Verified" (17 Oct 2026; Part 17): recomps rebuilt as a curated list of verified ports (five PS4 ports), port settings in Cartridge, the skills work (worst-case, accessibility, tokens, GSAP test switch) and a controller playtest. Before that v0.9.69 "Cartridge 0.9.69 · Recomps, Finished" (16 Oct 2026; Part 16): save backups you can put back, Check It and a setup step for link recomps, the copy checked before install, stricter automatic finds, a daily switch, a clean-up. Before it v0.9.68 "Cartridge 0.9.68 · Set Up Right" (16 Oct 2026; Part 15): the freeze fix, the Steam card and recomps setting themselves up (made 14 Oct, unreleased until then) plus a full debugging pass. Before it v0.9.67 "Cartridge 0.9.67 · Follow Through" (14 Oct 2026; Part 14). Before it v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). PRs: v0.9.63 #82, v0.9.64 #83, v0.9.65 #84, v0.9.66 #85, handover catch-ups #86 and #87 (docs only), v0.9.67 #88, v0.9.68 #89, v0.9.69 the PR after it.
+- **Latest release:** v0.9.71 "Cartridge 0.9.71 · Every Promise Kept" (17 Oct 2026; Part 18): update channels (Stable, Beta, Nightly), safe start and settings backups, end-to-end tests in CI, Settings as cards, two shader backgrounds, Play With and port trophies, cheats for Switch and RetroArch, multi-drive finished, Saves widget, Online Play extras. Before that v0.9.70 "Cartridge 0.9.70 · Cartridge Verified" (17 Oct 2026; Part 17): recomps rebuilt as a curated list of verified ports (five PS4 ports), port settings in Cartridge, the skills work (worst-case, accessibility, tokens, GSAP test switch) and a controller playtest. Before that v0.9.69 "Cartridge 0.9.69 · Recomps, Finished" (16 Oct 2026; Part 16): save backups you can put back, Check It and a setup step for link recomps, the copy checked before install, stricter automatic finds, a daily switch, a clean-up. Before it v0.9.68 "Cartridge 0.9.68 · Set Up Right" (16 Oct 2026; Part 15): the freeze fix, the Steam card and recomps setting themselves up (made 14 Oct, unreleased until then) plus a full debugging pass. Before it v0.9.67 "Cartridge 0.9.67 · Follow Through" (14 Oct 2026; Part 14). Before it v0.9.66 "Cartridge 0.9.66 · Loose Ends" (13 Oct 2026; Part 13). Before it v0.9.65 "Cartridge 0.9.65 · Recomps and Online Play" (Parts 11 and 12). Before it, v0.9.64 "Cartridge 0.9.64 · Forks and Links" (9 Oct 2026). PRs: v0.9.63 #82, v0.9.64 #83, v0.9.65 #84, v0.9.66 #85, handover catch-ups #86 and #87 (docs only), v0.9.67 #88, v0.9.68 #89, v0.9.69 the PR after it.
 - **Branch:** `claude/relaxed-fermat-30pigp`, merged into `main` by a PR for every release (merge commit, not squash). After a merge, reset the branch to `main` (`git fetch origin main && git checkout -B claude/relaxed-fermat-30pigp origin/main`) before new work.
-- **package.json:** `version` = `versionName` = 0.9.70, `releaseName` "Cartridge 0.9.70". The lockfile's version field is stale and always was; leave it.
-- **Tests:** 365 pass at 0.9.70 (recipes and tokens added; the catalogue tests went with the catalogue), 356 at 0.9.69, 354 at 0.9.68 (347 at 0.9.67, 343 at 0.9.66; fileIds added and recomps grown in 0.9.68) (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink, recomps, onlinePlay (fake RPCN server inside); saveSync and gameSettings grew a lot.
+- **package.json:** `version` = `versionName` = 0.9.71, `releaseName` "Cartridge 0.9.71". Betas and nightlies are stamped by `tools/release/prerelease.js` in CI only; never commit their versions. The lockfile's version field is stale and always was; leave it.
+- **Tests:** 382 pass at 0.9.71 (updateChannels, recovery, cheatDbs, forks added; e2e is separate: `xvfb-run -a node test/e2e/run.js`, 18 checks), 365 pass at 0.9.70 (recipes and tokens added; the catalogue tests went with the catalogue), 356 at 0.9.69, 354 at 0.9.68 (347 at 0.9.67, 343 at 0.9.66; fileIds added and recomps grown in 0.9.68) (`npm test`; recomps and onlinePlay added in 0.9.65 and grown in 0.9.66). Test files added in this stretch: saveLocator, titleDb, vitaInstall, gameSettingsAll, rpcs3Paths, wua (with `test/fixtures/mario-tennis.wua`), xeniaPatches, forkVersions, phoneLink, recomps, onlinePlay (fake RPCN server inside); saveSync and gameSettings grew a lot.
 - **Before every release:** `npm test`, `npx vite build`, the launch check (`CARTRIDGE_SMOKE=1 HOME=$(mktemp -d) xvfb-run -a node_modules/electron/dist/electron . --no-sandbox` must print `SMOKE OK`), `npm run audit:ui` (focus and contrast in six looks, clipping, the tour twice; all zero at 0.9.63 to 0.9.67; it takes about 15 minutes, so run it in the background). Never rebuild `dist` while the audit runs: it reads `dist` and crashes mid-run.
 - **Standing instruction:** when an update is finished, built and launch-checked, open the PR and merge it without asking. A version change on `main` publishes the release to every user.
 
@@ -37,11 +37,12 @@ The repo is public. Nothing private is in this document. Keep it that way.
 3. ~~The three Part 7 items left after 0.9.66~~: shipped as 0.9.67 with two bug fixes (Part 14). Everything still not done, checked three times, is in Part 9.
 4. ~~A full debugging pass~~ (owner, on another account after a catch-up): shipped as 0.9.68 (Part 15).
 5. ~~Recomps, Finished~~ (Part 9 items 1, 2, 4, 5, 6, 9, 10 and 13): shipped as 0.9.69 (Part 16).
-6. ~~One update with everything from the skills review and verified recomps~~: shipped as 0.9.70 (Part 17). The owner's picks from the option board (shader backgrounds, Settings layouts) come next.
+6. ~~One update with everything from the skills review and verified recomps~~: shipped as 0.9.70 (Part 17).
+6b. ~~Everything still promised plus my eight recommendations~~: shipped as 0.9.71 (Part 18), with my picks from the option board since the owner hadn't picked.
 7. Owner device tests (end of Parts 11 to 17), then whatever the owner picks from Part 9's list. The owner said on 14 Oct they were sending more bugs; none had arrived by 0.9.68.
 8. Keep this handover updated after each.
 
-**Waiting on the owner:** the 0.9.68 tests (end of Part 15: Place recomps, Zelda 64's own wizard, Game Mode start with no dimming); device tests listed in Part 9 (from 0.9.63 to 0.9.66); KytyPS5 log after 0.9.63 if it still fails; the Unit 13 freeze test with frame generation off; which of Part 9's not-done items to build next (they built items 1 to 3 of the old list as 0.9.67 and asked for a triple check of the rest).
+**Waiting on the owner:** the 0.9.71 device tests (end of Part 18) and a first beta from Actions; whether the option-board picks I took (A, D, B) are the ones they want; RomM too old (item 20), the shadPS4 note, two Cartridge devices (plan-0.9.39 §4); the 0.9.68 tests (end of Part 15: Place recomps, Zelda 64's own wizard, Game Mode start with no dimming); device tests listed in Part 9 (from 0.9.63 to 0.9.66); KytyPS5 log after 0.9.63 if it still fails; the Unit 13 freeze test with frame generation off; which of Part 9's not-done items to build next (they built items 1 to 3 of the old list as 0.9.67 and asked for a triple check of the rest).
 
 ---
 
@@ -101,6 +102,7 @@ Everything in the earlier handovers still applies. New in this stretch:
 | 0.9.69 | Recomps, Finished | recomp save backups with Put Back, Check It and It's Set Up for link recomps, guessed save backups, copy checked before install, automatic finds vetted, daily switch, Flatpak update start, clean-up (Part 16) |
 | 0.9.68 | Set Up Right | freeze about 30 s after start (game IDs in a worker, memoised lookups), recomp Place setup by real paths (`setup.to`), recomp launch and one-off setup arguments, picker recomps set themselves up, the Steam card's controller (Part 15) |
 | 0.9.70 | Cartridge Verified | recomps as a curated list of verified ports (Bloodborne, Uncharted, God of War III, inFAMOUS Second Son, P.T.), port settings, Proton without Steam, nightly recipe watchdog, worst-case and accessibility audits, one token table, GSAP test switch, controller playtest |
+| 0.9.71 | Every Promise Kept | update channels and Choose a Version, safe start and settings backups, end-to-end tests in CI with budgets, Settings cards, Aurora Veil and Horizon Grid, Play With, port trophies, checked downloads, cheats (libretro, Switch), multi-drive finished, Saves widget, forks list from the repo, Online Play extras, Windows trial start, rows audit (Part 18) |
 | 0.9.66 | Loose Ends | RPCN accounts made in Cartridge, ShadNet sign-up in its own window, RPCS3 Repair before Online Play writes, Online Play on emulator pages, recomp project details, link guesses, recomp updates started once before they're kept (Part 13) |
 
 ---
@@ -118,11 +120,16 @@ Everything in the earlier handovers still applies. New in this stretch:
 - **Game IDs off the main thread (0.9.68):** `electron/fileIds.js` (readers with nothing from main's state, `createReader`), `electron/idWorker.js`; `gameId` `extractAsync`; `steamManager.warmSerials`. Memos in `steamManager` (`candMemo`, `binMemo`) and `trophies.emulationRoots` (`rootsMemo`).
 - **Cartridge Verified (0.9.70):** `electron/recipes/*.json` + `index.json`, `electron/recipes.js` (pure), `electron/protonRunner.js`, verified parts of `electron/recomps.js`, `src/components/VerifiedSheet.vue`, `tools/recipes/{index,check}.js`; docs/recipes.md.
 - **Design tooling (0.9.70):** `src/tokens.js` → `src/tokens.css` (`tools/tokens/gen.js`), `src/gsapEngine.js`, `tools/ui-audit/{worst,a11y,playtest,motionBench}.js`.
+- **0.9.71:** `electron/updateChannels.js`, `electron/recovery.js`, `electron/recompsIpc.js` (first area out of main.js), `electron/raCheats.js` + `electron/chtIndex.json.gz` (`tools/cheats/index.js`), `electron/switchCheats.js`, `electron/forks.json`, `test/e2e/` (mockRomm, run, budgets), `tools/recipes/install-test.js`, `tools/recipes/draft.js`, `tools/ui-audit/rows.js`, `tools/release/prerelease.js`, workflows `prerelease.yml` and `e2e.yml`; shaders in `src/bgRenderers.js` (`SHADERS`, `shader()`), the hub in Settings.vue (`hub`, `statusOf`).
 - **Online Play (0.9.65, 0.9.66):** `electron/onlinePlay.js` (engine), `electron/onlineAdapters.js` (one adapter per emulator, with its source), `electron/onlineFormats.js` (one-key writers), `electron/sha3.js` (pure SHA3/PBKDF2), `electron/rpcnClient.js` (RPCN accounts), main `online:*`, `src/components/OnlinePlay.vue`, the Online Play rows in Game.vue and EmuGet.vue.
 
 ---
 
 ## Part 6. Subsystems: what they do now and why
+
+- **Update channels (0.9.71):** electron-updater's channel picks the file (`latest`, `beta`, `nightly`-linux.yml). `UC.apply` sets `allowPrerelease`/`channel` and keeps `allowDowngrade` off except once after a switch (`config.updateSwitched`), so moving from Nightly back to Stable can go down a version and normal updates never do.
+- **Recovery (0.9.71):** a start counts as clean 15 s after the UI loads or at quit; two unclean starts in a row give a safe start overlaid in `shownConfig()` only, so nothing of yours is overwritten. The marker starts after the single-instance lock, so a second launch isn't counted.
+- **Cheat databases (0.9.71):** RetroArch's game file is the only place Cartridge writes for RetroArch cheats, plus `apply_cheats_after_load` once; Switch cheats live only in Cartridge's own mod folder, removed when none are on.
 
 ### 6.1 Speed and freezes
 Rule (docs/design-rules.md 10b, pinned in test/designRules.test.js): nothing heavy on Electron's main thread. Found and fixed in this stretch:
@@ -248,7 +255,7 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 
 **Everything promised and not done yet (14 Oct 2026, checked three times: my pass through Part 7, a read-only agent sweeping every handover, plan, options file, CLAUDE.md and the session log, and a second agent trying to prove each item wrong; file:line evidence was in their reports).**
 
-*Recomps (Part 7.1):*
+*Recomps (Part 7.1):* since 0.9.70 the catalogue is gone (recipes), so items 1 to 13 apply only to recomps added from a link.
 
 0. **Fixed in 0.9.68 (Part 15):** Place setup, launch and setup arguments, Quest 64's done note. The picker items below still stand; picker recomps now set themselves up with no Set Up step (owner, 14 Oct), so item 3 (copy the path) only matters for recomps whose own picker Cartridge opens.
 1. ~~**No off switch for the daily catalogue refresh (7.1 #5).**~~ Done in 0.9.69 (Check for New Recomps Every Day). The plan said it "runs on by default", which implies one. It's always scheduled (main.js `recomps-refresh`). Only a manual Check for New exists.
@@ -260,7 +267,7 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 7. **Setup isn't redone after an update (7.1 #13).** Things survive implicitly (`rec.game`, args, a link inside the folder), but nothing checks whether the new release needs setting up again.
 8. **No "Updates on Their Own Site" for builds published only as CI artifacts (7.1 #13).** Only `site` and `none` exist. openmbu, for one, has Linux builds only as artifacts and is filed as Windows.
 9. ~~**No "Check It" preview for recomp links (7.1 #16).**~~ Done in 0.9.69. Typed links, GitHub search, the phone and the 0.9.66 guess exist. `recomps:addLink` checks only the link's shape, not that a release exists.
-10. **Start-once after an update covers Linux builds only (7.1 #13).** Flatpak added in 0.9.69 (reported, no roll back); Windows (Proton) still not: it only runs through Steam. Windows (Proton) and Flatpak updates aren't started before they're kept.
+10. **Start-once after an update:** Windows done in 0.9.71 for ports with their own prefix. Earlier note: covers Linux builds only (7.1 #13).** Flatpak added in 0.9.69 (reported, no roll back); Windows (Proton) still not: it only runs through Steam. Windows (Proton) and Flatpak updates aren't started before they're kept.
 11. **The setup watch starts only from Cartridge's Open (7.1 #10).** A first start from Steam isn't watched. 33 entries with `needs` have no `done` file, so there's no watch and no bar for them. No entry has `doneSize`, so the bar shows MB written, not a percentage. Both need catalogue data, from real installs.
 12. **Doubtful catalogue facts.** docs/recomps.md has **98** "Not certain" lines, not the 5 named before: asset names, program names, save folders, Linux locations "not confirmed". They need checking against real downloads. Save notes that name no real place (Kirby Wii's "Linux location not confirmed", Foxhollow's memory cards, Marble Blast's prefs.cs, the 9 Windows recomps whose saves sit in a Proton prefix until they're in Steam) give no paths since 0.9.67.
 
@@ -268,19 +275,19 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 
 *Online Play (Part 7.2 and Part 12):*
 
-14. **Researched settings not offered** (listed in Part 12 "Found in research but not offered"): Eden's lobby server and token, network interface and per-game airplane mode; Azahar's room token; Ryujinx's relay, LAN interface and internet access; Dolphin's lobby listing; Cemu's choice of Pretendo; RetroArch hosting or joining from Cartridge. These were never agreed, only found.
+14. **Researched settings not offered** Done in 0.9.71 except Cemu's Pretendo choice (format unconfirmed) and RetroArch hosting or joining (Cartridge starts games only through Steam). (listed in Part 12 "Found in research but not offered"): Eden's lobby server and token, network interface and per-game airplane mode; Azahar's room token; Ryujinx's relay, LAN interface and internet access; Dolphin's lobby listing; Cemu's choice of Pretendo; RetroArch hosting or joining from Cartridge. These were never agreed, only found.
 
 *From older plans and handovers (all confirmed not done by both agents):*
 
-15. **Multi-drive leftovers (docs/plan-multidrive.md, built in 0.9.38 as `extraRoots`):**
+15. ~~**Multi-drive leftovers~~ Done in 0.9.71 (Emulator Storage lists sizes and opens each emulator's Folders sheet; moving those folders stays there). (docs/plan-multidrive.md, built in 0.9.38 as `extraRoots`):**
     - a drive chosen per console;
     - moving a game between drives with its Steam shortcut following;
     - games on an unplugged drive shown as "not inserted" (they are just skipped);
     - emulator storage folders (RPCS3 `dev_hdd0` and others) as Storage entries with Move.
-16. **A Saves widget on Start** (plan-0.9.29 §2.1: last synced, conflicts). Not in `TILES`.
-17. **More cheat sources** (plan-0.9.4 §2, plan-0.9.16 §1): the libretro cheat database and a Switch cheat source. `cheats.js` has Dolphin Gecko and PPSSPP CWCheat (plus Cemu's packs) only.
-18. **A forks list fetched from the repo** (plan-0.9.md), like the recomp catalogue. Forks are fixed in `emulators.js` `FORKS`; adding by link is the escape hatch.
-19. **A row-by-row check of empty or unclear Settings rows** (0.9.3 G4, plan-0.9.19 §5): deferred, "not audited row by row".
+16. ~~**A Saves widget on Start**~~ Done in 0.9.71. (plan-0.9.29 §2.1: last synced, conflicts). Not in `TILES`.
+17. ~~**More cheat sources**~~ Done in 0.9.71 (libretro database, switch-cheats-db). (plan-0.9.4 §2, plan-0.9.16 §1): the libretro cheat database and a Switch cheat source. `cheats.js` has Dolphin Gecko and PPSSPP CWCheat (plus Cemu's packs) only.
+18. ~~**A forks list fetched from the repo**~~ Done in 0.9.71 (forks.json). (plan-0.9.md), like the recomp catalogue. Forks are fixed in `emulators.js` `FORKS`; adding by link is the escape hatch.
+19. ~~**A row-by-row check of empty or unclear Settings rows**~~ Done in 0.9.71 (tools/ui-audit/rows.js). (0.9.3 G4, plan-0.9.19 §5): deferred, "not audited row by row".
 20. **RomM version check turning features off** (0.9.3 H2): there is a check, an Issues entry and a test (romm.js `rommTooOld`), but by design it says so once instead of switching features off. Ask the owner whether that's enough.
 21. **A frame generation warning for Vita games**, only if the owner's Unit 13 test points at lsfg-vk (this list, item 21).
 22. **Housekeeping:** the remote branches `claude/relaxed-fermat-30pigp-release-g` and `-release-i` still exist. The owner said to clean up (16 Oct); both are fully merged, but a session can't delete them (the proxy allows only the session branch, the API refuses writes). The owner deletes them on GitHub (Branches).
@@ -568,3 +575,31 @@ The owner, after I offered the Part 9 recomp items as one update: "Okay go clean
 3. inFAMOUS with update 1.07 on the device.
 4. GSAP Motion (Test) on and off with the Performance Overlay; say which feels better.
 5. Pick from the option board.
+
+---
+
+## Part 18. 0.9.71 · Every Promise Kept (17 Oct 2026)
+
+**Asked:** "Do all of these and allow users to switch beta channels and nightly versions via the update menu", with my recommendations first: everything still promised (this Part 9) plus my eight recommendations (beta channel, one Play button, recovery, end-to-end tests with budgets, big-library check, nightly recipe install test, splitting main.js, 4K checks). Option-board picks were unanswered, so my recommendations were taken: shader backgrounds A and D, Settings layout B, GSAP stays off.
+
+**What was done:**
+1. **Update channels** (`electron/updateChannels.js`, Settings → Downloads and Updates): Stable, Beta, Nightly with electron-updater channels; Choose a Version per channel. `.github/workflows/prerelease.yml` builds a nightly at 02:23 UTC from the newest of main and claude/* (skipped when nothing changed, 7 kept) and a beta on Run workflow with input `beta`; `tools/release/prerelease.js` stamps the version (`0.9.72-beta.N`, `0.9.72-nightly.YYYYMMDD.N`). **To publish a beta:** GitHub → Actions → Beta and nightly → Run workflow → channel beta.
+2. **Recovery** (`electron/recovery.js`): start marker, safe start after two unclean starts (shown config only, never saved), settings backups (10), export/import without secrets, unexpected closes in Report a Problem.
+3. **End to end in CI** (`test/e2e/`, `.github/workflows/e2e.yml`): the real app against a fake RomM in a fake home, normal and 20,000 games, budgets in budgets.json; UI audits, rows check and playtest on pull requests; a 4K clipping pass. Big libraries needed no change (only visible cards are drawn).
+4. **Recipes:** nightly install test with the real releases (`tools/recipes/install-test.js`), draft tool (`tools/recipes/draft.js`, drafts are refused until filled in), trophies from ports, SHA-256 check of every download. No project publishes dump hashes, so none were added.
+5. **main.js split** started: recomps handlers in `electron/recompsIpc.js` (pattern in docs/architecture.md).
+6. **Look:** Aurora Veil and Horizon Grid (WebGL, 2D fallback, contexts released), Settings hub of cards (`hub`, `statusOf`, `store.settingsDirect` for screens that open a section).
+7. **Playtest wishes:** one name on coverless cards, port pictures, one Play button with LB/RB for Uncharted, PC Ports filter and More entry, Quick Menu fits, Played mark.
+8. **Part 9 items:** cheats (libretro .cht through RetroArch from its cheat_manager.c rules, `electron/chtIndex.json.gz` made by `tools/cheats/index.js`; switch-cheats-db into Eden's `load/<TID>/Cartridge Cheats/cheats/<BID>.txt` per patch_manager.cpp, Ryujinx's mods folder), forks list (`electron/forks.json`, daily refresh), multi-drive (drive per console, away games, Move to Another Drive, Emulator Storage), Saves widget, Settings rows audit (`tools/ui-audit/rows.js`), Online Play extras, Windows trial start through Proton.
+
+**What broke and how it was caught:** the hub broke every audit that clicked section keys one after another (they now press All Settings first) and screens opening a section landed on the hub (`settingsDirect`). The playtest reported lost focus after Achievements settings: its Open Achievements button changes tab, the tool didn't go back (tool fixed). The libretro database writes `&quot;` in names (shown decoded, written back as they were). One end-to-end run failed once in five without a repeat; watch the CI runs.
+
+**Not verified:** a real update across channels (needs a published prerelease), the shaders on a Deck GPU, cheats in a running emulator, a Windows port's trial start, Proton runs.
+
+**Owner device tests:**
+1. Switch to Beta, then back to Stable (Choose a Version too). After this merges, publish a beta once from Actions to try it.
+2. Settings cards on the handheld and the TV; open a section from a game's More (it should skip the cards).
+3. Aurora Veil and Horizon Grid in Plain, Glass and Light.
+4. A Switch game's Cheats tab in Eden, and a SNES game through RetroArch.
+5. Move a game to the SD card and start it from Steam; take the card out and look at the game page.
+6. Bloodborne trophies after unlocking one.

@@ -30,14 +30,29 @@ at that script, so a game started from Steam gets the same settings.
 
 ## Adding one
 
+0. `node tools/recipes/draft.js <github link> [id]` writes a draft: name, licence, about, the release and which file is
+   the Linux and Windows build. Everything it can't know is `TODO` with a `todo` list, and `validate` refuses the file
+   until both are gone, so a draft never reaches users.
 1. Read the project: release files, the launcher's settings code, save folder, the game files it checks.
 2. Write `electron/recipes/<id>.json`, then `node tools/recipes/index.js` (bundles every recipe into `index.json`).
 3. `npm test` (`test/recipes.test.js` validates every recipe and checks the bundle).
-4. Install it for real with its newest release and a dump folder shaped like the real one.
+4. Install it for real: `node tools/recipes/install-test.js <id>` downloads its newest release, installs it through
+   the app's own code, sets it up against a fake dump shaped like the real one (`SHAPES`) and checks the program, the
+   start scripts and a setting read back. `RECIPES_ASSETS=<folder>` uses files already downloaded.
 5. Commit. Users get it the next day without a release (the app reads `index.json` from `main` daily, a newer `rev` wins).
 
 `tools/recipes/check.js` runs every night in CI (`.github/workflows/recipes-check.yml`) and opens an issue labelled
-`recipes` when a project's newest release no longer has a file for one of its builds.
+`recipes` when a project's newest release no longer has a file for one of its builds, or no longer installs and sets
+up (install-test.js). Release files are checked against GitHub's SHA-256 (`digest`) after every download. None of the
+projects publishes hashes of good dumps, so the dump check stays title ID, version and the files it needs.
+
+## Trophies (0.9.71)
+
+`achievements` in a recipe: `files` the port writes unlocks to (Bloodborne's `{dir}/user/trophies.log`, "id time"
+lines), `output: true` when it prints "trophy N unlocked" (the start script then tees its output to
+`.cartridge/output.log`, trimmed past 5 MB), `list` names when the dump has none. Names come from the dump's own
+`sce_sys/trophy/trophy00.trp` when a shadPS4 trophy key is found, else the list, else "Trophy N"
+(`recompAchievements.js`, `trophies.portTrophyDefs`).
 
 ## The first five (17 Oct 2026)
 

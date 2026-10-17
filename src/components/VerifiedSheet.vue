@@ -20,7 +20,9 @@
           <div v-if="why" class="vs-why small"><Icon name="mdiAlertCircleOutline" :size="18" />{{ why }}</div>
           <div class="vs-main">
             <template v-if="e.state === 'play' || e.state === 'update'">
-              <button v-for="(s, i) in e.starts" :key="s.id" class="btn" :class="{ primary: i === 0 || e.starts.length > 1 }" data-focus :data-key="'vs-play-' + s.id" :disabled="!!job" @click="play(s.id)"><Icon name="mdiPlay" :size="20" />{{ e.starts.length > 1 ? s.name : 'Play' }}</button>
+              <!-- one Play button; with more than one game (Uncharted 1, 2, 3) LB/RB or a tap on its name picks which (0.9.71 playtest) -->
+              <button v-if="e.starts.length > 1" class="btn vs-which" data-focus data-key="vs-which" @click="stepStart(1)"><Btn b="LB" class="vs-pad" />{{ curStart.name }}<Btn b="RB" class="vs-pad" /></button>
+              <button class="btn primary" data-focus :data-key="'vs-play-' + curStart.id" :disabled="!!job" @click="play(curStart.id)"><Icon name="mdiPlay" :size="20" />Play</button>
               <button v-if="e.state === 'update'" class="btn" data-focus data-key="vs-update" :disabled="!!job" @click="install"><Icon name="mdiUpdate" :size="20" />Update to {{ e.latest?.tag }}</button>
             </template>
             <button v-else class="btn primary" data-focus data-key="vs-main" :disabled="!!job || step.off" @click="main"><Icon :name="step.icon" :size="20" />{{ step.button }}</button>
@@ -45,16 +47,22 @@
 // A Cartridge Verified game (0.9.70, owner: "you don't need to add anything else, Cartridge makes the setup sleek").
 // The steps are Install (the port, for this system), Your Copy (from your library, downloaded if needed), then Play;
 // Settings opens the port's own settings in Cartridge. Nested pop-ups save this sheet's resolve and reopen it.
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { store, call, toast, closeModal, choose, confirm, romById, cover, bgJob, ago, pickFolder, openModal, download, plural } from '../store.js';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { store, call, toast, closeModal, choose, confirm, romById, cover, img, bgJob, ago, pickFolder, openModal, download, plural } from '../store.js';
 import { pushLayer, focusFirst } from '../nav.js';
 import Icon from './Icon.vue';
+import Btn from './Btn.vue';
 
 const props = defineProps({ id: String });
 const el = ref(null), e = ref(null), why = ref(''), copies = ref([]), runner = ref(undefined), kept = ref([]), saveBaks = ref([]);
 const short = (p) => String(p || '').replace(store.info?.home || '\0', '~');
 const job = computed(() => bgJob('recomp:' + props.id) || bgJob('recompprep:' + props.id) || (copyRom.value ? dlJob.value : null));
-const art = computed(() => { const r = e.value?.roms?.length && romById(e.value.roms[0]); return r ? cover(r) : ''; });
+const startAt = ref(0);
+const curStart = computed(() => e.value?.starts?.[startAt.value] || e.value?.starts?.[0] || {});
+function stepStart(d) { const n = e.value?.starts?.length || 0; if (n > 1) startAt.value = (startAt.value + d + n) % n; }
+const pic = ref('');
+const art = computed(() => { const r = e.value?.roms?.length && romById(e.value.roms[0]); return r ? cover(r) : pic.value; });
+watch(() => e.value?.id, (id) => { if (id && !pic.value) call('recomps:details', { id }).then((d) => { if (d?.picture) pic.value = img(d.picture, 240); }).catch(() => {}); }, { immediate: true });
 const copyRom = computed(() => copies.value[0] || null);
 // your copy downloading: the download's own progress
 const dlJob = computed(() => { const it = (store.downloads || []).find((d) => copies.value.some((c) => c.romId === d.romId) && ['queued', 'downloading', 'checking', 'unpacking'].includes(d.status)); return it ? { text: 'Downloading your copy', pct: it.total ? Math.floor((it.received / it.total) * 100) : null } : null; });
@@ -101,7 +109,7 @@ async function load() {
 let off = [], layer = null;
 onMounted(async () => {
   resolveOuter = store.modal?.resolve;
-  layer = pushLayer(el.value, { back: () => closeModal(null), start: () => closeModal(null), lb() {}, rb() {}, y: () => more(), select() {}, lt() {}, rt() {} });
+  layer = pushLayer(el.value, { back: () => closeModal(null), start: () => closeModal(null), lb: () => stepStart(-1), rb: () => stepStart(1), y: () => more(), select() {}, lt() {}, rt() {} });
   off = [window.cart.on('bg-job', (j) => { if (['recomp:', 'recompprep:'].some((k) => j?.key === k + props.id) && j.state !== 'run') load(); }), window.cart.on('installed', () => load())];
   call('recomps:runner').then((r) => (runner.value = r)).catch(() => (runner.value = null));
   await load(); await nextTick(); if (el.value) focusFirst(el.value);
@@ -192,4 +200,6 @@ async function more() {
 .vs-facts > div { display: contents; }
 .vs-facts b { color: var(--muted); font-weight: 600; }
 .vs-facts span { overflow-wrap: anywhere; }
+.vs-which { gap: 10px; }
+body:not(.pad-mode) .vs-pad { display: none; }
 </style>

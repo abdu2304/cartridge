@@ -9,6 +9,7 @@
 //           <XDG_DATA_HOME or ~/.local/share>/<app>/achievements/<TITLEID>.toml as [unlocked.<id>] filetime = N
 //           (Windows FILETIME), names in the achievements.toml the recomp ships ([[achievements]] id, label,
 //           description, gamerscore).
+//   ps4     (Cartridge Verified PS4 ports, 0.9.71): see readPs4Unlocks.
 // Tested in test/recomps.test.js.
 const fs = require('fs');
 const path = require('path');
@@ -35,6 +36,16 @@ function readRexUnlocks(text) {
   // the older form, before filetimes: unlocked = [1, 2, 3]
   const arr = /^\s*unlocked\s*=\s*\[([^\]]*)\]/m.exec(t);
   if (arr) for (const n of arr[1].split(',').map((x) => Number(x.trim())).filter(Boolean)) if (!out.some((x) => x.id === n)) out.push({ id: n, time: null });
+  return out;
+}
+// the PS4 ports' unlocks (0.9.71): "<id> <unix time>" lines (Bloodborne's trophies.log) and "Runtime: trophy <id>
+// unlocked" (every port's output, kept by Cartridge's start script; no time there)
+function readPs4Unlocks(text) {
+  const out = [];
+  for (const m of String(text || '').matchAll(/^(\d{1,3})\s+(\d{9,11})\s*$|Runtime: trophy (\d{1,3}) unlocked/gm)) {
+    if (m[1] != null) out.push({ id: Number(m[1]), time: Number(m[2]) * 1000 });
+    else out.push({ id: Number(m[3]), time: null });
+  }
   return out;
 }
 // achievements.toml: each [[achievements]] block's own keys (the language subtables after it are left out)
@@ -64,6 +75,9 @@ function findMeta(dir, depth = 3) {
 // it: { id, name, program, dir, ach: { format, user, file } from the catalogue }
 function locate(it, { home = os.homedir(), env = process.env } = {}) {
   const ach = it.ach || {};
+  // 0.9.71, Cartridge Verified PS4 ports: the recipe names the files (recipes.achievementsOf), names come from the
+  // recipe's list or the player's own copy (its trophy file, decrypted when a shadPS4 trophy key is set up)
+  if (ach.format === 'ps4') return { format: 'ps4', files: (ach.files || []).filter((f) => fs.existsSync(f)), list: ach.list || null, game: ach.game || null, always: true };
   if (ach.format === 'hedge' && ach.user && ach.file) {
     const portable = fs.existsSync(path.join(it.dir, 'portable.txt')) ? [path.join(it.dir, 'save', ach.file)] : [];
     // a Flatpak build (Unleashed's Linux release) keeps it inside its own sandbox folder
@@ -91,17 +105,23 @@ function gameOf(it, where, read = (f) => fs.readFileSync(f)) {
   const got = new Map();
   for (const f of where.files) {
     let list = null;
-    try { list = where.format === 'hedge' ? readHedge(read(f)) : readRexUnlocks(read(f).toString('utf8')); } catch {}
+    try { list = where.format === 'hedge' ? readHedge(read(f)) : where.format === 'ps4' ? readPs4Unlocks(read(f).toString('utf8')) : readRexUnlocks(read(f).toString('utf8')); } catch {}
     for (const u of list || []) { const p = got.get(u.id); if (!p || (u.time && (!p.time || u.time < p.time))) got.set(u.id, u); }
   }
   let defs = [];
   if (where.meta) { try { defs = readRexMeta(read(where.meta).toString('utf8')); } catch {} }
-  if (!defs.length) defs = [...got.keys()].sort((a, b) => a - b).map((id) => ({ id, name: `Achievement ${id}`, desc: '', score: 0 }));
+  if (where.format === 'ps4') {
+    let own = null;
+    try { own = where.game ? require('./trophies').portTrophyDefs(where.game) : null; } catch {}
+    if (own?.length) defs = own;
+    else if (where.list) defs = where.list.map(([id, name, desc, grade]) => ({ id, name, desc, grade, score: 0 }));
+  }
+  if (!defs.length) defs = [...got.keys()].sort((a, b) => a - b).map((id) => ({ id, name: `${where.format === 'ps4' ? 'Trophy' : 'Achievement'} ${id}`, desc: '', score: 0 }));
   if (!defs.length) return null;
   return {
     src: 'recomp', set: 'recomp-' + it.id, title: it.game || it.name, titleId: it.id, icon: '', recomp: it.id,
-    trophies: defs.map((d) => ({ id: d.id, name: d.name, desc: d.desc, grade: null, points: d.score || 0, hidden: false, icon: '', unlocked: got.has(d.id), time: got.get(d.id)?.time || null })),
+    trophies: defs.map((d) => ({ id: d.id, name: d.name, desc: d.desc, grade: d.grade || null, points: d.score || 0, hidden: false, icon: d.icon || '', unlocked: got.has(d.id), time: got.get(d.id)?.time || null })),
     files: where.files,
   };
 }
-module.exports = { readHedge, readRexUnlocks, readRexMeta, findMeta, locate, gameOf, FILETIME_EPOCH };
+module.exports = { readPs4Unlocks, readHedge, readRexUnlocks, readRexMeta, findMeta, locate, gameOf, FILETIME_EPOCH };

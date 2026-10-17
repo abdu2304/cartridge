@@ -1,0 +1,10 @@
+{
+ "rev": 1,
+ "about": "Known forks of emulators, by the emulator they fork and a pattern in their program, script or Flatpak name. Cartridge reads a newer copy of this file from its repository once a day (a higher rev wins), so a fork can be added without a release.",
+ "forks": [
+  { "of": "shadps4", "match": "gr2", "name": "shadPS4 GR2" },
+  { "of": "shadps4", "match": "bb[\\s._-]?launcher", "name": "BB Launcher" },
+  { "of": "dolphin", "match": "primehack", "name": "PrimeHack" },
+  { "of": "dolphin", "match": "slippi", "name": "Slippi Dolphin" }
+ ]
+}

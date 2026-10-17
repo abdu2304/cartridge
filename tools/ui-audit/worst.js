@@ -47,7 +47,7 @@ async function run(width, height) {
   const scan = async (label) => { await p.waitForTimeout(600); for (const x of [...await p.evaluate(SCAN), ...(await p.evaluate(WORDS)).map((w) => 'reads ' + w)]) bad.add(`${width}x${height} ${label} | ${x}`); };
   for (const t of TABS) { await p.click(`[data-tab="${t}"]`).catch(() => {}); await scan(t); }
   await p.click('[data-tab="settings"]').catch(() => {}); await p.waitForTimeout(600);
-  for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key))) { await p.click(`[data-key="${k}"]`).catch(() => {}); await scan('settings ' + k); }
+  for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key))) { await p.evaluate(() => document.querySelector(".hub-back")?.click()); await p.waitForTimeout(200); await p.click(`[data-key="${k}"]`).catch(() => {}); await scan('settings ' + k); }
   for (const id of [1, 4, 1290]) { await p.evaluate((x) => window.__cartStore?.go?.('game', { romId: x }), id).catch(() => {}); await scan('game page ' + id); }
   await p.click('[data-tab="consoles"]').catch(() => {}); await p.waitForTimeout(500);
   for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sys-"]')].slice(0, 4).map((e) => e.dataset.key))) { await p.click(`[data-key="${k}"]`).catch(() => {}); await scan('console ' + k); await p.click('[data-tab="consoles"]').catch(() => {}); await p.waitForTimeout(300); }

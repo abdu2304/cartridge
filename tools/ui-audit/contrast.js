@@ -30,7 +30,7 @@ async function run(theme, style) {
   for (const t of TABS) { await p.click(`[data-tab="${t}"]`).catch(() => {}); await p.waitForTimeout(600); await audit(t, 'main.main'); }
   await audit('dock', '.tabs', false);
   await p.click('[data-tab="settings"]'); await p.waitForTimeout(600);
-  for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key))) { await p.click(`[data-key="${k}"]`).catch(() => {}); await audit('settings ' + k, '.pane'); }
+  for (const k of await p.evaluate(() => [...document.querySelectorAll('[data-key^="sec-"]')].map((e) => e.dataset.key))) { await p.evaluate(() => document.querySelector(".hub-back")?.click()); await p.waitForTimeout(200); await p.click(`[data-key="${k}"]`).catch(() => {}); await audit('settings ' + k, '.pane'); }
   await p.click('[data-tab="library"]'); await p.waitForTimeout(800); await p.locator('.card').first().click(); await p.waitForTimeout(1200); await audit('game page', 'main.main');
   await p.keyboard.press('y'); await p.waitForTimeout(1200);
   for (let i = 0; i < 5; i++) { await audit('More tab ' + i, '.dialog'); await p.keyboard.press('e'); await p.waitForTimeout(500); }

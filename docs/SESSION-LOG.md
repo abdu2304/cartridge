@@ -6,6 +6,17 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 
 ---
 
+
+## 17 Oct 2026 · 0.9.71 · Every Promise Kept
+
+**Asked:** do everything still promised (handover Part 9, the playtest wishes, the GSAP remainder, Play as PC Port, port trophies, hashes, the draft tool, the played mark) and my eight recommendations, starting with the recommendations, and let users switch to beta and nightly versions in the update menu.
+
+**Decisions taken for the owner (they didn't answer the option board):** shader backgrounds A (Aurora Veil) and D (Horizon Grid), Settings layout B (hub of cards), GSAP stays off by default and the rest of the GSAP list (Draggable, Inertia, page-turn timelines, SplitText, DrawSVG) is not built. Say if any pick is wrong. Dump hashes: no project publishes them, so none were invented; downloads are checked against GitHub's SHA-256 instead.
+
+**Built:** see handover Part 18 and the release notes. Checks: `npm test` 382 pass, build, launch check, `npm run audit:ui` all zero, worst case 0 (after fitting long names in the game page's no-cover box), accessibility 0, playtest 0 (the tool now goes back to Settings when a row changes tab), rows audit 0, e2e 18 of 18 (one run of five had one failure that didn't repeat).
+
+**Left for the owner:** device tests at the end of Part 18; RomM too old (Part 9 item 20), the shadPS4 note, two devices; Cemu's Pretendo choice and RetroArch hosting stay out with reasons in Part 9 item 14. Publish a beta: Actions → Beta and nightly → Run workflow → beta.
+
 ## 17 Oct 2026 · 0.9.70 Cartridge Verified (owner: "do all of these as one update", playtest on controller "like a real professional", recomps "cartridge verified" per game, the first five links)
 - Owner's decisions in chat: recomps become a curated list the owner grows by sending links; each one is researched and made "Cartridge Verified" (Cartridge installs it, takes the user's copy, writes the port's settings, starts it, Linux or Windows alike); install from a GitHub link stays (Unverified). The old 96-entry catalogue and PCGamingWiki finds go. My skills recommendations were all taken: worst-case and accessibility sweep, one token source for Plain and Glass, GSAP behind a test switch (measured), shader backgrounds and Settings layouts as option boards first.
 - Done, in commits: recipes engine (five ports researched from their launchers' source, each installed for real here with its newest release: Bloodborne prefix and settings, Uncharted three starts, gow3 AppImage reaching its game prepare step, inFAMOUS update view with its real binary, P.T.'s own installer), Recomps page and Verified sheet, recipe watchdog, worst-case and a11y audits with fixes, tokens.js, GSAP switch with bench, controller playtest with fixes, docs (recipes.md, playtest-0.9.70.md).

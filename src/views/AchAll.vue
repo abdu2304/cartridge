@@ -174,7 +174,7 @@ const shadNoKey = computed(() => (tro.value?.sources || []).some((s) => s.id ===
 async function keyGuide() {
   await choose({ title: 'shadPS4 trophy key', message: 'shadPS4 needs your trophy key to read and record PS4 trophies.\n\n1. Open shadPS4 (its launcher) on this device.\n2. Add your trophy key in its settings (it is saved in keys.json).\n3. Open a PS4 game once, then come back.\n\nCartridge never stores or downloads keys.', options: [{ label: 'OK', value: 'ok', icon: 'mdiCheck' }] });
 }
-function openSettings() { store.settingsSection = 'ra'; go('settings'); }
+function openSettings() { store.settingsSection = 'ra'; store.settingsDirect = true; go('settings'); }
 
 async function load(force = false) {
   await Promise.all([

@@ -2,7 +2,8 @@
   <button class="card" :class="{ picked: selected }" data-focus :data-key="'rom-' + rom.id" @click="$emit('open', rom)" @focus="onFocus">
     <div class="art">
       <img v-if="src && !failed" :ref="seen" :src="src" :class="{ wait: !shown }" loading="lazy" decoding="async" @load="shown = true" @error="failed = true" />
-      <div v-else class="ph"><span class="ph-t">{{ rom.name }}</span><small>{{ rom.platform_display_name }}</small></div>
+      <!-- no cover: the name is said once, under the card (0.9.71 playtest); on cards without that line it stays here -->
+      <div v-else class="ph"><span v-if="hideTitle" class="ph-t">{{ rom.name }}</span><small>{{ rom.platform_display_name }}</small></div>
       <div class="shine" />
       <span v-if="fresh && !installed" class="chip new badge-new">NEW</span>
       <div v-if="installed" class="badge-dl"><Icon name="mdiCheckBold" :size="15" /></div>

@@ -124,7 +124,7 @@ const limit = ref(PAGE);
 // Show and Sort are one sheet with two tabs (0.9.3 K, G4 B); each button opens it on its own tab
 async function showSort(tab) {
   const v = await choose({ title: title.value, tab, tabs: [
-    { label: 'Show', options: filters.map((f) => ({ label: f.l, value: 'f:' + f.v, icon: f.icon, selected: filter.value === f.v })) },
+    { label: 'Show', options: filters.value.map((f) => ({ label: f.l, value: 'f:' + f.v, icon: f.icon, selected: filter.value === f.v })) },
     { label: 'Sort by', options: sorts.map((x) => ({ label: x.l, value: 's:' + x.v, icon: x.icon, selected: sort.value === x.v })) },
   ] });
   if (v?.startsWith('f:')) filter.value = v.slice(2);
@@ -136,13 +136,18 @@ async function moreActions() {
   const v = await choose({ title: title.value, sheet: true, options: [
     { label: 'Surprise me', sub: 'Open a random game from this list', value: 'surprise', icon: 'mdiDiceMultipleOutline' },
     { label: 'Select games', sub: 'Download, collect or add many to Steam', value: 'select', icon: 'mdiCheckboxMultipleMarkedOutline' },
+    { label: 'PC Ports', sub: 'Games Cartridge can install and run as a native PC port', value: 'ports', icon: 'mdiMonitorShimmer' },
     ...(canGetAll ? [{ label: `Get all ${missingCount.value}`, sub: 'Download every game here not on this device', value: 'all', icon: 'mdiDownloadMultiple' }] : []),
   ] });
   if (v === 'surprise') surprise();
   else if (v === 'select') selecting.value = true;
   else if (v === 'all') downloadAll();
+  else if (v === 'ports') go('recomps');
 }
-const filters = [{ v: 'all', l: 'All', icon: 'mdiViewGridOutline' }, { v: 'installed', l: 'On device', icon: 'mdiCheckCircleOutline' }, { v: 'missing', l: 'Not downloaded', icon: 'mdiCloudOutline' }, { v: 'new', l: 'New', icon: 'mdiNewBox' }];
+// games with a Cartridge Verified PC port (0.9.71 playtest: ports were three screens deep)
+const portRoms = ref(new Set());
+call('recomps:list').then((r) => { portRoms.value = new Set((r?.entries || []).filter((e) => e.from === 'verified').flatMap((e) => e.roms || [])); }).catch(() => {});
+const filters = computed(() => [{ v: 'all', l: 'All', icon: 'mdiViewGridOutline' }, { v: 'installed', l: 'On device', icon: 'mdiCheckCircleOutline' }, { v: 'missing', l: 'Not downloaded', icon: 'mdiCloudOutline' }, { v: 'new', l: 'New', icon: 'mdiNewBox' }, ...(portRoms.value.size ? [{ v: 'ports', l: 'Has a PC Port', icon: 'mdiMonitorShimmer' }] : [])]);
 const sorts = [...(collectionById(props.collectionId)?.ordered ? [{ v: 'list', l: 'As on Home', icon: 'mdiFormatListNumbered' }] : []), { v: 'name', l: 'A–Z', icon: 'mdiSortAlphabeticalAscending' }, { v: 'new', l: 'Recently added', icon: 'mdiClockOutline' }, { v: 'year', l: 'Release', icon: 'mdiCalendarOutline' }, { v: 'rating', l: 'Rating', icon: 'mdiStarOutline' }, { v: 'size', l: 'Size', icon: 'mdiHarddisk' }];
 
 const platform = computed(() => platformById(props.platformId));
@@ -214,6 +219,7 @@ const list = computed(() => {
   if (filter.value === 'installed') items = items.filter((r) => store.installed[r.id]);
   if (filter.value === 'missing') items = items.filter((r) => !store.installed[r.id]);
   if (filter.value === 'new') items = items.filter(isNew);
+  if (filter.value === 'ports') items = items.filter((r) => portRoms.value.has(r.id));
   if (q.value) { const s = q.value.toLowerCase(); items = items.filter((r) => r.name.toLowerCase().includes(s) || (r.fs_name || '').toLowerCase().includes(s)); }
   items = [...items];
   if (sort.value === 'name') items.sort((a, b) => a.name.localeCompare(b.name));
@@ -282,7 +288,7 @@ useView(
       const r = romById(key.slice(4));
       if (r && !store.installed[r.id]) download(r); else if (r) toast('Already on this device', 'info', 1800);
     },
-    select: () => { filter.value = filters[(filters.findIndex((f) => f.v === filter.value) + 1) % filters.length].v; },
+    select: () => { const fs = filters.value; filter.value = fs[(fs.findIndex((f) => f.v === filter.value) + 1) % fs.length].v; },
     back: () => { if (selecting.value) { stopSelect(); return; } return false; },
   },
   () => [{ b: 'A', label: 'Details' }, { b: 'X', label: 'Download' }, { b: 'Y', label: 'Filter' },

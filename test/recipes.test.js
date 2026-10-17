@@ -95,14 +95,14 @@ test('start scripts: Linux directly; Windows through umu, Steam\'s runtime or Pr
   const rec = { dir: "/E/it's here", program: "/E/it's here/God.AppImage", game: { path: '/g' } };
   const o = RC.render(g, g.builds[0], rec, RC.effective(g, g.builds[0]), { home: '/h', env: {} });
   const sh = RC.script(g, g.builds[0], rec, o.starts[0], null, o.vars);
-  assert.match(sh, /^exec '\/E\/it'\\''s here\/God\.AppImage' '--play' "\$@"$/m);
+  assert.match(sh, /^'\/E\/it'\\''s here\/God\.AppImage' '--play' "\$@" 2>&1 \| tee -a '\/E\/it'\\''s here\/\.cartridge\/output\.log'$/m); // 0.9.71: its output kept for trophies
   assert.match(sh, /^mkdir -p '\/h\/\.config\/gow3-launcher' && cp -f /m);
   const wrec = { dir: '/E/B', program: '/E/B/Bloodborne.exe', game: { path: '/g' } }, wo = RC.render(bb, bb.builds[0], wrec, RC.effective(bb, bb.builds[0]), { home: '/h', env: {} });
   const umu = RC.script(bb, bb.builds[0], wrec, wo.starts[0], { kind: 'umu', umu: '/usr/bin/umu-run', proton: '/s/Proton 10.0' }, wo.vars);
   assert.match(umu, /^export WINEPREFIX='\/E\/B\/\.cartridge\/proton\/pfx' GAMEID=0 STORE=none$/m);
-  assert.match(umu, /^exec '\/usr\/bin\/umu-run' '\/E\/B\/Bloodborne\.exe' '--play' "\$@"$/m);
+  assert.match(umu, /^'\/usr\/bin\/umu-run' '\/E\/B\/Bloodborne\.exe' '--play' "\$@" 2>&1 \| tee -a /m);
   const sn = RC.script(bb, bb.builds[0], wrec, wo.starts[0], { kind: 'sniper', proton: '/s/P', sniper: '/s/SLR', steam: '/s' }, wo.vars);
-  assert.match(sn, /^exec '\/s\/SLR\/_v2-entry-point' --verb=waitforexitandrun -- '\/s\/P\/proton' waitforexitandrun '\/E\/B\/Bloodborne\.exe' '--play' "\$@"$/m);
+  assert.match(sn, /^'\/s\/SLR\/_v2-entry-point' --verb=waitforexitandrun -- '\/s\/P\/proton' waitforexitandrun '\/E\/B\/Bloodborne\.exe' '--play' "\$@" 2>&1 \| tee -a /m);
   assert.match(sn, /^export STEAM_COMPAT_DATA_PATH='\/E\/B\/\.cartridge\/proton' STEAM_COMPAT_CLIENT_INSTALL_PATH='\/s'$/m);
   assert.throws(() => RC.script(bb, bb.builds[0], wrec, wo.starts[0], null, wo.vars), /Proton/);
   // the script really runs: its copy line puts settings.json in place
@@ -233,4 +233,55 @@ test('the engine: a port with its own installer (P.T.) runs it with your copy in
   const copy2 = path.join(d, 'Another dump'); fs.mkdirSync(copy2);
   await eng.setVerifiedGame('pt', copy2);
   assert.strictEqual(runs.length, 2);
+});
+
+test('verified ports’ trophies (0.9.71): output kept by the start script, unlocks read from both forms', () => {
+  const RA = require('../electron/recompAchievements');
+  const RC = require('../electron/recipes');
+  assert.deepStrictEqual(RA.readPs4Unlocks('3 1760000000\nnoise\nRuntime: trophy 14 unlocked\n'), [{ id: 3, time: 1760000000000 }, { id: 14, time: null }]);
+  const bb = RC.load().find((r) => r.id === 'bloodborne');
+  assert.strictEqual(bb.achievements.list.length, 40);
+  const rec = { dir: '/g/Bloodborne', program: '/g/Bloodborne/Bloodborne.exe', game: { path: '/roms/bb' } };
+  const b = RC.chooseBuild(bb, { runner: true });
+  const a = RC.achievementsOf(bb, b, rec, RC.varsFor(bb, b, rec, { home: '/h', env: {} }));
+  assert.deepStrictEqual(a.files, ['/g/Bloodborne/user/trophies.log', '/g/Bloodborne/.cartridge/output.log']);
+  const sh = RC.script(bb, b, rec, { id: 'main', name: 'Bloodborne' }, { kind: 'proton', proton: '/p', steam: '/s' }, { prefix: '/g/Bloodborne/.cartridge/proton' });
+  assert.match(sh, /2>&1 \| tee -a '\/g\/Bloodborne\/\.cartridge\/output\.log'$/m);
+  assert.doesNotMatch(sh, /^exec /m);
+  // a recipe without achievements keeps exec
+  const pt = RC.load().find((r) => r.id === 'pt'), pb = RC.chooseBuild(pt, {});
+  assert.match(RC.script(pt, pb, { dir: '/g/pt', program: '/g/pt/game/pt' }, { id: 'main', name: 'P.T.' }, null, {}), /^exec /m);
+  // the trophy list of Bloodborne with two unlocks
+  const g = RA.gameOf({ id: 'bloodborne', name: 'Bloodborne' }, { format: 'ps4', files: ['x'], list: bb.achievements.list }, () => Buffer.from('1 1760000000\nRuntime: trophy 14 unlocked\n'));
+  assert.strictEqual(g.trophies.length, 40);
+  assert.deepStrictEqual(g.trophies.filter((t) => t.unlocked).map((t) => [t.id, t.grade]), [[1, 'G'], [14, 'B']]);
+});
+
+test('downloads are checked against GitHub’s SHA-256 (0.9.71)', async () => {
+  const R = require('../electron/recomps');
+  const d = fs.mkdtempSync(path.join(require('os').tmpdir(), 'dig-')), f = path.join(d, 'a.zip');
+  fs.writeFileSync(f, 'hello');
+  await R.checkDigest(f, 'sha256:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824');
+  await R.checkDigest(f, null); // older releases have none
+  await assert.rejects(R.checkDigest(f, 'sha256:' + '0'.repeat(64)), /checksum/);
+  assert.ok(!fs.existsSync(f)); // a bad file is thrown away
+  const G = require('../electron/github');
+  assert.ok(typeof G.release === 'function');
+});
+
+test('a draft from draft.js never loads: TODO fields and the todo list are refused', () => {
+  const ok = JSON.parse(fs.readFileSync(path.join(__dirname, '../electron/recipes/pt.json'), 'utf8'));
+  const draft = { ...ok, by: 'TODO: who made it', game: { ...ok.game, title: 'TODO' }, todo: ['fill in'] };
+  const bad = RC.validate(draft);
+  assert.ok(bad.includes('todo list still there') && bad.includes('by is TODO') && bad.includes('game.title is TODO'), bad.join(', '));
+  assert.deepStrictEqual(RC.validate(ok), []);
+});
+
+test('a Windows update is started once through the runner, in the port’s own prefix', () => {
+  const pre = '/g/bb/.cartridge/proton';
+  const u = RC.runCommand({ kind: 'umu', umu: '/usr/bin/umu-run', proton: '/s/GE-Proton9' }, '/g/bb/game.exe', ['-x'], pre);
+  assert.deepStrictEqual([u.cmd, u.args, u.env.WINEPREFIX, u.env.PROTONPATH], ['/usr/bin/umu-run', ['/g/bb/game.exe', '-x'], pre + '/pfx', '/s/GE-Proton9']);
+  const s = RC.runCommand({ kind: 'sniper', proton: '/s/Proton', sniper: '/s/sniper', steam: '/s' }, '/g/bb/game.exe', [], pre);
+  assert.deepStrictEqual([s.cmd, s.args], ['/s/sniper/_v2-entry-point', ['--verb=run', '--', '/s/Proton/proton', 'run', '/g/bb/game.exe']]);
+  assert.strictEqual(s.env.STEAM_COMPAT_DATA_PATH, pre);
 });

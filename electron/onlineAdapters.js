@@ -178,6 +178,10 @@ const ryujinx = {
     isOn: (g) => Number(g(['main', ['multiplayer_mode']])) === 1,
     fields: [
       { key: 'server', label: 'LDN Server', icon: 'mdiServerNetwork', at: ['main', ['ldn_server']], free: true, choices: [{ value: '', label: 'Ryujinx’s Own', sub: 'ldn.ryujinx.app' }], read: (g) => g(['main', ['ldn_server']]) || 'Ryujinx’s Own', check: (v) => (!v || /^[\w.-]+$/.test(v) ? null : 'A server is a host name or IP address.') },
+      // 0.9.71 (Part 12 research): relay, network adapter and games' own internet access, same Config.json keys
+      { key: 'relay', label: 'Connection', icon: 'mdiLanConnect', at: ['main', ['multiplayer_disable_p2p']], choices: [{ value: 'false', label: 'Direct', sub: 'Players connect to each other (UPnP)' }, { value: 'true', label: 'Through the Server', sub: 'When direct connections fail behind your router' }], write: ({ value, put }) => put(['main', ['multiplayer_disable_p2p']], value === 'true'), read: (g) => (g(['main', ['multiplayer_disable_p2p']]) === true ? 'Through the Server' : 'Direct') },
+      { key: 'lan', label: 'Network Adapter', icon: 'mdiExpansionCardVariant', at: ['main', ['multiplayer_lan_interface_id']], free: true, choices: [{ value: '0', label: 'Default', sub: 'The one your system uses' }], help: 'Ryujinx names adapters by their ID; pick one in its Network settings if Default doesn’t work.', read: (g) => { const v = g(['main', ['multiplayer_lan_interface_id']]); return !v || v === '0' ? 'Default' : String(v); } },
+      { key: 'net', label: 'Games’ Internet Access', icon: 'mdiWeb', at: ['main', ['enable_internet_access']], choices: [{ value: 'false', label: 'Off', sub: 'Ryujinx’s default' }, { value: 'true', label: 'On', sub: 'Some games and homebrew need it' }], write: ({ value, put }) => put(['main', ['enable_internet_access']], value === 'true'), read: (g) => (g(['main', ['enable_internet_access']]) === true ? 'On' : 'Off') },
       { key: 'pass', label: 'Private Group', icon: 'mdiLockOutline', at: ['main', ['multiplayer_ldn_passphrase']], placeholder: 'Ryujinx-1a2b3c4d', help: 'Players with the same passphrase only see each other. Leave empty to play with everyone.', check: (v) => (!v || /^Ryujinx-[0-9a-f]{8}$/.test(v) ? null : 'A passphrase is Ryujinx- and 8 characters from 0-9 and a-f.'), read: (g) => g(['main', ['multiplayer_ldn_passphrase']]) || '' },
     ],
   }],
@@ -201,6 +205,10 @@ const eden = {
     fieldsAlways: true,
     fields: [
       { key: 'nick', label: 'Nickname', icon: 'mdiAccountOutline', required: true, at: ['main', ['UI', 'Multiplayer\\nickname']], check: (v) => (/^.{1,32}$/.test(v) ? null : 'A nickname is 1 to 32 characters.'), help: 'What other players see in rooms.', read: (g) => (g(['main', ['UI', 'Multiplayer\\nickname\\default']]) === 'false' ? g(['main', ['UI', 'Multiplayer\\nickname']]) || '' : '') },
+      // 0.9.71 (Part 12 research): the lobby server, the token public rooms check, the network adapter
+      { key: 'lobby', label: 'Lobby Server', icon: 'mdiServerNetwork', at: ['main', ['WebService', 'web_api_url']], free: true, choices: [{ value: 'api.ynet-fun.xyz', label: 'Eden’s Own', sub: 'api.ynet-fun.xyz' }], check: (v) => (/^\S+$/.test(v) ? null : 'A lobby server is an address with no spaces.'), read: (g) => (g(['main', ['WebService', 'web_api_url\\default']]) === 'false' ? g(['main', ['WebService', 'web_api_url']]) : '') || 'Eden’s Own' },
+      { key: 'token', label: 'Web Service Token', icon: 'mdiKeyOutline', secret: true, at: ['main', ['WebService', 'eden_token']], help: 'From your account on the lobby server. Public rooms that check who joins use it with your username.', check: (v) => (/^\S{8,}$/.test(v) ? null : 'A token is at least 8 characters, no spaces.') },
+      { key: 'iface', label: 'Network Adapter', icon: 'mdiExpansionCardVariant', at: ['main', ['Services', 'network_interface']], free: true, choices: [{ value: '', label: 'Automatic', sub: 'Eden picks one' }], help: 'The name of the network adapter, such as wlan0 or eth0.', read: (g) => (g(['main', ['Services', 'network_interface\\default']]) === 'false' ? g(['main', ['Services', 'network_interface']]) : '') || 'Automatic' },
       { key: 'user', label: 'Web Service Username', icon: 'mdiAccountNetworkOutline', at: ['main', ['WebService', 'eden_username']], check: (v) => (/^.{4,20}$/.test(v) ? null : 'A username is 4 to 20 characters.'), note: 'For public rooms that check who joins', read: (g) => (g(['main', ['WebService', 'eden_username\\default']]) === 'false' ? g(['main', ['WebService', 'eden_username']]) || '' : '') },
     ],
   }],
@@ -220,6 +228,7 @@ const azahar = {
       what: 'Local wireless play and Download Play with other Azahar players. Join a room in Azahar: Multiplayer, Direct Connect, with the address the host gives you.',
       note: 'Your name in rooms is the 3DS username in Azahar’s System settings.',
       fields: [
+        { key: 'token', label: 'Room Token', icon: 'mdiKeyOutline', secret: true, at: ['main', ['WebService', 'network_token']], help: 'For verified rooms on a lobby server: the token from your account there.', check: (v) => (/^\S{8,}$/.test(v) ? null : 'A token is at least 8 characters, no spaces.') }, // 0.9.71
         { key: 'lobby', label: 'Lobby Server', icon: 'mdiServerNetwork', at: ['main', ['WebService', 'web_api_url']], placeholder: 'https://', help: 'A server that lists public rooms, if your community runs one. Azahar comes without one.', check: (v) => (!v || /^https?:\/\/\S+$/.test(v) ? null : 'A lobby server is an address starting with http:// or https://.') },
       ],
     },
@@ -248,7 +257,12 @@ const dolphin = {
       what: 'Play GameCube and Wii games together. With this on, players join with the host’s short code instead of an IP address. Start or join in Dolphin: Tools, NetPlay.',
       on: [[['main', ['NetPlay', 'TraversalChoice']], 'traversal']], off: [[['main', ['NetPlay', 'TraversalChoice']], 'direct']],
       fieldsAlways: true,
-      fields: [{ key: 'nick', label: 'Nickname', icon: 'mdiAccountOutline', at: ['main', ['NetPlay', 'Nickname']], check: (v) => (/^.{1,32}$/.test(v) ? null : 'A nickname is 1 to 32 characters.'), read: (g) => g(['main', ['NetPlay', 'Nickname']]) || 'Player' }],
+      fields: [
+        { key: 'nick', label: 'Nickname', icon: 'mdiAccountOutline', at: ['main', ['NetPlay', 'Nickname']], check: (v) => (/^.{1,32}$/.test(v) ? null : 'A nickname is 1 to 32 characters.'), read: (g) => g(['main', ['NetPlay', 'Nickname']]) || 'Player' },
+        // 0.9.71 (Part 12 research): sessions you host listed in the public lobby, and which lobby
+        { key: 'index', label: 'List My Sessions in the Lobby', icon: 'mdiFormatListBulleted', at: ['main', ['NetPlay', 'UseIndex']], choices: [{ value: 'False', label: 'No', sub: 'Players join with your host code' }, { value: 'True', label: 'Yes', sub: 'Anyone can find and join them' }], read: (g) => (g(['main', ['NetPlay', 'UseIndex']]) === 'True' ? 'Yes' : 'No') },
+        { key: 'indexServer', label: 'Lobby Server', icon: 'mdiServerNetwork', at: ['main', ['NetPlay', 'IndexServer']], free: true, choices: [{ value: 'https://lobby.dolphin-emu.org', label: 'Dolphin’s Own', sub: 'lobby.dolphin-emu.org' }], check: (v) => (/^https?:\/\/\S+$/.test(v) ? null : 'A lobby server is an address starting with http:// or https://.'), read: (g) => g(['main', ['NetPlay', 'IndexServer']]) || 'Dolphin’s Own' },
+      ],
     },
     {
       id: 'wiilink', name: 'WiiLink Channels',
