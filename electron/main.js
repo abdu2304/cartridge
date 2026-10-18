@@ -3357,8 +3357,9 @@ function ps4PatchState(romId, r) {
   if (!serial) return { emu: 'shadps4', why: 'Cartridge couldn’t read this game’s serial (CUSA12345).' };
   const ph = patchHome(romId, 'shadps4');
   // 0.9.23: shadPS4's user folder even before it has patches (Cartridge downloads them, freshShadPatches)
-  const shadUser = path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local/share'), 'shadPS4');
-  const dir = (ph.shad || []).find((d) => fs.existsSync(d)) || patchesMod.shadDirs()[0] || (fs.existsSync(shadUser) ? shadUser : null); // 0.9.64: the fork's own folder first
+  // 0.9.84: or the Flatpak's (a Flatpak-only shadPS4 was "never started")
+  const shadUser = [path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local/share'), 'shadPS4'), path.join(os.homedir(), '.var/app/net.shadps4.shadPS4/data/shadPS4')].find((d) => fs.existsSync(d)) || null;
+  const dir = (ph.shad || []).find((d) => fs.existsSync(d)) || patchesMod.shadDirs()[0] || shadUser; // 0.9.64: the fork's own folder first
   if (!dir) return { emu: 'shadps4', serial, why: 'shadPS4 hasn’t been started on this device yet, so it has no folder for patches. Start it once, then come back.' };
   return { emu: 'shadps4', serial, version: patchesMod.ps4Version(where), dir, fork: dir === (ph.shad || [])[0] ? ph.fork || null : null };
 }

@@ -222,7 +222,8 @@ function rpcs3Set(dir, changes, mine = {}) {
 // (qt_gui/cheats_patches.cpp, common/memory_patcher.cpp). Only that attribute is changed here.
 function shadDirs(home = os.homedir()) {
   const data = process.env.XDG_DATA_HOME || path.join(home, '.local/share');
-  return [...new Set([path.join(data, 'shadPS4'), path.join(home, '.local/share/shadPS4')])].filter((d) => exists(path.join(d, 'patches')));
+  // 0.9.84: the Flatpak's own folder too (Flathub net.shadps4.shadPS4), found by the game settings sweep
+  return [...new Set([path.join(data, 'shadPS4'), path.join(home, '.local/share/shadPS4'), path.join(home, '.var/app/net.shadps4.shadPS4/data/shadPS4')])].filter((d) => exists(path.join(d, 'patches')));
 }
 // a PS4 game's version: an update folder next to it (Game-UPDATE, Game-patch) wins over the game
 function ps4Version(gameDir) {

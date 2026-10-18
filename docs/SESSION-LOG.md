@@ -7,6 +7,9 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 18 Oct 2026 · 0.9.84 · shadPS4 as a Flatpak
+Scheduled sweep resume: rounds 7 to 9 (game settings for 14 emulators, add-ons into 11 layouts, Linked Folders with forks) plus every older sweep again. One bug: the shadPS4 Flatpak's folder was never found for Game Settings and patches; fixed (handover Part 31). The owner's recomps redesign questions (name, which games show, Set Up on the game page) are still waiting for an answer; nothing built for it yet.
+
 ## 18 Oct 2026 · 0.9.83 · Windows Ports on Any Drive
 Owner's photo: Uncharted's Proton prefix failed on the external drive. Prefix now on the internal drive when links can't be made there (handover Part 30).
 

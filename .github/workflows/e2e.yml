@@ -41,6 +41,12 @@ jobs:
         run: xvfb-run -a node test/e2e/online.js
       - name: Saves across two devices
         run: xvfb-run -a node test/e2e/saves.js
+      - name: Game settings for every emulator
+        run: xvfb-run -a node test/e2e/gamesettings.js
+      - name: Add-ons into every emulator's layout
+        run: xvfb-run -a node test/e2e/addons.js
+      - name: Linked Folders with forks
+        run: xvfb-run -a node test/e2e/links.js
       - uses: actions/upload-artifact@v4
         if: always()
         with:

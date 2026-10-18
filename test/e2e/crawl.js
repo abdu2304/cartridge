@@ -100,7 +100,7 @@ async function crawlHere(t, where, out, scope = 'main.main, .pane') {
         for (const o of opts.filter((x) => /^(folders|forks|versions)/i.test(x))) {
           if (!(await page.evaluate(() => !!document.querySelector('.scrim .menu-item')))) { await page.evaluate((n) => document.querySelectorAll('.eg-emu.have')[n]?.click(), i); await wait(900); }
           await page.evaluate((lb) => [...document.querySelectorAll('.scrim .menu-item')].find((x) => x.innerText.split('\n')[0].trim() === lb)?.click(), o); await wait(1500);
-          const st = await page.evaluate(() => ({ modal: !!document.querySelector('.scrim'), errs: [...document.querySelectorAll('.toast.error')].map((x) => x.innerText), text: (document.querySelector('.scrim .dialog')?.innerText || '').slice(0, 100) }));
+          const st = await page.evaluate(() => ({ modal: !!document.querySelector('.scrim'), errs: [...document.querySelectorAll('.toast.error')].map((x) => x.innerText), said: !!document.querySelector('.toast:not(.error)'), text: (document.querySelector('.scrim .dialog')?.innerText || '').slice(0, 100) }));
           for (const e of st.errs) out.push({ where: `emulator ${label}`, button: o, kind: 'error message', detail: e });
           if (!st.modal && !st.errs.length) out.push({ where: `emulator ${label}`, button: o, kind: 'nothing happened', detail: '' });
           for (let k = 0; k < 4 && (await page.evaluate(() => !!document.querySelector('.scrim'))); k++) { await page.keyboard.press('Escape'); await wait(350); }
@@ -129,7 +129,8 @@ async function crawlHere(t, where, out, scope = 'main.main, .pane') {
               await page.evaluate((label) => [...document.querySelectorAll('.scrim .menu-item')].find((x) => x.innerText.split('\n')[0].trim() === label)?.click(), o); await wait(1300);
               const st = await page.evaluate(() => ({ modal: !!document.querySelector('.scrim'), route: window.__cartStore.route?.name, errs: [...document.querySelectorAll('.toast.error')].map((x) => x.innerText), text: (document.querySelector('.scrim .dialog')?.innerText || '').slice(0, 120) }));
               for (const e of st.errs) out.push({ where: `game ${g.plat[1]} More`, button: o, kind: 'error message', detail: e });
-              if (!st.modal && st.route === r0 && !st.errs.length) out.push({ where: `game ${g.plat[1]} More`, button: o, kind: 'nothing happened', detail: '' });
+              // a message that it worked counts (0.9.84: Add to Favourites only says so)
+              if (!st.modal && st.route === r0 && !st.errs.length && !st.said) out.push({ where: `game ${g.plat[1]} More`, button: o, kind: 'nothing happened', detail: '' });
               if (/Reading…|Loading/.test(st.text)) { await wait(4000); const still = await page.evaluate(() => /Reading…|Loading/.test(document.querySelector('.scrim .dialog')?.innerText || '')); if (still) out.push({ where: `game ${g.plat[1]} More`, button: o, kind: 'still loading after 5 s', detail: st.text }); }
               for (let k = 0; k < 4 && (await page.evaluate(() => !!document.querySelector('.scrim'))); k++) { await page.keyboard.press('Escape'); await wait(350); }
               if (st.route !== r0) { await page.keyboard.press('Escape'); await wait(600); }
