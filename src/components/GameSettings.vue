@@ -51,7 +51,7 @@ import { pushLayer, focusFirst } from '../nav.js';
 import { store, call, closeModal, toast, choose, romById, cover, askText } from '../store.js';
 import Icon from './Icon.vue';
 import Btn from './Btn.vue';
-import { frameGenFor } from '../steam.js';
+import { frameGenFor, vitaFgOk, isVita } from '../steam.js';
 
 const props = defineProps({ romId: Number, name: String, tab: String, at: String, recomp: String }); // recomp: a Cartridge Verified port's settings (0.9.70)
 const own = computed(() => (props.recomp ? 'Port' : d.value?.name || 'Emulator'));
@@ -78,8 +78,9 @@ async function pickFg() {
     ...(f.found.mako ? [{ label: FGL.mako, value: 'mako', selected: f.own === 'mako' }] : []),
     { label: 'Off', value: 'off', icon: 'mdiClose', selected: f.own === 'off' },
   ] });
+  const ok = !v || (await vitaFgOk(v, isVita(f.console)));
   reopen('fg');
-  if (!v) return;
+  if (!v || !ok) return;
   busy.value = true;
   try { await call('steam:setFrameGen', { scope: 'game', id: props.romId, value: v === '__base' ? null : v }); await loadFg(); toast('Saved. Its Steam shortcut is being updated.', 'ok', 2800, 'mdiCheck'); }
   catch (e) { toast(e.message, 'error', 5000); }

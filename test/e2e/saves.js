@@ -21,7 +21,7 @@ const DATA = Buffer.from(Array.from({ length: 3000 }, (_, i) => (i * 13) & 255))
 const FILES = { srm: `${RA}/saves/Save Quest.srm`, sfo: `${PSP}/PSP/SAVEDATA/ULUS10500DATA00/PARAM.SFO`, bin: `${PSP}/PSP/SAVEDATA/ULUS10500DATA00/DATA.BIN` };
 const SFO = mock.sfo({ TITLE: 'Pocket Saga', SAVEDATA_DIRECTORY: 'ULUS10500DATA00', SAVEDATA_TITLE: 'Chapter 1' });
 // the emulators as each leaves its folder after a first start
-const setup = (home) => { put(path.join(home, RA, 'retroarch.cfg'), 'savefile_directory = "default"\n'); put(path.join(home, PSP, 'PSP/SYSTEM/ppsspp.ini'), '[General]\nFirstRun = False\n'); };
+const setup = (home) => { put(path.join(home, RA, 'retroarch.cfg'), 'savefile_directory = "default"\n'); put(path.join(home, RA, 'cores/snes9x_libretro.so'), Buffer.alloc(64)); put(path.join(home, PSP, 'PSP/SYSTEM/ppsspp.ini'), '[General]\nFirstRun = False\n'); };
 
 async function device(srv, label, withSaves) {
   const t = await launch('flatpaks', srv);
@@ -50,6 +50,13 @@ const doneSync = async (call) => { for (let i = 0; i < 60; i++) { const s = awai
     await call('savesync:set', { on: true });
     const st = await doneSync(call);
     check('device one: Save Sync sent both to RomM', srv.saves.filter((x) => [620, 621].includes(x.rom_id)).length === 2, `${srv.saves.length} in RomM · ${JSON.stringify(st.last?.counts || st.last?.sent || '').slice(0, 120)}`);
+    // 0.9.80: RetroArch netplay for a game RetroArch runs here (the Flatpak, with its snes9x core): offered, and a bad address refused
+    const net = await call('online:raInfo', { romId: 620 });
+    check('device one: RetroArch hosting offered for the SNES game', net?.can === true, JSON.stringify(net));
+    const bad = await call('online:raPlay', { romId: 620, mode: 'join', host: 'not an address' });
+    check('device one: a bad address is refused with a sentence', /isn’t an address/.test(bad?.error || ''), bad?.error || JSON.stringify(bad));
+    const psp = await call('online:raInfo', { romId: 621 });
+    check('device one: not offered for a game another emulator runs', psp?.can === false, JSON.stringify(psp));
     check('device one: no script errors', !t.errors.length, t.errors.slice(0, 3).join(' | '));
   } catch (e) { check('device one finished', false, e.message); }
   await t.close();

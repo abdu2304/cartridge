@@ -101,8 +101,41 @@ function xmlRange(text, at) {
 }
 const xmlUnesc = (s) => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
 const xmlEsc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-function xmlGet(text, at) { const r = xmlRange(String(text || ''), at); return r ? xmlUnesc(text.slice(r[0], r[1]).trim()) : undefined; }
+// 0.9.80: the last step can be { tag, where: [name, value], attr }: an attribute of the child element picked by another
+// attribute (Cemu's <AccountService><SelectedService PersistentId=".." Service=".."/>, CemuConfig.cpp)
+const attrsOf = (s) => Object.fromEntries([...String(s || '').matchAll(/([\w:-]+)\s*=\s*"([^"]*)"/g)].map((m) => [m[1], xmlUnesc(m[2])]));
+function xmlPick(text, range, step) {
+  const re = new RegExp(`<${step.tag}(\\s[^>]*?)?\\s*(/?)>`, 'g'), body = text.slice(range[0], range[1]);
+  for (let m; (m = re.exec(body));) { const a = attrsOf(m[1]); if (String(a[step.where[0]]) === String(step.where[1])) return { at: range[0] + m.index, len: m[0].length, attrs: a, self: !!m[2] }; }
+  return null;
+}
+// a parent written empty as <Tag/> (tinyxml2 does) opened up so a child can go in
+function xmlOpen(text, at) {
+  if (xmlRange(text, at)) return text;
+  const up = at.length > 1 ? xmlRange(text, at.slice(0, -1)) : [0, text.length];
+  if (!up) return text;
+  const tag = at[at.length - 1], body = text.slice(up[0], up[1]), m = new RegExp(`<${tag}\\s*/>`).exec(body);
+  if (m) return text.slice(0, up[0] + m.index) + `<${tag}>\n\t</${tag}>` + text.slice(up[0] + m.index + m[0].length);
+  const trail = /\s*$/.exec(body)[0], cut = up[1] - trail.length;
+  return text.slice(0, cut) + `\n\t<${tag}>\n\t</${tag}>` + text.slice(cut);
+}
+function xmlGet(text, at) {
+  const t = String(text || ''), last = at[at.length - 1];
+  if (last && typeof last === 'object') { const r = xmlRange(t, at.slice(0, -1)); const el = r && xmlPick(t, r, last); return el ? el.attrs[last.attr] : undefined; }
+  const r = xmlRange(t, at); return r ? xmlUnesc(t.slice(r[0], r[1]).trim()) : undefined;
+}
 function xmlSet(text, at, value) {
+  const last = at[at.length - 1];
+  if (last && typeof last === 'object') {
+    const t = xmlOpen(String(text || ''), at.slice(0, -1)), r = xmlRange(t, at.slice(0, -1));
+    if (!r) throw new Error(`The settings file has no <${at[at.length - 2]}> section, so Cartridge leaves it as it is.`);
+    const el = xmlPick(t, r, last), attrs = { ...(el?.attrs || { [last.where[0]]: last.where[1] }), [last.attr]: value };
+    const tag = `<${last.tag} ${Object.entries(attrs).map(([k, v]) => `${k}="${xmlEsc(v).replace(/"/g, '&quot;')}"`).join(' ')}${el && !el.self ? '' : '/'}>`;
+    if (el) return t.slice(0, el.at) + tag + t.slice(el.at + el.len);
+    const ind = (/\n([ \t]*)<[^/]/.exec(t.slice(r[0], r[1])) || [])[1] || '\t\t';
+    const trail = /\s*$/.exec(t.slice(r[0], r[1]))[0], cut = r[1] - trail.length;
+    return t.slice(0, cut) + `\n${ind}${tag}` + t.slice(cut);
+  }
   const t = String(text || ''), r = xmlRange(t, at);
   if (r) return t.slice(0, r[0]) + xmlEsc(value) + t.slice(r[1]);
   // the last tag missing inside its parent: added before the parent closes

@@ -195,3 +195,25 @@ test('after an update: a renamed setting is reported, never written back; a chan
   assert.strictEqual(F2.yaml.valid('Video:\n  Write Depth Buffer: falseResolution Scale: = 150\n  a: b\n'), false);
   assert.strictEqual(F2.json.valid('{"a":1}'), true); assert.strictEqual(F2.json.valid('{a'), false);
 });
+
+test('Cemu Pretendo (0.9.80): refused without the Wii U files, then set per account as CemuConfig.cpp writes it', async () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-op-')), data = path.join(home, 'data'); fs.mkdirSync(data);
+  const xml = path.join(home, '.config/Cemu/settings.xml');
+  fs.mkdirSync(path.dirname(xml), { recursive: true });
+  fs.writeFileSync(xml, '<?xml version="1.0" encoding="UTF-8"?>\n<content>\n\t<Account>\n\t\t<PersistentId>2147483650</PersistentId>\n\t</Account>\n\t<AccountService>\n\t\t<SelectedService PersistentId="2147483649" Service="1"/>\n\t</AccountService>\n</content>\n');
+  const eng = createOnline({ home, dataDir: data, installed: () => ['cemu'] });
+  const k = () => eng.list().emus.find((e) => e.emu === 'cemu').kinds[0];
+  assert.strictEqual(k().info, false); assert.strictEqual(k().ready, false); assert.strictEqual(k().on, false);
+  const before = fs.readFileSync(xml, 'utf8');
+  await assert.rejects(() => eng.set('cemu', 'pretendo', true), /otp\.bin/);
+  assert.strictEqual(fs.readFileSync(xml, 'utf8'), before);
+  fs.mkdirSync(path.join(home, '.local/share/Cemu'), { recursive: true });
+  fs.writeFileSync(path.join(home, '.local/share/Cemu/otp.bin'), Buffer.alloc(1024)); fs.writeFileSync(path.join(home, '.local/share/Cemu/seeprom.bin'), Buffer.alloc(512));
+  await eng.set('cemu', 'pretendo', true);
+  const t = fs.readFileSync(xml, 'utf8');
+  assert.match(t, /<SelectedService PersistentId="2147483649" Service="1"\/>/, 'another account is left as it was');
+  assert.match(t, /<SelectedService PersistentId="2147483650" Service="2"\/>/);
+  assert.strictEqual(k().on, true);
+  await eng.set('cemu', 'pretendo', false);
+  assert.match(fs.readFileSync(xml, 'utf8'), /PersistentId="2147483650" Service="0"/);
+});

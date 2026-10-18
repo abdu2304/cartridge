@@ -134,13 +134,21 @@ export async function steamReport() {
 // Frame generation for one game (0.9.28, owner: couldn't find it): from the game's More → Steam, or its Game
 // Settings. Says why when it can't apply instead of leaving the option out.
 const FGL = { lsfg: 'Lossless Scaling (lsfg-vk)', mako: 'mako-run', off: 'Off' };
+// 0.9.80 (owner: build the warning): a Vita game froze on the owner's Deck with frame generation on (Unit 13: picture
+// and controls stopped, sound went on, Steam's button dead, when the game's settings opened). Not proven to be frame
+// generation, so it's said plainly before it's turned on for Vita games, never refused.
+export const isVita = (key) => /^(psvita|vita)$/i.test(String(key || ''));
+export async function vitaFgOk(value, vita) {
+  if (!vita || !['lsfg', 'mako'].includes(value)) return true;
+  return confirm('Frame Generation With Vita Games', 'A Vita game froze on a Steam Deck with frame generation on: the picture and the controls stopped while the sound carried on, and the Steam button did nothing. It may not have been frame generation, but if a Vita game freezes like that, turn frame generation off for it here.', 'Turn It On');
+}
 export async function frameGenFor(romId) {
   const r = await call('steam:frameGen').catch(() => null);
   if (!r) return { why: 'Steam wasn’t found.' };
   if (!r.found?.lsfg && !r.found?.mako) return { why: 'Frame generation needs lsfg-vk or mako-run on this device (Settings → Steam → Frame Generation).' };
   const g = r.games.find((x) => x.romId === Number(romId));
   if (!g) return { why: 'Add this game to Steam with Cartridge first: frame generation goes in its Steam shortcut.' };
-  return { found: r.found, own: g.own, uses: g.uses, consoleOwn: !!(r.conf.consoles || {})[g.console] };
+  return { found: r.found, own: g.own, uses: g.uses, console: g.console, consoleOwn: !!(r.conf.consoles || {})[g.console] };
 }
 export async function pickFrameGen(romId, f = null) {
   f ||= await frameGenFor(romId);
@@ -152,6 +160,7 @@ export async function pickFrameGen(romId, f = null) {
     { label: 'Off', value: 'off', icon: 'mdiClose', selected: f.own === 'off' },
   ] });
   if (!v) return false;
+  if (!(await vitaFgOk(v, isVita(f.console)))) return false;
   try { await call('steam:setFrameGen', { scope: 'game', id: Number(romId), value: v === '__base' ? null : v }); toast('Saved. Its Steam shortcut is being updated.', 'ok', 2800, 'mdiAnimationPlay'); return true; }
   catch (e) { toast(e.message, 'error', 5000); return false; }
 }

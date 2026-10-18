@@ -3552,6 +3552,9 @@ function createWindow() {
     // recomps (0.9.65): recomp/<console> in every Emulation folder once, and the catalogue, PCGamingWiki and installed
     // recomps' releases checked once a day, silently (owner: "without consuming many resources")
     scheduler.add('recomp-folders', { once: true, firstAfter: 25000, deferWhilePlaying: true, run: async () => { try { recomps().ensureFolders(); } catch (e) { log('recomp folders', e.message); } recompTrophies(); } });
+    // 0.9.80 (agreed plan 7.1 #10): a recomp not set up yet, started from Steam instead of Cartridge's Open, gets the same
+    // setup watch: looked for every 30 s, only while one with a done file is waiting
+    scheduler.add('recomp-setup-steam', { every: 30000, firstAfter: 60000, run: () => RIPC.watchFromSteam() });
     scheduler.add('recomps-refresh', { every: 24 * 3600e3, firstAfter: 5 * 60000, deferWhilePlaying: true, run: async () => { if (config.recomps?.daily === false) return; /* 0.9.69: Settings → Recomps, Check Every Day */ const r = await recomps().refresh({ playing: () => !!(gameFocus.away || runOn) }); log('recomps refreshed', JSON.stringify(r)); } });
     // 0.9.71: the fork list from Cartridge's repository (a newer rev than the one shipped or kept wins)
     scheduler.add('forks-refresh', { every: 24 * 3600e3, firstAfter: 6 * 60000, deferWhilePlaying: true, run: async () => {
@@ -4351,7 +4354,7 @@ const handlers09 = {
 const MAIN = {
   log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob,
   get broadcast() { return broadcast; }, get webFetch() { return webFetch; }, get romName() { return romName; }, get isDir() { return isDir; }, get romIndexMain() { return romIndexMain; },
-  get steamMgr() { return steamMgr; }, get config() { return config; }, get installedMap() { return installedMap; }, get library() { return library; }, get runOn() { return runOn; }, get gameFocus() { return gameFocus; }, get trophySvc() { return trophySvc; },
+  get steamMgr() { return steamMgr; }, get config() { return config; }, get installedMap() { return installedMap; }, get library() { return library; }, get runOn() { return runOn; }, get gameFocus() { return gameFocus; }, get trophySvc() { return trophySvc; }, get win() { return win; },
   USER_DATA,
 };
 const RIPC = require('./recompsIpc')(MAIN);
@@ -6176,6 +6179,29 @@ Object.assign(handlers, {
     const S = String(slugs || ''), want = [[/\bpsp\b/, 'ppsspp'], [/\bps2\b/, 'pcsx2'], [/\bps3\b/, 'rpcs3'], [/\bps4\b/, 'shadps4'], [/\b(ngc|gc|gamecube|wii)\b/, 'dolphin'], [/\b(3ds|n3ds)\b/, 'azahar'], [/\bswitch\b/, 'eden'], [/\bswitch\b/, 'ryujinx'], [/\bwiiu\b/, 'cemu']].filter(([re]) => re.test(S)).map(([, e]) => e);
     return online().list().emus.filter((e) => want.includes(e.emu)).map((e) => ({ emu: e.emu, label: e.label, kinds: e.kinds.map((k) => ({ name: k.name, on: k.on })) }));
   },
+  // RetroArch netplay for one game (0.9.80): started in RetroArch with --host or --connect, the same command its Steam
+  // shortcut runs (raNetplay.js); Windows builds and games RetroArch doesn't run are refused with the reason
+  'online:raInfo': ({ romId }) => { const c = (() => { try { return steamMgr.directCommand(romId); } catch { return null; } })(); return { can: !!c && require('./raNetplay').isRetroArch(c) && !/\.exe$/i.test(c.exe), port: require('./raNetplay').DEFAULT_PORT }; },
+  'online:raPlay': ({ romId, mode, host, port }) => new Promise((resolve, reject) => {
+    const N = require('./raNetplay'), c = steamMgr.directCommand(romId);
+    if (!c || !N.isRetroArch(c)) return reject(new Error('This game doesn’t start in RetroArch on this device.'));
+    if (/\.exe$/i.test(c.exe)) return reject(new Error('A Windows RetroArch starts through Proton: host or join from RetroArch’s own menu.'));
+    if (gameFocus.away || runOn) return reject(new Error('A game is already running. Close it first.'));
+    let join = {};
+    if (mode !== 'host') { join = N.checkJoin(host, port); if (join.why) return reject(new Error(join.why)); }
+    const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+    const runLog = path.join(USER_DATA, 'emulator-runs', 'retroarch-netplay.log');
+    let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
+    const line = N.commandLine(c, mode === 'host' ? 'host' : 'join', join);
+    const p = require('child_process').spawn('/bin/sh', ['-c', line], { cwd: c.start && fs.existsSync(c.start) ? c.start : os.homedir(), env, detached: true, stdio: ['ignore', fd, fd] });
+    if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
+    p.once('error', (e) => reject(new Error(`RetroArch didn’t start: ${e.message}`)));
+    p.once('spawn', () => {
+      log('retroarch netplay', mode === 'host' ? 'host' : `join ${join.host}:${join.port}`, c.name);
+      if (isGamescope()) { broadcast('background', { away: true }); p.once('exit', () => { broadcast('background', { away: false }); refocus(); }); }
+      p.unref(); resolve({ started: true, port: join.port || N.DEFAULT_PORT });
+    });
+  }),
   'online:set': ({ emu, kind, on }) => online().set(emu, kind, !!on),
   'online:field': ({ emu, kind, key, value }) => online().field(emu, kind, key, String(value ?? '')),
   'online:action': ({ emu, kind, action, input }) => online().action(emu, kind, action, input || {}),

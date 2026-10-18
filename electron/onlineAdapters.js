@@ -286,21 +286,28 @@ const dolphin = {
 
 // ---- Cemu (cemu-project/Cemu 2c212b5: src/config/NetworkSettings.h, ActiveSettings.cpp:162-170,
 // Cafe/IOSU/legacy/iosu_crypto.cpp:622-653). Online needs files dumped from your own Wii U; Cemu greys out the
-// service choice until they're valid and then keeps it per account itself, so Cartridge only reports what's there.
+// service choice until they're valid. 0.9.80: the choice itself is per account in settings.xml (CemuConfig.cpp
+// Load/Save: <AccountService><SelectedService PersistentId=".." Service=".."/>, NetworkService Offline 0, Nintendo 1,
+// Pretendo 2, Custom 3; the account is <Account><PersistentId>, 0x80000001 by default), so Cartridge sets it once
+// the files are there.
 const cemuData = (dir, home) => (dir && /\.var\/app\/[^/]+\/config\//.test(dir) ? dir.replace(/\/config\/([^/]+)$/, '/data/$1') : dir && /\/portable$/.test(dir) ? dir : path.join(home, '.local/share/Cemu'));
+const CEMU_FIRST_ACCOUNT = 0x80000001; // Account::kMinPersistendId
+const cemuService = (g) => { const id = Number(g(['main', ['content', 'Account', 'PersistentId']])); return ['main', ['content', 'AccountService', { tag: 'SelectedService', where: ['PersistentId', String(id >= CEMU_FIRST_ACCOUNT ? id : CEMU_FIRST_ACCOUNT)], attr: 'Service' }]]; };
 const sizeOf = (f) => { try { return fs.statSync(f).size; } catch { return -1; } };
 const cemu = {
   emu: 'cemu', label: 'Cemu', proc: /^cemu/i,
   dirs: ['.config/Cemu', '.var/app/info.cemu.Cemu/config/Cemu'],
   files: { main: ['settings.xml', 'xml'] },
   kinds: [{
-    id: 'pretendo', name: 'Pretendo Network', info: true,
-    what: 'Online play for Wii U games through Pretendo, the fan-run Nintendo Network. It needs files dumped from your own Wii U and a Pretendo account linked on it. Then pick Pretendo in Cemu: Options, General Settings, Account.',
+    id: 'pretendo', name: 'Pretendo Network',
+    what: 'Online play for Wii U games through Pretendo, the fan-run Nintendo Network. It needs files dumped from your own Wii U and a Pretendo account linked on it. Turning it on picks Pretendo for Cemu’s current account; off goes back to offline.',
+    on: (g) => [[cemuService(g), '2']], off: (g) => [[cemuService(g), '0']],
+    isOn: (g) => g(cemuService(g)) === '2',
     status: ({ dir, home }) => {
       const d = cemuData(dir, home), miss = [];
       if (sizeOf(path.join(d, 'otp.bin')) !== 1024) miss.push('otp.bin');
       if (sizeOf(path.join(d, 'seeprom.bin')) !== 512) miss.push('seeprom.bin');
-      return miss.length ? { ready: false, note: `Missing from Cemu: ${miss.join(', ')}, dumped from your Wii U (with its certificates and account).` } : { ready: true, note: 'Your Wii U’s keys are in Cemu. Choose Pretendo for your account in Cemu’s settings.' };
+      return miss.length ? { ready: false, note: `Missing from Cemu: ${miss.join(', ')}, dumped from your Wii U (with its certificates and account).` } : { ready: true, note: 'Your Wii U’s keys are in Cemu.' };
     },
     actions: [{ id: 'guide', label: 'Cemu’s Online Guide', sub: 'cemu.info', icon: 'mdiOpenInNew', url: 'https://cemu.info/online-guide' }],
   }],
