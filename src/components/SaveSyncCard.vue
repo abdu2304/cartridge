@@ -12,6 +12,12 @@
       <button v-else class="btn" data-focus @click="emit('advanced')"><Icon name="mdiTune" />Advanced</button>
     </div>
 
+    <!-- 0.9.79: a RomM without save slots can't hold Cartridge's saves -->
+    <template v-if="st?.oldRomm">
+      <div class="subh">Your RomM Needs an Update</div>
+      <p class="muted small">This RomM has no save slots, so Cartridge Save Sync can’t keep your saves there. Update RomM on your server, then turn Save Sync on.</p>
+    </template>
+
     <!-- 0.9.52: away from the server, saves stay here and go up the moment RomM answers again -->
     <template v-if="st?.on && st?.held">
       <div class="subh">Waiting for Your Server</div>

@@ -7,6 +7,9 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 18 Oct 2026 · 0.9.79 · Your Answers
+Owner answered the six open questions (yes, yes, P.T.'s files beside eboot.bin, yes, the shadPS4 note is no longer true, yes). Built all of them: RomM features from its /openapi.json, recipe `tested` and `find`, Settings → Steam → PC Ports, PS4 updates as `<game>-UPDATE`; the shadPS4 note closed in CLAUDE.md and the handover. Details in handover Part 26. The owner also asked whether Claude Code on their Linux desktop could run the tests there and look at the screen: answered in chat (yes for running and launching things and reading screenshots; it runs on their computer, started by them).
+
 ## 18 Oct 2026 · 0.9.78 · Saves on a New Device
 
 **Loop rounds 5 and 6:** Online Play (clean) and saves across two devices (RetroArch fix). Handover Part 25 lists the next round.

@@ -636,7 +636,8 @@ module.exports = function createSteamManager(ctx) {
       for (const n of ls(d)) {
         const p = path.join(d, n);
         if (/^eboot\.bin$/i.test(n)) return p;
-        if (depth < 3 && isDir(p)) { const r = walk(p, depth + 1); if (r) return r; }
+        // a game's update, patch or mods folder beside it (shadPS4's -UPDATE/-patch/-mods) is never the game
+        if (depth < 3 && isDir(p) && !/-(UPDATE|patch|mods)$/.test(n)) { const r = walk(p, depth + 1); if (r) return r; }
       }
       return null;
     };

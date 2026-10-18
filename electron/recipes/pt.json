@@ -21,7 +21,14 @@
   ],
   "kind": "folder-or-pkg",
   "has": [],
-  "why": "The US release CUSA01127 is the tested one; the European and Japanese ones install with a note."
+  "why": "The US release CUSA01127 is the tested one; the European and Japanese ones install with a note. The port finds chunk1.psarc and texture.qar beside eboot.bin, or in a folder inside the one you pick.",
+  "find": {
+   "files": [
+    "chunk1.psarc",
+    "texture.qar"
+   ],
+   "depth": 2
+  }
  },
  "builds": [
   {
@@ -468,5 +475,6 @@
    ],
    "desc": "Cartridge already updates it."
   }
- ]
+ ],
+ "rev": 3
 }
