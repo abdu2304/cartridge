@@ -105,7 +105,8 @@ function varsFor(r, build, rec, { home = os.homedir(), env = process.env, game }
     prefix,
   };
 }
-const prefixOf = (rec) => path.join(rec.dir, '.cartridge', 'proton');
+// beside the install, unless its drive can't hold one (0.9.83: rec.prefix, on the internal drive, recomps.js prefixFor)
+const prefixOf = (rec) => rec.prefix || path.join(rec.dir, '.cartridge', 'proton');
 const expand = (t, v) => String(t).replace(TPL, (_, k) => v[k] ?? '');
 
 // ---- values: yours where you changed one, else the port's own default; settings for another system are left out

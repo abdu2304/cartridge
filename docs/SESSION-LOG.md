@@ -7,6 +7,9 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 18 Oct 2026 · 0.9.83 · Windows Ports on Any Drive
+Owner's photo: Uncharted's Proton prefix failed on the external drive. Prefix now on the internal drive when links can't be made there (handover Part 30).
+
 ## 18 Oct 2026 · 0.9.82 · Out of the Way
 Owner: P.T. setup slow but worked; SteamOS laggy while a game from Cartridge runs. Quiet mode now follows our own game and Steam launches, not only gamescope focus; game watch async; setup shows speed and time left with a timing log line (handover Part 29).
 

@@ -772,19 +772,20 @@ function createRecomps(ctx) {
     // 0.9.80 (agreed plan 7.1 #13): a Windows build with no prefix of its own gets one, made once with wineboot, so its
     // updates are tried too (Steam keeps its own prefix for playing; this one is only for the trial start)
     let winTrial = prev && prev.tag && kind === 'windows' && ctx.trialRun && ctx.runner ? await ctx.runner().catch(() => null) : null;
-    if (winTrial && !exists(path.join(RC.prefixOf({ dir: dest }), 'pfx'))) {
+    const pfx = winTrial ? RC.prefixOf(prefixFor(id, installs[id])) : null;
+    if (winTrial && !exists(path.join(pfx, 'pfx'))) {
       if (!ctx.runProgram || ctx.playing?.()) winTrial = null;
       else {
         onProgress({ step: 'prefix', pct: null });
-        try { const c = RC.prefixCommand(winTrial, { prefix: RC.prefixOf({ dir: dest }) }); fs.mkdirSync(RC.prefixOf({ dir: dest }), { recursive: true }); await ctx.runProgram(c.cmd, c.args, { cwd: dest, env: c.env, timeoutMs: 5 * 60e3 }); }
+        try { const c = RC.prefixCommand(winTrial, { prefix: pfx }); fs.mkdirSync(pfx, { recursive: true }); await ctx.runProgram(c.cmd, c.args, { cwd: dest, env: c.env, timeoutMs: 15 * 60e3 }); }
         catch (er) { log('recomp prefix for the trial start', id, er.message); winTrial = null; }
-        if (winTrial && !exists(path.join(RC.prefixOf({ dir: dest }), 'pfx'))) winTrial = null;
+        if (winTrial && !exists(path.join(pfx, 'pfx'))) winTrial = null;
       }
     }
     if (prev && prev.tag && ((kind === 'linux' && ctx.trialRun) || winTrial)) {
       onProgress({ step: 'trial', pct: null });
       const argList = (launchArgs(id) || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
-      const run = winTrial ? RC.runCommand(winTrial, program, argList, RC.prefixOf({ dir: dest })) : null;
+      const run = winTrial ? RC.runCommand(winTrial, program, argList, pfx) : null;
       const t = await ctx.trialRun(run ? { program: run.cmd, argv: run.args, env: run.env, cwd: path.dirname(program), ready: readyOf(e, prev) } : { program, args: launchArgs(id), cwd: path.dirname(program), ready: readyOf(e, prev) }).catch((er) => ({ failed: true, why: er.message }));
       if (t?.failed) {
         log('recomp update did not start, back to', prev.tag, id, t.why);
@@ -1088,6 +1089,23 @@ function createRecomps(ctx) {
   }
   // everything written from the recipe and your settings: the port's installer when it has one, Cartridge's Proton
   // prefix for a Windows build, the port's settings files and the start scripts
+  // 0.9.83 (owner's photo: "Proton couldn't make … Windows folder" for Uncharted on a drive called Expansion): a Proton
+  // prefix is full of symbolic links (dosdevices, the Windows system folders), which a drive formatted for Windows
+  // (exFAT, NTFS: most external drives) can't hold; Steam refuses Proton games there for the same reason. Tried once
+  // beside the install; where a link can't be made, the prefix goes on the internal drive instead.
+  function prefixFor(id, rec) {
+    if (!rec || rec.prefix) return rec;
+    const at = path.join(rec.dir, '.cartridge'), probe = path.join(at, `.link-check-${process.pid}`);
+    let links = false;
+    try { fs.mkdirSync(at, { recursive: true }); fs.rmSync(probe, { force: true }); fs.symlinkSync('proton', probe); links = fs.lstatSync(probe).isSymbolicLink(); } catch {}
+    try { fs.rmSync(probe, { force: true }); } catch {}
+    if (!links && !exists(path.join(at, 'proton', 'pfx', 'drive_c'))) {
+      rec.prefix = path.join(ctx.prefixRoot || path.join(os.homedir(), '.local/share/cartridge/proton'), id);
+      log('recomp prefix on the internal drive', id, rec.dir, '->', rec.prefix);
+      saveInstalls();
+    }
+    return rec;
+  }
   async function configure(id, { onProgress = () => {} } = {}) {
     const e = byId(id), r = recipeOf(e), rec = installs[id];
     if (!r || !rec) throw new Error('Install it first.');
@@ -1097,6 +1115,7 @@ function createRecomps(ctx) {
     if (ctx.isRunning(rec.program)) throw new Error(`Close ${r.name} first.`);
     const runner = build.os === 'windows' ? (ctx.runner ? await ctx.runner() : null) : null;
     if (build.os === 'windows' && !runner) throw new Error(`${r.name}’s port is a Windows build, and there’s no Proton here to run it.`);
+    if (build.os === 'windows') prefixFor(id, rec);
     const vars = RC.varsFor(r, build, rec);
     // the installer, with your copy (again after an update of the installer, or for another copy)
     if (build.installer && (rec.installedTag !== rec.tag || rec.installedFrom !== rec.game.path || !exists(rec.program))) {
@@ -1149,8 +1168,10 @@ function createRecomps(ctx) {
       onProgress({ step: 'prefix', pct: null });
       fs.mkdirSync(vars.prefix, { recursive: true });
       const c = RC.prefixCommand(runner, vars);
-      await ctx.runProgram(c.cmd, c.args, { env: c.env, cwd: rec.dir, timeoutMs: 5 * 60e3 }).catch((er) => log('verified prefix', id, er.message));
-      if (!exists(path.join(vars.prefix, 'pfx', 'drive_c'))) throw new Error(`Proton couldn’t make ${r.name}’s Windows folder (its prefix). Start a Windows game in Steam once, then try again.`);
+      // umu-launcher fetches Steam's runtime on its first run: that can take minutes
+      let why = '';
+      await ctx.runProgram(c.cmd, c.args, { env: c.env, cwd: rec.dir, timeoutMs: 15 * 60e3 }).catch((er) => { why = er.message; log('verified prefix', id, vars.prefix, er.message); });
+      if (!exists(path.join(vars.prefix, 'pfx', 'drive_c'))) throw new Error(`Proton couldn’t make ${r.name}’s Windows folder (its prefix) in ${vars.prefix.replace(os.homedir(), '~')}${why ? `: ${why.slice(0, 200)}` : '.'} Press Set Up to try again; if it fails again, send Cartridge’s log (Settings → Help and About → Report a Problem).`);
     }
     onProgress({ step: 'write' });
     // the first time: what you chose in the port's own launcher before is kept

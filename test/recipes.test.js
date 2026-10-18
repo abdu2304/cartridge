@@ -340,3 +340,32 @@ test('0.9.81: P.T.’s installer shows what it has copied, and one that writes n
   assert.ok(inst.length >= 2 && inst.every((m) => m.want === 5000 && m.pct <= 99), JSON.stringify(inst));
   assert.deepStrictEqual([seen[0].step, seen.at(-1).step], ['check', 'write']);
 });
+
+test('0.9.83: a Windows port on a drive that can’t hold links (exFAT, NTFS) gets its Proton prefix on the internal drive', async () => {
+  const d = tmp(), data = path.join(d, 'data'), emu = path.join(d, 'Expansion', 'Emulation'), home = path.join(d, 'home');
+  fs.mkdirSync(data); fs.mkdirSync(home);
+  const rdir = path.join(d, 'recipes'); fs.mkdirSync(rdir);
+  const rcp = { schema: 1, id: 'wport', name: 'Win Port', repo: 'github:o/wport', game: { console: 'ps4', title: 'Win', ids: ['CUSA00002'], kind: 'folder', has: ['eboot.bin'] }, verified: { on: '2026-10-18', release: 'v1' },
+    builds: [{ os: 'windows', asset: '^wport\\.tar\\.gz$', program: 'Port.exe', args: [], files: {} }], settings: [] };
+  fs.writeFileSync(path.join(rdir, 'wport.json'), JSON.stringify(rcp));
+  const pkg = path.join(d, 'pkg', 'wport'); fs.mkdirSync(pkg, { recursive: true }); fs.writeFileSync(path.join(pkg, 'Port.exe'), 'MZ');
+  execFileSync('tar', ['-czf', path.join(d, 'wport.tar.gz'), '-C', path.join(d, 'pkg'), 'wport']);
+  const rel = [{ tag_name: 'v1', published_at: '2026-10-18', prerelease: false, draft: false, assets: [{ name: 'wport.tar.gz', browser_download_url: 'file://' + path.join(d, 'wport.tar.gz'), size: 1 }] }];
+  const made = [];
+  const eng = R.createRecomps({ dataDir: data, recipesDir: rdir, log: () => {}, prefixRoot: path.join(home, '.local/share/cartridge/proton'),
+    fetchImpl: async (url) => ({ ok: true, status: 200, json: async () => (url.includes('/latest') ? rel[0] : rel) }),
+    download: async (url, dest) => fs.copyFileSync(url.replace('file://', ''), dest), unpackTo: async (a, out) => execFileSync('tar', ['-xf', a, '-C', out]),
+    isElf: () => false, isRunning: () => false, recompRoot: () => path.join(emu, 'recomp'), recompRoots: () => [path.join(emu, 'recomp')],
+    runner: async () => ({ kind: 'umu', umu: '/usr/bin/umu-run', proton: '/p/Proton 11.0', name: 'Proton 11.0' }),
+    runProgram: async (cmd, args, o) => { made.push(o.env.WINEPREFIX); fs.mkdirSync(path.join(o.env.WINEPREFIX, 'drive_c'), { recursive: true }); return ''; } });
+  await eng.install('wport');
+  const copy = path.join(d, 'games', 'Win'); fs.mkdirSync(path.join(copy, 'sce_sys'), { recursive: true }); fs.writeFileSync(path.join(copy, 'eboot.bin'), 'e');
+  const real = fs.symlinkSync;
+  fs.symlinkSync = () => { const e = new Error('EPERM: operation not permitted, symlink'); e.code = 'EPERM'; throw e; }; // what exFAT answers
+  try { const r = await eng.setVerifiedGame('wport', copy); assert.ok(r.ok, JSON.stringify(r)); }
+  finally { fs.symlinkSync = real; }
+  const rec = eng.record('wport');
+  assert.strictEqual(rec.prefix, path.join(home, '.local/share/cartridge/proton', 'wport'));
+  assert.deepStrictEqual(made, [path.join(rec.prefix, 'pfx')], 'Proton made it there, not beside the install');
+  assert.match(fs.readFileSync(rec.starts[0].script, 'utf8'), new RegExp(rec.prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'the start script uses it');
+});
