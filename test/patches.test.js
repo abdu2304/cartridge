@@ -165,6 +165,13 @@ test('shadPS4: this version and "any version" patches, from files.json', () => {
   assert.deepStrictEqual(P.shadList(dir, 'CUSA99999', '01.00'), []);
 });
 
+test('shadPS4: the Flatpak’s own folder is found (0.9.84)', () => {
+  const H = path.join(TMP, 'shad-flatpak'), d = path.join(H, '.var/app/net.shadps4.shadPS4/data/shadPS4');
+  fs.mkdirSync(path.join(d, 'patches'), { recursive: true });
+  const old = process.env.XDG_DATA_HOME; delete process.env.XDG_DATA_HOME;
+  try { assert.deepStrictEqual(P.shadDirs(H), [d]); } finally { if (old !== undefined) process.env.XDG_DATA_HOME = old; }
+});
+
 test('shadPS4: only isEnabled changes, and only on the patch picked', () => {
   const { dir, xml } = shadSetup('shad-set');
   const [fps, skip] = P.shadList(dir, 'CUSA00001', '01.00');

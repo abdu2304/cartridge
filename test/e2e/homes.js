@@ -51,6 +51,7 @@ async function launch(name, srv, opts = {}) {
     ...config, ui: { toured: true, startTips: true, setupNotice: 1, welcomeNotice: 1, gameModeAsked: 1, sounds: false, idle: '0', ...(config.ui || {}) },
   }));
   SETUPS[name](home);
+  if (opts.prep) opts.prep(home); // 0.9.84: files that must be there before the app starts (forks, saves)
   // a Steam install with one account (closed), so shortcuts can be written: the same as a Deck's in Desktop Mode
   if (opts.steam) {
     const steam = path.join(home, '.local/share/Steam');

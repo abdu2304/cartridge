@@ -1,8 +1,7 @@
-## Cartridge 0.9.83 · Windows Ports on Any Drive
+## Cartridge 0.9.84 · shadPS4 as a Flatpak
 
 ### Fixed
-- **Windows ports on an external drive couldn't be set up ("Proton couldn't make … Windows folder").** Each Windows port gets its own Proton folder, called a prefix, which is full of symbolic links. Drives formatted for Windows (exFAT or NTFS, as most external drives are) can't hold those, the same reason Steam won't run Proton games from them. Cartridge now checks the drive first. When it can't hold links, the prefix goes on your internal drive instead, and the port's settings and its Steam start follow it. The port itself stays where it is.
-- **The message no longer tells you to start a Windows game in Steam**, which didn't help. If Proton still can't make the folder, the message says where it tried and why.
+- **Game Settings and patches for PS4 games now work with the shadPS4 Flatpak.** Cartridge only looked for shadPS4's folder where the AppImage keeps it. With only the Flatpak installed, a PS4 game's Game Settings and Patches said "shadPS4 hasn't been started on this device yet", even after you'd started it. Cartridge now also finds the Flatpak's own folder.
 
 ### Changed
-- **The first Proton setup gets more time.** umu-launcher downloads Steam's runtime the first time it runs, which can take minutes. Cartridge now waits up to 15 minutes, and the sheet says the first time can be slow.
+- **Three more checks run before every release.** They cover game settings for 14 emulators (each changed, read back and put back), add-ons installed into each emulator's own folders (and refused when they don't fit, and removed cleanly), and Linked Folders with a fork (PrimeHack and a shadPS4 fork), with the real app against a test server.
