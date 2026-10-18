@@ -391,3 +391,15 @@ test('a save refused for its size (413) goes through the server’s other addres
   const none = SS.rommRpc({ base: async () => 'http://home', headers: () => ({}), fetchImpl: async () => new Response('', { status: 413 }), altBases: async () => ['http://home', 'http://away2'] });
   await assert.rejects(none.upload({ romId: 1, emu: 'ppsspp', slot: 's' }, Buffer.alloc(3 * 1048576), 'x.zip', {}), (e) => e.code === 'toolarge' && /3\.0 MB/.test(e.message));
 });
+
+// 0.9.78 sweep: a device where RetroArch has never saved has no saves/ or states/ yet; with its retroarch.cfg there the
+// folders it will use are known, so a synced save is placed instead of left "unplaced"
+test('RetroArch saves are placed before its first save', () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ss-ra-'));
+  const cfgDir = path.join(home, '.var/app/org.libretro.RetroArch/config/retroarch');
+  assert.strictEqual(SS.placeFor('retroarch', 'ra:Game.srm', { home }), null); // RetroArch not set up: nothing to place into
+  fs.mkdirSync(cfgDir, { recursive: true }); fs.writeFileSync(path.join(cfgDir, 'retroarch.cfg'), 'savefile_directory = "default"\n');
+  assert.strictEqual(SS.placeFor('retroarch', 'ra:Game.srm', { home }), path.join(cfgDir, 'saves', 'Game.srm'));
+  assert.strictEqual(SS.placeFor('retroarch', 'rastate:Snes9x/Game.state1', { home }), path.join(cfgDir, 'states', 'Snes9x'));
+  fs.rmSync(home, { recursive: true, force: true });
+});

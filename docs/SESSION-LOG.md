@@ -7,6 +7,10 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 18 Oct 2026 · 0.9.78 · Saves on a New Device
+
+**Loop rounds 5 and 6:** Online Play (clean) and saves across two devices (RetroArch fix). Handover Part 25 lists the next round.
+
 ## 18 Oct 2026 · 0.9.77 · Every Button Pressed
 
 **Loop rounds 2 and 3:** crawl of every page, sheet and game More in four setups (`test/e2e/crawl.js`); three fixes (handover Part 24). Next rounds listed there.

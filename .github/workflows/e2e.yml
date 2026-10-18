@@ -18,7 +18,7 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,6 +37,10 @@ jobs:
         run: xvfb-run -a node test/e2e/setups.js
       - name: Every console's games into Steam, in each setup
         run: xvfb-run -a node test/e2e/steam.js
+      - name: Online Play on and off for ten emulators
+        run: xvfb-run -a node test/e2e/online.js
+      - name: Saves across two devices
+        run: xvfb-run -a node test/e2e/saves.js
       - uses: actions/upload-artifact@v4
         if: always()
         with:

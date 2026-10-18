@@ -201,8 +201,10 @@ function placeFor(emu, key, { home = os.homedir(), extra = {}, extraAt = {} } = 
       case 'wiiu': { const mlc = at.mlc || path.join(b, 'mlc01'); if (isDir(path.join(mlc, 'usr'))) return path.join(mlc, 'usr/save/00050000', id); break; }
       case '3ds': { const n = path.join(at.sdmc || path.join(b, 'sdmc'), 'Nintendo 3DS'), a = firstDir(n), c = a && firstDir(a); if (c) return path.join(c, 'title/00040000', id, 'data'); break; }
       case 'x360': { const p = firstDir(path.join(b, 'content')); if (p) return path.join(p, id, '00000001'); break; }
-      case 'ra': { const { saves } = retroarchDirs(b); if (isDir(saves)) return path.join(saves, id); break; }
-      case 'rastate': { const { states } = retroarchDirs(b); const rel = id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : ''; if (isDir(states)) return path.join(states, rel); break; }
+      // RetroArch makes saves/ and states/ only at the first save (0.9.78 sweep: a second device that had never saved
+      // left synced saves unplaced); with its retroarch.cfg here the folder it will use is known, so it's made now
+      case 'ra': { const { saves } = retroarchDirs(b); if (isDir(saves) || exists(path.join(b, 'retroarch.cfg'))) return path.join(saves, id); break; }
+      case 'rastate': { const { states } = retroarchDirs(b); const rel = id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : ''; if (isDir(states) || exists(path.join(b, 'retroarch.cfg'))) return path.join(states, rel); break; }
     }
   }
   return null;
