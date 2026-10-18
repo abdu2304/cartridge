@@ -59,14 +59,14 @@
               <button v-if="pkgBusy" class="btn xl" data-focus data-autofocus @click="cancelPkg"><Icon name="mdiLoading" class="spin" :size="22" />{{ pkgProg?.opens ? `Close ${emuName} to finish` : `Installing in ${emuName}` }}{{ pkgPct != null ? ` · ${pkgPct}%` : '' }}{{ pkgProg?.of > 1 ? ` · ${pkgProg.step} of ${pkgProg.of}` : '' }}</button>
               <button v-else-if="needsInstall" class="btn primary xl" data-focus data-autofocus @click="installPkg"><Icon name="mdiPackageDown" :size="22" />Install in {{ emuName }}</button>
               <button v-else-if="pkg?.licenceMissing?.length" class="btn primary xl" data-focus data-autofocus @click="addLicence"><Icon name="mdiKeyOutline" :size="22" />Get licence (.rap)</button>
-              <button v-else-if="usePort" class="btn primary ok xl" data-focus data-autofocus @click="playPort(usePort)"><Icon name="mdiCheckDecagramOutline" />{{ usePort.state === 'play' ? 'Play the PC Port' : 'Set Up the PC Port' }}</button>
+              <button v-else-if="usePort" class="btn primary ok xl" data-focus data-autofocus @click="playPort(usePort)"><Icon name="mdiCheckDecagramOutline" />{{ portLabel(usePort) }}</button>
               <button v-else class="btn primary ok xl" data-focus data-autofocus @click="playNow"><Icon name="mdiCheckCircle" />Ready to play</button>
               <button v-if="ports.length && !needsInstall && !pkgBusy" class="btn icon-btn" data-focus @click="pickWay"><Icon name="mdiSwapHorizontal" :size="22" /><span>Play With</span></button>
               <!-- Re-download and Delete live in More → Options (owner, 0.9.16); the ring shows while deleting -->
               <button v-if="deleting != null" class="btn danger icon-btn" data-focus disabled><Ring :pct="deleting" :size="22" /><span>Deleting</span></button>
             </template>
             <template v-else>
-              <button v-if="readyPort" class="btn primary ok xl" data-focus data-autofocus @click="playPort(readyPort)"><Icon name="mdiCheckDecagramOutline" />Play the PC Port</button>
+              <button v-if="readyPort" class="btn primary ok xl" data-focus data-autofocus @click="playPort(readyPort)"><Icon name="mdiCheckDecagramOutline" />{{ portLabel(readyPort) }}</button>
               <button class="btn xl" :class="{ primary: !readyPort }" data-focus :data-autofocus="readyPort ? null : ''" @click="dlNow"><Icon name="mdiDownload" :size="22" />{{ dl?.status === 'cancelled' ? 'Resume' : 'Download' }} · {{ bytes(base.fs_size_bytes) }}</button>
             </template>
             <button class="btn icon-btn" data-focus title="More options" @click="more"><Icon name="mdiDotsHorizontal" :size="22" /><span>More</span></button>
@@ -174,7 +174,7 @@ import Grade from '../components/Grade.vue';
 import GameCard from '../components/GameCard.vue';
 import Ring from '../components/Ring.vue';
 
-const props = defineProps({ romId: Number });
+const props = defineProps({ romId: Number, port: String }); // port: opened from PC Ports (0.9.85), that port plays
 const el = ref(null);
 const detail = ref(null);
 const coverFail = ref(false);
@@ -670,7 +670,7 @@ async function more() {
     // 0.9.70: a Cartridge Verified port says where it is in its setup; one from a link stays as it was
     ...rcs.map((r) => (r.from === 'verified'
       ? { label: `PC Port: ${r.name}`, sub: { play: 'Cartridge Verified · ready to play', update: 'Cartridge Verified · an update is out', game: 'Cartridge Verified · installed, needs your copy', setup: 'Cartridge Verified · finish setting up', broken: 'Cartridge Verified · needs repairing' }[r.state] || 'Cartridge Verified · a native PC port, set up for you', value: 'verified:' + r.id, icon: 'mdiCheckDecagramOutline', raw: true }
-      : { label: `Recomp: ${r.name}`, sub: r.installed ? (r.installed.ready ? `Installed ${r.installed.tag}` : 'Installed, needs your game') : 'A native PC port of this game', value: 'recomp:' + r.id, icon: 'mdiRocketLaunchOutline', raw: true })),
+      : { label: `PC Port: ${r.name}`, sub: r.installed ? (r.installed.ready ? `Installed ${r.installed.tag}` : 'Installed, needs your game') : 'A native PC port of this game', value: 'recomp:' + r.id, icon: 'mdiRocketLaunchOutline', raw: true })),
     // 0.9.38 (owner): About belongs with the game, last, under Pin to Start (it was in Options)
     { label: 'About', sub: 'Console, ID, version, and what’s installed for it', value: 'about', icon: 'mdiInformationOutline' },
   ];
@@ -812,9 +812,12 @@ async function more() {
 // a port that isn't ready yet opens its sheet. Not downloaded but the port is ready (its copy is elsewhere): Play the
 // PC Port sits beside Download.
 const ports = ref([]);
-async function loadPorts() { const r = await call('recomps:forRom', { romId: Number(props.romId) }).catch(() => []); ports.value = (r || []).filter((x) => x.from === 'verified' || x.installed?.ready); }
-const usePort = computed(() => { const w = store.config?.ui?.playWith?.[props.romId]; return w && w !== 'emu' ? ports.value.find((x) => x.id === w) || null : null; });
-const readyPort = computed(() => usePort.value || ports.value.find((x) => x.state === 'play') || null);
+async function loadPorts() { const r = await call('recomps:forRom', { romId: Number(props.romId) }).catch(() => []); ports.value = (r || []).filter((x) => x.from === 'verified' || x.installed); }
+// your Play With choice first; else the port this page was opened for (PC Ports), else the port last played (0.9.85)
+const usePort = computed(() => { const w = store.config?.ui?.playWith?.[props.romId] || props.port || store.play[props.romId]?.port; return w && w !== 'emu' ? ports.value.find((x) => x.id === w) || null : null; });
+// what the main button says: a link port sets itself up when it starts; a verified one not ready opens its sheet
+const portLabel = (x) => (x.from !== 'verified' ? (x.installed?.ready ? 'Play the PC Port' : 'Set Up the PC Port') : x.state === 'play' ? 'Play the PC Port' : x.state === 'update' ? 'Update the PC Port' : 'Set Up the PC Port');
+const readyPort = computed(() => usePort.value || ports.value.find((x) => x.state === 'play' || (x.from !== 'verified' && x.installed?.ready)) || null);
 async function pickWay() {
   const cur = store.config?.ui?.playWith?.[props.romId] || 'emu';
   const v = await choose({ title: 'Play With', message: `How ${base.value.name} starts when you press Play. You can change it here any time.`, options: [
@@ -825,7 +828,8 @@ async function pickWay() {
   await saveConfig({ ui: { playWith: { ...(store.config.ui.playWith || {}), [props.romId]: v } } });
 }
 async function playPort(x) {
-  if (x.from !== 'verified') return openModal('recomp', { id: x.id });
+  if (x.from !== 'verified' && !x.installed?.ready) return openModal('recomp', { id: x.id });
+  if (x.from !== 'verified') { try { await call('recomps:open', { id: x.id }); toast(`Starting ${x.name}…`, 'info', 2500, 'mdiPlay'); } catch (e) { toast(e.message, 'error', 5000); } return; }
   if (x.state !== 'play') return openModal('verified', { id: x.id });
   const starts = (await call('recomps:list').catch(() => null))?.entries?.find((e) => e.id === x.id)?.starts || [];
   let start;

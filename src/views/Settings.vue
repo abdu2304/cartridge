@@ -743,7 +743,7 @@ const SEARCH = [
   ['New games go to', 'Library · Games and Storage', 'library', 'folders'], ['Always ask where downloads go', 'Library · Games and Storage', 'library', 'folders'],
   ['BIOS folder', 'Library · Games and Storage', 'library', 'folders'], ['Free up space, storage manager', 'Library · Games and Storage', 'library', 'folders'], ['Check downloaded games', 'Library · Games and Storage', 'library', 'folders'],
   ['Online play, netplay, RPCN, ShadNet, rooms, ad hoc, Wiimmfi, Pretendo', 'Online Play', 'online'],
-  ['Recomps, native ports of console games', 'Emulators · Recomps', 'emu', 'recomps'], ['Cartridge Verified PC ports: Bloodborne, Uncharted, God of War III, P.T., inFAMOUS Second Son', 'Emulators · Recomps', 'emu', 'recomps'],
+  ['PC Ports, recomps, native ports of console games', 'Emulators · PC Ports', 'emu', 'recomps'], ['Cartridge Verified PC ports: Bloodborne, Uncharted, God of War III, P.T., inFAMOUS Second Son', 'Emulators · PC Ports', 'emu', 'recomps'],
   ['Get and update emulators', 'Emulators', 'emu', 'emus'], ['Vita3K, RPCS3, shadPS4, Dolphin, PCSX2...', 'Emulators', 'emu', 'emus'],
   ['Game add-ons, mods, texture packs, patches', 'Emulators · Game Add-ons', 'emu', 'addons'], ['Nexus Mods API key', 'Emulators · Game Add-ons', 'emu', 'addons'], ['BIOS and firmware', 'Emulators · Setup and Health', 'emu', 'overview'],
   ['Shortcut health, issues', 'Emulators · Setup and Health', 'emu', 'overview'], ['Console folders', 'Emulators · Console Folders', 'emu', 'folders'], ['Linked folders, share saves with a fork', 'Emulators · Linked Folders', 'emu', 'links'],
@@ -1262,7 +1262,7 @@ async function loadAll() {
 const mediaSizes = [{ v: 'compact', l: 'Compact' }, { v: 'large', l: 'Medium' }, { v: 'xl', l: 'Large' }];
 // Emulators pages (0.9.16)
 // 0.9.28 (owner: the flow felt confusing): what you have first, then add-ons, then setup and health checks, then folders
-const EMU_PAGES = [{ v: 'emus', l: 'Emulators' }, { v: 'recomps', l: 'Recomps' }, { v: 'addons', l: 'Game Add-ons' }, { v: 'overview', l: 'Setup and Health' }, { v: 'folders', l: 'Console Folders' }, { v: 'links', l: 'Linked Folders' }];
+const EMU_PAGES = [{ v: 'emus', l: 'Emulators' }, { v: 'recomps', l: 'PC Ports' }, { v: 'addons', l: 'Game Add-ons' }, { v: 'overview', l: 'Setup and Health' }, { v: 'folders', l: 'Console Folders' }, { v: 'links', l: 'Linked Folders' }];
 // a fork's Manage sheet asks for Linked Folders (0.9.33)
 // another page inside Settings asks for a section (0.9.66: an emulator's Online Play row)
 watch(() => store.settingsWant, (v) => { if (!v) return; store.settingsWant = null; sec.value = v; nextTick(() => { if (input.mode === 'pad') enter(); }); });

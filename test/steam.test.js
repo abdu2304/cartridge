@@ -299,3 +299,21 @@ test('EmuDeck\'s Vita3K (an AppImage named Vita3K in its own folder) is an insta
   const out = execFileSync(process.execPath, ['-e', code], { env: { ...process.env, HOME: H, XDG_DATA_HOME: '' }, encoding: 'utf8' }).trim().split('\n').pop();
   assert.deepStrictEqual(JSON.parse(out), [['appimage', '~/Applications/Vita3K/Vita3K']]);
 });
+
+// 0.9.85 (owner: PC ports in Continue Playing): a port's own Steam shortcut counts for the library game it came from
+test('play time: a PC port\'s shortcut counts for its library game, and says it was the port', () => {
+  const H = path.join(TMP, 'portplay');
+  const cfg = path.join(H, '.local/share/Steam/userdata/123/config');
+  fs.mkdirSync(cfg, { recursive: true }); fs.mkdirSync(H + '/cfg', { recursive: true });
+  const { writeVdf } = require('../electron/steamArt.js');
+  const appid = 3000000001;
+  fs.writeFileSync(path.join(cfg, 'shortcuts.vdf'), writeVdf({ shortcuts: { 0: { appid: appid | 0, AppName: 'P.T.', Exe: '"/home/u/Emulation/recomp/ps4/pt/.cartridge/play.sh"', StartDir: '"/home/u"', LaunchOptions: '' } } }));
+  fs.writeFileSync(path.join(cfg, 'localconfig.vdf'), `"UserLocalConfigStore"\n{\n\t"Software"\n\t{\n\t\t"Valve"\n\t\t{\n\t\t\t"Steam"\n\t\t\t{\n\t\t\t\t"apps"\n\t\t\t\t{\n\t\t\t\t\t"${appid}"\n\t\t\t\t\t{\n\t\t\t\t\t\t"Playtime"\t\t"95"\n\t\t\t\t\t\t"LastPlayed"\t\t"1760000000"\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\t\t}\n\t}\n}\n`);
+  fs.writeFileSync(path.join(H, 'cfg/steam-games.json'), JSON.stringify({ [appid]: { romId: null, recomp: 'pt', artRomId: 900, game: 'P.T.', name: 'P.T.', console: 'recomp' } }));
+  const code = `
+    const sm = require(${JSON.stringify(path.join(ROOT, 'electron/steamManager.js'))})({ USER_DATA: ${JSON.stringify(H + '/cfg')}, log() {}, PLATFORM_MAP: {}, getConfig: () => ({}), saveConfig() {}, broadcast() {},
+      emulationRoots: () => [], getLibrary: () => null, installed: () => ({}), romById: () => null, isGamescope: () => false, artFor: () => ({}), MARKED: 'm', markedPath: () => null });
+    console.log(JSON.stringify(sm.playtime()));`;
+  const out = JSON.parse(execFileSync(process.execPath, ['-e', code], { env: { ...process.env, HOME: H, XDG_DATA_HOME: '' }, encoding: 'utf8' }).trim().split('\n').pop());
+  assert.deepStrictEqual(out, { 900: { min: 95, last: 1760000000000, src: 'Steam', port: 'pt' } });
+});

@@ -262,7 +262,7 @@ const shelves = computed(() => {
   // One row for what you're playing (0.9.3 L: "Continue playing" and "Recently played" were two rows
   // that looked the same): marked as playing in RomM, or played lately on any device, newest first
   const playing = roms.filter((r) => r.user?.playing || r.user?.status === 'incomplete' || lastPlay(r)).sort((a, b) => lastPlay(b) - lastPlay(a));
-  if (playing.length) out.push({ id: 'playing', title: 'Continue playing', icon: 'mdiPlayCircleOutline', count: '', items: playing, sub: (r) => (store.play[r.id]?.device ? 'on ' + store.play[r.id].device : '') });
+  if (playing.length) out.push({ id: 'playing', title: 'Continue playing', icon: 'mdiPlayCircleOutline', count: '', items: playing, sub: (r) => [store.play[r.id]?.device ? 'on ' + store.play[r.id].device : '', store.play[r.id]?.port ? 'PC Port' : ''].filter(Boolean).join(' · ') });
   // started (played a while, or marked in RomM) but not finished, and not already near the front above
   const inPlaying = new Set(playing.slice(0, 15).map((r) => r.id));
   const started = roms.filter((r) => !inPlaying.has(r.id) && !DONE.has(r.user?.status) && (minsOf(r) >= 30 || r.user?.status === 'incomplete')).sort((a, b) => lastPlay(b) - lastPlay(a));
