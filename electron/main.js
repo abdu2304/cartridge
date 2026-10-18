@@ -6231,7 +6231,7 @@ for (const [ch, info] of Object.entries(JOBS)) {
 const JOB_EVENTS = {
   'emu-update': (m) => ['emu:' + m.path, { pct: m.pct, text: m.text || '' }],
   'recomp-progress': (m) => ['recomp:' + m.id, { pct: m.pct, text: { check: 'Checking', download: 'Downloading', unpack: 'Unpacking', installer: 'Running its installer', prefix: 'Preparing Proton', trial: 'Starting it once' }[m.step] || '' }],
-  'recomp-prep': (m) => ['recompprep:' + m.id, { pct: null, text: { installer: 'Running its installer', prefix: 'Preparing Proton', view: 'Laying the update over it' }[m.step] || '' }],
+  'recomp-prep': (m) => { const gb = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`); return ['recompprep:' + m.id, { pct: m.pct ?? null, text: ({ check: 'Checking your copy', installer: 'Running its installer', prefix: 'Preparing Proton', view: 'Laying the update over it', write: 'Writing its settings' }[m.step] || '') + (m.step === 'installer' && m.got ? ` · ${gb(m.got)}${m.want ? ' of ' + gb(m.want) : ''} copied` : '') }]; },
   'emuget-progress': (m) => [`get:${m.key}:${m.id}`, { pct: m.pct }],
   'emuget-custom': (m) => [customJob, { pct: m.pct }],
   'shadv-progress': (m) => ['shadv:' + m.tag, { pct: m.pct }],

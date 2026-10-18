@@ -7,6 +7,9 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 18 Oct 2026 · 0.9.81 · Setting Up, Shown
+Owner's photo: P.T. stuck on Working while setting up. Its installer is silent; setup now names each step, shows bytes copied and stops a stalled installer (handover Part 28). Waiting for the owner to try again and send the log if it stalls.
+
 ## 18 Oct 2026 · 0.9.80 · Loose Ends, Tied
 Owner: "Build 2, 3 and 4" of the What's left answer. Built: link recomps (Save Sync for ticked folders, setup after an update, GitHub Actions builds, Steam-start setup watch, Windows trial prefix), Cemu Pretendo switch and RetroArch host/join, the Vita frame generation warning. Formats read from Cemu's CemuConfig.cpp/XMLConfig.h and RetroArch's retroarch.c/config.def.h. Details in handover Part 27.
 
