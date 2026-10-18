@@ -1112,17 +1112,29 @@ function createRecomps(ctx) {
       const want = from ? r.game.find.files.reduce((n, f) => n + fsz(path.join(from, f)), 0) : 0;
       const stallMs = ctx.stallMs || 5 * 60e3, ac = new AbortController();
       const base = await bytesIn([rec.dir]);
-      let last = -1, still = Date.now(), looking = false;
+      let last = -1, still = Date.now(), looking = false, firstAt = 0;
+      const t0 = Date.now();
       onProgress({ step: 'installer', got: 0, pct: want ? 0 : null });
       const tick = setInterval(async () => {
         if (looking) return; looking = true;
         try {
           const got = Math.max(0, (await bytesIn([rec.dir])) - base);
-          if (got !== last) { last = got; still = Date.now(); onProgress({ step: 'installer', got, want, pct: want ? Math.min(99, Math.floor((got / want) * 100)) : null }); }
+          if (got !== last) {
+            last = got; still = Date.now(); if (got && !firstAt) firstAt = Date.now();
+            // 0.9.82 (owner: why so slow): its speed and the time left, from the copying so far
+            const rate = firstAt && Date.now() - firstAt > 1500 ? got / ((Date.now() - firstAt) / 1000) : 0;
+            onProgress({ step: 'installer', got, want, rate, left: want && rate ? Math.max(0, Math.round((want - got) / rate)) : null, pct: want ? Math.min(99, Math.floor((got / want) * 100)) : null });
+          }
           else if (Date.now() - still > stallMs) ac.abort();
         } finally { looking = false; }
       }, ctx.tickMs || 2000);
-      try { await ctx.runProgram(rec.installer, args, { cwd: rec.dir, timeoutMs: 40 * 60e3, signal: ac.signal }); }
+      try {
+        await ctx.runProgram(rec.installer, args, { cwd: rec.dir, timeoutMs: 40 * 60e3, signal: ac.signal });
+        // where the time went: its own checks before the first byte, then the copy and its speed; both folders on one
+        // drive means every byte is read and written on the same card
+        const secs = (Date.now() - t0) / 1000, wrote = Math.max(0, (await bytesIn([rec.dir])) - base), dev = (p) => { try { return fs.statSync(p).dev; } catch { return -1; } };
+        log('verified installer done', id, `${Math.round(secs)} s`, `first write after ${firstAt ? Math.round((firstAt - t0) / 1000) : '?'} s`, `${Math.round(wrote / 1e6)} MB`, firstAt ? `${(wrote / 1e6 / Math.max(1, (Date.now() - firstAt) / 1000)).toFixed(1)} MB/s` : '', dev(rec.game.path) === dev(rec.dir) ? 'same drive as the game' : 'another drive than the game');
+      }
       catch (er) {
         if (ac.signal.aborted) { log('verified installer stalled', id, last); throw new Error(`${r.name}’s installer wrote nothing for ${Math.round(stallMs / 60000)} minutes, so Cartridge stopped it. Press Set Up to try again. If it stops again, send Cartridge’s log (Settings → Help and About → Report a Problem).`); }
         throw er;

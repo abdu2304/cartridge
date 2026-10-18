@@ -7,6 +7,9 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 18 Oct 2026 · 0.9.82 · Out of the Way
+Owner: P.T. setup slow but worked; SteamOS laggy while a game from Cartridge runs. Quiet mode now follows our own game and Steam launches, not only gamescope focus; game watch async; setup shows speed and time left with a timing log line (handover Part 29).
+
 ## 18 Oct 2026 · 0.9.81 · Setting Up, Shown
 Owner's photo: P.T. stuck on Working while setting up. Its installer is silent; setup now names each step, shows bytes copied and stops a stalled installer (handover Part 28). Waiting for the owner to try again and send the log if it stalls.
 

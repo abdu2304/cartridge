@@ -174,6 +174,20 @@ function refocus() {
 // Cartridge comes back to the front with the pad working (nav.js gameEnded), in Game Mode and on the desktop.
 let runT = null, runOn = false;
 const runActive = () => runOn;
+// 0.9.82 (owner: SteamOS gets very laggy while a game started from Cartridge runs): Cartridge goes quiet (no animations,
+// no background drawing, pad off) whenever a game is in front. Measured in the real app: an animated background costs
+// about 22% of a core and GPU time in front, 0.1% and none once quiet. gamescope's focus (xprop) decides when it can be
+// read; without it, a game Cartridge started or any Steam launch counts; on the desktop, our game running while
+// Cartridge's window isn't focused.
+const awayBy = { focus: null, run: false, launch: false };
+let awaySent = false;
+function updateAway() {
+  const desk = !isGamescope();
+  const a = awayBy.focus != null ? awayBy.focus : desk ? awayBy.run && !(win && !win.isDestroyed() && win.isFocused()) : awayBy.run || awayBy.launch;
+  if (a === awaySent) return;
+  awaySent = a; broadcast('background', { away: a }); log('quiet while a game runs:', a ? 'on' : 'off');
+}
+const setAway = (src, v) => { awayBy[src] = v; updateAway(); };
 // background jobs Cartridge runs by itself (0.9.48): a game in front (Game Mode) or one started from Cartridge counts as playing
 const scheduler = require('./scheduler').createScheduler({ playing: () => !!(gameFocus.away || runOn), file: path.join(USER_DATA, 'scheduler.json'), log });
 function watchGameRun(romId) {
@@ -185,20 +199,23 @@ function watchGameRun(romId) {
   // RPCS3 and Vita3K start installed games by serial, not by file
   let serial = ''; try { serial = /ps3/i.test(`${r.platform_slug} ${r.platform_fs_slug}`) ? ps3Serial(romId, where) || '' : installs[romId]?.serial || ''; } catch {}
   const needles = [...new Set([where, mainFile(where)].filter(Boolean).map((p) => path.basename(p)).concat(serial ? [serial] : []))].filter((n) => n.length > 3);
-  const running = () => {
-    for (const d of fs.readdirSync('/proc')) {
-      if (!/^\d+$/.test(d) || Number(d) === process.pid) continue;
-      let c = ''; try { c = fs.readFileSync(`/proc/${d}/cmdline`, 'utf8'); } catch { continue; }
-      if (needles.some((n) => c.includes(n)) && !/\bcartridge\b|electron/i.test(c.split('\0')[0])) return true;
+  // read without holding the main thread (0.9.82): it was a full synchronous /proc read every 2 s for the whole game
+  const running = async () => {
+    let ids = []; try { ids = (await fsp.readdir('/proc')).filter((d) => /^\d+$/.test(d) && Number(d) !== process.pid); } catch { return false; }
+    for (let i = 0; i < ids.length; i += 64) {
+      const got = await Promise.all(ids.slice(i, i + 64).map((d) => fsp.readFile(`/proc/${d}/cmdline`, 'utf8').catch(() => '')));
+      if (got.some((c) => c && needles.some((n) => c.includes(n)) && !/\bcartridge\b|electron/i.test(c.split('\0')[0]))) return true;
     }
     return false;
   };
   let seen = false, started = Date.now(), seenAt = 0, asked = false, copiedAt = 0;
   const vita = /psvita|vita/i.test(`${r.platform_slug} ${r.platform_fs_slug}`);
   broadcast('game-run', { state: 'starting', romId });
-  runT = setInterval(() => {
-    let on = false; try { on = running(); } catch {}
-    if (on && !seen) { seen = true; seenAt = Date.now(); runOn = true; log('game running', romId); }
+  let looking = false;
+  runT = setInterval(async () => {
+    if (looking) return; looking = true;
+    let on = false; try { on = await running(); } catch {} finally { looking = false; }
+    if (on && !seen) { seen = true; seenAt = Date.now(); runOn = true; log('game running', romId); setAway('run', true); }
     // 0.9.49 (owner: Vita3K "doesn't launch, nothing happens"): a Vita game that never shows, or closes within 15 s,
     // gets Vita3K's own reason (its log, or the title not being in its storage) instead of silence
     if (vita && !asked && ((!on && !seen && Date.now() - started > 20000) || (!on && seen && Date.now() - seenAt < 15000))) { asked = true; vitaQuickExit(romId, serial); }
@@ -207,7 +224,7 @@ function watchGameRun(romId) {
     // while its game runs, so a freeze that takes everything down still leaves the last of it (emulator-runs/)
     if (vita && on && Date.now() - (copiedAt || 0) > 30000) { copiedAt = Date.now(); keepEmuLog('vita3k', require('./pkgInstall').vita3kLogFile(steamMgr.vita3kCommand?.()?.exe)); }
     if (!on && seen) {
-      clearInterval(runT); runOn = false; gameFocus.endedAt = Date.now(); log('game ended', romId);
+      clearInterval(runT); runOn = false; gameFocus.endedAt = Date.now(); log('game ended', romId); setAway('run', false);
       broadcast('game-run', { state: 'ended', romId });
       saveSyncAfter(romId); // Cartridge Save Sync (0.9.51)
       bringBack();
@@ -253,7 +270,7 @@ function watchGamescopeFocus() {
   const gid = process.env.SteamGameId || process.env.STEAM_GAME_ID || '';
   if (!isGamescope() || !/^\d+$/.test(gid)) return;
   let mine = BigInt(gid); if (mine > 0xffffffffn) mine >>= 32n;
-  let last = null, busy = false, seen = new Set(), first = true, hiddenFor = 0, tick = false, scanning = false;
+  let last = null, busy = false, seen = new Set(), first = true, hiddenFor = 0, tick = false, scanning = false, focusFails = 0;
   gameFocus.watched = true;
   // CAE governor (0.9.47, owner: no CPU taken from the game): every 600 ms while Cartridge is in front, every 1.5 s
   // while another app is (xprop is a process start each round, the Steam launch scan reads every process's command line)
@@ -262,7 +279,9 @@ function watchGamescopeFocus() {
     require('child_process').execFile('xprop', ['-root', 'GAMESCOPE_FOCUSED_APP'], { timeout: 1500 }, (err, out) => {
       busy = false;
       const m = /=\s*(\d+)/.exec(String(out || ''));
-      if (err || !m) return;
+      // xprop missing or failing three times in a row: focus is unknown, the other signals decide (0.9.82)
+      if (err || !m) { if (++focusFails === 3) { log('gamescope focus unreadable:', err?.code || err?.message || 'no value', '(a game Cartridge started, or a Steam launch, quiets it instead)'); setAway('focus', null); last = null; } return; }
+      focusFails = 0;
       let away = BigInt(m[1]) !== mine && m[1] !== '0';
       // 0.9.34 (owner: after a game started from Cartridge closes, the pad is seen but does nothing): while our game
       // runs, the app gamescope focuses is noted; once it has ended, gamescope can keep naming that closed game as
@@ -272,7 +291,7 @@ function watchGamescopeFocus() {
       if (away && gameFocus.endedAt && m[1] === gameFocus.gameApp) away = false;
       if (m[1] !== gameFocus.lastApp) { log('gamescope focus', m[1], away ? '(away)' : '(cartridge)'); gameFocus.lastApp = m[1]; }
       if (away !== last) {
-        last = away; broadcast('background', { away });
+        last = away; setAway('focus', away);
         // back in front after a game (0.9.24, owner: controls dead after closing a game): the window came back
         // without focus (showInactive), and the page only reads the pad while focused
         if (!away && win && !win.isDestroyed()) refocus();
@@ -292,6 +311,7 @@ function watchGamescopeFocus() {
       // the other game ended: come back now rather than waiting out the 45 s
       if (seen.size && !now.size && hiddenFor) { hiddenFor = 0; log('the other game ended, showing again'); try { win?.showInactive(); } catch {} }
       seen = now;
+      setAway('launch', now.size > 0);
       if (fresh && first) { first = false; return; }
       first = false;
       if (fresh) { gameFocus.endedAt = 0; gameFocus.gameApp = null; } // a new game (even the same one again) is away as usual
@@ -6231,7 +6251,7 @@ for (const [ch, info] of Object.entries(JOBS)) {
 const JOB_EVENTS = {
   'emu-update': (m) => ['emu:' + m.path, { pct: m.pct, text: m.text || '' }],
   'recomp-progress': (m) => ['recomp:' + m.id, { pct: m.pct, text: { check: 'Checking', download: 'Downloading', unpack: 'Unpacking', installer: 'Running its installer', prefix: 'Preparing Proton', trial: 'Starting it once' }[m.step] || '' }],
-  'recomp-prep': (m) => { const gb = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`); return ['recompprep:' + m.id, { pct: m.pct ?? null, text: ({ check: 'Checking your copy', installer: 'Running its installer', prefix: 'Preparing Proton', view: 'Laying the update over it', write: 'Writing its settings' }[m.step] || '') + (m.step === 'installer' && m.got ? ` · ${gb(m.got)}${m.want ? ' of ' + gb(m.want) : ''} copied` : '') }]; },
+  'recomp-prep': (m) => { const gb = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`); return ['recompprep:' + m.id, { pct: m.pct ?? null, text: ({ check: 'Checking your copy', installer: 'Running its installer', prefix: 'Preparing Proton', view: 'Laying the update over it', write: 'Writing its settings' }[m.step] || '') + (m.step === 'installer' && m.got ? ` · ${gb(m.got)}${m.want ? ' of ' + gb(m.want) : ''} copied${m.rate ? ` · ${Math.round(m.rate / 1e6)} MB/s` : ''}${m.left != null ? ` · about ${m.left < 90 ? m.left + ' s' : Math.round(m.left / 60) + ' min'} left` : ''}` : '') }]; },
   'emuget-progress': (m) => [`get:${m.key}:${m.id}`, { pct: m.pct }],
   'emuget-custom': (m) => [customJob, { pct: m.pct }],
   'shadv-progress': (m) => ['shadv:' + m.tag, { pct: m.pct }],
@@ -6277,7 +6297,7 @@ function healthLine() {
     const pct = healthPrev && t > healthPrev.t ? Math.round(((cpu - healthPrev.cpu) / ((t - healthPrev.t) / 1000)) * 100) : null;
     healthPrev = { cpu, t };
     const mine = Math.round(m.reduce((a, x) => a + (x.memory?.workingSetSize || 0), 0) / 1024);
-    log('health:', `cartridge ${mine} MB, cpu ${pct ?? '?'}%`, `| system free ${Math.round(os.freemem() / 1048576)} of ${Math.round(os.totalmem() / 1048576)} MB`, `| load ${os.loadavg()[0].toFixed(1)}`, playing ? '| game running' : '');
+    log('health:', `cartridge ${mine} MB, cpu ${pct ?? '?'}%`, `| system free ${Math.round(os.freemem() / 1048576)} of ${Math.round(os.totalmem() / 1048576)} MB`, `| load ${os.loadavg()[0].toFixed(1)}`, playing ? '| game running' : '', awaySent ? '| quiet' : '');
   } catch {}
 }
 const loopDelay = require('perf_hooks').monitorEventLoopDelay({ resolution: 20 });
@@ -6352,7 +6372,8 @@ app.whenReady().then(() => {
   scheduler.add('library-sync', { every: 60e3, firstAfter: 60e3, deferWhilePlaying: true,
     due: () => { const every = (config.sync.everyMinutes || 0) * 60e3; return !!(config.configured && every && library && Date.now() - library.syncedAt > every); },
     run: () => syncLibrary().catch(() => {}) });
-  win.on('focus', () => { if (library) computeInstalled(); });
+  win.on('focus', () => { if (library) computeInstalled(); updateAway(); });
+  win.on('blur', () => updateAway()); // desktop: our game in front means quiet (0.9.82)
   watchGamescopeFocus();
   setupUpdater();
   // Safety net if the display could not be read up front: a big window drawn in software is
