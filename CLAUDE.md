@@ -10,6 +10,8 @@ A controller-first RomM client for SteamOS and Bazzite, shipped as one AppImage.
 
 **Coming back after 0.9.37 (another account)?** Read `docs/HANDOVER-0.9.22-to-0.9.37.md` first: everything from 0.9.22 to 0.9.37 (Syncthing saves, Switch reading, Steam collections, controller after a game, Cemu, BIOS placement, Linked Folders and more), the owner's decisions, how the real app was run and tested in the container, what broke and how it was fixed, and what is still open. Then the older handover above for the history before.
 
+**Running on the owner's own PC (a local Claude Code session)?** Read `docs/PLAYTEST-ON-A-REAL-PC.md` first: the owner's brief (test everything yourself as a playtester, fix for every setup), starting with why Windows PC ports don't set up or launch.
+
 This file is the short version every session needs. The full handoff (history, every decision, the reasons behind odd-looking code, test notes) is in **`docs/HANDOFF.md`**. Read the parts that relate to your task before changing code. The Steam manager test scripts are in `docs/steam-tests.md`.
 
 ## Stack and layout

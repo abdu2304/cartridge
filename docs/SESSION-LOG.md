@@ -7,6 +7,9 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 18 Oct 2026 · Next: a playtest on the owner's PC
+The owner will run Claude Code on their Linux PC (teleported or fresh) and wants everything in Cartridge tested by me alone, fixed for every setup. Brief and first job (Windows PC ports, the Proton prefix and symlinks, Steam variables leaking into Proton): docs/PLAYTEST-ON-A-REAL-PC.md.
+
 ## 18 Oct 2026 · 0.9.85 · PC Ports
 Owner: "do the recommended" on the three recomps questions (name PC Ports, installed only, Set Up on the game page). Built: a console-style PC Ports page, port play time in Continue Playing, the installer under Settings → Emulators → PC Ports (handover Part 32).
 
