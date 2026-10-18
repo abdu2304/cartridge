@@ -1,4 +1,7 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
+
+// 0.9.82: while a game is in front, the page's decoded pictures and other caches are let go, so the game has that memory
+ipcRenderer.on('background', (_e, b) => { if (b?.away) setTimeout(() => { try { webFrame.clearCache(); } catch {} }, 1500); });
 
 async function call(ch, arg) {
   const r = await ipcRenderer.invoke(ch, arg);
