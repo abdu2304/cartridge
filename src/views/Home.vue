@@ -100,7 +100,7 @@ const ROW_H = new Map(), TYPE_H = new Map();
 <script setup>
 import { recommend } from '../recs.js';
 import { computed, ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue';
-import { tab, img, cover, collections, autoLists, seriesLists, genres, visible, store, go, allRoms, visiblePlatforms, romsOf, isNew, setBg, backdropOf, wantSharp, heroArt as heroOf, bytes, year, ago, rating, resync, downloadFor, download, romById, toast, logoOf, call, GRADE, loadPlay, playtimeText } from '../store.js';
+import { img, cover, collections, autoLists, seriesLists, genres, visible, store, go, allRoms, visiblePlatforms, romsOf, isNew, setBg, backdropOf, wantSharp, heroArt as heroOf, bytes, year, ago, rating, resync, downloadFor, download, romById, toast, logoOf, call, GRADE, loadPlay, playtimeText } from '../store.js';
 import { useView } from '../useView.js';
 import { ensureFocus, scrollMode } from '../nav.js';
 const rowGuess = (s) => ROW_H.get(s.id) || TYPE_H.get(s.type || 'games') || 360;
@@ -320,9 +320,10 @@ function openGame(r) { go('game', { romId: r.id }); }
 const ROW = 15;
 // Show all: the whole row as a list in the Library view, in the row's own order
 function showAll(s) {
-  if (s.type === 'col') return tab('collections');
-  if (s.type === 'genre') return tab('genres');
-  if (s.type === 'sys') return tab('consoles');
+  // opened like every other Show all, so B comes back to Home and the row (0.9.76 crawl: a tab switch cleared the way back)
+  if (s.type === 'col') return go('collections');
+  if (s.type === 'genre') return go('genres');
+  if (s.type === 'sys') return go('consoles');
   store.homeLists = { ...(store.homeLists || {}), ['home-' + s.id]: { id: 'home-' + s.id, name: s.title, icon: s.icon, rom_ids: s.items.map((r) => r.id), auto: true, ordered: true, description: 'From Home' } };
   go('collection', { collectionId: 'home-' + s.id });
 }

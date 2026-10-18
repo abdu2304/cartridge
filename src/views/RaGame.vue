@@ -95,7 +95,7 @@ async function more() {
   else if (v === 'refresh') load(true);
   else if (v === 'reset') { await call('icon:reset', { key }); iconChanged(key); toast('Icon reset', 'ok', 2000, 'mdiRestore'); }
   else if (v === 'icon') {
-    if (!store.config.sgdbKey) return toast('Add a SteamGridDB API key in Settings → Look & Feel first', 'error', 4500);
+    if (!store.config.sgdbKey) return toast('Pictures come from SteamGridDB: add your free key in Settings → Look & Feel → Metadata.', 'info', 5000, 'mdiKeyVariant');
     const url = await openModal('art', { kind: 'icon', romName: String(g.value.title || '').replace(/[™®©]/g, '').replace(/\s*[\[(|~].*$/, '').trim() });
     if (!url) return;
     await call('icon:set', { key, url }); iconChanged(key); toast('Icon updated', 'ok', 2000, 'mdiCheck');

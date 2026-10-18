@@ -62,7 +62,7 @@ function library(games = 120, extra = {}) {
 
 function start({ port = 0, games = 120, extra = {} } = {}) {
   const { F, ROMS, plats } = library(games, extra);
-  const served = {}, covers = {};
+  const served = {}, covers = {}, cols = [];
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x'), p = u.pathname;
     const json = (o, code = 200) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
@@ -71,6 +71,11 @@ function start({ port = 0, games = 120, extra = {} } = {}) {
     if (p === '/api/users/me') return json({ id: 1, username: 'tester' });
     if (p === '/api/platforms') return json(plats);
     if (p === '/api/roms') { const pid = Number(u.searchParams.get('platform_ids')); const items = ROMS.filter((r) => !pid || r.platform_id === pid); return json({ items, total: items.length }); }
+    // collections made and changed (favourites, 0.9.76): kept in memory, answered as RomM does
+    if (p === '/api/collections' && req.method === 'POST') { const name = (u.searchParams.get('is_favorite') === 'true' && 'Favourites') || 'Made in Cartridge'; const c = { id: 500 + cols.length, name, description: '', rom_ids: [], is_favorite: u.searchParams.get('is_favorite') === 'true', user_id: 1 }; cols.push(c); return json(c); }
+    if ((m = p.match(/^\/api\/collections\/(\d+)$/)) && req.method === 'PUT') { const c = cols.find((x) => x.id === Number(m[1])); let body = ''; req.on('data', (d) => (body += d)); req.on('end', () => { const ids = /name="rom_ids"\r?\n\r?\n(\[[^\]]*\])/.exec(body); if (c && ids) c.rom_ids = JSON.parse(ids[1]); json(c || {}, c ? 200 : 404); }); return; }
+    if ((m = p.match(/^\/api\/roms\/(\d+)\/props$/)) && req.method === 'PUT') return json({ status: null, backlogged: false, now_playing: false, hidden: false });
+    if (p === '/api/collections' && req.method === 'GET') return json(cols);
     if (/^\/api\/(collections|collections\/smart|collections\/virtual|firmware|saves|states|devices|play-sessions)$/.test(p)) return json([]);
     if ((m = p.match(/^\/assets\/cov\/(\d+)\.bmp$/))) { const b = covers[m[1]] ||= bmp(120, 160, Number(m[1])); res.writeHead(200, { 'content-type': 'image/bmp', 'content-length': b.length }); return res.end(b); }
     if ((m = p.match(/^\/api\/roms\/(\d+)\/notes/))) return json([]);

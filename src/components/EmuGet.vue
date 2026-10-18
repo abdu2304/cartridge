@@ -68,7 +68,8 @@
         <!-- 0.9.56 (owner: an Update All box beside the others): the summary on its own line, the actions as one even row -->
         <div class="eg-acts" :class="{ four: updates && !flow }">
           <button class="btn small" data-focus :disabled="!missingFirst.length" @click="getAll"><Icon name="mdiDownloadMultiple" :size="18" />{{ missingFirst.length ? `Download All (${missingFirst.length})` : 'Everything Is Here' }}</button>
-          <button v-if="!flow" class="btn small" data-focus @click="phase = 'where'; loadDrives()"><Icon name="mdiFolderMove" :size="18" />Where They Go</button>
+          <!-- only on a fresh setup: with emulators already here every drive was refused (0.9.76 crawl) -->
+          <button v-if="!flow && fresh?.fresh" class="btn small" data-focus @click="phase = 'where'; loadDrives()"><Icon name="mdiFolderMove" :size="18" />Where They Go</button>
           <button v-if="updates" class="btn small" data-focus :disabled="upBusy" @click="loadUps(true)"><Icon name="mdiRefresh" :size="18" :class="{ spin: upBusy }" />{{ upBusy ? 'Checking…' : 'Check for Updates' }}</button>
           <button v-if="updates" class="btn small" :class="{ primary: upCount && !upRun }" data-focus :disabled="!upCount || !!upRun" @click="updateAll"><Icon name="mdiUpdate" :size="18" :class="{ spin: !!upRun && allRun }" />{{ allRun ? `Updating ${allRun.done + 1} of ${allRun.of}` : upCount ? `Update All (${upCount})` : 'All Up to Date' }}</button>
         </div>
@@ -472,7 +473,7 @@ onMounted(async () => {
   call('emuup:allState').then((m) => m && follow(m)).catch(() => {});
   q.value = (await call('emuget:state').catch(() => null)) || q.value; // installs queued earlier carry on
   loadUps(); // at the same time as the list (0.9.37)
-  if (phase.value === 'where') await loadDrives(); else { if (props.flow) fresh.value = await call('emuget:fresh').catch(() => ({ fresh: false })); await load(); }
+  if (phase.value === 'where') await loadDrives(); else { fresh.value = await call('emuget:fresh').catch(() => ({ fresh: false })); await load(); }
 });
 onBeforeUnmount(() => { off?.(); offP?.(); offU?.(); offA?.(); });
 defineExpose({ load });

@@ -781,7 +781,7 @@ async function more() {
   if (v === 'textures') { const sl = `${base.value.platform_slug} ${base.value.platform_fs_slug}`; await openModal('gameaddons', { romId: Number(props.romId), name: base.value.name, tab: /ps3|ps4|xbox360/i.test(sl) ? 'patches' : /\bps2\b/i.test(sl) ? 'tex' : 'mods' }); return; }
   if (v === 'refresh') { try { detail.value = await call('api:get', { path: `/api/roms/${props.romId}` }); resetLogos(props.romId); toast('Details refreshed', 'ok', 2000, 'mdiRefresh'); } catch (e) { toast(e.message, 'error'); } return; }
   if (v === 'reset') { store.art = { ...store.art }; delete store.art[props.romId]; await call('art:reset', { id: props.romId }); resetLogos(props.romId); toast('Artwork reset', 'ok', 2000, 'mdiRestore'); return; }
-  if (!store.config.sgdbKey) { toast('Add a SteamGridDB API key in Settings → Look & feel first', 'error', 4500); return; }
+  if (!store.config.sgdbKey) { toast('Pictures come from SteamGridDB: add your free key in Settings → Look & Feel → Metadata.', 'info', 5000, 'mdiKeyVariant'); return; }
   const url = await openModal('art', { kind: v, romName: base.value.name });
   if (!url) return;
   const o = await call('art:set', { id: props.romId, kind: v, url });
