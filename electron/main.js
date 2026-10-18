@@ -470,6 +470,28 @@ async function probe(base, srv = config.server, timeout = 2500) {
   }
 }
 
+// What this RomM can do (0.9.79): read once per server and version from its /openapi.json (rommFeatures.js);
+// a feature whose endpoints aren't there is switched off with a plain reason instead of failing on every run.
+let rommFeat = null, rommFeatAt = '', rommFeatT = 0;
+async function rommFeatures(force = false) {
+  if (!config.configured || config.localOnly) return require('./rommFeatures').fromOpenApi(null);
+  if (rommFeat && !force && Date.now() - rommFeatT < 10 * 60000) return rommFeat; // a server update is seen within 10 minutes
+  const b = await resolveBase().catch(() => null);
+  if (!b) return require('./rommFeatures').fromOpenApi(null);
+  const v = (await probe(b, config.server, 4000).catch(() => null))?.version || '';
+  const key = `${b}|${v}`;
+  rommFeatT = Date.now();
+  if (rommFeat && rommFeatAt === key && !force) return rommFeat;
+  let doc = null;
+  try { const r = await fetch(`${b}/openapi.json`, { headers: authHeaders(), signal: AbortSignal.timeout(8000) }); if (r.ok) doc = await r.json().catch(() => null); } catch {}
+  const f = require('./rommFeatures').fromOpenApi(doc);
+  // an unreadable answer is never kept as "nothing works": only a real description is cached
+  if (f.known || !rommFeat) { rommFeat = { ...f, version: v }; rommFeatAt = key; }
+  if (f.known && f.off.length) log('romm features off', v, f.off.join(', '));
+  return rommFeat;
+}
+const rommLacks = (k) => !!(rommFeat?.known && rommFeat.on[k] === false);
+
 async function resolveBase(force = false) {
   if (activeBase && !force) return activeBase;
   const s = config.server;
@@ -737,6 +759,7 @@ const normTitle = (t) => String(t || '').toLowerCase().replace(/[™®©]/g, '')
 function sfoIndex(dir, entries) {
   const out = [];
   for (const entry of entries) {
+    if (/-(UPDATE|patch|mods)$/.test(entry)) continue; // shadPS4's update, patch and mods folders beside a game (0.9.79)
     const at = path.join(dir, entry);
     let st; try { st = fs.statSync(at); } catch { continue; }
     if (!st.isDirectory()) continue;
@@ -745,7 +768,7 @@ function sfoIndex(dir, entries) {
       let info = null;
       const look = (d, rel) => { try { const p = require('./saves').sfo(path.join(d, 'sce_sys/param.sfo')); return p && (p.TITLE_ID || p.TITLE) ? { id: String(p.TITLE_ID || '').toUpperCase(), title: p.TITLE || '', rel } : null; } catch { return null; } };
       info = look(at, '');
-      if (!info) { let kids = []; try { kids = fs.readdirSync(at, { withFileTypes: true }).filter((k) => k.isDirectory()); } catch {} for (const k of kids.slice(0, 8)) { info = look(path.join(at, k.name), k.name); if (info) break; } }
+      if (!info) { let kids = []; try { kids = fs.readdirSync(at, { withFileTypes: true }).filter((k) => k.isDirectory()); } catch {} for (const k of kids.filter((k) => !/-(UPDATE|patch|mods)$/.test(k.name)).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8)) { info = look(path.join(at, k.name), k.name); if (info) break; } }
       SFO_SEEN.set(key, info);
     }
     const info = SFO_SEEN.get(key);
@@ -1836,6 +1859,12 @@ function zipEntries(z) {
 // a game archive unpacked into dest (0.9.74: zip, 7z and rar; into a folder already holding other files too). One
 // folder around everything is dropped. When what's inside is a single file and `home` is given, that file goes
 // into home instead of a folder of its own (Game.zip holding Game.iso becomes Game.iso beside your other games).
+// 0.9.79 (owner: yes): a PS4 game's update, unpacked into a folder of its own, goes beside the game as
+// "<game folder>-UPDATE", where shadPS4 reads it (ps4Layout.js)
+function ps4Updates(rom, dir) {
+  if (rom.platform_slug !== 'ps4' && rom.platform_fs_slug !== 'ps4') return;
+  try { for (const m of require('./ps4Layout').arrange(dir, { sfo: require('./saves').sfo })) log('ps4 update placed', path.basename(m.from), '->', path.basename(m.to), m.ver); } catch (e) { log('ps4 update not placed', e.message); }
+}
 async function unpackGame(arc, dest, it, { home = null } = {}) {
   const tmp = dest + '.partial';
   await fsp.rm(tmp, { recursive: true, force: true });
@@ -1962,6 +1991,7 @@ async function runJob(it) {
       if (isUnpackSystem(rom) && GAME_ARCHIVE.test(finalPath)) {
         await fsp.rm(path.join(target, path.basename(finalPath).replace(GAME_ARCHIVE, '')), { recursive: true, force: true });
         finalPath = await unpackGame(finalPath, path.join(target, path.basename(finalPath).replace(GAME_ARCHIVE, '')), it, { home: isFolderSystem(rom) ? null : target });
+        ps4Updates(rom, finalPath);
       }
     } else {
       // Multi-file: mirror the server folder, one file at a time (resumable)
@@ -1989,6 +2019,7 @@ async function runJob(it) {
           const alone = arcs.length === 1 && files.length === 1;
           await unpackGame(a, alone ? folder : path.join(folder, r.replace(GAME_ARCHIVE, '')), it, { home: isFolderSystem(rom) ? null : folder });
         }
+        if (arcs.length) ps4Updates(rom, folder);
       }
       // Multi-disc: generate an .m3u if the server has none
       const exts = files.map((f) => (f.file_name.split('.').pop() || '').toLowerCase());
@@ -2760,6 +2791,7 @@ function slowSteps(name, t) { const parts = Object.entries(t).filter(([, ms]) =>
 async function saveSyncRun({ romId = null, key = null, choice = null, dry = false, why = 'run' } = {}) {
   const manual = why === 'run' || why === 'resolve'; // Sync Now (and settling a conflict) tries everything again
   if (!saveSyncOn()) return { off: true, syncthing: syncthingSaves() };
+  if ((await rommFeatures().catch(() => null)) && rommLacks('saves')) return { off: true, oldRomm: true, error: 'Your RomM is too old for Cartridge Save Sync: it has no save slots. Update RomM on your server.' };
   if (ssBusy) return ssBusy; // one sync at a time; a second ask shares the running one
   ssBusy = (async () => {
     const T = {}, tick = (k, t0) => { T[k] = (T[k] || 0) + (performance.now() - t0); };
@@ -3545,7 +3577,7 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
 }
 
-const trophySvc = require('./trophyService')({ busy: () => !!(gameFocus.away || runOn), idsReady: () => idsReady(), // 0.9.60: links by ID once the games' IDs are read
+const trophySvc = require('./trophyService')({ busy: () => !!(gameFocus.away || runOn), notesMissing: async () => { await rommFeatures().catch(() => null); return rommLacks('notes'); }, idsReady: () => idsReady(), // 0.9.60: links by ID once the games' IDs are read
   USER_DATA, api, broadcast: (c, d) => broadcast(c, d), log, loadJson,
   getConfig: () => config, saveConfig: () => saveConfig(), getLibrary: () => library,
   codeName: (src, code) => require('./titleNames').nameFor(src, code),
@@ -4009,8 +4041,9 @@ const handlers08 = {
   },
   'saves:list': ({ fresh } = {}) => savesList(fresh),
   // Cartridge Save Sync (0.9.51)
-  'savesync:status': () => ({ mode: config.saveSync || null, on: saveSyncOn(), syncthing: syncthingSaves(), busy: !!ssBusy, prog: ssProg, last: ssData.last, saved: Object.keys(ssData.ledger).length, backups: SAVE_BACKUPS, held: ssData.held ? { ...ssData.held, games: ssData.held.romIds.map((id) => romIndexMain().get(id)?.name).filter(Boolean) } : null }),
-  'savesync:set': ({ on } = {}) => {
+  'savesync:status': () => ({ mode: config.saveSync || null, on: saveSyncOn(), oldRomm: rommLacks('saves'), syncthing: syncthingSaves(), busy: !!ssBusy, prog: ssProg, last: ssData.last, saved: Object.keys(ssData.ledger).length, backups: SAVE_BACKUPS, held: ssData.held ? { ...ssData.held, games: ssData.held.romIds.map((id) => romIndexMain().get(id)?.name).filter(Boolean) } : null }),
+  'savesync:set': async ({ on } = {}) => {
+    if (on && (await rommFeatures().catch(() => null)) && rommLacks('saves')) throw new Error('Your RomM is too old for Cartridge Save Sync: it has no save slots. Update RomM on your server.');
     if (on && syncthingSaves()) throw new Error('This device syncs saves with Syncthing. Stop using Syncthing for saves first: a device uses one or the other.');
     config.saveSync = on ? 'cartridge' : null; saveConfig();
     if (on) setTimeout(() => saveSyncRun({ why: 'on' }).catch(() => {}), 1500);
@@ -4133,6 +4166,7 @@ const handlers08 = {
     return { created: r?.created_at ? Date.parse(r.created_at) || null : null, firstSeen: library?.firstSeen?.[romId] > 1 ? library.firstSeen[romId] : null, downloaded: manifest[romId]?.at || null, steam: Number.isFinite(st) ? st : null, play: playStats()[romId] || null };
   },
   'server:health': () => serverHealth(),
+  'server:features': ({ fresh } = {}) => rommFeatures(!!fresh),
   'rom:edit': (o) => editRom(o),
   'upload:list': () => ({ files: uploadCandidates(), active: [...uploads.values()].map(({ path: p, pct, state, error }) => ({ path: p, pct, state, error })) }),
   'upload:start': (o) => uploadFile(o),
@@ -4285,6 +4319,10 @@ const handlers09 = {
     try {
       const v = config.configured ? (await probe(await resolveBase(), config.server, 4000))?.version : null;
       if (v && rommTooOld(v)) add('romm', `RomM ${v} is older than Cartridge supports (${ROMM_MIN.join('.')} or newer)`, 'Games still sync, but collections, play status and uploads may not work. Update RomM on your server.', 'romm');
+    } catch {}
+    try {
+      const f = config.configured && !config.localOnly ? await rommFeatures() : null;
+      if (f?.known && f.off.length) add('romm', `Your RomM doesn’t have ${f.off.length === 1 ? 'one thing' : `${f.off.length} things`} Cartridge uses, so ${f.off.length === 1 ? 'it’s' : 'they’re'} off: ${f.off.join(', ')}`, 'Update RomM on your server to turn them on. Everything else works as usual.', 'romm');
     } catch {}
     try {
       const miss = (await steamMgr.verifyCollections()) || [];

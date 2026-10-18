@@ -62,12 +62,14 @@ function library(games = 120, extra = {}) {
 
 function start({ port = 0, games = 120, extra = {} } = {}) {
   const { F, ROMS, plats } = library(games, extra);
-  const served = {}, covers = {}, cols = [], saves = []; let savesN = 0;
+  const served = {}, covers = {}, cols = [], saves = [], ctl = {}; let savesN = 0;
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x'), p = u.pathname;
     const json = (o, code = 200) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
     let m;
     if (p === '/api/heartbeat') return json({ SYSTEM: { VERSION: '4.4.0' }, METADATA_SOURCES: {} });
+    // 0.9.79: extra.openapi = the API description an older RomM would give (no description served otherwise)
+    if (p === '/openapi.json' && ctl.openapi) return json(ctl.openapi);
     if (p === '/api/users/me') return json({ id: 1, username: 'tester' });
     if (p === '/api/platforms') return json(plats);
     if (p === '/api/roms') { const pid = Number(u.searchParams.get('platform_ids')); const items = ROMS.filter((r) => !pid || r.platform_id === pid); return json({ items, total: items.length }); }
@@ -105,7 +107,7 @@ function start({ port = 0, games = 120, extra = {} } = {}) {
     if ((m = p.match(/^\/api\/roms\/(\d+)$/))) { const r = ROMS.find((x) => x.id === Number(m[1])); return r ? json(r) : json({}, 404); }
     json({ detail: 'not found' }, 404);
   });
-  return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok({ port: server.address().port, served, saves, roms: ROMS, close: () => new Promise((d) => server.close(d)) })));
+  return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok({ port: server.address().port, served, saves, ctl, roms: ROMS, close: () => new Promise((d) => server.close(d)) })));
 }
 if (require.main === module) start({ port: Number(process.argv[2] || 8089) }).then((s) => console.log('fake RomM on', s.port));
 module.exports = { start, zip, sfo };

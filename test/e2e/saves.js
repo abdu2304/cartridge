@@ -38,7 +38,7 @@ const doneSync = async (call) => { for (let i = 0; i < 60; i++) { const s = awai
 (async () => {
   const srv = await mock.start({ games: 5, extra: { games: GAMES } });
   // device one
-  let { t, call } = await device(srv, 'one', true);
+  let { t, call } = await device(srv, 'one', true); // eslint-disable-line prefer-const
   try {
     const l = await call('saves:list', { fresh: true });
     const items = (l?.items || l?.saves || l || []);
@@ -63,6 +63,20 @@ const doneSync = async (call) => { for (let i = 0; i < 60; i++) { const s = awai
     check('device two: PPSSPP save brought here, same bytes', got(FILES.bin)?.equals(DATA) && got(FILES.sfo)?.equals(SFO), got(FILES.bin) ? 'present' : 'missing');
     check('device two: no script errors', !t.errors.length, t.errors.slice(0, 3).join(' | '));
   } catch (e) { check('device two finished', false, e.message); }
+  await t.close();
+  // an older RomM (0.9.79): its API description has saves without slots, so Save Sync is refused with the reason
+  srv.ctl.openapi = { paths: { '/api/collections': { get: {} }, '/api/saves': { post: { parameters: [{ name: 'rom_id' }] } }, '/api/roms': { post: {} } } };
+  t = await launch('none', srv); call = (ch, a) => t.call(ch, a).catch((e) => ({ error: String(e.message).split('\n')[0].replace(/^.*?Error: /, '') }));
+  try {
+    await wait(1500);
+    const r = await call('savesync:set', { on: true });
+    check('older RomM: Save Sync refused with the reason', /too old for Cartridge Save Sync/.test(r?.error || ''), r?.error || JSON.stringify(r).slice(0, 80));
+    const st = await call('savesync:status');
+    check('older RomM: Save Sync stays off and says why', !st.on && st.oldRomm, JSON.stringify({ on: st.on, oldRomm: st.oldRomm }));
+    const iss = await call('issues:list');
+    const line = (Array.isArray(iss) ? iss : iss?.items || []).find((i) => /Cartridge uses/.test(i.text || ''));
+    check('older RomM: Issues names what is off', line && /Cartridge Save Sync/.test(line.text) && /Trophy Sync/.test(line.text), line?.text || 'no line');
+  } catch (e) { check('older RomM finished', false, e.message); }
   await t.close();
   await srv.close();
   const bad = results.filter((r) => !r.ok).length;

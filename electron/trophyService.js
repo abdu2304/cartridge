@@ -442,6 +442,8 @@ module.exports = function createTrophyService(ctx) {
     await ctx.idsReady?.(); // 0.9.60: games' IDs are read in the background; linking waits for them instead of guessing
     if (cfg().sync === false) { syncState = { state: 'off' }; return syncState; }
     if (!ctx.getConfig().configured) return syncState;
+    // 0.9.79: a RomM without notes can't hold trophies; say so once instead of failing on every game
+    if (await ctx.notesMissing?.()) { syncState = { state: 'error', error: 'Your RomM is too old for Trophy Sync: it has no game notes. Update RomM on your server.', at: syncState.at }; broadcast('trophies-sync', syncState); return syncState; }
     syncState = { state: 'running', at: syncState.at };
     broadcast('trophies-sync', syncState);
     let pushed = 0, pulled = 0;

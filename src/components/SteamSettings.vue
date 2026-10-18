@@ -5,6 +5,24 @@
       <div v-if="ov.steam.error" class="ss-warn glass"><Icon name="mdiAlertOutline" :size="20" />{{ ov.steam.error }}</div>
       <template v-else>
         <div class="ss-pages"><Btn b="LB" /><div class="seg"><button v-for="pg in PAGES" :key="pg.v" data-focus :data-key="'ssp-' + pg.v" :class="{ on: page === pg.v }" @click="setPage(pg.v)">{{ pg.l }}</button></div><Btn b="RB" /></div>
+        <template v-if="page === 'ports'">
+          <!-- 0.9.79 (owner: yes to PC ports in Settings → Steam): every installed port, its shortcut, A opens its sheet -->
+          <div class="sc-head">
+            <div class="sc-head-t">
+              <b>PC Ports</b>
+              <span class="muted small">Ports go into Steam as their own shortcuts, one per game, in the Recomps collection.</span>
+            </div>
+            <button class="btn" data-focus data-key="ports-all" :disabled="!portsOut.length || portsBusy" @click="addPorts"><Icon name="mdiSteam" />{{ portsOut.length ? `Add ${portsOut.length} to Steam` : 'All in Steam' }}</button>
+          </div>
+          <div v-if="!ports" class="muted small"><Icon name="mdiSync" :size="16" class="spin" /> Looking at your ports…</div>
+          <div v-else-if="!ports.length" class="muted small">No PC ports installed yet. Get them from Consoles → Recomps, or a game’s More.</div>
+          <template v-else>
+            <button v-for="p in ports" :key="p.id" class="lrow sc-row" data-focus :data-key="'port-' + p.id" @click="openPort(p)">
+              <span class="l-mid"><b>{{ p.name }}</b><span class="l-sub">{{ portSub(p) }}</span></span>
+              <span class="l-end"><span class="status" :class="p.installed.steam ? 'ok' : p.installed.steamQueued ? '' : 'warn'">{{ p.installed.steam ? 'In Steam' : p.installed.steamQueued ? 'Waiting' : 'Not in Steam' }}</span></span>
+            </button>
+          </template>
+        </template>
         <template v-if="page === 'cols'">
           <!-- 0.9.32 (owner: redesign it from the start, with a refresh): one row per console, the Steam collection its
                games go into; A changes it. Read from Steam itself when it's reachable. -->
@@ -111,9 +129,25 @@ import Btn from './Btn.vue';
 const ov = ref(store.steamOv || null);
 const emit = defineEmits(['ready']);
 // Pages (0.9.24, owner: a Collections tab in the Steam section); LB/RB through Settings' step()
-const PAGES = [{ v: 'games', l: 'Games' }, { v: 'cols', l: 'Collections' }];
+const PAGES = [{ v: 'games', l: 'Games' }, { v: 'cols', l: 'Collections' }, { v: 'ports', l: 'PC Ports' }];
 const page = ref('games');
-function setPage(v) { page.value = v; if (v === 'cols' && !loadingCols.value) loadReview(); }
+function setPage(v) { page.value = v; if (v === 'cols' && !loadingCols.value) loadReview(); if (v === 'ports') loadPorts(); }
+// PC ports (0.9.79): the installed ones from recomps:list, with their Steam shortcut state
+const ports = ref(null), portsBusy = ref(false);
+const portsOut = computed(() => (ports.value || []).filter((p) => !p.installed.steam && !p.installed.steamQueued));
+async function loadPorts() { try { ports.value = ((await call('recomps:list'))?.entries || []).filter((e) => e.installed); } catch { ports.value = []; } }
+const portSub = (p) => [p.from === 'verified' ? 'Cartridge Verified' : p.from === 'link' ? 'From a GitHub link' : 'Installed by an earlier Cartridge', p.starts?.length > 1 ? `${p.starts.length} games` : '', p.installed.steamQueued ? 'Apply on the Games page to put it in Steam' : ''].filter(Boolean).join(' · ');
+async function openPort(p) { await openModal(p.from === 'verified' ? 'verified' : 'recomp', { id: p.id }); loadPorts(); }
+async function addPorts() {
+  portsBusy.value = true;
+  let added = 0, queued = 0;
+  try {
+    for (const p of portsOut.value) { const r = await call('recomps:steam', { id: p.id }); if (r?.added) added++; else if (r?.queued) queued++; }
+    steam.queue = await call('steam:overview').then((o) => o.queue).catch(() => steam.queue);
+    toast(queued ? `${queued} waiting for Apply on the Games page (Steam restarts)` : `${added} added to Steam`, 'ok', 3500, 'mdiSteam');
+  } catch (e) { toast(e.message, 'error', 6000); }
+  portsBusy.value = false; loadPorts();
+}
 function step(d) { const i = PAGES.findIndex((p) => p.v === page.value); setPage(PAGES[(i + d + PAGES.length) % PAGES.length].v); }
 defineExpose({ step });
 // Collections (0.9.32 redesign): one row per console in the library with the Steam collection its games go into

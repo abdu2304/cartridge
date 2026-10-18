@@ -172,7 +172,7 @@ LT/RT switch top tabs. LB/RB only switch sections inside a page. A select, B bac
 - Patches (`electron/patches.js`, PatchesSheet.vue, `patches:list`/`patches:apply`): RPCS3 `config/patch_config.yml` (js-yaml FAILSAFE), shadPS4 `isEnabled` on `<Metadata>`; `patches.json` records what Cartridge turned on, the only ones it turns off. PCSX2 not done (done in 0.9.3 K).
 - `versionName` in package.json is what users see ("0.9.3 I"); the number keeps rising. `test-build.yml` builds an AppImage for every `claude/**` push.
 - UI: Home rows of 15 + Show all (`store.homeLists`), delete ring (`Ring.vue`, `delete-progress`), game page More grouped (Steam and emulator, Details and artwork), score/age badges, one RomM tab in Settings (`OLD_SEC`), Report a problem (About), Refresh Library (Quick Menu), Hidden Games (Settings → Achievements), RA tab filter and sort. RomM game fields read in `electron/romm.js` (tested).
-- Owner's open items: shadPS4 PS4 games start only after opening shadPS4 once (black screen 30 s, not IPC; the owner later said it was fixed: confirm, handover Part 9); options for Discuss items in `docs/options-0.9.3.md`.
+- Owner's open items: options for Discuss items in `docs/options-0.9.3.md`. (The shadPS4 "only starts after opening it once" note is closed: the owner said on 18 Oct 2026 it's no longer true.)
 
 ## 0.9.3 K (owner's picks, 2 Oct 2026; log: docs/SESSION-LOG.md)
 - Achievements: `AchAll.vue` is the default tab (`store.achTab = 'all'`), RA + trophies merged, grouped by console; LB/RB: all, ra, others.
@@ -692,6 +692,12 @@ LT/RT switch top tabs. LB/RB only switch sections inside a page. A select, B bac
 ## 0.9.78 · Saves on a New Device (18 Oct 2026; handover Part 25)
 - Sweep rounds 5 and 6. `test/e2e/online.js` (in CI): ten emulators' settings files as after a first start (Flatpak folders), every Online Play kind on and off through `online:set`/`online:field` (required fields refused first, files read back as JSON/YAML/XML/ini); 37 checks, clean. `test/e2e/saves.js` (in CI): device one's RetroArch .srm and PPSSPP SAVEDATA found, matched and sent; device two gets them back byte for byte. `mockRomm` has a saves API (GET/POST /api/saves, content, downloaded) and `sfo()`.
 - Fixed: `saveSync.placeFor` 'ra'/'rastate' place into RetroArch's saves/states folder when `retroarch.cfg` exists even before the folder does (it was `unplaced` `nofolder` on a device that had never saved). Unit test in `test/saveSync.test.js`.
+
+## 0.9.79 · Your Answers (18 Oct 2026; handover Part 26)
+- RomM features: `electron/rommFeatures.js` (`FEATURES`, `fromOpenApi`) reads RomM's `/openapi.json`; main `rommFeatures(force)` (10 min cache per server and version, everything on when there's no description), `rommLacks(k)`, `server:features`. Save Sync (`savesync:set`, `saveSyncRun`, status `oldRomm`), Trophy Sync (`ctx.notesMissing`) and Issues use it. Judge features by endpoints, never by guessed version numbers. `mockRomm` `ctl.openapi`.
+- Recipes: `game.tested` (NN.NN versions, note on other copies) and `game.find` (`{ files, depth }`, `findDir` in recipes.js as P.T.'s first_run.cpp searches). P.T.'s chunk1.psarc and texture.qar sit beside eboot.bin (owner).
+- Settings → Steam page `ports` (PC Ports: each installed port's Steam state, A opens its sheet, Add N to Steam via `recomps:steam`).
+- PS4 updates: `electron/ps4Layout.js` `arrange(dir, { sfo })` after a download unpacks (main `ps4Updates`): the update (param.sfo CATEGORY gp, same TITLE_ID) becomes `<game folder>-UPDATE` beside the game (shadPS4 fs.cpp). `sfoIndex` and `findEboot` skip `-UPDATE`/`-patch`/`-mods` folders.
 
 ## Releases (full steps: HANDOFF D8)
 Only when the owner asks. Bump `version` and `build.releaseInfo.releaseName` ("Cartridge X.Y.Z") in `package.json`, and set `versionName` (what Settings → About and update messages show). **0.9.3 is shipped in parts (owner, 1 Oct 2026):** the number goes up as usual (0.9.4, 0.9.5...) but `versionName` and the release title are "0.9.3 B", "0.9.3 C"... until the 0.9.3 plan is done; notes heading `## Cartridge 0.9.3 B · Title`. Then put only this version's notes in `RELEASE_NOTES.md` (heading `## Cartridge X.Y.Z · Title`), add them to the top of `CHANGELOG.md`, grouped as New / Changed / Fixed with bold lead-ins. CI builds, launch-checks and publishes.

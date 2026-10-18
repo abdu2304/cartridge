@@ -219,6 +219,7 @@ test('the engine: a port with its own installer (P.T.) runs it with your copy in
   assert.deepStrictEqual([i.tag, i.build], ['v1.0.5', 'linux']);
   assert.strictEqual(eng.list().entries.find((e) => e.id === 'pt').state, 'game');
   const copy = path.join(d, 'P.T. dump'); fs.mkdirSync(copy);
+  for (const f of ['eboot.bin', 'chunk1.psarc', 'texture.qar']) fs.writeFileSync(path.join(copy, f), f);
   const g = await eng.setVerifiedGame('pt', copy);
   assert.ok(g.ok && g.ready, JSON.stringify(g));
   const rec = eng.record('pt');
@@ -231,6 +232,7 @@ test('the engine: a port with its own installer (P.T.) runs it with your copy in
   assert.strictEqual(runs.length, 1);
   assert.match(fs.readFileSync(path.join(rec.dir, 'game/data/pt.ini'), 'utf8'), /^vsync=0$/m);
   const copy2 = path.join(d, 'Another dump'); fs.mkdirSync(copy2);
+  for (const f of ['chunk1.psarc', 'texture.qar']) fs.writeFileSync(path.join(copy2, f), f);
   await eng.setVerifiedGame('pt', copy2);
   assert.strictEqual(runs.length, 2);
 });
@@ -284,4 +286,24 @@ test('a Windows update is started once through the runner, in the port’s own p
   const s = RC.runCommand({ kind: 'sniper', proton: '/s/Proton', sniper: '/s/sniper', steam: '/s' }, '/g/bb/game.exe', [], pre);
   assert.deepStrictEqual([s.cmd, s.args], ['/s/sniper/_v2-entry-point', ['--verb=run', '--', '/s/Proton/proton', 'run', '/g/bb/game.exe']]);
   assert.strictEqual(s.env.STEAM_COMPAT_DATA_PATH, pre);
+});
+
+test('0.9.79: a copy outside the tested versions says so; P.T. finds its files as the port does', () => {
+  const d = tmp(), gw = recipe('gow3'), pt = recipe('pt');
+  const a = path.join(d, 'gow-a'); dump(a, 'CUSA01623', '01.02', gw.game.has);
+  assert.ok(RC.checkGame(gw, a, { sfo }).notes.every((n) => !/tested with versions/.test(n)), 'a tested version has no note');
+  const b = path.join(d, 'gow-b'); dump(b, 'CUSA01623', '01.03', gw.game.has);
+  const cb = RC.checkGame(gw, b, { sfo });
+  assert.ok(cb.ok && cb.notes.includes('It’s version 01.03; the port was tested with versions 01.00 and 01.02.'), JSON.stringify(cb));
+  // P.T.: beside eboot.bin (the owner's dump), or in a folder up to two down (first_run.cpp FindGameFolder)
+  const top = path.join(d, 'pt-top'); dump(top, 'CUSA01127', '01.00', ['chunk1.psarc', 'texture.qar']);
+  assert.ok(RC.checkGame(pt, top, { sfo }).ok);
+  const deep = path.join(d, 'pt-deep'); fs.mkdirSync(path.join(deep, 'dumps/CUSA01127'), { recursive: true });
+  for (const f of ['chunk1.psarc', 'texture.qar']) fs.writeFileSync(path.join(deep, 'dumps/CUSA01127', f), f);
+  assert.ok(RC.checkGame(pt, deep, { sfo }).ok);
+  const none = path.join(d, 'pt-none'); dump(none, 'CUSA01127', '01.00', ['chunk1.psarc']);
+  const cn = RC.checkGame(pt, none, { sfo });
+  assert.ok(!cn.ok && cn.problems.includes('chunk1.psarc and texture.qar aren’t in it or the folders inside it.'), JSON.stringify(cn));
+  assert.ok(RC.validate({ ...gw, game: { ...gw.game, tested: ['1.0'] } }).includes('game tested'));
+  assert.ok(RC.validate({ ...pt, game: { ...pt.game, find: { files: ['../x'] } } }).includes('game find'));
 });

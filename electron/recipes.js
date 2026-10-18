@@ -40,6 +40,8 @@ function validate(r) {
   if (!r.name) bad.push('name');
   if (!/^github:[\w.-]+\/[\w.-]+$/.test(r.repo || '')) bad.push('repo');
   if (!r.game?.console || !r.game?.title) bad.push('game');
+  if (r.game?.tested && !(Array.isArray(r.game.tested) && r.game.tested.every((v) => /^\d{2}\.\d{2}$/.test(v)))) bad.push('game tested');
+  if (r.game?.find && !(Array.isArray(r.game.find.files) && r.game.find.files.length && r.game.find.files.every((f) => f && !/[/\\]|^\.\.?$/.test(f)) && Number.isInteger(r.game.find.depth ?? 0))) bad.push('game find');
   if (!Array.isArray(r.builds) || !r.builds.length) bad.push('builds');
   for (const b of r.builds || []) {
     if (!['linux', 'windows'].includes(b.os)) bad.push(`build os ${b.os}`);
@@ -259,6 +261,30 @@ function runCommand(runner, program, args, prefix) {
 // ---- your copy: a dump folder (eboot.bin, sce_sys/param.sfo), its title ID and version, and what's missing
 const verNum = (v) => String(v || '').split('.').map((x) => parseInt(x, 10) || 0);
 const verCmp = (a, b) => { const x = verNum(a), y = verNum(b); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
+// the folder holding every one of find.files: the folder itself, then up to find.depth levels of folders inside it
+// (sce_sys and sce_module skipped, 256 folders a level), as the port's own search does
+function findDir(dir, find) {
+  const holds = (d) => find.files.every((f) => { try { return fs.statSync(path.join(d, f)).isFile(); } catch { return false; } });
+  if (holds(dir)) return dir;
+  let level = [dir];
+  for (let depth = 0; depth < (find.depth || 0) && level.length; depth++) {
+    const next = [];
+    for (const d of level) {
+      let names = []; try { names = fs.readdirSync(d, { withFileTypes: true }); } catch {}
+      for (const e of names) {
+        if (next.length >= 256) break;
+        if (e.name === 'sce_sys' || e.name === 'sce_module') continue;
+        const p = path.join(d, e.name);
+        let isDir = e.isDirectory(); if (!isDir && e.isSymbolicLink()) { try { isDir = fs.statSync(p).isDirectory(); } catch {} }
+        if (!isDir) continue;
+        if (holds(p)) return p;
+        next.push(p);
+      }
+    }
+    level = next;
+  }
+  return null;
+}
 function checkGame(r, dir, { sfo } = {}) {
   const g = r.game || {}, out = { ok: true, problems: [], notes: [] };
   let st; try { st = fs.statSync(dir); } catch { return { ok: false, problems: ['That folder isn’t there any more.'] }; }
@@ -267,9 +293,13 @@ function checkGame(r, dir, { sfo } = {}) {
   if (!st.isDirectory() && !pkg) return { ok: false, problems: ['That’s a file, not the game’s folder.'] };
   if (st.isDirectory()) {
     for (const f of g.has || []) if (!fs.existsSync(path.join(dir, f))) out.problems.push(`${f} isn’t in it.`);
+    // files the port finds by itself in the folder or a few folders down (P.T.: first_run.cpp FindGameFolder)
+    if (g.find && !findDir(dir, g.find)) out.problems.push(`${g.find.files.join(' and ')} ${g.find.files.length === 1 ? 'isn’t' : 'aren’t'} in it${g.find.depth ? ' or the folders inside it' : ''}.`);
     const p = sfo ? sfo(path.join(dir, 'sce_sys/param.sfo')) : {};
     out.id = p.TITLE_ID || null; out.version = p.APP_VER || p.VERSION || null; out.title = p.TITLE || null;
     if (out.id && g.ids?.length && !g.ids.includes(out.id)) out.notes.push(`It’s ${out.id}; the port is tested with ${g.ids.join(' and ')}.`);
+    // 0.9.79 (owner: yes): the versions the port was tested with, so a copy outside them says so plainly
+    if (g.tested?.length && out.version && !g.tested.includes(out.version) && !(g.version?.want && verCmp(out.version, g.version.want) < 0)) out.notes.push(`It’s version ${out.version}; the port was tested with ${g.tested.length === 1 ? 'version ' + g.tested[0] : 'versions ' + g.tested.slice(0, -1).join(', ') + ' and ' + g.tested.at(-1)}.`);
     if (g.version?.want && out.version && verCmp(out.version, g.version.want) < 0) {
       if (g.version.soft) out.notes.push(`It’s version ${out.version}. ${g.version.why}`);
       else { out.needsUpdate = g.version.want; out.problems.push(`It’s version ${out.version}; it needs ${g.version.want}.`); }

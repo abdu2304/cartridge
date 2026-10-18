@@ -25,7 +25,11 @@
    "sce_module/libc.prx",
    "sce_module/libSceFios2.prx"
   ],
-  "why": "Tested with CUSA01623 and CUSA01715, versions 01.00 and 01.02."
+  "why": "Tested with CUSA01623 and CUSA01715, versions 01.00 and 01.02.",
+  "tested": [
+   "01.00",
+   "01.02"
+  ]
  },
  "builds": [
   {
@@ -634,5 +638,5 @@
   "output": true,
   "why": "runtime_services.c prints Runtime: trophy N unlocked; names come from your copy's trophy file when a shadPS4 trophy key is set up"
  },
- "rev": 2
+ "rev": 3
 }

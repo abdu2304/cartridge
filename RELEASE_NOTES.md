@@ -1,7 +1,11 @@
-## Cartridge 0.9.78 · Saves on a New Device
+## Cartridge 0.9.79 · Your Answers
 
-### Fixed
-- **RetroArch saves didn't come down to a device that had never saved in RetroArch.** RetroArch makes its saves and states folders only at its first save, so Cartridge Save Sync left those saves waiting as "no folder". When RetroArch is set up, its folders are now made and the saves put in place.
+### New
+- **PC Ports in Settings → Steam.** A third page beside Games and Collections lists every installed port with whether it's in Steam, waiting for Apply, or not yet. Press A to open its sheet. Add to Steam puts in every port that isn't there yet.
+- **PS4 updates where shadPS4 looks for them.** A game downloaded with its update now has the update's folder placed beside the game as "<game folder>-UPDATE", read from each folder's own param.sfo. Nothing already there is replaced.
 
 ### Changed
-- **Two more checks before every release:** every Online Play feature of ten emulators switched on and off with their real settings files (refusals checked, every file read back in its own format), and saves carried from one device to another through Save Sync, byte for byte.
+- **An older RomM switches off what it can't do, and says so.** Cartridge reads the list of features your RomM publishes. If a server has no save slots, Cartridge Save Sync stays off and tells you to update RomM, instead of failing on every run. Trophy Sync does the same without game notes. Settings → Emulators → Issues lists what's off. A RomM that doesn't publish the list works exactly as before.
+- **Ports check your copy's version.** A copy outside the versions a port was tested with gets a plain note on its sheet (God of War III: tested with 01.00 and 01.02).
+- **P.T. checks your copy before installing.** It looks for chunk1.psarc and texture.qar beside eboot.bin, or in a folder inside the one you pick, the same way the port does.
+- **Update, patch and mods folders are never taken for the game.** Finding PS4 games on your drive and making their Steam shortcuts both skip them.
