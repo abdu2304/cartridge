@@ -7,6 +7,10 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 18 Oct 2026 · 0.9.77 · Every Button Pressed
+
+**Loop rounds 2 and 3:** crawl of every page, sheet and game More in four setups (`test/e2e/crawl.js`); three fixes (handover Part 24). Next rounds listed there.
+
 ## 17 Oct 2026 · 0.9.76 · Every Emulator Opens
 
 **Asked:** Vita3K's sheet didn't open; test every setup and keep looping until there are no bugs. Fixed with a setups sweep in CI (handover Part 23); the wider sweep continues.

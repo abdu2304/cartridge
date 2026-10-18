@@ -123,6 +123,12 @@ async function until(fn, ms = 15000, step = 150) { const t = Date.now(); while (
       const got = inst?.[g.id];
       check(`unpacked by hand: ${g.name}`, got === want, String(got || 'not found').replace(roms, ''));
     }
+    // 4c. Favourites: RomM's favourite collection made on first use, the game in it (0.9.76 crawl)
+    {
+      const on = await page.evaluate(() => window.cart.call('fav:set', { romId: 1, on: true }).then((r) => r.data ?? r));
+      const cols = await page.evaluate(() => window.cart.call('library:get').then((r) => (r.data || r)?.collections || []).catch(() => []));
+      check('Add to Favourites', on === true && cols.some?.((c) => c.favorite && c.rom_ids.includes(1)), JSON.stringify(on));
+    }
     // 4b. a game moved to the other drive, then that drive unplugged: shown as away, not as never downloaded (0.9.71)
     {
       const moved = await page.evaluate((root) => window.cart.call('library:moveGame', { romId: 1, root }).then((r) => r.data || r, (e) => ({ error: e.message })), drive2);

@@ -120,7 +120,7 @@ async function more() {
   if (v === 'link') { await linkGame(); return; }
   if (v === 'reset') { await call('icon:reset', { key }); iconChanged(key); toast('Icon reset', 'ok', 2000, 'mdiRestore'); return; }
   if (v !== 'icon') return;
-  if (!store.config.sgdbKey) { toast('Add a SteamGridDB API key in Settings → Look & Feel first', 'error', 4500); return; }
+  if (!store.config.sgdbKey) { toast('Pictures come from SteamGridDB: add your free key in Settings → Look & Feel → Metadata.', 'info', 5000, 'mdiKeyVariant'); return; }
   const url = await openModal('art', { kind: 'icon', romName: rom.value?.name || g.value.title.replace(/[™®©]/g, '') });
   if (!url) return;
   await call('icon:set', { key, url });

@@ -18,7 +18,7 @@ permissions:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,6 +35,8 @@ jobs:
         run: E2E_GAMES=20000 xvfb-run -a node test/e2e/run.js
       - name: Every emulator setup (AppImages, Flatpaks, EmuDeck, nothing)
         run: xvfb-run -a node test/e2e/setups.js
+      - name: Every console's games into Steam, in each setup
+        run: xvfb-run -a node test/e2e/steam.js
       - uses: actions/upload-artifact@v4
         if: always()
         with:
