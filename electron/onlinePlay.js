@@ -108,6 +108,8 @@ function createOnline(ctx) {
     const { a, dir, before, t } = prep(emu), k = a.kinds.find((x) => x.id === kind);
     if (!k || k.info) throw new Error('Unknown online feature.');
     if (on) for (const f of k.fields || []) if (f.required && !fieldValue(a, f, t)) throw new Error(`Set ${f.label} first.`);
+    // 0.9.80: a kind whose status says it isn't ready (Pretendo without the Wii U's files) can't be turned on
+    if (on && k.status) { let st = null; try { st = k.status({ dir, home, exists, get: (ref) => get(a, t, ref) }); } catch {} if (st && !st.ready) throw new Error(st.note || 'It isn’t ready yet.'); }
     for (const [ref, v] of pairsOf(a, t, on ? k.on : k.off)) put(a, t, ref, v);
     write(a, dir, before, t);
     remember(emu, (r) => { r.kinds[kind] = { on, at: Date.now() }; r.wroteAt = Date.now(); r.issues = (r.issues || []).filter((i) => i.kind !== kind); });

@@ -51,7 +51,7 @@
 <script setup>
 import { computed, nextTick, onMounted, ref } from 'vue';
 import { store, call, toast, choose, romById, cover } from '../store.js';
-import { steam, applyChanges } from '../steam.js';
+import { steam, applyChanges, vitaFgOk, isVita } from '../steam.js';
 import { useView } from '../useView.js';
 import { ensureFocus } from '../nav.js';
 import Icon from '../components/Icon.vue';
@@ -75,6 +75,7 @@ const groups = computed(() => {
 async function load() { try { d.value = await call('steam:frameGen'); } catch (e) { toast(e.message, 'error'); d.value = { found: {}, conf: {}, games: [], consoles: [] }; } }
 async function set(scope, id, value) {
   if (value && value !== 'off' && !d.value.found[value]) return toast(`${NAME[value]} isn’t installed on this device.`, 'info', 3500);
+  if (scope === 'default' && !(await vitaFgOk(value, (d.value.consoles || []).some((c) => isVita(c.key)) && !(d.value.conf.consoles || {}).psvita))) return;
   try { await call('steam:setFrameGen', { scope, id, value }); await load(); } catch (e) { toast(e.message, 'error'); }
 }
 async function pick(scope, id, title, own) {
@@ -84,6 +85,9 @@ async function pick(scope, id, title, own) {
   ];
   const v = await choose({ sheet: true, title, options });
   if (!v) return;
+  // 0.9.80: Vita games get a word first (steam.js vitaFgOk): its console, one of its games, or all games while there are Vita games
+  const vita = scope === 'console' ? isVita(id) : scope === 'game' ? isVita((d.value.games || []).find((x) => x.romId === id)?.console) : (d.value.consoles || []).some((c) => isVita(c.key));
+  if (!(await vitaFgOk(v, vita))) return;
   await set(scope, id, v === 'inherit' ? null : v);
 }
 // each console with games in Steam, the way its Update button does it (changed in place when it can)

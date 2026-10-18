@@ -49,6 +49,7 @@ module.exports = function recompsIpc(m) {
       unpackTo: (archive, dir) => unpackTo(archive, dir),
       appImageType: (f) => D.appImageType(f), isElf: (f) => D.isElf(f),
       isRunning: (f) => progRunning(f),
+      playing: () => !!(m.gameFocus.away || m.runOn),
       trash: (p) => toTrash(p),
       // 0.9.66: the new release of an update started once, for a few seconds, then closed. It fails only when it can't
       // run at all here: missing libraries (127/126, "error while loading shared libraries"), a crash signal, or (once
@@ -111,7 +112,7 @@ module.exports = function recompsIpc(m) {
       const R = recomps(), RC = require('./recomps'), roms = libraryRoms();
       for (const e of R.catalogue().entries) {
         const rec = R.record(e.id);
-        if (!rec || !(e.saves?.length || e.from === 'verified')) continue;
+        if (!rec || !(e.saves?.length || e.from === 'verified' || rec.syncSaves?.length)) continue; // 0.9.80: link recomps' ticked folders
         const romIds = RC.matchRoms(e, roms);
         R.saveDirs(e.id).filter((d) => path.resolve(d) !== path.resolve(rec.dir)).forEach((d, i) => {
           const key = i ? `${e.id}-${i}` : e.id;
@@ -122,6 +123,26 @@ module.exports = function recompsIpc(m) {
       }
     } catch (er) { log('recomp save units', er.message); }
     return out;
+  }
+  // 0.9.80: what's running, read without holding the main thread (each /proc/<pid>/cmdline asked in turn)
+  async function runningAny(files) {
+    const fsp = fs.promises, want = files.flatMap((f) => { let r = f; try { r = fs.realpathSync(f); } catch {} return [...new Set([f, r])]; });
+    let pids = []; try { pids = (await fsp.readdir('/proc')).filter((d) => /^\d+$/.test(d)); } catch { return new Set(); }
+    const hit = new Set();
+    for (let i = 0; i < pids.length; i += 64) {
+      const got = await Promise.all(pids.slice(i, i + 64).map((d) => fsp.readFile(`/proc/${d}/cmdline`, 'utf8').catch(() => '')));
+      for (const c of got) for (const f of want) if (c && c.includes(f)) hit.add(f);
+    }
+    return new Set(files.filter((f) => hit.has(f) || [...hit].some((h) => { try { return fs.realpathSync(f) === h; } catch { return false; } })));
+  }
+  // a recomp that isn't set up yet, started from its Steam shortcut: the setup watch starts as if Open was pressed
+  async function watchFromSteam() {
+    const R = recomps(), wait = R.pendingSetup();
+    if (!wait.length) return 0;
+    const on = await runningAny(wait.map((w) => w.program));
+    let n = 0;
+    for (const w of wait) if (on.has(w.program)) { recompSetupWatch(w.id); n++; }
+    return n;
   }
   // installed recomps handed to the trophy reader (0.9.65): the ones that record achievements show in Achievements
   let recompTroSig = '[]';
@@ -280,6 +301,49 @@ module.exports = function recompsIpc(m) {
     return r;
   },
   'recomps:done': ({ id }) => recomps().markDone(id),
+  // 0.9.80: the save folders a link recomp's Save Sync takes, ticked by you from what Cartridge found (or one you pick)
+  'recomps:saveChoices': ({ id }) => recomps().saveChoices(id),
+  'recomps:setSyncSaves': ({ id, dirs }) => { const r = recomps().setSyncSaves(id, dirs); log('recomp save folders', id, r.chosen.length); return r; },
+  // 0.9.80: builds only from GitHub Actions: their run page in Cartridge's own window (signed in to GitHub there, kept
+  // in its own session); the artifact downloaded there installs as the update, then the window closes
+  'recomps:ciGet': ({ id }) => new Promise((resolve, reject) => {
+    const R = recomps(), e = R.byId(id), lt = R.list().entries.find((x) => x.id === id)?.latest;
+    if (!e || !lt?.ci?.url) return reject(new Error('Check for updates first.'));
+    const { BrowserWindow, session } = require('electron');
+    const ses = session.fromPartition('persist:github');
+    const bw = new BrowserWindow({ parent: m.win, width: 1280, height: 800, fullscreen: !!m.win?.isFullScreen(), autoHideMenuBar: true, backgroundColor: '#111', title: `${e.name}: GitHub build`, webPreferences: { session: ses, sandbox: true, contextIsolation: true } });
+    bw.webContents.setWindowOpenHandler(({ url: u }) => { if (/^https:\/\//i.test(u)) bw.loadURL(u); return { action: 'deny' }; });
+    bw.webContents.on('before-input-event', (_e, i) => { if (i.type === 'keyDown' && i.key === 'Escape') bw.close(); });
+    let took = false;
+    const onDl = (_e, item) => {
+      const fname = item.getFilename() || 'build.zip';
+      if (!/\.zip$/i.test(fname)) { item.cancel(); broadcast('toast', { text: 'GitHub’s builds come as .zip files: pick the build’s own download.', kind: 'error' }); return; }
+      took = true;
+      const file = path.join(m.USER_DATA, 'recomp-downloads', `${id}-${Date.now()}.zip`); fs.mkdirSync(path.dirname(file), { recursive: true });
+      item.setSavePath(file);
+      const key = 'recomp:' + id;
+      bgJob(key, { key, state: 'run', kind: 'Recomp', title: e.name, icon: 'mdiDownload', pct: null, text: 'Downloading from GitHub' });
+      setTimeout(() => { try { if (!bw.isDestroyed()) bw.close(); } catch {} }, 150);
+      item.on('updated', () => { const t = item.getTotalBytes(); bgJob(key, { pct: t ? Math.floor((item.getReceivedBytes() / t) * 100) : null }); });
+      item.once('done', async (_ev, state) => {
+        ses.removeListener('will-download', onDl);
+        if (state !== 'completed') { bgJob(key, { state: 'error', error: 'The download stopped.' }); fs.rmSync(file, { force: true }); return resolve({ cancelled: true }); }
+        try {
+          bgJob(key, { pct: null, text: 'Installing' });
+          const r = await R.install(id, { local: { file, name: fname, tag: lt.tag, date: lt.date, kind: lt.kind }, onProgress: (x) => broadcast('recomp-progress', { id, ...x }) });
+          recompTrophies();
+          if (r.programMoved) { try { const sp = recompShortcutSpec(id); await m.steamMgr.recompRepoint(id, { exe: sp.exe, start: sp.start, lo: sp.args }); } catch (er) { log('recomp shortcut repoint', er.message); } }
+          bgJob(key, { state: 'done', pct: 100, text: r.rolledBack ? 'Didn’t start: the earlier one is back' : 'Installed' });
+          broadcast('recomp-installed', { id, ...r });
+          resolve(r);
+        } catch (er) { bgJob(key, { state: 'error', error: er.message }); reject(er); }
+        finally { fs.rmSync(file, { force: true }); }
+      });
+    };
+    ses.on('will-download', onDl);
+    bw.on('closed', () => { refocus(); if (!took) { ses.removeListener('will-download', onDl); resolve({ closed: true }); } });
+    bw.loadURL(lt.ci.url);
+  }),
   // Add to Steam: queued and applied straight away when Steam can be changed while it runs; otherwise it waits for
   // Apply in Settings → Steam (Steam restarts for that), and the screen says so
   'recomps:steam': async ({ id }) => {
@@ -369,5 +433,5 @@ module.exports = function recompsIpc(m) {
   'recomps:setSettings': async ({ id, changes }) => { const d = await recomps().setSettings(id, changes); log('verified settings', id, (changes || []).map((x) => `${x.id}=${x.value}`).join(' ')); return d; },
   'recomps:runner': () => { const r = require('./protonRunner').find({ roots: (() => { try { return m.steamMgr.steamRoots(); } catch { return []; } })() }); return r ? { kind: r.kind, name: r.name } : null; },
   };
-  return { handlers, recomps, ssUnits, recompTrophies };
+  return { handlers, recomps, ssUnits, recompTrophies, watchFromSteam };
 };

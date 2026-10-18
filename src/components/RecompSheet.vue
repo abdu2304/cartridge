@@ -26,6 +26,7 @@
           <div v-if="e.installed"><b>Here</b><span class="mono">{{ short(e.installed.dir) }}</span></div>
           <div v-if="e.installed?.game"><b>Your Copy</b><span class="mono">{{ short(e.installed.game.file) }}{{ e.installed.game.checked === false ? ' (used anyway)' : '' }}</span></div>
           <div v-if="e.saves?.length"><b>Saves</b><span>Backed up before every update and removal, then checked.</span></div>
+          <div v-else-if="e.installed && ['link', 'found', 'kept'].includes(e.from)"><b>Saves</b><span>{{ e.syncSaves?.length ? `Save Sync keeps ${e.syncSaves.length === 1 ? 'the folder' : e.syncSaves.length + ' folders'} you picked in RomM.` : 'Backed up before every update. Pick its save folders below for Save Sync.' }}</span></div>
         </div>
         <!-- 0.9.67: checking your copy, then the recomp building its own files on its first start, with how much it has written -->
         <div v-if="setupJob" class="rcs-job small"><Icon name="mdiCogOutline" :size="16" class="spin" />{{ setupJob.key.startsWith('recompset:') ? 'Checking your copy' : 'Setting itself up' }}{{ setupJob.text ? ' · ' + setupJob.text : '' }}{{ setupJob.pct != null ? ` · ${setupJob.pct}%` : '' }}<span class="up-bar"><i :style="{ width: (setupJob.pct || 4) + '%' }" /></span></div>
@@ -44,6 +45,8 @@
             <button class="lrow" data-focus data-key="rc-open" @click="openIt"><Icon name="mdiPlay" :size="24" /><span class="l-mid"><b>{{ e.installed.kind === 'windows' ? 'Open Through Steam' : 'Open' }}</b><span class="l-sub">{{ e.installed.kind === 'windows' ? 'A Windows build: Proton runs it, as it will in play' : 'Start it here' }}</span></span></button>
             <button v-if="!e.update" class="lrow" data-focus :disabled="checking" @click="check"><Icon name="mdiRefresh" :size="24" :class="{ spin: checking }" /><span class="l-mid"><b>Check for Updates</b><span class="l-sub">{{ e.installed.tag }}{{ e.latest?.at ? ' · checked ' + ago(e.latest.at) : '' }}</span></span></button>
             <button class="lrow" data-focus @click="channel"><Icon name="mdiSourceBranch" :size="24" /><span class="l-mid"><b>Updates: {{ e.installed.channel === 'pre' ? 'Pre-releases' : 'Stable' }}</b><span class="l-sub">Which releases it updates to. Never automatic.</span></span></button>
+            <!-- 0.9.80: a link recomp's saves are where it puts them: Save Sync takes only folders you tick -->
+            <button v-if="['link', 'found', 'kept'].includes(e.from) && !e.saves?.length" class="lrow" data-focus data-key="rc-sync" @click="syncSaves"><Icon name="mdiCloudSyncOutline" :size="24" /><span class="l-mid"><b>Saves for Save Sync</b><span class="l-sub">{{ e.syncSaves?.length ? e.syncSaves.map(short).join(', ') : 'None picked yet: only backed up' }}</span></span></button>
             <button v-if="saveBaks.length" class="lrow" data-focus @click="restore"><Icon name="mdiContentSaveMoveOutline" :size="24" /><span class="l-mid"><b>Save Backups</b><span class="l-sub">{{ saveBaks.length }} kept, newest {{ ago(saveBaks[0].at) }}. Put one back</span></span></button>
             <button v-if="kept.length" class="lrow" data-focus @click="versions"><Icon name="mdiHistory" :size="24" /><span class="l-mid"><b>Roll Back</b><span class="l-sub">{{ kept.length }} earlier {{ kept.length === 1 ? 'version' : 'versions' }} kept</span></span></button>
             <button class="lrow" data-focus @click="remove"><Icon name="mdiDeleteOutline" :size="24" /><span class="l-mid"><b>Remove</b><span class="l-sub">Saves backed up first, the folder goes to the Trash</span></span></button>
@@ -94,7 +97,7 @@ const latestText = computed(() => {
   if (!l) return why.value ? 'Couldn’t check its newest release' : 'Checking its newest release…'; // 0.9.68: a failed check said "Checking" for good
   if (l.none === 'nobuild') return 'Its newest release has no Linux or Windows build';
   if (l.none) return 'No releases yet';
-  return `${l.tag} · ${l.kind === 'windows' ? 'Windows build, through Proton' : 'Linux build'}`;
+  return `${l.tag} · ${l.kind === 'windows' ? 'Windows build, through Proton' : 'Linux build'}${l.ci ? ', from GitHub Actions' : ''}`;
 });
 let resolveOuter = null;
 const reopen = () => { store.modal = { type: 'recomp', props: { id: props.id }, resolve: resolveOuter }; };
@@ -128,14 +131,42 @@ async function install() {
     }
   }
   try {
-    const r = await call('recomps:install', { id: props.id });
+    let r = await call('recomps:install', { id: props.id });
+    // 0.9.80: builds only from GitHub Actions: downloading needs you signed in to GitHub, in Cartridge's own window
+    if (r.ci) {
+      const go = await confirm('Built by GitHub Actions', `${e.value.name} publishes its builds only from GitHub Actions (${r.name}, ${r.tag}). GitHub asks you to sign in before it lets anyone download one.\n\nCartridge opens the build’s page: sign in, then pick ${r.name} under Artifacts. It installs by itself.`, 'Open GitHub');
+      reopen();
+      if (!go) return load();
+      r = await call('recomps:ciGet', { id: props.id });
+      if (r.closed || r.cancelled) return load();
+    }
     // 0.9.66: the new release is started once; one that can't run here goes back to the one that worked
     if (r.rolledBack) { why.value = `${r.newTag} couldn’t start here (${r.why}), so ${e.value.name} went back to ${r.tag}. Your saves are as they were.`; toast(`${r.newTag} couldn’t start, kept ${r.tag}`, 'error', 6000); }
     else if (r.rollBackFailed) why.value = `${r.tag} couldn’t start here (${r.why}), and going back failed: ${r.rollBackFailed}. Use Roll Back.`;
     else if (r.started === false) why.value = `${r.tag} is installed but couldn’t start here (${r.why}). Flatpak keeps no earlier version to go back to.`;
+    else if (r.setupAgain) { why.value = r.setupAgain; toast(`Updated to ${r.tag}: set it up again`, 'info', 5000, 'mdiCogOutline'); }
     else toast(r.already ? 'Already the newest' : r.updated ? `Updated to ${r.tag}${r.started ? ', started once to check' : ''}${r.restored ? ', saves put back' : ''}` : `${e.value.name} is installed`, 'ok', 3000, 'mdiCheck');
+    if (r.kept) toast(r.kept, 'info', 8000, 'mdiFileReplaceOutline');
   } catch (er) { why.value = er.message; }
   load();
+}
+// 0.9.80 (agreed plan 7.1 #13): which folders hold a link recomp's saves, ticked by you; only those go to RomM
+async function syncSaves() {
+  for (;;) {
+    const c = await call('recomps:saveChoices', { id: props.id }).catch(() => ({ found: [], chosen: [] }));
+    const v = await choose({ title: 'Saves for Save Sync', message: c.found.length ? 'Tick the folders that hold its saves. Save Sync keeps only these in RomM, never its own program files.' : 'Cartridge found no folders it writes to yet. Play it once, or pick its save folder.', options: [
+      ...c.found.map((f) => ({ label: short(f.path), sub: f.chosen ? 'Synced' : 'Not synced', value: f.path, icon: f.chosen ? 'mdiCheckboxMarkedOutline' : 'mdiCheckboxBlankOutline', selected: f.chosen, raw: true })),
+      { label: 'Pick Another Folder', sub: 'In your home folder', value: '__pick', icon: 'mdiFolderOpenOutline' },
+      { label: 'Done', value: '__done', icon: 'mdiCheck' },
+    ] });
+    if (!v || v === '__done') break;
+    let dirs = c.chosen;
+    if (v === '__pick') { const d = await pickFolder({ title: 'Its Save Folder', start: store.info?.home, hidden: true }); if (!d) continue; dirs = [...dirs, d]; }
+    else dirs = dirs.includes(v) ? dirs.filter((x) => x !== v) : [...dirs, v];
+    const r = await call('recomps:setSyncSaves', { id: props.id, dirs }).catch((er) => { toast(er.message, 'error', 5000); return null; });
+    if (r && dirs.length > r.chosen.length) toast('That folder can’t be synced: it has to be inside your home folder, not your whole home or the recomp’s own folder.', 'info', 6000);
+  }
+  reopen(); load();
 }
 async function check() {
   checking.value = true; why.value = '';

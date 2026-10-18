@@ -641,6 +641,12 @@ async function more() {
   // Online Play (0.9.66): the online features of this console's emulators, on or off, opening Settings → Online Play
   const ops = await Promise.race([call('online:forConsole', { slugs }).catch(() => []), new Promise((r) => setTimeout(() => r([]), 1200))]);
   for (const o of ops || []) play.push({ label: `Online Play: ${o.label}`, sub: o.kinds.map((k) => `${k.name} ${k.on ? 'on' : 'off'}`).join(' · '), value: 'online', icon: 'mdiWeb', raw: true });
+  // 0.9.80: RetroArch netplay, hosted or joined straight from here (the game starts in RetroArch with it)
+  const ra = installedPath.value && !marked.value ? await Promise.race([call('online:raInfo', { romId: Number(props.romId) }).catch(() => null), new Promise((r) => setTimeout(() => r(null), 1200))]) : null;
+  if (ra?.can) {
+    play.push({ label: 'Host This Game Online', sub: `Starts it in RetroArch for friends to join (port ${ra.port})`, value: 'rahost', icon: 'mdiAccountMultiplePlusOutline' });
+    play.push({ label: 'Join a Friend’s Game', sub: 'Type their address and start it in RetroArch', value: 'rajoin', icon: 'mdiLanConnect' });
+  }
   if (installedPath.value && !marked.value) play.push({ label: 'Game settings', sub: `${pe || (/\bpsx\b/i.test(slugs) ? 'DuckStation' : 'The emulator')}’s settings for this game only`, value: 'gamesettings', icon: 'mdiTune' });
   // patches and cheats are in Game Add-ons (0.9.24, owner: no separate row for them here)
   // 0.9.28 (owner: PS4 patches had gone from here): PS3 and PS4 too; Game Add-ons shows only the tabs the console has
@@ -713,6 +719,17 @@ async function more() {
   if (v === 'steamapply') { await applyChanges(); return; }
   if (v === 'gameemu') { await pickGameEmu(); return; }
   if (v === 'online') { store.settingsSection = 'online'; store.settingsDirect = true; go('settings'); return; }
+  if (v === 'rahost' || v === 'rajoin') {
+    let host = '', port = '';
+    if (v === 'rajoin') {
+      host = await askText({ title: 'Your friend’s address', placeholder: 'Like 203.0.113.7, or a name', value: store.config.ui?.raJoin || '' });
+      if (!host) return;
+      const m = /^(.*?)(?::(\d+))?$/.exec(String(host).trim()); host = m[1]; port = m[2] || '';
+      saveConfig({ ui: { raJoin: String(host).trim() + (port ? ':' + port : '') } });
+    }
+    try { const r = await call('online:raPlay', { romId: Number(props.romId), mode: v === 'rahost' ? 'host' : 'join', host, port }); toast(v === 'rahost' ? `Hosting ${base.value.name}: friends join on port ${r.port}` : `Joining ${host}`, 'ok', 3500, 'mdiWeb'); } catch (e) { toast(e.message, 'error', 6000); }
+    return;
+  }
   if (v === 'gamesettings') { openModal('gamesettings', { romId: Number(props.romId), name: base.value.name }); return; }
   if (v === 'shadver') {
     const sv = await call('steam:shadVersions', { romId: Number(props.romId) }).catch(() => null);

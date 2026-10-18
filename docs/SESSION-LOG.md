@@ -7,6 +7,9 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 18 Oct 2026 · 0.9.80 · Loose Ends, Tied
+Owner: "Build 2, 3 and 4" of the What's left answer. Built: link recomps (Save Sync for ticked folders, setup after an update, GitHub Actions builds, Steam-start setup watch, Windows trial prefix), Cemu Pretendo switch and RetroArch host/join, the Vita frame generation warning. Formats read from Cemu's CemuConfig.cpp/XMLConfig.h and RetroArch's retroarch.c/config.def.h. Details in handover Part 27.
+
 ## 18 Oct 2026 · 0.9.79 · Your Answers
 Owner answered the six open questions (yes, yes, P.T.'s files beside eboot.bin, yes, the shadPS4 note is no longer true, yes). Built all of them: RomM features from its /openapi.json, recipe `tested` and `find`, Settings → Steam → PC Ports, PS4 updates as `<game>-UPDATE`; the shadPS4 note closed in CLAUDE.md and the handover. Details in handover Part 26. The owner also asked whether Claude Code on their Linux desktop could run the tests there and look at the screen: answered in chat (yes for running and launching things and reading screenshots; it runs on their computer, started by them).
 

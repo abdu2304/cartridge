@@ -1992,6 +1992,8 @@ module.exports = function createSteamManager(ctx) {
     candidatesFor: (key) => az(candidates(key).map((c) => ({ id: c.id, label: c.label, sub: shortPath(c.t.how === 'flatpak' ? c.t.from : c.t.exe), fork: !!c.fork }))),
     // one game's own Target, Start in and Launch options (console page, 0.9.15); null goes back
     setGameTemplate: (romId, t) => { const c = cfg(); c.gameTemplates ||= {}; if (t) c.gameTemplates[romId] = parseTemplate(t); else delete c.gameTemplates[romId]; ctx.saveConfig(); return true; },
+    // the command a game's shortcut would run, without Steam (0.9.80: RetroArch netplay starts it with its flags)
+    directCommand: (romId) => { const g = installedGames().find((x) => x.rom.id === Number(romId)); if (!g?.file) return null; const t = templateForGame(g.rom.id, g.key); if (!t) return null; const { args, missing } = buildLaunch(g.rom, g.file, t); return missing ? null : { exe: t.exe, args, pre: t.pre || [], start: startOf(t), how: t.how, key: g.key, name: g.rom.name }; },
     gameTemplate: (romId, key) => { const t = templateForGame(romId, key); return t ? { exe: t.exe, start: startOf(t), lo: [...(t.pre || []), ...(t.command ? ['%command%'] : []), t.args].join(' '), how: t.how, own: !!(cfg().gameTemplates || {})[romId] } : null; },
     setGameEmu: (romId, id) => { const c = cfg(); c.gameEmus ||= {}; if (id) c.gameEmus[romId] = id; else delete c.gameEmus[romId]; ctx.saveConfig(); return true; },
     gameEmu: (romId) => (cfg().gameEmus || {})[romId] || null,

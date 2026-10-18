@@ -396,3 +396,110 @@ test('a recomp from a link: set up when you say so, saves guessed for backups on
   assert.deepStrictEqual(got, [path.relative(w.d, path.join(rec.dir, 'config.ini')), path.relative(w.d, path.join(rec.dir, 'saves')), path.relative(w.d, cfg)].sort());
   assert.deepStrictEqual(w.eng.saveDirs(r.id), [], 'Save Sync never gets guessed folders');
 });
+
+test('0.9.80: builds only from GitHub Actions: the newest Linux artifact, installed from the file you download', async () => {
+  const arts = { artifacts: [
+    { id: 7, name: 'game-macos', expired: false, created_at: '2026-10-17T10:00:00Z', workflow_run: { id: 70, head_branch: 'main' } },
+    { id: 8, name: 'game-linux-x64', expired: true, created_at: '2026-10-18T10:00:00Z', workflow_run: { id: 80, head_branch: 'main' } },
+    { id: 9, name: 'game-linux-x64', expired: false, created_at: '2026-10-16T09:30:00Z', workflow_run: { id: 90, head_branch: 'main' }, size_in_bytes: 4000 },
+    { id: 10, name: 'game-windows', expired: false, created_at: '2026-10-16T12:00:00Z', workflow_run: { id: 91, head_branch: 'main' } },
+  ] };
+  const ci = await R.ciBuildOf({ repo: 'github:o/openmbu' }, { fetchImpl: async (u) => (/actions\/artifacts/.test(u) ? { ok: true, json: async () => arts } : { ok: false }) });
+  assert.deepStrictEqual([ci.tag, ci.kind, ci.name, ci.ci.url], ['build 2026-10-16 09:30', 'linux', 'game-linux-x64', 'https://github.com/o/openmbu/actions/runs/90']);
+  assert.strictEqual((await R.ciBuildOf({ repo: 'github:o/x', builds: 'windows' }, { fetchImpl: async () => ({ ok: true, json: async () => arts }) })).kind, 'windows');
+  // the engine: no release with a build, so install says where the build is; the file downloaded there installs
+  const w = fakeWorld([], { fetchImpl: async (u) => (/actions\/artifacts/.test(u) ? { ok: true, json: async () => arts } : /releases/.test(u) ? { ok: true, json: async () => [] } : { ok: false, status: 404, json: async () => ({}) }) });
+  const r = w.eng.addLink({ repo: 'github:o/openmbu', console: 'n64', title: 'Game', name: 'game' });
+  const a = await w.eng.install(r.id);
+  assert.deepStrictEqual([a.ci.run, a.tag], [90, 'build 2026-10-16 09:30']);
+  assert.strictEqual(w.eng.record(r.id), null, 'nothing installed yet');
+  const src = path.join(w.d, 'art', 'Game'); fs.mkdirSync(src, { recursive: true }); fs.writeFileSync(path.join(src, 'Game'), '#!/bin/sh\necho hi\n' + ' '.repeat(600 * 1024));
+  const tgz = path.join(w.d, 'art', 'game-linux-x64.tar.gz'); execFileSync('tar', ['-czf', tgz, '-C', path.join(w.d, 'art'), 'Game']);
+  const done = await w.eng.install(r.id, { local: { file: tgz, name: 'game-linux-x64.tar.gz', tag: a.tag, kind: 'linux' } });
+  assert.deepStrictEqual([done.tag, done.kind, path.basename(done.program)], ['build 2026-10-16 09:30', 'linux', 'Game']);
+  assert.strictEqual((await w.eng.install(r.id)).already, true, 'the same build isn’t asked for again');
+});
+
+test('0.9.80: after an update, set up again when its done file went; files you made never replaced by the release', async () => {
+  const entry = { id: 'game', name: 'Game', games: [{ title: 'Game', console: 'n64' }], repo: 'github:o/game', builds: 'linux', program: 'Game', saves: [], needs: { what: 'x', files: 'any' }, setup: { how: 'picker' }, done: 'game.o2r' };
+  const w = fakeWorld([entry]);
+  w.publish('v1', 'one');
+  const r1 = await w.eng.install('game'), dir = path.dirname(r1.program);
+  fs.writeFileSync(path.join(dir, 'game.o2r'), 'made by its setup');
+  fs.writeFileSync(path.join(dir, 'controls.cfg'), 'mine');
+  assert.strictEqual(w.eng.ready('game'), true);
+  // v2 brings its own controls.cfg, and its update moves game.o2r away (the done file is gone afterwards)
+  w.publish('v2', 'two');
+  const v2 = path.join(w.d, 'srv', 'v2', 'Game'); fs.writeFileSync(path.join(v2, 'controls.cfg'), 'default');
+  execFileSync('tar', ['-czf', path.join(w.d, 'srv', 'v2', 'Game-Linux-x64.tar.gz'), '-C', path.join(w.d, 'srv', 'v2'), 'Game']);
+  fs.rmSync(path.join(dir, 'game.o2r'));
+  const r2 = await w.eng.install('game');
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'controls.cfg'), 'utf8'), 'mine', 'yours stays in place');
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'controls.cfg.cartridge-release'), 'utf8'), 'default');
+  assert.match(r2.kept, /controls\.cfg/);
+  // the done file had been there before this update only if it existed: here it was removed before, so no ask
+  assert.strictEqual(r2.setupAgain, undefined);
+  // now with the done file there before an update that loses it
+  fs.writeFileSync(path.join(dir, 'game.o2r'), 'made');
+  w.publish('v3', 'three');
+  const v3 = path.join(w.d, 'srv', 'v3', 'Game'); fs.writeFileSync(path.join(v3, 'game.o2r'), 'stale'); // the release ships one: it's put beside, yours stays
+  execFileSync('tar', ['-czf', path.join(w.d, 'srv', 'v3', 'Game-Linux-x64.tar.gz'), '-C', path.join(w.d, 'srv', 'v3'), 'Game']);
+  const r3 = await w.eng.install('game');
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'game.o2r'), 'utf8'), 'made');
+  assert.strictEqual(r3.setupAgain, undefined);
+  // the files listed as v3's own are the release's, so the next update keeps them aside, never yours
+  assert.ok(w.eng.record('game').files.includes('game.o2r.cartridge-release') && !w.eng.record('game').files.includes('controls.cfg'));
+  w.publish('v4', 'four');
+  fs.rmSync(path.join(w.d, 'srv', 'v4', 'Game', 'assets.dat'));
+  execFileSync('tar', ['-czf', path.join(w.d, 'srv', 'v4', 'Game-Linux-x64.tar.gz'), '-C', path.join(w.d, 'srv', 'v4'), 'Game']);
+  // a release that had game.o2r as its own file: the update keeps it aside with the rest, so the done file goes
+  const rec = w.eng.record('game'); rec.files = [...rec.files, 'game.o2r'];
+  const r4 = await w.eng.install('game');
+  assert.match(r4.setupAgain, /set it up again/);
+  assert.strictEqual(w.eng.ready('game'), false);
+});
+
+test('0.9.80: a link recomp’s Save Sync takes only the folders you tick, never home or its own folder', async () => {
+  const w = fakeWorld([]), home0 = process.env.HOME;
+  process.env.HOME = w.home;
+  try {
+    const r = w.eng.addLink({ repo: 'github:o/game', console: 'n64', title: 'Game', name: 'game' });
+    w.publish('v1', 'x', 600 * 1024);
+    await w.eng.install(r.id);
+    const rec = w.eng.record(r.id), cfg = path.join(w.home, '.config', 'Game');
+    fs.mkdirSync(cfg, { recursive: true }); fs.mkdirSync(path.join(rec.dir, 'saves'));
+    assert.deepStrictEqual(w.eng.saveDirs(r.id), []);
+    const c = w.eng.saveChoices(r.id);
+    assert.ok(c.found.some((f) => f.path === cfg) && c.found.every((f) => !f.chosen));
+    // the emulation folder sits outside this fake home, so a folder inside the recomp's own counts too
+    const set = w.eng.setSyncSaves(r.id, [cfg, path.join(rec.dir, 'saves'), w.home, rec.dir, '/etc', path.join(w.home, '.config')]);
+    assert.deepStrictEqual(set.chosen.sort(), [cfg, path.join(rec.dir, 'saves')].sort());
+    assert.deepStrictEqual(w.eng.saveDirs(r.id).sort(), set.chosen.sort());
+    assert.deepStrictEqual(w.eng.list().entries.find((x) => x.id === r.id).syncSaves.sort(), set.chosen.sort());
+  } finally { process.env.HOME = home0; }
+});
+
+test('0.9.80: pending setups for a start from Steam; a Windows update gets its own prefix for the trial start', async () => {
+  const entry = { id: 'soh', name: 'Ship', games: [{ title: 'Ship', console: 'n64' }], repo: 'github:o/soh', builds: 'linux', program: 'Game', saves: [], needs: { what: 'x', files: 'any' }, setup: { how: 'picker' }, done: 'oot.o2r' };
+  const runs = [], trials = [];
+  const w = fakeWorld([entry], {
+    runner: async () => ({ kind: 'proton', proton: '/p/Proton', steam: '/s' }),
+    runProgram: async (cmd, args, o) => { runs.push([cmd, ...args]); fs.mkdirSync(path.join(o.env.STEAM_COMPAT_DATA_PATH, 'pfx'), { recursive: true }); return ''; },
+    trialRun: async (t) => { trials.push(t); return { ok: true }; },
+  });
+  w.publish('v1', 'one');
+  await w.eng.install('soh');
+  assert.deepStrictEqual(w.eng.pendingSetup().map((x) => x.id), ['soh']);
+  fs.writeFileSync(path.join(path.dirname(w.eng.record('soh').program), 'oot.o2r'), 'x');
+  assert.deepStrictEqual(w.eng.pendingSetup(), []);
+  // a Windows link build: the update makes Cartridge's prefix once with wineboot, then starts it through Proton
+  const r = w.eng.addLink({ repo: 'github:o/win', console: 'n64', title: 'Win', name: 'win' });
+  const pub = (tag) => { const src = path.join(w.d, 'w', tag, 'Win'); fs.mkdirSync(src, { recursive: true }); fs.writeFileSync(path.join(src, 'Win.exe'), 'MZ' + tag); const t = path.join(w.d, 'w', tag, 'Win-windows.tar.gz'); execFileSync('tar', ['-czf', t, '-C', path.join(w.d, 'w', tag), 'Win']); return t; };
+  const t1 = pub('w1'), t2 = pub('w2');
+  await w.eng.install(r.id, { local: { file: t1, name: 'Win-windows.tar.gz', tag: 'w1', kind: 'windows' } });
+  assert.strictEqual(runs.length, 0, 'no prefix for a first install');
+  const u = await w.eng.install(r.id, { local: { file: t2, name: 'Win-windows.tar.gz', tag: 'w2', kind: 'windows' } });
+  assert.ok(runs.some((c) => c.includes('wineboot')), 'the prefix made with wineboot');
+  assert.strictEqual(u.started, true);
+  assert.ok(trials.some((t) => /proton$/.test(t.program) && t.argv.includes('run')), 'started through Proton');
+});

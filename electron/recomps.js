@@ -106,6 +106,26 @@ async function releaseOf(e, { pre = false, fetchImpl } = {}) {
   return ok.find((x) => want(x.assets)) || ok[0] || null;
 }
 
+// 0.9.80 (agreed plan 7.1 #13): a project that publishes its builds only from GitHub Actions (openmbu has Linux builds
+// only as artifacts): the newest artifact that hasn't expired, from GitHub's public API (main or master first).
+// Downloading an artifact needs a signed-in GitHub account, so Cartridge opens the run's page in its own window and
+// installs what you download there (installFrom).
+const CI_LINUX = /linux|appimage|ubuntu|steam.?deck/i, CI_WIN = /win(dows)?(32|64)?([-_ ]?(x64|x86_64|amd64))?(\b|_)|msvc|mingw/i, CI_NOT = /\b(arm|arm64|aarch64|android|mac|macos|osx|darwin|ios|debug|symbols|pdb)\b/i;
+async function ciBuildOf(e, { fetchImpl } = {}) {
+  const r = repoOf(e.repo);
+  if (!r || r.host !== 'github') return null;
+  const f = fetchImpl || require('./webFetch');
+  const res = await f(`https://api.github.com/repos/${r.repo}/actions/artifacts?per_page=50`, { headers: { 'User-Agent': 'Cartridge', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(20000) });
+  if (!res.ok) return null;
+  const all = ((await res.json())?.artifacts || []).filter((a) => a && !a.expired && !CI_NOT.test(a.name));
+  const main = (a) => (/^(main|master|trunk)$/.test(a.workflow_run?.head_branch || '') ? 1 : 0);
+  const pick = (re) => all.filter((a) => re.test(a.name)).sort((a, b) => main(b) - main(a) || String(b.created_at).localeCompare(String(a.created_at)))[0];
+  const lin = e.builds !== 'windows' ? pick(CI_LINUX) : null, a = lin || pick(CI_WIN);
+  if (!a) return null;
+  const run = a.workflow_run?.id || null, at = String(a.created_at || '');
+  return { tag: `build ${at.slice(0, 16).replace('T', ' ')}`, date: at, kind: lin ? 'linux' : 'windows', name: a.name, size: a.size_in_bytes || 0, ci: { id: a.id, run, url: run ? `https://github.com/${r.repo}/actions/runs/${run}` : `https://github.com/${r.repo}/actions` } };
+}
+
 // ---------------------------------------------------------------- saves
 // a save place from the catalogue on this device: ~ is home, $XDG_* the usual folders, a plain path is inside the
 // recomp's own folder
@@ -519,7 +539,8 @@ function createRecomps(ctx) {
         builds: e.builds, needs: e.needs || null, setup: e.setup || { how: 'none' }, done: e.done || null, saves: e.saves || [], achievements: e.achievements || null, license: e.license || null,
         roms: matchRoms(e, roms),
         installed: rec ? { tag: rec.tag, kind: rec.kind, dir: rec.dir, program: rec.program, channel: rec.channel || 'stable', at: rec.at, game: rec.game || null, ready: readyOf(e, rec), here: exists(rec.program), appid: rec.appid || null } : null,
-        latest: lt && { tag: lt.tag, date: lt.date, kind: lt.kind, at: lt.at, none: lt.none || null },
+        latest: lt && { tag: lt.tag, date: lt.date, kind: lt.kind, at: lt.at, none: lt.none || null, ci: lt.ci || null },
+        syncSaves: rec?.syncSaves || [],
         update: !!(rec && lt?.tag && rec.tag && lt.tag !== rec.tag && !lt.none),
         ...(e.from === 'verified' ? verifiedInfo(e, rec, lt) : {}),
       });
@@ -553,7 +574,9 @@ function createRecomps(ctx) {
     if (!repoOf(e.repo)) { latest[id] = { at: Date.now(), channel: ch, none: e.builds === 'site' ? 'site' : 'source' }; writeJson(F('recomp-latest.json'), latest); return latest[id]; }
     const rel = await releaseOf(e, { pre: ch === 'pre', fetchImpl: ctx.fetchImpl });
     const b = rel && pickBuild(rel.assets, e);
-    latest[id] = b ? { tag: rel.tag, date: rel.date, kind: b.kind, name: b.asset.name, url: b.asset.url, size: b.asset.size || 0, at: Date.now(), channel: ch } : { at: Date.now(), channel: ch, none: rel ? 'nobuild' : 'norelease', tag: rel?.tag || null };
+    // no usable release: builds published only by GitHub Actions count as its updates (0.9.80)
+    const ci = !b ? await ciBuildOf(e, { fetchImpl: ctx.fetchImpl }).catch(() => null) : null;
+    latest[id] = b ? { tag: rel.tag, date: rel.date, kind: b.kind, name: b.asset.name, url: b.asset.url, size: b.asset.size || 0, at: Date.now(), channel: ch } : ci ? { ...ci, at: Date.now(), channel: ch } : { at: Date.now(), channel: ch, none: rel ? 'nobuild' : 'norelease', tag: rel?.tag || null };
     writeJson(F('recomp-latest.json'), latest);
     return latest[id];
   }
@@ -621,7 +644,7 @@ function createRecomps(ctx) {
     return { files, places: meta.items.length, savedFirst: !!before };
   }
   // ---- install or update: download, unpack, keep the release it replaces, put the new one where the old one is
-  async function install(id, { channel, onProgress = () => {}, signal, build: pickOs, _e } = {}) {
+  async function install(id, { channel, onProgress = () => {}, signal, build: pickOs, _e, local } = {}) {
     const e0 = byId(id);
     if (!e0) throw new Error('That recomp isn’t in the list.');
     if (e0.from === 'verified' && !_e) return installVerified(e0, { channel, onProgress, signal, pickOs });
@@ -631,10 +654,16 @@ function createRecomps(ctx) {
     if (prev && exists(prev.program) && ctx.isRunning(prev.flatpak || prev.program)) throw new Error(`Close ${e.name} first.`);
     const ch = channel || prev?.channel || 'stable';
     onProgress({ step: 'check', pct: null });
-    const rel = await releaseOf(e, { pre: ch === 'pre', fetchImpl: ctx.fetchImpl });
-    if (!rel) throw new Error(`${e.name} has no releases yet.`);
-    const b = pickBuild(rel.assets, e);
-    if (!b) throw new Error(`${e.name}’s newest release has no Linux or Windows build (Android, macOS and source code can’t run here).`);
+    // 0.9.80: `local` is a build downloaded from its GitHub Actions page ({ file, name, tag, date, kind })
+    const rel = local ? { tag: local.tag, date: local.date || '' } : await releaseOf(e, { pre: ch === 'pre', fetchImpl: ctx.fetchImpl });
+    const b = local ? { asset: { name: local.name || path.basename(local.file), size: 0 }, kind: local.kind || (e.builds === 'windows' ? 'windows' : 'linux') } : rel && pickBuild(rel.assets, e);
+    if (!b) {
+      // builds only from GitHub Actions: the screen opens the run's page, where a signed-in download comes back to installFrom
+      const ci = await ciBuildOf(e, { fetchImpl: ctx.fetchImpl }).catch(() => null);
+      if (ci) { latest[id] = { ...ci, at: Date.now(), channel: ch }; writeJson(F('recomp-latest.json'), latest); if (prev?.tag === ci.tag && exists(prev.program)) return { already: true, tag: ci.tag }; return { ci: ci.ci, tag: ci.tag, name: ci.name, kind: ci.kind }; }
+      if (!rel) throw new Error(`${e.name} has no releases yet.`);
+      throw new Error(`${e.name}’s newest release has no Linux or Windows build (Android, macOS and source code can’t run here).`);
+    }
     if (prev && prev.tag === rel.tag && exists(prev.program)) return { already: true, tag: rel.tag };
     const dest = prev?.dir || homeDir(e);
     if (!prev && fs.existsSync(dest) && fs.readdirSync(dest).length) throw new Error(`${dest.replace(os.homedir(), '~')} already has something in it. Cartridge leaves it as it is.`);
@@ -645,10 +674,11 @@ function createRecomps(ctx) {
     const tmp = path.join(path.dirname(dest), `.${path.basename(dest)}.cartridge-dl${ext}`);
     const out = dest + '.cartridge-new';
     const FV = require('./forkVersions'), store = FV.storeOf(path.dirname(dest), path.basename(dest));
-    let program, files, kind = b.kind, tmpNow = tmp;
+    let program, files, kind = b.kind, tmpNow = tmp, setupWas = null;
     try {
       let got = 0;
-      await ctx.download(b.asset.url, tmp, (n) => { got += n; onProgress({ step: 'download', pct: b.asset.size ? Math.min(99, Math.floor((got / b.asset.size) * 100)) : null, got }); }, signal);
+      if (local) fs.copyFileSync(local.file, tmp);
+      else await ctx.download(b.asset.url, tmp, (n) => { got += n; onProgress({ step: 'download', pct: b.asset.size ? Math.min(99, Math.floor((got / b.asset.size) * 100)) : null, got }); }, signal);
       await checkDigest(tmp, b.asset.digest);
       onProgress({ step: 'unpack', pct: null });
       fs.rmSync(out, { recursive: true, force: true }); fs.mkdirSync(out, { recursive: true });
@@ -702,6 +732,17 @@ function createRecomps(ctx) {
       if (!pick) throw new Error(`The release was unpacked, but there’s no ${kind === 'windows' ? 'Windows program' : 'AppImage or Linux program'} in it.`);
       if (kind === 'linux' && /\.exe$/i.test(pick.rel)) kind = 'windows';
       files = FV.filesOf(inner);
+      // 0.9.80 (agreed plan 7.1 #13): what its setup or the game made beside it (top-level names that aren't the old
+      // release's own) and whether its done file was there, so the update can say when it needs setting up again. A
+      // new release file with the same name as one of those never goes over it: yours stays, the release's goes beside
+      // it as .cartridge-release (and is what the next update keeps aside, never yours)
+      if (prev && e.needs && fs.existsSync(dest)) {
+        const oldTop = new Set((prev.files || []).map((r) => String(r).split('/')[0])), newTop = new Set(files.map((r) => r.split('/')[0]));
+        const made = oldTop.size ? fs.readdirSync(dest).filter((n) => !n.startsWith('.') && !oldTop.has(n)) : [];
+        setupWas = { done: doneAt(e, prev).some(exists), clashed: made.filter((n) => newTop.has(n) && n !== pick.rel.split('/')[0] && !exists(path.join(inner, `${n}.cartridge-release`))) };
+        for (const n of setupWas.clashed) fs.renameSync(path.join(inner, n), path.join(inner, `${n}.cartridge-release`));
+        if (setupWas.clashed.length) files = FV.filesOf(inner);
+      }
       // an update: the release in use is kept aside first (its own files only: saves and settings stay)
       if (prev && fs.existsSync(dest)) {
         FV.keep({ base: dest, files: prev.files || files.filter((r) => fs.existsSync(path.join(dest, r))), store, tag: prev.tag || 'as found' });
@@ -714,13 +755,32 @@ function createRecomps(ctx) {
       if (kind === 'linux') { for (const f of entries) if (f.elf || f.appimage || f.path === pick.path) { try { fs.chmodSync(path.join(dest, f.rel), 0o755); } catch {} } }
     } finally { fs.rmSync(tmp, { force: true }); fs.rmSync(tmpNow, { force: true }); fs.rmSync(out, { recursive: true, force: true }); }
     const saves = checkSaves(meta);
-    installs[id] = { ...(prev || {}), id, repo: e.repo, dir: dest, program, kind, tag: rel.tag, date: rel.date, files, channel: ch, at: Date.now(), asset: b.asset.name };
+    installs[id] = { ...(prev || {}), id, repo: e.repo, dir: dest, program, kind, tag: rel.tag, date: rel.date, files, channel: ch, at: Date.now(), asset: b.asset.name, ...(local ? { ci: true } : {}) };
+    // set up again? Its done file went with the update, or the release brought files where its setup had made them
+    let setupAgain = null, kept = null;
+    if (setupWas?.done && !doneAt(e, installs[id]).some(exists)) {
+      installs[id].setupDone = false;
+      setupAgain = 'The update took away what its setup had made. Open it and set it up again.';
+      log('recomp needs setting up again', id);
+    }
+    if (setupWas?.clashed.length) { kept = `The new release has its own ${setupWas.clashed.slice(0, 3).join(', ')}. Yours stayed in place; the release’s ${setupWas.clashed.length === 1 ? 'is' : 'are'} beside ${setupWas.clashed.length === 1 ? 'it' : 'them'}, ending .cartridge-release. If it misbehaves, set it up again.`; log('recomp update kept yours', id, setupWas.clashed.join(', ')); }
     saveInstalls();
     // 0.9.66 (agreed plan): after an update the new release is started once before Steam's shortcut follows it. One that
     // can't start at all (missing libraries, a crash in the first seconds) goes back to the release that worked
     // 0.9.71: Windows builds too, through the Proton runner, when the port already has its own prefix (a verified port's
     // .cartridge/proton): an update never makes a new prefix just to try a start
-    const winTrial = prev && prev.tag && kind === 'windows' && ctx.trialRun && ctx.runner && exists(path.join(RC.prefixOf({ dir: dest }), 'pfx')) ? await ctx.runner().catch(() => null) : null;
+    // 0.9.80 (agreed plan 7.1 #13): a Windows build with no prefix of its own gets one, made once with wineboot, so its
+    // updates are tried too (Steam keeps its own prefix for playing; this one is only for the trial start)
+    let winTrial = prev && prev.tag && kind === 'windows' && ctx.trialRun && ctx.runner ? await ctx.runner().catch(() => null) : null;
+    if (winTrial && !exists(path.join(RC.prefixOf({ dir: dest }), 'pfx'))) {
+      if (!ctx.runProgram || ctx.playing?.()) winTrial = null;
+      else {
+        onProgress({ step: 'prefix', pct: null });
+        try { const c = RC.prefixCommand(winTrial, { prefix: RC.prefixOf({ dir: dest }) }); fs.mkdirSync(RC.prefixOf({ dir: dest }), { recursive: true }); await ctx.runProgram(c.cmd, c.args, { cwd: dest, env: c.env, timeoutMs: 5 * 60e3 }); }
+        catch (er) { log('recomp prefix for the trial start', id, er.message); winTrial = null; }
+        if (winTrial && !exists(path.join(RC.prefixOf({ dir: dest }), 'pfx'))) winTrial = null;
+      }
+    }
     if (prev && prev.tag && ((kind === 'linux' && ctx.trialRun) || winTrial)) {
       onProgress({ step: 'trial', pct: null });
       const argList = (launchArgs(id) || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
@@ -738,7 +798,7 @@ function createRecomps(ctx) {
     }
     latest[id] = { tag: rel.tag, date: rel.date, kind, name: b.asset.name, at: Date.now(), channel: ch }; writeJson(F('recomp-latest.json'), latest);
     log('recomp', prev ? 'updated' : 'installed', id, rel.tag, kind, program);
-    return { tag: rel.tag, kind, program, dir: dest, updated: !!prev, programMoved: !!(prev && prev.program !== program), started: prev && ((kind === 'linux' && ctx.trialRun) || winTrial) ? true : undefined, restored: saves.restored, backedUp: !!meta };
+    return { tag: rel.tag, kind, program, dir: dest, updated: !!prev, programMoved: !!(prev && prev.program !== program), started: prev && ((kind === 'linux' && ctx.trialRun) || winTrial) ? true : undefined, restored: saves.restored, backedUp: !!meta, ...(setupAgain ? { setupAgain } : {}), ...(kept ? { kept } : {}) };
   }
   function versions(id) {
     const rec = installs[id];
@@ -1117,9 +1177,32 @@ function createRecomps(ctx) {
     writeJson(F('recipes-fetched.json'), ok); cat = null;
     return ok.length;
   }
+  // 0.9.80 (agreed plan 7.1 #13, owner: build it): a recomp from a link has no known save places, so Save Sync takes
+  // only the folders you tick, from what Cartridge found (guessSaves) or one you pick in your home folder. Never its
+  // whole install folder, your home or a system folder: nothing guessed is uploaded without your say.
+  function saveChoices(id) {
+    const e = byId(id), rec = installs[id];
+    if (!e || !rec) return { found: [], chosen: [] };
+    const chosen = (rec.syncSaves || []).filter(exists);
+    return { found: [...new Set([...guessSaves(e, rec), ...chosen])].map((p) => ({ path: p, chosen: chosen.includes(p) })), chosen };
+  }
+  function setSyncSaves(id, dirs, home = os.homedir()) {
+    const rec = installs[id], e = byId(id);
+    if (!rec || !e) throw new Error('That recomp isn’t installed.');
+    if (e.from === 'verified' || e.saves?.length) throw new Error('This one’s saves are known already.');
+    const ok = [...new Set((dirs || []).map((d) => path.resolve(String(d))))].filter((d) => {
+      if (!exists(d)) return false;
+      if ([home, rec.dir, '/', path.join(home, '.config'), path.join(home, '.local/share')].some((x) => path.resolve(x) === d)) return false;
+      return d.startsWith(home + path.sep) || d.startsWith(path.resolve(rec.dir) + path.sep);
+    });
+    rec.syncSaves = ok; saveInstalls();
+    return saveChoices(id);
+  }
+  // installed, not set up yet, with a done file to wait for: what a start from Steam should be watched for (0.9.80)
+  const pendingSetup = () => catalogue().entries.filter((e) => e.done && installs[e.id] && !readyOf(e, installs[e.id])).map((e) => ({ id: e.id, program: installs[e.id].flatpak || installs[e.id].program }));
   const record = (id) => installs[id] || null;
   const reload = () => { cat = null; repaired = false; installs = readJson(F('recomp-installs.json'), {}); };
-  return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : saveDirs(e, installs[id]); }, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes };
+  return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : e?.saves?.length ? saveDirs(e, installs[id]) : (installs[id]?.syncSaves || []).filter(exists); }, saveChoices, setSyncSaves, pendingSetup, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes };
 }
 
-module.exports = { checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
+module.exports = { ciBuildOf, checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };

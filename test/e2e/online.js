@@ -23,7 +23,7 @@ const CFG = {
   '.var/app/dev.eden_emu.eden/config/eden/qt-config.ini': '[System]\nairplane_mode\\default=true\nairplane_mode=false\n[WebService]\nweb_api_url\\default=true\nweb_api_url=https://api.ynet-fun.xyz\n',
   '.var/app/org.azahar_emu.Azahar/config/azahar-emu/qt-config.ini': '[WebService]\nweb_api_url\\default=true\n',
   '.var/app/org.DolphinEmu.dolphin-emu/config/dolphin-emu/Dolphin.ini': '[General]\nISOPaths = 0\n[Core]\nSerialPort1 = 255\n',
-  '.var/app/info.cemu.Cemu/config/Cemu/settings.xml': '<?xml version="1.0" encoding="UTF-8"?>\n<content>\n  <Account>\n    <ActiveService>0</ActiveService>\n  </Account>\n</content>\n',
+  '.var/app/info.cemu.Cemu/config/Cemu/settings.xml': '<?xml version="1.0" encoding="UTF-8"?>\n<content>\n  <Account>\n    <PersistentId>2147483649</PersistentId>\n    <OnlineEnabled>false</OnlineEnabled>\n    <ActiveService>0</ActiveService>\n  </Account>\n  <AccountService/>\n</content>\n',
 };
 
 // each file must still read in its own format
@@ -46,6 +46,8 @@ const DUMMY = (fd) => (fd.choices?.length ? fd.choices[0].value : fd.secret ? 'S
   const call = (ch, a) => t.call(ch, a).catch((e) => ({ error: String(e.message).split('\n')[0].replace(/^.*?Error: /, '') }));
   try {
     for (const [f, s] of Object.entries(CFG)) put(path.join(home, f), s);
+    // Cemu's Pretendo needs the Wii U's own files (sizes as iosu_crypto.cpp checks them)
+    put(path.join(home, '.var/app/info.cemu.Cemu/data/Cemu/otp.bin'), Buffer.alloc(1024, 1)); put(path.join(home, '.var/app/info.cemu.Cemu/data/Cemu/seeprom.bin'), Buffer.alloc(512, 2));
     await wait(2500);
     const files = () => Object.keys(CFG).map((f) => path.join(home, f)).concat(['.var/app/net.rpcs3.RPCS3/config/rpcs3/rpcn.yml'].map((f) => path.join(home, f)));
     let l = await call('online:list');
