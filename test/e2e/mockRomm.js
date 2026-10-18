@@ -62,7 +62,7 @@ function library(games = 120, extra = {}) {
 
 function start({ port = 0, games = 120, extra = {} } = {}) {
   const { F, ROMS, plats } = library(games, extra);
-  const served = {}, covers = {}, cols = [];
+  const served = {}, covers = {}, cols = [], saves = []; let savesN = 0;
   const server = http.createServer((req, res) => {
     const u = new URL(req.url, 'http://x'), p = u.pathname;
     const json = (o, code = 200) => { res.writeHead(code, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)); };
@@ -71,6 +71,23 @@ function start({ port = 0, games = 120, extra = {} } = {}) {
     if (p === '/api/users/me') return json({ id: 1, username: 'tester' });
     if (p === '/api/platforms') return json(plats);
     if (p === '/api/roms') { const pid = Number(u.searchParams.get('platform_ids')); const items = ROMS.filter((r) => !pid || r.platform_id === pid); return json({ items, total: items.length }); }
+    // saves (0.9.78): RomM's save API as Cartridge Save Sync uses it; uploads kept in memory, same slot and game replaced
+    if (p === '/api/saves' && req.method === 'GET') { const rid = u.searchParams.get('rom_id'), slot = u.searchParams.get('slot'); return json(saves.filter((x) => (!rid || x.rom_id === Number(rid)) && (!slot || x.slot === slot)).map(({ data, ...x }) => x)); }
+    if (p === '/api/saves' && req.method === 'POST') {
+      const chunks = []; req.on('data', (d) => chunks.push(d)); req.on('end', () => {
+        const body = Buffer.concat(chunks), ct = req.headers['content-type'] || '', bd = '--' + (/boundary=(.*)$/.exec(ct) || [])[1];
+        const start = body.indexOf('\r\n\r\n') + 4, end = body.lastIndexOf('\r\n' + bd);
+        const name = (/filename="([^"]*)"/.exec(body.subarray(0, start).toString('latin1')) || [])[1] || 'save.zip';
+        const data = body.subarray(start, end), q = u.searchParams, rid = Number(q.get('rom_id')), slot = q.get('slot');
+        const old = saves.find((x) => x.rom_id === rid && x.slot === slot);
+        if (old && q.get('overwrite') !== 'true' && old.content_hash !== q.get('content_hash')) return json({ detail: 'conflict' }, 409);
+        if (old) saves.splice(saves.indexOf(old), 1);
+        const sv = { id: 700 + savesN++, rom_id: rid, slot, emulator: q.get('emulator'), file_name: name, file_size_bytes: data.length, content_hash: q.get('content_hash'), updated_at: new Date().toISOString(), created_at: new Date().toISOString(), data };
+        saves.push(sv); const { data: _d, ...out } = sv; json(out);
+      }); return;
+    }
+    if ((m = p.match(/^\/api\/saves\/(\d+)\/content$/))) { const sv = saves.find((x) => x.id === Number(m[1])); if (!sv) return json({}, 404); res.writeHead(200, { 'Content-Length': sv.data.length }); return res.end(sv.data); }
+    if ((m = p.match(/^\/api\/saves\/(\d+)\/downloaded$/))) return json({ ok: true });
     // collections made and changed (favourites, 0.9.76): kept in memory, answered as RomM does
     if (p === '/api/collections' && req.method === 'POST') { const name = (u.searchParams.get('is_favorite') === 'true' && 'Favourites') || 'Made in Cartridge'; const c = { id: 500 + cols.length, name, description: '', rom_ids: [], is_favorite: u.searchParams.get('is_favorite') === 'true', user_id: 1 }; cols.push(c); return json(c); }
     if ((m = p.match(/^\/api\/collections\/(\d+)$/)) && req.method === 'PUT') { const c = cols.find((x) => x.id === Number(m[1])); let body = ''; req.on('data', (d) => (body += d)); req.on('end', () => { const ids = /name="rom_ids"\r?\n\r?\n(\[[^\]]*\])/.exec(body); if (c && ids) c.rom_ids = JSON.parse(ids[1]); json(c || {}, c ? 200 : 404); }); return; }
@@ -88,7 +105,7 @@ function start({ port = 0, games = 120, extra = {} } = {}) {
     if ((m = p.match(/^\/api\/roms\/(\d+)$/))) { const r = ROMS.find((x) => x.id === Number(m[1])); return r ? json(r) : json({}, 404); }
     json({ detail: 'not found' }, 404);
   });
-  return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok({ port: server.address().port, served, roms: ROMS, close: () => new Promise((d) => server.close(d)) })));
+  return new Promise((ok) => server.listen(port, '127.0.0.1', () => ok({ port: server.address().port, served, saves, roms: ROMS, close: () => new Promise((d) => server.close(d)) })));
 }
 if (require.main === module) start({ port: Number(process.argv[2] || 8089) }).then((s) => console.log('fake RomM on', s.port));
 module.exports = { start, zip, sfo };
