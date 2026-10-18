@@ -331,4 +331,4 @@ function viewPlan(base, update, { list }) {
   return [...plan].map(([rel, from]) => ({ rel, from }));
 }
 
-module.exports = { achievementsOf, outputLog, SHIPPED, validate, load, chooseBuild, winPath, varsFor, expand, settingsFor, effective, typed, untyped, check, render, readBack, flat, script, prefixCommand, runCommand, checkGame, findUpdate, viewPlan, verCmp, prefixOf };
+module.exports = { findDir, achievementsOf, outputLog, SHIPPED, validate, load, chooseBuild, winPath, varsFor, expand, settingsFor, effective, typed, untyped, check, render, readBack, flat, script, prefixCommand, runCommand, checkGame, findUpdate, viewPlan, verCmp, prefixOf };

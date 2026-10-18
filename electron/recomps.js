@@ -1051,6 +1051,7 @@ function createRecomps(ctx) {
     const e = byId(id), r = recipeOf(e), rec = installs[id];
     if (!r) throw new Error('That isn’t a Cartridge Verified game.');
     const sfo = require('./saves').sfo;
+    onProgress({ step: 'check' });
     const chk = RC.checkGame(r, dir, { sfo });
     let use = dir, update = null;
     if (!chk.ok && chk.needsUpdate) {
@@ -1103,7 +1104,29 @@ function createRecomps(ctx) {
       fs.mkdirSync(rec.dir, { recursive: true });
       try { fs.rmSync(vars.result, { force: true }); } catch {}
       const args = build.installer.map((a) => RC.expand(a, { ...vars, game: rec.game.path }));
-      await ctx.runProgram(rec.installer, args, { cwd: rec.dir, timeoutMs: 40 * 60e3 });
+      // 0.9.81 (owner's photo: P.T. "stuck on an endless Working"): its installer prints nothing while it copies your
+      // game, so what it writes into the install folder is measured every 2 s and shown, against the size of the files
+      // it copies when the recipe names them; one that writes nothing for 5 minutes is stopped and says so
+      const fsz = (f) => { try { return fs.statSync(f).size; } catch { return 0; } };
+      const from = r.game.find ? RC.findDir(rec.game.path, r.game.find) : null;
+      const want = from ? r.game.find.files.reduce((n, f) => n + fsz(path.join(from, f)), 0) : 0;
+      const stallMs = ctx.stallMs || 5 * 60e3, ac = new AbortController();
+      const base = await bytesIn([rec.dir]);
+      let last = -1, still = Date.now(), looking = false;
+      onProgress({ step: 'installer', got: 0, pct: want ? 0 : null });
+      const tick = setInterval(async () => {
+        if (looking) return; looking = true;
+        try {
+          const got = Math.max(0, (await bytesIn([rec.dir])) - base);
+          if (got !== last) { last = got; still = Date.now(); onProgress({ step: 'installer', got, want, pct: want ? Math.min(99, Math.floor((got / want) * 100)) : null }); }
+          else if (Date.now() - still > stallMs) ac.abort();
+        } finally { looking = false; }
+      }, ctx.tickMs || 2000);
+      try { await ctx.runProgram(rec.installer, args, { cwd: rec.dir, timeoutMs: 40 * 60e3, signal: ac.signal }); }
+      catch (er) {
+        if (ac.signal.aborted) { log('verified installer stalled', id, last); throw new Error(`${r.name}’s installer wrote nothing for ${Math.round(stallMs / 60000)} minutes, so Cartridge stopped it. Press Set Up to try again. If it stops again, send Cartridge’s log (Settings → Help and About → Report a Problem).`); }
+        throw er;
+      } finally { clearInterval(tick); }
       const res = readText(vars.result) || '';
       if (!/^PASS\b/.test(res)) throw new Error(`${r.name}’s installer didn’t finish: ${(res.split('\n').find((l) => l.trim()) || 'it gave no answer').slice(0, 200)}`);
       rec.installedTag = rec.tag; rec.installedFrom = rec.game.path; rec.installNotes = res.split('\n').filter((l) => /^note:/.test(l)).map((l) => l.slice(5).trim());
@@ -1117,6 +1140,7 @@ function createRecomps(ctx) {
       await ctx.runProgram(c.cmd, c.args, { env: c.env, cwd: rec.dir, timeoutMs: 5 * 60e3 }).catch((er) => log('verified prefix', id, er.message));
       if (!exists(path.join(vars.prefix, 'pfx', 'drive_c'))) throw new Error(`Proton couldn’t make ${r.name}’s Windows folder (its prefix). Start a Windows game in Steam once, then try again.`);
     }
+    onProgress({ step: 'write' });
     // the first time: what you chose in the port's own launcher before is kept
     if (!rec.settings) { rec.settings = RC.readBack(r, build, rec, { read: readText }); saveInstalls(); }
     const out = RC.render(r, build, rec, RC.effective(r, build, rec.settings), { read: readText });

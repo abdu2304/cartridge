@@ -90,13 +90,15 @@ module.exports = function recompsIpc(m) {
       // port's own installer or Proton's wineboot run and waited for (off the main thread: spawned, never execSync)
       recipesUrl: 'https://raw.githubusercontent.com/abdu2304/cartridge/main/electron/recipes/index.json',
       runner: () => require('./protonRunner').find({ roots: (() => { try { return m.steamMgr.steamRoots(); } catch { return []; } })() }),
-      runProgram: (cmd, args, { cwd, env: extra = {}, timeoutMs = 10 * 60e3 } = {}) => new Promise((ok, bad) => {
+      runProgram: (cmd, args, { cwd, env: extra = {}, timeoutMs = 10 * 60e3, signal } = {}) => new Promise((ok, bad) => {
         const env = { ...process.env, ...extra }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
         let tail = '';
         const p = require('child_process').spawn(cmd, args, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
         const keep = (b) => { tail = (tail + b).slice(-3000); };
         p.stdout.on('data', keep); p.stderr.on('data', keep);
         const t = setTimeout(() => { try { process.kill(-p.pid, 'SIGTERM'); } catch {} bad(new Error('It took too long and was stopped.')); }, timeoutMs);
+        // stopped from outside (0.9.81: an installer that stopped writing): the whole process group, then the reason
+        signal?.addEventListener?.('abort', () => { clearTimeout(t); try { process.kill(-p.pid, 'SIGTERM'); } catch {} setTimeout(() => { try { process.kill(-p.pid, 'SIGKILL'); } catch {} }, 3000); bad(new Error('stopped')); });
         p.once('error', (e) => { clearTimeout(t); bad(new Error(e.code === 'EACCES' ? 'It isn’t allowed to run.' : e.message)); });
         p.once('exit', (code) => { clearTimeout(t); log('verified run', path.basename(cmd), args[0] || '', 'exit', code); if (code === 0) ok(tail); else bad(new Error(tail.trim().split('\n').pop() || `It stopped (exit ${code}).`)); });
       }),

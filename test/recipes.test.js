@@ -307,3 +307,36 @@ test('0.9.79: a copy outside the tested versions says so; P.T. finds its files a
   assert.ok(RC.validate({ ...gw, game: { ...gw.game, tested: ['1.0'] } }).includes('game tested'));
   assert.ok(RC.validate({ ...pt, game: { ...pt.game, find: { files: ['../x'] } } }).includes('game find'));
 });
+
+test('0.9.81: P.T.’s installer shows what it has copied, and one that writes nothing is stopped with the reason', async () => {
+  const mk = (runProgram) => {
+    const d = tmp(), data = path.join(d, 'data'), emu = path.join(d, 'Emulation'); fs.mkdirSync(data);
+    const setup = path.join(d, 'Setup-linux'); fs.writeFileSync(setup, '#!/bin/sh\n'); fs.chmodSync(setup, 0o755);
+    const rel = [{ tag_name: 'v1.0.5', published_at: '2026-10-17', prerelease: false, draft: false, assets: [{ name: 'P.T.PC.Port.Setup-linux', browser_download_url: 'file://' + setup, size: 1 }] }];
+    const eng = R.createRecomps({ dataDir: data, fetchImpl: async (url) => ({ ok: true, json: async () => (url.includes('/latest') ? rel[0] : rel) }), log: () => {},
+      download: async (url, dest) => fs.copyFileSync(url.replace('file://', ''), dest), isRunning: () => false, stallMs: 300, tickMs: 40,
+      recompRoot: () => path.join(emu, 'recomp'), recompRoots: () => [path.join(emu, 'recomp')], runProgram });
+    const copy = path.join(d, 'P.T.'); fs.mkdirSync(copy);
+    fs.writeFileSync(path.join(copy, 'eboot.bin'), 'e'); fs.writeFileSync(path.join(copy, 'chunk1.psarc'), Buffer.alloc(4000)); fs.writeFileSync(path.join(copy, 'texture.qar'), Buffer.alloc(1000));
+    return { eng, copy };
+  };
+  // writes nothing, never ends: stopped once nothing has been written for stallMs
+  let killed = false;
+  const a = mk((cmd, args, o) => new Promise((ok, bad) => o.signal?.addEventListener('abort', () => { killed = true; bad(new Error('stopped')); })));
+  await a.eng.install('pt');
+  await assert.rejects(a.eng.setVerifiedGame('pt', a.copy), /wrote nothing for/);
+  assert.ok(killed, 'the installer was stopped');
+  // copies the game in steps, then passes: each step shows, measured against the files it copies (5000 bytes)
+  const seen = [];
+  const b = mk(async (cmd, args) => {
+    const dest = args[2]; fs.mkdirSync(dest, { recursive: true });
+    for (let i = 1; i <= 3; i++) { fs.writeFileSync(path.join(dest, `part${i}`), Buffer.alloc(1500)); await new Promise((r) => setTimeout(r, 120)); }
+    fs.writeFileSync(path.join(dest, 'pt'), '#!/bin/sh\n'); fs.writeFileSync(args[3], 'PASS installed\n');
+  });
+  await b.eng.install('pt');
+  const r = await b.eng.setVerifiedGame('pt', b.copy, { onProgress: (m) => seen.push(m) });
+  assert.ok(r.ok, JSON.stringify(r));
+  const inst = seen.filter((m) => m.step === 'installer' && m.got);
+  assert.ok(inst.length >= 2 && inst.every((m) => m.want === 5000 && m.pct <= 99), JSON.stringify(inst));
+  assert.deepStrictEqual([seen[0].step, seen.at(-1).step], ['check', 'write']);
+});
