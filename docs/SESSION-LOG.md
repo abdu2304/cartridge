@@ -7,6 +7,9 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 18 Oct 2026 · 0.9.85 · PC Ports
+Owner: "do the recommended" on the three recomps questions (name PC Ports, installed only, Set Up on the game page). Built: a console-style PC Ports page, port play time in Continue Playing, the installer under Settings → Emulators → PC Ports (handover Part 32).
+
 ## 18 Oct 2026 · 0.9.84 · shadPS4 as a Flatpak
 Scheduled sweep resume: rounds 7 to 9 (game settings for 14 emulators, add-ons into 11 layouts, Linked Folders with forks) plus every older sweep again. One bug: the shadPS4 Flatpak's folder was never found for Game Settings and patches; fixed (handover Part 31). The owner's recomps redesign questions (name, which games show, Set Up on the game page) are still waiting for an answer; nothing built for it yet.
 

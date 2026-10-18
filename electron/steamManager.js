@@ -996,6 +996,20 @@ module.exports = function createSteamManager(ctx) {
       const last = Math.max(p.last || 0, (sc.last || 0) * 1000);
       if (p.min || last) out[g.rom.id] = { min: p.min || 0, last, src: 'Steam' };
     }
+    // PC ports (0.9.85, owner: they belong in Continue Playing): a port's own shortcut counts for the library game it
+    // was made from (reg artRomId); its minutes add up with the emulator's, and when it was played last it says so (port)
+    const byAppid = new Map(scs.map((x) => [x.appid >>> 0, x]));
+    for (const [a, r] of Object.entries(reg)) {
+      if (!r.recomp || r.artRomId == null) continue;
+      const sc = byAppid.get(Number(a) >>> 0);
+      if (!sc && !r.live) continue;
+      const p = pt[String(Number(a) >>> 0)] || {}, last = Math.max(p.last || 0, (sc?.last || 0) * 1000);
+      if (!p.min && !last) continue;
+      const cur = out[r.artRomId] || { min: 0, last: 0, src: 'Steam' };
+      cur.min += p.min || 0;
+      if (last > (cur.last || 0)) { cur.last = last; cur.port = r.recomp; }
+      out[r.artRomId] = cur;
+    }
     return out;
   }
   // One game: is it in Steam, and would Cartridge know how to add it?

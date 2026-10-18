@@ -19,7 +19,7 @@
     <div v-if="!store.lib" class="center"><div class="spinner" />Waiting for the first sync…</div>
     <div v-else class="sys-grid">
       <SysTile v-for="p in plats" :key="p.id" :p="p" @open="(p) => go('platform', { platformId: p.id })" @focused="focusSys" />
-      <SteamTile v-if="recomps" :count="recomps.n" :installed="recomps.mine" @open="go('recomps')" />
+      <SteamTile v-if="recomps" :count="recomps.n" :ready="recomps.ready" @open="go('recomps')" />
     </div>
   </div>
 </template>
@@ -34,9 +34,9 @@ import SysTile from '../components/SysTile.vue';
 import SteamTile from '../components/SteamTile.vue';
 
 const el = ref(null);
-// the Steam card (0.9.65): recomps, counted from the list
+// the Steam card (0.9.65): PC ports you have installed (0.9.85), and how many are ready to play
 const recomps = ref(null);
-call('recomps:list').then((l) => { if (l?.entries?.length) recomps.value = { n: l.entries.length, mine: l.entries.filter((e) => e.installed).length }; }).catch(() => {});
+call('recomps:list').then((l) => { if (l?.entries?.length) { const mine = l.entries.filter((e) => e.installed); recomps.value = { n: mine.length, ready: mine.filter((e) => (e.from === 'verified' ? e.state === 'play' || e.state === 'update' : e.installed.ready)).length }; } }).catch(() => {});
 const plats = computed(() => (store.libVersion, visiblePlatforms()));
 const total = computed(() => allRoms().length);
 const installedCount = computed(() => Object.keys(store.installed).length);
