@@ -57,6 +57,25 @@ the chat after 0.9.85):
 - Smoothness and CPU, above all while a game runs (the 0.9.82 lag report)
 - Updates and safe start
 
+## PC ports are their own thing, not console games (owner, 19 Oct 2026; build on the PC session, not before)
+
+"Consider the games that are in console libraries completely different from recomps." Keep it in mind and build it
+during the PC session, checking each step there:
+
+- **Game page More for a port** shows only what fits a PC port: no Steam emulator rows, no emulator Game Settings, no
+  add-ons for the console's emulator. It gets its own options (the port's settings, version and updates, set up again,
+  save backups, its folder, Steam shortcut, remove) and its own icon.
+- **Continue Playing and other rows:** a port played last shows its name and the Steam mark (SteamTile's Steam logo),
+  nothing else. Not "P.T. · PS4" with "Steam Machine · PC Port" under it; just "P.T." and the Steam mark. The mark must
+  sit at the same size as the other console marks in that row (check against ConsoleMark's sizes and docs/logos.md).
+- The same split anywhere else a port shows as its console game (cards, search, Start tiles): find them on the PC.
+
+## Find what the owner wouldn't
+
+The owner also asked for the things they would never have found themselves: odd setups, rare paths, races, slow
+drives, half-finished installs, things that only break the second time or after an update. Look for those too, not
+only what the brief lists.
+
 ## How to work there
 
 - Launch and quit everything yourself: the AppImage or a build from source, emulators, games, ports, Steam (use its
