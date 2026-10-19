@@ -1687,7 +1687,26 @@ function publicItem(it) {
   const { abort, dlw, dlwIdle, dlJob, ...rest } = it; // the worker and its timer never go to the screen
   return rest;
 }
-function emitQueue() { broadcast('downloads', queue.map(publicItem)); }
+function emitQueue() { broadcast('downloads', queue.map(publicItem)); savePending(); }
+// 0.9.86 (PC playtest: a 19.7 GB download stopped when Cartridge closed on leaving Game Mode, and was gone at the next
+// start, its .part left behind): downloads not finished yet are kept in downloads-pending.json and start again at the
+// next start, resuming from their .part (downloadTo asks for the rest with Range) in the folder they started in
+const PENDING_FILE = path.join(USER_DATA, 'downloads-pending.json');
+let pendingT = null;
+function savePending() {
+  if (pendingT) return; // at most once a second (progress comes four times a second)
+  pendingT = setTimeout(() => {
+    pendingT = null;
+    const keep = require('./dlPending').pick(queue);
+    try { if (keep.length) fs.writeFileSync(PENDING_FILE, JSON.stringify(keep)); else fs.rmSync(PENDING_FILE, { force: true }); } catch {}
+  }, 1000);
+}
+function restorePending() {
+  let list = []; try { list = JSON.parse(fs.readFileSync(PENDING_FILE, 'utf8')); } catch { return; }
+  if (!Array.isArray(list) || !list.length) return;
+  log('downloads: picking up', list.length, 'not finished last time');
+  for (const job of list) if (job?.romId != null) enqueue({ ...job, resumed: true });
+}
 let emitTimer = null;
 function emitQueueThrottled() {
   if (emitTimer) return;
@@ -1977,7 +1996,9 @@ async function runJob(it) {
   try {
     const rom = await api(`/api/roms/${it.romId}`);
     // 0.9.65 Download More Files: more of a game's files go into the folder it already has, wherever that is
-    const target = it.into ? path.dirname(it.into) : downloadDir({ slug: rom.platform_slug, fs_slug: rom.platform_fs_slug }, rom.fs_size_bytes || 0, it.root || null); // 0.9.38: any drive; 0.9.49: the one asked for
+    // 0.9.86: a download picked up from last time goes on in the folder it started in, where its .part is
+    const target = it.into ? path.dirname(it.into) : it.target && isDir(it.target) ? it.target : downloadDir({ slug: rom.platform_slug, fs_slug: rom.platform_fs_slug }, rom.fs_size_bytes || 0, it.root || null); // 0.9.38: any drive; 0.9.49: the one asked for
+    if (!it.into && it.target !== target) { it.target = target; savePending(); }
     if (!target) throw new Error('No folder set for this platform. Set it in Settings.');
     await fsp.mkdir(target, { recursive: true });
     // 0.9.63 (owner: a game with several files asks which to download): only the files picked, when some were
@@ -6362,6 +6383,7 @@ app.whenReady().then(() => {
   // readable by the page's canvas too (Theme from this game reads a cover's colours)
   protocol.handle('romimg', async (req) => { const r = await handleImage(req); try { r.headers.set('Access-Control-Allow-Origin', '*'); } catch {} return r; });
   createWindow();
+  setTimeout(restorePending, 8000); // downloads not finished last time (0.9.86), once the window and library are up
   if (library) computeInstalled();
   win.webContents.once('did-finish-load', () => {
     if (config.configured && (config.sync.onLaunch || !library)) syncLibrary().catch(() => {});
