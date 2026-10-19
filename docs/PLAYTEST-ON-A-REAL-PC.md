@@ -3,7 +3,9 @@
 For the session that runs on the owner's own Linux PC (Claude Code in a terminal, teleported from the cloud session or
 started fresh). Read this after CLAUDE.md and the newest entry in docs/SESSION-LOG.md.
 
-## Handoff after 0.9.87 (owner, 19 Oct 2026): read this first
+## Handoff after 0.9.87 (owner, 19 Oct 2026)
+
+**Done in 0.9.88 (handover Part 35, which says what was and wasn't tested on the machine).** Still open from this list: the real controller in Desktop Mode, rumble on a uinput pad, the exFAT prefix and the lowercase `.appimage` (handover Part 9).
 
 0.9.87 (a starting screen, and the controller after a PC port) was built in the cloud session; `git pull origin main`
 before anything else. The cloud session has stopped building: everything below is this session's.

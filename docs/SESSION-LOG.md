@@ -7,6 +7,15 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 19 Oct 2026 · 0.9.88 · Smooth Again (second session on the owner's PC)
+Owner: "playtest everything and iterate until everything is perfect", fixes for everyone, not only this PC; also GSAP for good and "Steam" beside the Steam logo in Continue Playing. Each report reproduced here first (handover Part 35 has causes and evidence):
+- Freezes and slow Settings pages: Save Sync zipped P.T.'s 1.9 GB of caches on the main thread every sync. Fixed for every port and every save over 512 MB.
+- Uncharted's controller: the owner's Steam Controller reaches only games Steam started; ports in Steam now start through Steam. Uncharted's FPS counter went to the wrong file (recipe rev 3).
+- Ports apart from emulators: a port's page is that port only; no Play With; link copies named; Remove in its More.
+- GSAP is the engine (switch gone); controller playtest green (Settings page scroll on LB/RB); CLAUDE.md split into docs/VERSIONS.md.
+Tested here: npm test, every e2e script, audits and the controller playtest, the real app at 4K under gamescope and on the desktop, P.T. and Uncharted started through Steam. Not tested: buttons pressed on a real pad (needs a person), Game Mode itself.
+Open: Cartridge's own pad on the desktop with a Steam Controller (Part 9), hashing big downloads in the worker.
+
 ## 19 Oct 2026 · The PC playtest (in progress, 0.9.86 not released yet)
 Running on the owner's Bazzite PC (4K TV, KDE at 150%, Steam with Proton 10/11/Experimental/GE, umu 1.2.9, games on an ext4 drive "Expansion"). The owner is at work and gave full permission; release to main when done (standing instruction). Committed and pushed on the branch so far:
 - Windows ports never made a prefix: umu 1.2.9 can't match Proton 11/Experimental/Hotfix (they need SteamLinuxRuntime_4, appid 4183110). `protonRunner` runs each Proton in the runtime its toolmanifest asks for; umu only as a fallback with a Proton it knows. Uncharted and Bloodborne set up and reach their title screens from Cartridge and from Steam.

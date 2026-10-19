@@ -59,8 +59,9 @@ function stateOf(e) {
   if (job) return job.pct != null ? `${job.pct}%` : job.text || 'Working';
   const r = romOf(e), mins = r ? store.play[r.id]?.min || 0 : 0;
   if (e.from === 'verified') return { play: mins ? playtimeText(mins) + ' played' : 'Ready', update: 'Update Out', setup: 'Needs Setting Up', game: 'Needs Your Copy', broken: 'Needs Repair' }[e.state] || 'Installed';
-  if (!e.installed?.here) return 'Missing';
-  return e.installed.ready ? (mins ? playtimeText(mins) + ' played' : 'Ready') : 'Needs Setting Up';
+  // 0.9.88 (owner): a copy installed from a link says so, or it reads as a second copy of the verified one
+  if (!e.installed?.here) return 'From a Link · Missing';
+  return 'From a Link · ' + (e.installed.ready ? (mins ? playtimeText(mins) + ' played' : 'Ready') : 'Needs Setting Up');
 }
 function focus(e) { const r = romOf(e); if (r) setBg(backdropOf(r)); }
 // its game's page, with the port as the way to play; no game to show: the port's own sheet

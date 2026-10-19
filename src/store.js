@@ -70,6 +70,9 @@ export function playtimeText(min) {
 // 0.9.37 (owner: a component morphs into its detail view): a game card's picture flies into the game page's cover,
 // and back into its card on the way out (motion.js morph: one picture moved by transform, with or without the GPU
 // since 0.9.38; any press finishes it)
+// 0.9.88: a game played last as its PC port opens as that port where its card shows the Steam mark (Continue Playing)
+export const playedPort = (romId) => { const p = store.play[romId]?.port; return p ? String(p).split(':')[0] : null; };
+export function goPlayed(romId) { const port = playedPort(romId); go('game', port ? { romId: Number(romId), port } : { romId: Number(romId) }); }
 export function go(name, params = {}) {
   // 0.9.44: null, never false, for other pages (false?.querySelector threw, and every non-game page stopped opening
   // from 0.9.38: Steam consoles, Missing from Steam, Emulator setup and the rest)

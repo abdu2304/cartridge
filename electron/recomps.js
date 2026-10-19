@@ -471,6 +471,7 @@ function createRecomps(ctx) {
     return made;
   }
   const exists = (p) => { try { fs.accessSync(p); return true; } catch { return false; } };
+  const isDirP = (p) => { try { return fs.lstatSync(p).isDirectory(); } catch { return false; } };
   // installed and set up? A recomp that names a file made by its setup is ready once that file is there
   function readyOf(e, rec) {
     if (!rec || !exists(rec.program)) return false;
@@ -611,7 +612,8 @@ function createRecomps(ctx) {
     if (!dirs.length) return null;
     const stamp = new Date().toISOString().replace(/[:.]/g, '-'), to = path.join(dataDir, 'recomp-backups', id, stamp);
     const meta = { id, why, at: Date.now(), tag: rec?.tag || null, items: [] };
-    dirs.forEach((d, i) => { const dst = path.join(to, `${i}-${path.basename(d)}`); fs.cpSync(d, dst, { recursive: true, dereference: false }); meta.items.push({ from: d, copy: dst, files: countFiles(dst) }); });
+    // 0.9.88: never a port's caches, textures or logs (P.T.'s data folder held 1.9 GB of them)
+    dirs.forEach((d, i) => { const dst = path.join(to, `${i}-${path.basename(d)}`); fs.cpSync(d, dst, { recursive: true, dereference: false, filter: (src) => src === d || !require('./saveSync').notSave(path.basename(src), isDirP(src)) }); meta.items.push({ from: d, copy: dst, files: countFiles(dst) }); });
     fs.writeFileSync(path.join(to, 'backup.json'), JSON.stringify(meta, null, 1));
     // ten backups per recomp are kept, the oldest go
     const all = (() => { try { return fs.readdirSync(path.dirname(to)).sort(); } catch { return []; } })();

@@ -202,15 +202,16 @@ function childRun(p, what) {
   runOn = true; gameFocus.gameApp = null; gameFocus.endedAt = 0; log('game running', what); setAway('child', true); broadcast('game-run', { state: 'starting', port: what });
   p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setAway('child', false); broadcast('game-run', { state: 'ended', port: what }); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
 }
-function watchGameRun(romId) {
+// o.needles: what to look for instead of the game's own file (0.9.88: a PC port started through Steam, by its start script)
+function watchGameRun(romId, o = {}) {
   clearInterval(runT);
   gameFocus.gameApp = null; gameFocus.endedAt = 0;
   const where = installedMap[romId];
-  if (!where || where === MARKED) return;
+  if (!o.needles && (!where || where === MARKED)) return;
   const r = romIndexMain().get(romId) || {};
   // RPCS3 and Vita3K start installed games by serial, not by file
-  let serial = ''; try { serial = /ps3/i.test(`${r.platform_slug} ${r.platform_fs_slug}`) ? ps3Serial(romId, where) || '' : installs[romId]?.serial || ''; } catch {}
-  const needles = [...new Set([where, mainFile(where)].filter(Boolean).map((p) => path.basename(p)).concat(serial ? [serial] : []))].filter((n) => n.length > 3);
+  let serial = ''; try { serial = o.needles ? '' : /ps3/i.test(`${r.platform_slug} ${r.platform_fs_slug}`) ? ps3Serial(romId, where) || '' : installs[romId]?.serial || ''; } catch {}
+  const needles = o.needles || [...new Set([where, mainFile(where)].filter(Boolean).map((p) => path.basename(p)).concat(serial ? [serial] : []))].filter((n) => n.length > 3);
   // read without holding the main thread (0.9.82): it was a full synchronous /proc read every 2 s for the whole game
   const running = async () => {
     let ids = []; try { ids = (await fsp.readdir('/proc')).filter((d) => /^\d+$/.test(d) && Number(d) !== process.pid); } catch { return false; }
@@ -425,8 +426,7 @@ log('start', app.getVersion(), 'gpu=' + (useGpu ? 'hardware' : 'software'), 'ses
 // The script drops both, starts without the Chromium sandbox, and writes everything to
 // steam-launch.log so a failed launch always leaves a trace.
 const STEAM_LAUNCHER = path.join(USER_DATA, 'steam-launch.sh');
-function writeSteamLauncher() {
-  const ai = process.env.APPIMAGE;
+function writeSteamLauncher(ai = process.env.APPIMAGE) {
   if (!ai) return null;
   const q = (v) => "'" + String(v).replace(/'/g, "'\\''") + "'";
   const body = `#!/bin/bash
@@ -438,7 +438,11 @@ LOG=${q(path.join(USER_DATA, 'steam-launch.log'))}
 } > "$LOG" 2>&1
 unset LD_PRELOAD LD_LIBRARY_PATH
 export CARTRIDGE_FROM_STEAM=1
-exec ${q(ai)} --no-sandbox "$@" >> "$LOG" 2>&1
+AI=${q(ai)}
+# an update gives a versioned file name the release's name, and a file can be moved or renamed by hand: the newest
+# Cartridge AppImage beside it then, so Steam's shortcut never points at nothing (0.9.88)
+[ -x "$AI" ] || AI="$(ls -t -- ${q(path.dirname(ai))}/*[Cc]artridge*.[Aa]pp[Ii]mage 2>/dev/null | head -n 1)"
+exec "$AI" --no-sandbox "$@" >> "$LOG" 2>&1
 `;
   fs.mkdirSync(USER_DATA, { recursive: true });
   fs.writeFileSync(STEAM_LAUNCHER, body, { mode: 0o755 });
@@ -2884,7 +2888,7 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
       t0 = performance.now();
       try { r = await SS.syncUnit(u, rpc, ssLedger, { extra, extraAt: saveAt(), backupsRoot: SAVE_BACKUPS, choice: key ? choice : null, dry, remotes, slugsOf: ssSlugsOf, hashCache: ssHashes, refused: manual ? null : (k, h) => (ssData.tooLarge?.[k]?.hash === h ? ssData.tooLarge[k].error : null) }); } catch (e) { r = { key: u.key, result: e.code === 'auth' ? 'auth' : e.code === 'toolarge' ? 'toolarge' : 'error', error: e.message }; }
       // a save refused for its size is remembered with its hash, and only tried again when it changes or on Sync Now
-      if (r.result === 'toolarge' && !dry) { const h = ssHashes && u.path ? await SS.hashUnitAsync(u, ssHashes).catch(() => null) : null; if (h) { (ssData.tooLarge ||= {})[u.key] = { hash: h, error: r.error }; } }
+      if (r.result === 'toolarge' && !dry && !r.skipped) { const h = ssHashes && u.path ? await SS.hashUnitAsync(u, ssHashes).catch(() => null) : null; if (h) { (ssData.tooLarge ||= {})[u.key] = { hash: h, error: r.error }; } }
       else if (ssData.tooLarge?.[u.key] && ['up', 'same', 'down'].includes(r.result)) delete ssData.tooLarge[u.key];
       { const ms = performance.now() - t0; if (ms > (T.slowest || 0)) { T.slowest = ms; T.slowestKey = u.key; } } await breathe();
       results.push({ ...r, place: r.result === 'unplaced' ? r.why : undefined, label: u.label || u.key, emu: u.emu, emuName: SS.labelOf(u.emu), romId: u.romId, romIds: u.card ? u.romIds || [] : undefined, card: u.card, states: !!u.states, remote: !!u.remote, why: u.why || null, likely: u.likely?.length ? u.likely : undefined });
@@ -3483,6 +3487,8 @@ function setupUpdater() {
   autoUpdater.on('update-not-available', () => set({ state: 'current', version: versionName() }));
   autoUpdater.on('update-downloaded', (i) => { try { recovery.backup(CONFIG_FILE, 'update'); } catch {} set({ state: 'ready', version: nameOf(i) }); if (config.updateSwitched) { delete config.updateSwitched; saveConfig(); } });
   autoUpdater.on('error', (e) => set({ state: 'error', error: String(e?.message || e).slice(0, 200) }));
+  // a versioned file name takes the release's name on install: Steam's launcher follows it at once (0.9.88)
+  autoUpdater.on('appimage-filename-updated', (dest) => { try { if (fs.existsSync(STEAM_LAUNCHER)) writeSteamLauncher(dest); log('appimage renamed by the update', path.basename(dest)); } catch {} });
   const check = () => autoUpdater.checkForUpdates().catch(() => {});
   setTimeout(check, 8000);
   setInterval(check, 6 * 3600e3);
@@ -4393,7 +4399,7 @@ const handlers09 = {
 };
 // What the moved areas share with main.js (0.9.71, the split by area): functions, and getters for state that changes
 const MAIN = {
-  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob, platformDirs, sfoIndex, childRun,
+  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob, platformDirs, sfoIndex, childRun, watchGameRun,
   get broadcast() { return broadcast; }, get webFetch() { return webFetch; }, get romName() { return romName; }, get isDir() { return isDir; }, get romIndexMain() { return romIndexMain; },
   get steamMgr() { return steamMgr; }, get config() { return config; }, get installedMap() { return installedMap; }, get library() { return library; }, get runOn() { return runOn; }, get gameFocus() { return gameFocus; }, get trophySvc() { return trophySvc; }, get win() { return win; },
   USER_DATA,

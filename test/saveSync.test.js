@@ -403,3 +403,20 @@ test('RetroArch saves are placed before its first save', () => {
   assert.strictEqual(SS.placeFor('retroarch', 'rastate:Snes9x/Game.state1', { home }), path.join(cfgDir, 'states', 'Snes9x'));
   fs.rmSync(home, { recursive: true, force: true });
 });
+
+test('a PC port’s save folder leaves out its caches, textures and logs; a save too big to be one is refused unread (0.9.88)', async () => {
+  const d = tmp();
+  put(d, 'PT_Save_Data0', 'save 0'); put(d, 'pt.ini', '[a]\nb=1\n'); put(d, 'pt.log', 'log');
+  put(d, 'enhanced-textures/156a.pttex', 'tex'); put(d, 'pipeline-cache/p.bin', 'p'); put(d, 'shadercache/s.bin', 's');
+  const port = { emu: 'recomp', kind: 'dir', key: 'pt', path: d };
+  assert.deepStrictEqual(SS.entriesOf(port).map(([n]) => n).sort(), ['PT_Save_Data0', 'pt.ini']);
+  // an emulator's own save folder is exact: nothing left out there
+  assert.ok(SS.entriesOf({ ...port, emu: 'rpcs3' }).some(([n]) => n === 'enhanced-textures/156a.pttex'));
+  // over SAVE_MAX: refused from stat alone, nothing uploaded
+  const big = path.join(d, 'huge.bin'); fs.closeSync(fs.openSync(big, 'w')); fs.truncateSync(big, SS.SAVE_MAX + 1);
+  let sent = 0;
+  const rpc = { listAll: async () => [], list: async () => [], upload: async () => { sent++; return {}; } };
+  const r = await SS.syncUnit({ ...port, romId: 1, slot: 'x' }, rpc, { get: () => null, set: () => {} }, {});
+  assert.strictEqual(r.result, 'toolarge'); assert.ok(r.skipped); assert.strictEqual(sent, 0);
+  fs.rmSync(d, { recursive: true, force: true });
+});

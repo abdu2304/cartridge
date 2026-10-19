@@ -216,6 +216,18 @@ module.exports = function recompsIpc(m) {
     if (!rec) throw new Error('Install it first.');
     if (!R.ready(id)) throw new Error(rec.game?.path ? `${e.name} isn’t set up yet. Press Set Up.` : `Pick your copy of ${e.recipe.game.title} first.`);
     const st = rec.starts.find((x) => x.id === start) || rec.starts[0];
+    // 0.9.88 (owner: Uncharted saw no controller): pads that Steam Input holds (a Steam Controller always, any pad on
+    // the desktop) reach only games Steam started; a port Cartridge spawned itself got Steam's desktop mouse and
+    // keyboard. With its shortcut in Steam and Steam running, it starts through Steam, as console games do.
+    const sc = m.steamMgr.recompShortcut(rec.starts.length > 1 ? `${id}:${st.id}` : id);
+    if (sc && require('./steamArt').steamRunning()) {
+      try {
+        const r = await m.steamMgr.runAppid(sc.appid);
+        log('verified opened', id, st.id, 'through steam', r.via);
+        m.watchGameRun(require('./recomps').matchRoms(e, libraryRoms())[0] ?? null, { needles: [st.script] });
+        return { via: 'steam', start: st.id };
+      } catch (er) { log('verified through steam failed', id, er.message); }
+    }
     const runLog = path.join(m.USER_DATA, 'emulator-runs', `verified-${id}.log`);
     let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
     const env = require('./childEnv').clean();

@@ -106,7 +106,7 @@
                   <div class="st-lead-wrap" :style="t.h > 1 ? { height: Math.round(Math.min(56, box(t).ph * 0.16) + 30) + 'px' } : null"><Transition name="st-lead">
                     <div :key="rowView(t)[0].id" class="st-row-lead">
                       <GameLogo :logo="store.config.ui.logos !== false ? logoOf(rowView(t)[0]) : null" :name="rowView(t)[0].name" cls="st-row-name" :area="Math.min(16000, box(t).pw * box(t).ph * 0.07)" :max-w="Math.min(300, box(t).pw * (t.h > 1 ? 0.5 : 0.36))" :max-h="t.h > 1 ? Math.min(56, box(t).ph * 0.16) : Math.min(64, box(t).ph * 0.3)" />
-                      <span class="st-sub"><ConsoleMark v-if="store.play[rowView(t)[0].id]?.port" slug="steam" label="Steam" />{{ firstLine(t.type, rowView(t)[0]) }}</span>
+                      <span class="st-sub"><ConsoleMark v-if="t.type === 'recent' && store.play[rowView(t)[0].id]?.port" slug="steam" label="Steam" />{{ firstLine(t.type, rowView(t)[0]) }}</span>
                     </div>
                   </Transition></div>
                 </div>
@@ -394,8 +394,8 @@ import { vAmbient } from '../ambient.js';
 // (the D-pad moves a corner, LB/RB pick the corner), Y removes, B is done. Touch and mouse: drag a tile
 // to move it, drag an edge or a corner to resize. Saved in config.ui.start.
 import { computed, ref, reactive, onMounted, onBeforeUnmount, onBeforeUpdate, onUpdated, nextTick, watch } from 'vue';
-import { gsapOn, load as loadGsap, ready as gsapReady, EASE } from '../gsapEngine.js';
-import { store, heroArt, call, go, tab, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour, plural, ago } from '../store.js';
+import { Flip, EASE } from '../gsapEngine.js';
+import { store, heroArt, call, go, goPlayed, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour, plural, ago } from '../store.js';
 import { useView } from '../useView.js';
 import { recommend } from '../recs.js';
 import { ensureFocus, input, pushLayer, focusFirst, rumble } from '../nav.js';
@@ -801,7 +801,7 @@ function openTile(t, ev) {
   if (suppressClick) { suppressClick = false; ev?.preventDefault(); return; }
   if (editing.value) return; // arranging: A (accept) and the mouse handle tiles themselves
   const T = t.type;
-  if (T === 'continue') return cur.value ? go('game', { romId: cur.value.id }) : tab('library');
+  if (T === 'continue') return cur.value ? goPlayed(cur.value.id) : go('library');
   if (T === 'clock') return;
   if (T === 'week') {
     const most = roms.value.filter((r) => store.play[r.id]?.min).sort((a, b) => store.play[b.id].min - store.play[a.id].min);
@@ -810,13 +810,14 @@ function openTile(t, ev) {
     return go('collection', { collectionId: 'start-most' });
   }
   if (T === 'storage') { store.settingsSection = 'storage'; store.settingsDirect = true; return go('settings'); }
-  if (T === 'consoles') return tab('consoles');
-  if (T === 'trophies') { const a = achView(t)[0]; return a ? a.open() : tab('achievements'); }
-  if (T === 'downloads') return tab('downloads');
+  // 0.9.88 (crawl: B didn't come back): a tile opens its page on top of Start, so B returns here, as Home's Show all
+  if (T === 'consoles') return go('consoles');
+  if (T === 'trophies') { const a = achView(t)[0]; return a ? a.open() : go('achievements'); }
+  if (T === 'downloads') return go('downloads');
   if (T === 'saves') { store.settingsSection = 'syncthing'; store.settingsDirect = true; return go('settings'); }
   if (T === 'surprise') { const r = deck.value[0]; if (r) go('game', { romId: r.id }); return; }
   if (T === 'daily') return daily.value && go('game', { romId: daily.value.id });
-  if (T === 'stats') return tab('library');
+  if (T === 'stats') return go('library');
   if (T === 'cstats') return platformById(t.platformId) && go('platform', { platformId: t.platformId });
   if (T === 'spotlight') { const r = spotOf(t); return r && go('game', { romId: r.id }); }
   if (T === 'media' || T === 'shelf') { const r = mediaOf(t); return r && go('game', { romId: r.id }); }
@@ -824,7 +825,7 @@ function openTile(t, ev) {
   if (T === 'image' || T === 'html') return;
   if (T === 'game') return romById(t.romId) && go('game', { romId: t.romId });
   if (T === 'console') return platformById(t.platformId) && go('platform', { platformId: t.platformId });
-  if (COVER_ROWS[T] && sel[t.id]) return go('game', { romId: rowView(t)[0].id }); // stepped to a game: that one
+  if (COVER_ROWS[T] && sel[t.id]) return T === 'recent' ? goPlayed(rowView(t)[0].id) : go('game', { romId: rowView(t)[0].id }); // stepped to a game: that one (Recently Played: as its port when its Steam mark shows)
   if (COVER_ROWS[T]) {
     const list = listOf(t);
     if (!list.length) return;
@@ -1303,12 +1304,11 @@ onMounted(async () => {
 onBeforeUnmount(() => { store.forceHints = false; clearInterval(clockT); clearInterval(spotT); clearInterval(rollT); clearInterval(spaceT); clearTimeout(pressT); ro?.disconnect(); if (editing.value) { settle(tiles.value); save(); } });
 watch(() => store.trophyVer, loadAch);
 watch(() => store.play, loadWeek);
-// 0.9.70 GSAP test switch (src/gsapEngine.js): while arranging, the tiles that move are flown by GSAP Flip from where
-// they were to where Vue put them (their CSS transitions are off then); the held tile still follows the finger
+// while arranging, the tiles that move are flown by GSAP Flip from where they were to where Vue put them (0.9.70 test,
+// GSAP for good since 0.9.88; their CSS transitions are off then); the held tile still follows the finger
 let flipState = null;
-watch(() => editing.value, (v) => { if (v && gsapOn()) loadGsap().catch(() => {}); });
-onBeforeUpdate(() => { const G = editing.value && gsapOn() ? gsapReady() : null; flipState = G && el.value ? G.Flip.getState(el.value.querySelectorAll('.st-tile:not(.held)')) : null; });
-onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G && st) G.Flip.from(st, { duration: 0.42, ease: EASE, simple: true }); });
+onBeforeUpdate(() => { flipState = editing.value && el.value ? Flip.getState(el.value.querySelectorAll('.st-tile:not(.held)')) : null; });
+onUpdated(() => { const st = flipState; flipState = null; if (st) Flip.from(st, { duration: 0.42, ease: EASE, simple: true }); });
 </script>
 
 <style scoped>
@@ -1367,7 +1367,7 @@ onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G
 .editing .st-face { box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12); }
 .editing .st-tile:not(.held):not(.picked) .st-face { transform: scale(0.975); }
 .editing .st-tile:focus .st-face, .editing .st-tile:focus-visible .st-face { box-shadow: var(--ring); transform: none; }
-:global(body.motion-gsap .start.editing .st-tile:not(.held)) { transition: opacity var(--fade-in); }
+.start.editing .st-tile:not(.held) { transition: opacity var(--fade-in); }
 .st-tile.held { z-index: 5; transition: width var(--glide), height var(--glide); }
 .st-tile.held .st-face, .st-tile.picked .st-face { transform: scale(1.035) rotate(-0.6deg); box-shadow: var(--ring), 0 30px 70px rgba(0, 0, 0, 0.6); }
 .st-tile.picked { z-index: 5; }

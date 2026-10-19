@@ -394,3 +394,8 @@ test('0.9.83: a Windows port on a drive that can’t hold links (exFAT, NTFS) ge
   assert.deepStrictEqual(made, [path.join(rec.prefix, 'pfx')], 'Proton made it there, not beside the install');
   assert.match(fs.readFileSync(rec.starts[0].script, 'utf8'), new RegExp(rec.prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), 'the start script uses it');
 });
+
+test('Uncharted’s FPS counter goes to bbport.ini, where its game reads it (its launcher’s --play never passes it on) (0.9.88)', () => {
+  const r = require('../electron/recipes/uncharted.json');
+  assert.deepStrictEqual(r.settings.find((s) => s.id === 'show_fps').at, ['ini', 'show_fps']);
+});

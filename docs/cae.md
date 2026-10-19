@@ -26,9 +26,10 @@ These are the rules every new motion must follow. If something can't follow them
    nothing snaps back to a start position. Any new input finishes a picture still flying (`skipMorph`).
 6. **Transform and opacity only.** No animating width, height, top, left, filters or shadows. A shadow that must
    change fades on a pseudo-element.
-7. **One frame loop.** Anything moved by script registers with `frame(fn)`. There is at most one
-   `requestAnimationFrame`, it sleeps when nothing moves, and it uses real elapsed time (dt, capped at 50 ms), so a
-   slow frame never makes things jump or speed up.
+7. **One frame loop: GSAP's.** Anything moved by script registers with `frame(fn)`, which runs on GSAP's ticker
+   (0.9.88), so GSAP's tweens and CAE's springs share one `requestAnimationFrame`. The listener comes off when nothing
+   moves, and it uses real elapsed time (dt, capped at 50 ms; `lagSmoothing(0)`), so a slow frame never makes things
+   jump or speed up.
 8. **Respect the person.** Reduced motion (the setting or the system's) turns movement into fades or nothing. Light
    effects (no GPU) keep pages to a 160 ms fade, because a moving full page doubled slow frames there (measured).
 9. **Plain and Glass are separate.** A motion made for Glass (the liquid morph of pop-ups, the light on the rim)
@@ -40,8 +41,12 @@ These are the rules every new motion must follow. If something can't follow them
 ## The parts
 
 ### 0. The ticker
-`frame(fn)` runs `fn(now, dt)` every frame until it returns `false`; it returns a stop function. One loop for
-everything: the scroll glide, shared-element flights, the Glass light, the Glass frame sampler.
+`frame(fn)` runs `fn(now, dt)` every frame until it returns `false`; it returns a stop function. It is GSAP's ticker
+(`src/gsapEngine.js`, since 0.9.88: GSAP is the engine, no longer a test switch), so one loop drives everything: the
+scroll glide, GSAP's tweens (the card's flight, Start's tiles while arranging with Flip, the welcome's timeline), the
+Glass light and the frame sampler. GSAP's curve is `EASE` (`expo.out`), CAE's critically damped settle: full speed
+at once, no overshoot. Focus, presses and page arrivals stay CSS springs: the compositor runs them, so they keep
+moving while the page's own thread is busy.
 
 ### 1. Spring curves for CSS
 `springCurve({ damping, response })` integrates the spring `x'' = -k (x - 1) - c x'` (k = (2π / response)²,

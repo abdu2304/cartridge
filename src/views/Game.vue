@@ -9,7 +9,8 @@
       </section>
       <section class="g-hero">
         <div class="g-info">
-          <div class="eyebrow row" style="gap: 8px"><PIcon :p="{ slug: base.platform_slug, fs_slug: base.platform_fs_slug }" :size="18" />{{ base.platform_display_name }}</div>
+          <div v-if="isPortPage" class="eyebrow row" style="gap: 8px; --cm-h: 14px"><ConsoleMark slug="steam" label="Steam" />PC Port<template v-if="usePort && usePort.from !== 'verified'"> · From a Link</template></div>
+          <div v-else class="eyebrow row" style="gap: 8px"><PIcon :p="{ slug: base.platform_slug, fs_slug: base.platform_fs_slug }" :size="18" />{{ base.platform_display_name }}</div>
           <div class="g-meta">
             <span v-if="isNew(base)" class="chip new">NEW</span>
             <span v-if="yr">{{ yr }}</span>
@@ -36,7 +37,10 @@
           </div>
 
           <div class="g-actions" data-top>
-            <template v-if="dl && dl.status === 'downloading'">
+            <template v-if="isPortPage">
+              <button v-if="usePort" class="btn primary ok xl" data-focus data-autofocus @click="playPort(usePort)"><Icon name="mdiCheckDecagramOutline" />{{ portLabel(usePort) }}</button>
+            </template>
+            <template v-else-if="dl && dl.status === 'downloading'">
               <div class="dlbox glass">
                 <div class="row" style="justify-content: space-between; font-size: 13px">
                   <b>Downloading</b><span class="muted">{{ pct }}% · {{ bytes(dl.speed) }}/s</span>
@@ -59,22 +63,20 @@
               <button v-if="pkgBusy" class="btn xl" data-focus data-autofocus @click="cancelPkg"><Icon name="mdiLoading" class="spin" :size="22" />{{ pkgProg?.opens ? `Close ${emuName} to finish` : `Installing in ${emuName}` }}{{ pkgPct != null ? ` · ${pkgPct}%` : '' }}{{ pkgProg?.of > 1 ? ` · ${pkgProg.step} of ${pkgProg.of}` : '' }}</button>
               <button v-else-if="needsInstall" class="btn primary xl" data-focus data-autofocus @click="installPkg"><Icon name="mdiPackageDown" :size="22" />Install in {{ emuName }}</button>
               <button v-else-if="pkg?.licenceMissing?.length" class="btn primary xl" data-focus data-autofocus @click="addLicence"><Icon name="mdiKeyOutline" :size="22" />Get licence (.rap)</button>
-              <button v-else-if="usePort" class="btn primary ok xl" data-focus data-autofocus @click="playPort(usePort)"><Icon name="mdiCheckDecagramOutline" />{{ portLabel(usePort) }}</button>
               <button v-else class="btn primary ok xl" data-focus data-autofocus @click="playNow"><Icon name="mdiCheckCircle" />Ready to play</button>
-              <button v-if="ports.length && !needsInstall && !pkgBusy" class="btn icon-btn" data-focus @click="pickWay"><Icon name="mdiSwapHorizontal" :size="22" /><span>Play With</span></button>
               <!-- Re-download and Delete live in More → Options (owner, 0.9.16); the ring shows while deleting -->
               <button v-if="deleting != null" class="btn danger icon-btn" data-focus disabled><Ring :pct="deleting" :size="22" /><span>Deleting</span></button>
             </template>
             <template v-else>
-              <button v-if="readyPort" class="btn primary ok xl" data-focus data-autofocus @click="playPort(readyPort)"><Icon name="mdiCheckDecagramOutline" />{{ portLabel(readyPort) }}</button>
-              <button class="btn xl" :class="{ primary: !readyPort }" data-focus :data-autofocus="readyPort ? null : ''" @click="dlNow"><Icon name="mdiDownload" :size="22" />{{ dl?.status === 'cancelled' ? 'Resume' : 'Download' }} · {{ bytes(base.fs_size_bytes) }}</button>
+              <button class="btn xl primary" data-focus data-autofocus @click="dlNow"><Icon name="mdiDownload" :size="22" />{{ dl?.status === 'cancelled' ? 'Resume' : 'Download' }} · {{ bytes(base.fs_size_bytes) }}</button>
             </template>
             <button class="btn icon-btn" data-focus title="More options" @click="more"><Icon name="mdiDotsHorizontal" :size="22" /><span>More</span></button>
           </div>
-          <div v-if="dl && dl.status === 'error'" class="chip red" style="align-self: flex-start">Last attempt failed: {{ dl.error }}</div>
+          <div v-if="!isPortPage && dl && dl.status === 'error'" class="chip red" style="align-self: flex-start">Last attempt failed: {{ dl.error }}</div>
           <!-- 0.9.71: it was last seen on a drive that's unplugged now; downloading again isn't needed once it's back -->
-          <div v-if="!installedPath && store.awayRoms[romId]" class="chip" style="align-self: flex-start"><Icon name="mdiUsbFlashDriveOutline" :size="16" />On {{ store.awayRoms[romId].drive }}, which isn’t plugged in</div>
-          <div class="dest"><Icon name="mdiFolderArrowDownOutline" :size="16" /><span class="mono">{{ marked ? 'Marked as installed by you' : installedPath || target?.path || 'No folder set for this system' }}</span><span v-if="space" class="muted">· {{ bytes(space.free) }} free</span></div>
+          <div v-if="!isPortPage && !installedPath && store.awayRoms[romId]" class="chip" style="align-self: flex-start"><Icon name="mdiUsbFlashDriveOutline" :size="16" />On {{ store.awayRoms[romId].drive }}, which isn’t plugged in</div>
+          <div v-if="isPortPage" class="dest"><Icon name="mdiFolderOutline" :size="16" /><span class="mono">{{ usePort?.installed?.dir || 'Not installed yet' }}</span></div>
+          <div v-else class="dest"><Icon name="mdiFolderArrowDownOutline" :size="16" /><span class="mono">{{ marked ? 'Marked as installed by you' : installedPath || target?.path || 'No folder set for this system' }}</span><span v-if="space" class="muted">· {{ bytes(space.free) }} free</span></div>
         </div>
         <div class="g-cover">
           <img v-if="coverSrc && !coverFail" :src="coverSrc" @error="coverFail = true" />
@@ -173,6 +175,7 @@ import GameLogo from '../components/GameLogo.vue';
 import Grade from '../components/Grade.vue';
 import GameCard from '../components/GameCard.vue';
 import Ring from '../components/Ring.vue';
+import ConsoleMark from '../components/ConsoleMark.vue';
 
 const props = defineProps({ romId: Number, port: String }); // port: opened from PC Ports (0.9.85), that port plays
 const el = ref(null);
@@ -770,8 +773,12 @@ async function more() {
   }
   if (v === 'pkg') { await installPkg(); return; }
   if (v === 'patches') { await openModal('gameaddons', { romId: Number(props.romId), name: base.value.name, tab: 'patches' }); return; }
-  if (typeof v === 'string' && v.startsWith('recomp:')) { await openModal('recomp', { id: v.slice(7) }); return; }
-  if (typeof v === 'string' && v.startsWith('verified:')) { await openModal('verified', { id: v.slice(9) }); return; }
+  // an installed port opens as its own page (0.9.88); one not installed yet opens its sheet to install it
+  if (typeof v === 'string' && /^(recomp|verified):/.test(v)) {
+    const id = v.replace(/^\w+:/, ''), inst = ports.value.find((x) => x.id === id && x.installed);
+    if (inst) return go('game', { romId: Number(props.romId), port: id });
+    await openModal(v.startsWith('verified:') ? 'verified' : 'recomp', { id }); return;
+  }
   if (v === 'redownload') { await redownload(); return; }
   if (v === 'move') { // 0.9.71 (plan-multidrive)
     const r = await call('roots:list').catch(() => null), here = installedPath.value || '';
@@ -815,26 +822,16 @@ async function more() {
   if (v === 'hero') setBg({ src: img(url) });
   toast({ grid: 'Cover', logo: 'Logo', hero: 'Background' }[v] + ' updated', 'ok', 2000, 'mdiCheck');
 }
-// Ways to play (0.9.71, play actions as Playnite has them): a game with a Cartridge Verified PC port (or a recomp from a
-// link) can be played through its emulator or as the port. Play With picks one, remembered per game (ui.playWith);
-// a port that isn't ready yet opens its sheet. Not downloaded but the port is ready (its copy is elsewhere): Play the
-// PC Port sits beside Download.
+// this game's PC ports (Cartridge Verified, or installed from a link); a port that isn't ready yet opens its sheet
 const ports = ref([]);
 async function loadPorts() { const r = await call('recomps:forRom', { romId: Number(props.romId) }).catch(() => []); ports.value = (r || []).filter((x) => x.from === 'verified' || x.installed); }
-// your Play With choice first; else the port this page was opened for (PC Ports), else the port last played (0.9.85)
-const usePort = computed(() => { const w = store.config?.ui?.playWith?.[props.romId] || props.port || store.play[props.romId]?.port; return w && w !== 'emu' ? ports.value.find((x) => x.id === w || String(w).startsWith(x.id + ':')) || null : null; }); // 0.9.86: a port with several starts is played as "<id>:<start>"
+// 0.9.88 (owner: ports and emulators are separate, never mixed): a page opened for a port (PC Ports, a card with the
+// Steam mark) is that port and nothing else; the console game's page is the console game. No Play With: the remembered
+// choice (ui.playWith) made the second P.T. card open the first one, and the console page start a port.
+const isPortPage = computed(() => !!props.port);
+const usePort = computed(() => (props.port ? ports.value.find((x) => x.id === props.port || String(props.port).startsWith(x.id + ':')) || null : null)); // a port with several starts is played as "<id>:<start>"
 // what the main button says: a link port sets itself up when it starts; a verified one not ready opens its sheet
 const portLabel = (x) => (x.from !== 'verified' ? (x.installed?.ready ? 'Play the PC Port' : 'Set Up the PC Port') : x.state === 'play' ? 'Play the PC Port' : x.state === 'update' ? 'Update the PC Port' : 'Set Up the PC Port');
-const readyPort = computed(() => usePort.value || ports.value.find((x) => x.state === 'play' || (x.from !== 'verified' && x.installed?.ready)) || null);
-async function pickWay() {
-  const cur = store.config?.ui?.playWith?.[props.romId] || 'emu';
-  const v = await choose({ title: 'Play With', message: `How ${base.value.name} starts when you press Play. You can change it here any time.`, options: [
-    { label: 'Its Emulator', sub: 'Through its Steam shortcut, with your emulator setup', value: 'emu', icon: 'mdiGamepadVariantOutline', selected: cur === 'emu' },
-    ...ports.value.map((x) => ({ label: `PC Port: ${x.name}`, sub: x.from === 'verified' ? ({ play: 'Cartridge Verified · ready', update: 'Cartridge Verified · an update is out' }[x.state] || 'Cartridge Verified · not set up yet') : 'From a link · Unverified', value: x.id, icon: 'mdiCheckDecagramOutline', selected: cur === x.id, raw: true })),
-  ] });
-  if (!v) return;
-  await saveConfig({ ui: { playWith: { ...(store.config.ui.playWith || {}), [props.romId]: v } } });
-}
 // the PC Port tab of More (0.9.86)
 function portRows(x) {
   const verified = x.from === 'verified', inst = x.installed, ready = verified ? x.state === 'play' || x.state === 'update' : !!inst?.ready;
@@ -846,7 +843,7 @@ function portRows(x) {
     ...(verified && inst && ready ? [{ label: 'Set Up Again', sub: 'Checks your copy and writes its settings and starts again', value: 'p:setup', icon: 'mdiWrenchOutline' }] : []),
     ...(inst?.dir ? [{ label: 'Show Its Folder', sub: inst.dir.split('/').filter(Boolean).pop(), value: 'p:dir', icon: 'mdiFolderOutline', raw: true }] : []),
     ...(inst && ready ? [{ label: inst.steam ? 'In Steam' : 'Add to Steam', sub: 'Its own shortcut, in a Recomps collection', value: 'p:steam', icon: 'mdiSteam', disabled: !!inst.steam }] : []),
-    ...(ports.value.length || store.installed[props.romId] ? [{ label: 'Play With', sub: 'This port, or the console game with its emulator', value: 'p:way', icon: 'mdiSwapHorizontal' }] : []),
+    ...(inst ? [{ label: 'Remove the Port', sub: 'Its saves are backed up first; your copy of the game isn’t touched', value: 'p:remove', icon: 'mdiDeleteOutline', danger: true }] : []),
   ].filter((o) => !o.disabled);
 }
 async function portAction(x, what) {
@@ -857,7 +854,11 @@ async function portAction(x, what) {
     if (what === 'setup') { toast(`Setting up ${x.name}…`, 'info', 2500, 'mdiWrenchOutline'); const r = await call('recomps:prepare', { id: x.id }); if (r?.ok === false) toast(r.why || 'It couldn’t be set up.', 'error', 6000); else toast(`${x.name} is set up`, 'ok', 2500, 'mdiCheck'); return loadPorts(); }
     if (what === 'dir') return toast(x.installed.dir, 'info', 5000, 'mdiFolder');
     if (what === 'steam') { const r = await call('recomps:steam', { id: x.id }); toast(r.added ? 'Added to Steam, in Recomps' : 'Queued: it goes into Steam as soon as Steam can take it', r.added ? 'ok' : 'info', 4000, 'mdiSteam'); return loadPorts(); }
-    if (what === 'way') return pickWay();
+    if (what === 'remove') {
+      if (!(await confirm(`Remove ${x.name}?`, 'Its saves are backed up first, and its folder goes to the Trash. Your copy of the game isn’t touched.', 'Remove', true))) return;
+      await call('recomps:remove', { id: x.id, steam: !!x.installed?.steam }); toast(`${x.name} removed`, 'ok', 2500, 'mdiCheck');
+      store.route = { name: 'game', params: { romId: Number(props.romId) } }; return; // the port is gone: its game's own page in its place (B never leads back to it)
+    }
   } catch (e) { toast(e.message, 'error', 6000); }
 }
 async function playPort(x) {

@@ -464,7 +464,7 @@
                   <div class="eyebrow">Signed in to RetroAchievements</div>
                   <div style="font-family: var(--display); font-size: 22px; font-weight: 700">{{ store.config.ra.user }}</div>
                 </div>
-                <button class="btn" data-focus @click="tab('achievements')"><Icon name="mdiTrophyOutline" />Open Achievements</button>
+                <button class="btn" data-focus @click="go('achievements')"><Icon name="mdiTrophyOutline" />Open Achievements</button>
                 <button class="btn" data-focus @click="raSignOut"><Icon name="mdiLogout" />Sign out</button>
               </div>
               <!-- 0.9.21 (owner: it kept saying "Sign in" after signing in): says who's signed in, opens a list -->
@@ -601,7 +601,6 @@
             <div class="row"><button class="btn" data-focus @click="store.welcoming = true"><Icon name="mdiHandWave" />Run the Welcome Again</button><span class="muted small">Starts from your current settings. Nothing is reset.</span></div>
             <div class="row"><button class="btn" data-focus @click="openTour({ start: activeTabs().includes('start') })"><Icon name="mdiGestureTapButton" />Take the Tour</button><span class="muted small">Try each control yourself, a step at a time.</span></div>
             <ServerStatus />
-            <Toggle :model-value="ui.motionEngine === 'gsap'" label="GSAP Motion (Test)" desc="Runs the game cover's flight to its page, tiles moving while you arrange Start, and the welcome's opening on GSAP instead of Cartridge's own engine. Try both with the Performance Overlay on and keep the smoother one" @update:model-value="(v) => saveConfig({ ui: { motionEngine: v ? 'gsap' : 'cae' } })" />
             <Toggle :model-value="ui.perfOverlay === true" label="Performance Overlay" desc="Frame rate, slowest frame, CPU and memory in a corner of the screen, to see how Cartridge runs on this device" @update:model-value="(v) => saveConfig({ ui: { perfOverlay: v } })" />
             <ReportProblem />
             <div class="subh">Your Settings</div>
@@ -627,7 +626,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { store, call, go, tab, saveConfig, pickFolder, choose, confirm, toast, openModal, bytes, ago, resync, scanServer, allRoms, romById, cover, resetLogos, askText, activeTabs, TAB_DEFS, consoleName, openTour, plural } from '../store.js';
+import { store, call, go, saveConfig, pickFolder, choose, confirm, toast, openModal, bytes, ago, resync, scanServer, allRoms, romById, cover, resetLogos, askText, activeTabs, TAB_DEFS, consoleName, openTour, plural } from '../store.js';
 import { useView } from '../useView.js';
 import { input, focusFirst, setPointerPref, setRumble, rumble, stopScroll } from '../nav.js';
 import { THEMES, STYLES, styleOf, dockOf, TEXTS, FONTS, CARD_SHAPES, CARD_SIZES, DENSITIES, themeFrom, themeOf, paletteOf, autoColors } from '../themes.js';
@@ -1030,7 +1029,7 @@ async function chooseSrc(s) {
 }
 async function removeDir(s, dir) { trophySrc.value = await call('trophies:removeDir', { src: s.id, dir }); store.config = await call('config:get'); }
 async function scanTrophies() { trophySrc.value = await call('trophies:scan').catch((e) => (toast(e.message, 'error'), trophySrc.value)); store.config = await call('config:get'); }
-function openOthers() { tab('achievements'); }
+function openOthers() { go('achievements'); } // on top of Settings, so B comes back (0.9.88)
 const syncLine = computed(() => {
   const s = store.trophySync;
   if (s.state === 'ok') return `Last synced ${ago(s.at)}.`;
@@ -1330,6 +1329,9 @@ const LOOK_PAGES = [{ v: 'theme', l: 'Theme' }, { v: 'cards', l: 'Text and Cards
 const lookPage = ref(sec.value === 'ui' && backTo ? backTo : 'theme'), lookAdv = ref(false);
 watch(sec, (v, was) => { if (was && v !== was) { emuPage.value = 'emus'; lookPage.value = 'theme'; lookAdv.value = false; libPage.value = 'folders'; dlupPage.value = 'downloads'; } }); // a section always opens on its first page
 watch([sec, emuPage, lookPage, libPage, dlupPage], () => { store.settingsPage = sec.value === 'emu' ? emuPage.value : sec.value === 'ui' ? lookPage.value : sec.value === 'library' ? libPage.value : sec.value === 'dlup' ? dlupPage.value : null; }, { immediate: true });
+// 0.9.88 (controller playtest, red since 0.9.80): a page changed with LB/RB kept the last page's scroll, so its tab
+// row, where focus goes, sat above the pane. A new page starts at the top, as a new section does.
+watch([emuPage, lookPage, libPage, dlupPage, syncPage], () => { const el = paneEl.value; if (el) { stopScroll(el); el.scrollTop = 0; } });
 function setLookPage(v) { lookPage.value = v; lookAdv.value = false; }
 function stepLook(d) {
   if (sec.value !== 'ui') return false;

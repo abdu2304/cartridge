@@ -102,7 +102,7 @@
 // picked above: PS2 texture packs from the EmuCoreX catalog, other consoles' mods from GameBanana.
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { pushLayer, focusFirst } from '../nav.js';
-import { store, call, closeModal, toast, bytes, confirm, pickFolder, openModal, tab, saveConfig, choose, plural } from '../store.js';
+import { store, call, closeModal, toast, bytes, confirm, pickFolder, openModal, go, saveConfig, choose, plural } from '../store.js';
 import Icon from './Icon.vue';
 import Btn from './Btn.vue';
 
@@ -201,7 +201,7 @@ async function install(p, f) {
   }
   // 0.9.28 (owner): Install goes to Downloads, where the pack shows with its game, downloading then unpacking
   const job = call('addons:install', { romId: props.romId, emuRoot: emu.value.emuRoot, pack: JSON.parse(JSON.stringify(p)), file: f ? JSON.parse(JSON.stringify(f)) : null });
-  closeModal(null); tab('downloads');
+  closeModal(null); go('downloads'); // on top of the page it came from: B returns there (0.9.88)
   try {
     const r = await job;
     toast(`Installed in ${emu.value.name}: ${r.files.toLocaleString()} files${r.patches ? ', in its patches (turn it on in the game’s Patches)' : r.graphicMods ? ', in its Graphics Mods (turn it on in the game’s Graphics Mods)' : r.autoOn ? '. Custom textures are on now.' : r.textures ? '. Turn custom textures on to see them.' : ''}`, 'ok', 5000, 'mdiPuzzleOutline');

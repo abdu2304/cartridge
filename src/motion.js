@@ -8,22 +8,22 @@
 //   moves; the governor below slows or stops the rest while you're idle or a game is in front.
 // Parts: 0 the ticker, 1 spring curves for CSS, 2 springs for script, 3 shared element flights, 4 sliding pills,
 // 5 the governor.
-import { gsapOn, load, EASE } from './gsapEngine.js';
+import { gsap, EASE } from './gsapEngine.js';
 
-// ---------- 0. one frame loop (0.9.47): every script-driven motion registers here, so there is at most one
-// requestAnimationFrame, it stops when nothing moves, and it never runs while Cartridge is in the background
+// ---------- 0. one frame loop (0.9.47; on GSAP's ticker since 0.9.88): every script-driven motion registers here, so
+// GSAP's tweens and CAE's springs share one requestAnimationFrame; the listener is off when nothing moves, and rAF
+// itself stops while Cartridge is hidden
 const jobs = new Set();
-let tickRaf = 0, tickLast = 0;
-function tick(now) {
-  tickRaf = 0;
-  const dt = Math.min(0.05, (now - (tickLast || now)) / 1000); tickLast = now;
+let ticking = false;
+function tick(time, deltaMs) {
+  const now = performance.now(), dt = Math.min(0.05, deltaMs / 1000);
   for (const j of [...jobs]) { let keep = false; try { keep = j(now, dt) !== false; } catch { keep = false; } if (!keep) jobs.delete(j); }
-  if (jobs.size) tickRaf = requestAnimationFrame(tick); else tickLast = 0;
+  if (!jobs.size && ticking) { gsap.ticker.remove(tick); ticking = false; }
 }
 // run fn(now, dt) every frame until it returns false; returns a stop function
 export function frame(fn) {
   jobs.add(fn);
-  if (!tickRaf) { tickLast = 0; tickRaf = requestAnimationFrame(tick); }
+  if (!ticking) { ticking = true; gsap.ticker.add(tick); }
   return () => jobs.delete(fn);
 }
 
@@ -130,32 +130,20 @@ export function morph(fromEl, change, toSel, nextTick) {
     to.style.visibility = 'hidden';
     // 0.9.45 (owner: the picture landed off its place, then snapped there, both ways): the target is read again every
     // frame. It moves while the flight runs (the new page settles in, a list scrolls the card into view), and the
-    // old flight was aimed at where it was in the first frame. A critically damped spring (no overshoot) carries the
-    // picture from where it was picked to wherever the target is now, so the last frame is exactly on it.
-    const w = (2 * Math.PI) / SPRINGS.spring.response, dur = 6 / w; // x(t) = 1 - e^(-wt) (0.9.56: starts at full speed), done at 99.75%
-    const t0 = performance.now();
+    // old flight was aimed at where it was in the first frame. A GSAP tween on CAE's curve (full speed at once, no
+    // overshoot) carries the picture from where it was picked to wherever the target is now, so it lands exactly on it.
+    const dur = 6 / ((2 * Math.PI) / SPRINGS.spring.response); // the settle spring's length
     let stop = null, alive = true;
     const end = () => { if (!alive) return; alive = false; stop?.(); to.style.visibility = ''; fly.remove(); if (running?.end === end) running = null; };
-    const step = (now) => {
-      if (!alive) return false;
-      const t = (now - t0) / 1000, p = t >= dur ? 1 : Math.min(1, (1 - Math.exp(-w * t)) / 0.9975); // the last bit folded in: it ends on the target, never a few pixels short
+    const o = { p: 0 }, place = () => {
       const c = to.isConnected ? to.getBoundingClientRect() : b;
-      if (c.width >= 8 && c.height >= 8) {
-        const x = a.left + (c.left - a.left) * p, y = a.top + (c.top - a.top) * p, wd = a.width + (c.width - a.width) * p, ht = a.height + (c.height - a.height) * p;
-        Object.assign(fly.style, { left: c.left + 'px', top: c.top + 'px', width: c.width + 'px', height: c.height + 'px', transform: `translate(${x - c.left}px, ${y - c.top}px) scale(${wd / c.width}, ${ht / c.height})` });
-      }
-      if (p >= 1) { end(); dispatchEvent(new Event('cae-settle')); return false; } // landed: a soft rumble (nav.js)
-      return true;
+      if (c.width < 8 || c.height < 8) return;
+      const p = o.p, x = a.left + (c.left - a.left) * p, y = a.top + (c.top - a.top) * p, wd = a.width + (c.width - a.width) * p, ht = a.height + (c.height - a.height) * p;
+      Object.assign(fly.style, { left: c.left + 'px', top: c.top + 'px', width: c.width + 'px', height: c.height + 'px', transform: `translate(${x - c.left}px, ${y - c.top}px) scale(${wd / c.width}, ${ht / c.height})` });
     };
     running = { end };
-    // 0.9.70 test switch: the same flight on GSAP's ticker and curve (src/gsapEngine.js), the target still read every frame
-    const G = gsapOn() ? await load().catch(() => null) : null;
-    if (G && alive) {
-      const o = { p: 0 }, tw = G.gsap.to(o, { p: 1, duration: dur * 0.75, ease: EASE, onUpdate: () => { const c = to.isConnected ? to.getBoundingClientRect() : b; if (c.width >= 8 && c.height >= 8) { const p = o.p, x = a.left + (c.left - a.left) * p, y = a.top + (c.top - a.top) * p, wd = a.width + (c.width - a.width) * p, ht = a.height + (c.height - a.height) * p; Object.assign(fly.style, { left: c.left + 'px', top: c.top + 'px', width: c.width + 'px', height: c.height + 'px', transform: `translate(${x - c.left}px, ${y - c.top}px) scale(${wd / c.width}, ${ht / c.height})` }); } }, onComplete: () => { end(); dispatchEvent(new Event('cae-settle')); } });
-      stop = () => tw.kill();
-      return;
-    }
-    stop = frame(step);
+    const tw = gsap.to(o, { p: 1, duration: dur * 0.75, ease: EASE, onUpdate: place, onComplete: () => { end(); dispatchEvent(new Event('cae-settle')); } }); // landed: a soft rumble (nav.js)
+    stop = () => tw.kill();
   })();
 }
 // any new input ends a flight at once (the page is already there underneath): never a wait

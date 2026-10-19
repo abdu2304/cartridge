@@ -233,7 +233,6 @@ export function applyTheme(uiOrName) {
   const b = document.body.classList;
   b.toggle('motion-fast', ui.motion === 'fast');
   b.toggle('motion-reduce', ui.motion === 'reduce');
-  b.toggle('motion-gsap', ui.motionEngine === 'gsap'); // 0.9.70: the GSAP test switch (src/gsapEngine.js)
   b.toggle('surface-oled', !!black);
   b.toggle('surface-glass', surf.glassA < 1 && !black);
   b.toggle('elements-glass', !!el.glass);
