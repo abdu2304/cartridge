@@ -52,6 +52,16 @@ function writeVdf(obj) {
 const deserialize = (o) => JSON.parse(JSON.stringify(o), (k, v) => (v && typeof v === 'object' && v.__big !== undefined ? BigInt(v.__big) : v));
 
 // ---------- Steam process
+// 0.9.88: only this user's Steam for this home counts (as steamArt.oursSteam; this file runs on its own, so it's
+// repeated here): another user's Steam never closes for us. HOME inside ours still counts (Snap); unsure = ours.
+function oursSteam(pid) {
+  try { if (typeof process.getuid === 'function' && fs.statSync(`/proc/${pid}`).uid !== process.getuid()) return false; } catch {}
+  let home = null; try { home = /(?:^|\0)HOME=([^\0]*)/.exec(fs.readFileSync(`/proc/${pid}/environ`, 'utf8'))?.[1] || null; } catch {}
+  if (!home) return true;
+  const real = (p) => { const rest = []; let d = path.resolve(p); for (;;) { try { return path.join(fs.realpathSync(d), ...rest); } catch { const up = path.dirname(d); if (up === d) return path.resolve(p); rest.unshift(path.basename(d)); d = up; } } };
+  const mine = real(require('os').homedir()), its = real(home);
+  return its === mine || its.startsWith(mine + path.sep);
+}
 function steamRunning() {
   const me = String(process.pid);
   try {
@@ -59,8 +69,8 @@ function steamRunning() {
       if (!/^\d+$/.test(pid) || pid === me) continue;
       let comm = '';
       try { comm = fs.readFileSync(`/proc/${pid}/comm`, 'utf8').trim(); } catch { continue; }
-      if (comm === 'steam' || comm === 'steamwebhelper') return true;
-      try { const cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0')[0]; if (/(ubuntu12_32|ubuntu12_64)\/steam(webhelper)?$|\/steam\.sh$/.test(cmd)) return true; } catch {}
+      if ((comm === 'steam' || comm === 'steamwebhelper') && oursSteam(pid)) return true;
+      try { const cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0')[0]; if (/(ubuntu12_32|ubuntu12_64)\/steam(webhelper)?$|\/steam\.sh$/.test(cmd) && oursSteam(pid)) return true; } catch {}
     }
   } catch {}
   return false;
