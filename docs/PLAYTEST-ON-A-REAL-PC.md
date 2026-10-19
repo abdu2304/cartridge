@@ -3,6 +3,49 @@
 For the session that runs on the owner's own Linux PC (Claude Code in a terminal, teleported from the cloud session or
 started fresh). Read this after CLAUDE.md and the newest entry in docs/SESSION-LOG.md.
 
+## Handoff after 0.9.87 (owner, 19 Oct 2026): read this first
+
+0.9.87 (a starting screen, and the controller after a PC port) was built in the cloud session; `git pull origin main`
+before anything else. The cloud session has stopped building: everything below is this session's.
+
+**The owner was unhappy with how 0.9.86 was done.** It shipped regressions found by the owner, not by us: the
+controller dead in Cartridge after a PC port (childRun sent no game-run ended and lost to gamescope's focus), the
+Emulators pages very slow, ports shown twice. So from now on, for every change, **triple check**:
+1. Reproduce the problem on this machine first (the real AppImage and the owner's real setup, not only fake homes),
+   and write down the cause before changing code.
+2. After the fix, check it on this machine the way the owner uses it: Game Mode on the TV as well as the desktop,
+   with the controller, launching from Cartridge and from Steam.
+3. Before any release, go back over every change made since 0.9.85 and check each still works on this machine:
+   the 0.9.86 list (Proton in its runtime, childEnv, downloads picked up at start, auto add retries, dumps found by
+   param.sfo, ports shown as ports, ambient steps, zoom, emuCfg, Wii U / Xbox 360 IDs, Save Sync on RomM 5.3) and
+   0.9.87. Read the whole diff adversarially. `npm test`, every `test/e2e/*.js`, `npm run audit:ui` and the controller
+   playtest (`tools/ui-audit/playtest.js`) must pass; the "Controller playtest" CI step has been red on every PR since
+   0.9.80: find out why and fix it, never merge past a red check again.
+4. Say plainly in the notes what was tested on this machine and what wasn't.
+
+**Reported by the owner, to fix:**
+- **Uncharted (PC port): the controller isn't detected in the game, and changes in its game settings don't take
+  effect.** Find where the port reads its pad (Proton/SDL, Steam Input in Game Mode vs desktop, the start script's
+  environment since childEnv and SHELL_UNSET, a Steam shortcut vs Cartridge's own start) and where its settings file
+  really is (the prefix in use: `recipes.prefixOf`, `rec.prefix`, the runtime-launched Proton's prefix vs the one
+  settings are written to, `varsFor` appdata). Check every Windows port the same way, and Linux ports too.
+- **Ports and emulators are separate. Stop mixing them.** No "Play With" for ports, no console emulator rows, Game
+  Settings, add-ons or Steam emulator options anywhere a port is shown. A port opened from the PC Ports page shows
+  that port only (it opened the port picked in Play With or played last: the second P.T. card opened the first one).
+  The older copies installed from a link ("P.T. (From a Link)", "God of War III (From a Link)") must be clearly
+  named on their cards, and Remove must be easy to reach for a port.
+- **Settings → Emulators, PC Ports and Game Add-ons took very long to open after 0.9.86** ("infinite load"). Not
+  found in the cloud (every fake setup lists emulators in under 5 s). Read cartridge.log here (`main thread
+  stalled`, `longest stall`, `downloads: picking up`) and the timings of `emuup:list`, `recomps:list` and the add-on
+  lists on this machine. Suspect: a big download picked up at start (0.9.86 restorePending).
+- **The controller in Cartridge after a game:** 0.9.87 fixed it for ports Cartridge starts; check it on this
+  machine after a port and after an emulator game, from Cartridge and from Steam, in Game Mode and on the desktop.
+
+**Still open from before:** the real controller in Desktop Mode (Chromium sees no pads here), rumble checked on a
+uinput pad, the internal-drive prefix on an exFAT drive (`truncate` + `mkfs.exfat` image), the renamed lowercase
+`.appimage` (updates, Add to Steam, steam-launch.sh), and CLAUDE.md over Claude Code's size limit (keep the rules and
+layout, move the per-version notes to docs/VERSIONS.md and link it).
+
 ## What the owner asked for, in their words
 
 - "You would fix the bugs for me, but it would also be an understanding of how you would fix these bugs across the
