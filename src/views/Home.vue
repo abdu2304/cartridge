@@ -76,7 +76,7 @@
               <CollTile v-for="c in s.items.slice(0, ROW)" :key="c.id" :c="c" wide @open="openCol" @focused="focusCol" />
             </template>
             <template v-else>
-              <GameCard v-for="r in s.items.slice(0, ROW)" :key="r.id" :rom="r" :show-platform="true" :extra="s.sub ? s.sub(r) : ''" :device="s.id === 'playing'" :port="s.id === 'playing' && !!store.play[r.id]?.port" @open="openGame" @focused="focusRom" />
+              <GameCard v-for="r in s.items.slice(0, ROW)" :key="r.id" :rom="r" :show-platform="true" :extra="s.sub ? s.sub(r) : ''" :device="s.id === 'playing'" :port="s.id === 'playing' && !!store.play[r.id]?.port" @open="(r) => (s.id === 'playing' ? goPlayed(r.id) : openGame(r))" @focused="focusRom" />
             </template>
             <!-- a row shows its first 15; the 16th card opens the whole list (0.9.3) -->
             <button v-if="s.type !== 'ra' && s.items.length > ROW" class="card show-all" :class="{ wide: s.type === 'col' || s.type === 'genre' || s.type === 'sys' }" data-focus :data-key="'all-' + s.id" @click="showAll(s)" @focus="clearHero">
@@ -101,7 +101,7 @@ const ROW_H = new Map(), TYPE_H = new Map();
 <script setup>
 import { recommend } from '../recs.js';
 import { computed, ref, nextTick, onMounted, onBeforeUnmount, watch } from 'vue';
-import { img, cover, collections, autoLists, seriesLists, genres, visible, store, go, allRoms, visiblePlatforms, romsOf, isNew, setBg, backdropOf, wantSharp, heroArt as heroOf, bytes, year, ago, rating, resync, downloadFor, download, romById, toast, logoOf, call, GRADE, loadPlay, playtimeText } from '../store.js';
+import { img, cover, collections, autoLists, seriesLists, genres, visible, store, go, goPlayed, allRoms, visiblePlatforms, romsOf, isNew, setBg, backdropOf, wantSharp, heroArt as heroOf, bytes, year, ago, rating, resync, downloadFor, download, romById, toast, logoOf, call, GRADE, loadPlay, playtimeText } from '../store.js';
 import { useView } from '../useView.js';
 import { ensureFocus, scrollMode } from '../nav.js';
 const rowGuess = (s) => ROW_H.get(s.id) || TYPE_H.get(s.type || 'games') || 360;

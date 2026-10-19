@@ -395,7 +395,7 @@ import { vAmbient } from '../ambient.js';
 // to move it, drag an edge or a corner to resize. Saved in config.ui.start.
 import { computed, ref, reactive, onMounted, onBeforeUnmount, onBeforeUpdate, onUpdated, nextTick, watch } from 'vue';
 import { gsapOn, load as loadGsap, ready as gsapReady, EASE } from '../gsapEngine.js';
-import { store, heroArt, call, go, tab, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour, plural, ago } from '../store.js';
+import { store, heroArt, call, go, goPlayed, tab, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour, plural, ago } from '../store.js';
 import { useView } from '../useView.js';
 import { recommend } from '../recs.js';
 import { ensureFocus, input, pushLayer, focusFirst, rumble } from '../nav.js';
@@ -801,7 +801,7 @@ function openTile(t, ev) {
   if (suppressClick) { suppressClick = false; ev?.preventDefault(); return; }
   if (editing.value) return; // arranging: A (accept) and the mouse handle tiles themselves
   const T = t.type;
-  if (T === 'continue') return cur.value ? go('game', { romId: cur.value.id }) : tab('library');
+  if (T === 'continue') return cur.value ? goPlayed(cur.value.id) : tab('library');
   if (T === 'clock') return;
   if (T === 'week') {
     const most = roms.value.filter((r) => store.play[r.id]?.min).sort((a, b) => store.play[b.id].min - store.play[a.id].min);
@@ -824,7 +824,7 @@ function openTile(t, ev) {
   if (T === 'image' || T === 'html') return;
   if (T === 'game') return romById(t.romId) && go('game', { romId: t.romId });
   if (T === 'console') return platformById(t.platformId) && go('platform', { platformId: t.platformId });
-  if (COVER_ROWS[T] && sel[t.id]) return go('game', { romId: rowView(t)[0].id }); // stepped to a game: that one
+  if (COVER_ROWS[T] && sel[t.id]) return goPlayed(rowView(t)[0].id); // stepped to a game: that one (as its port when its Steam mark shows)
   if (COVER_ROWS[T]) {
     const list = listOf(t);
     if (!list.length) return;

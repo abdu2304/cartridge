@@ -2884,7 +2884,7 @@ async function saveSyncRun({ romId = null, key = null, choice = null, dry = fals
       t0 = performance.now();
       try { r = await SS.syncUnit(u, rpc, ssLedger, { extra, extraAt: saveAt(), backupsRoot: SAVE_BACKUPS, choice: key ? choice : null, dry, remotes, slugsOf: ssSlugsOf, hashCache: ssHashes, refused: manual ? null : (k, h) => (ssData.tooLarge?.[k]?.hash === h ? ssData.tooLarge[k].error : null) }); } catch (e) { r = { key: u.key, result: e.code === 'auth' ? 'auth' : e.code === 'toolarge' ? 'toolarge' : 'error', error: e.message }; }
       // a save refused for its size is remembered with its hash, and only tried again when it changes or on Sync Now
-      if (r.result === 'toolarge' && !dry) { const h = ssHashes && u.path ? await SS.hashUnitAsync(u, ssHashes).catch(() => null) : null; if (h) { (ssData.tooLarge ||= {})[u.key] = { hash: h, error: r.error }; } }
+      if (r.result === 'toolarge' && !dry && !r.skipped) { const h = ssHashes && u.path ? await SS.hashUnitAsync(u, ssHashes).catch(() => null) : null; if (h) { (ssData.tooLarge ||= {})[u.key] = { hash: h, error: r.error }; } }
       else if (ssData.tooLarge?.[u.key] && ['up', 'same', 'down'].includes(r.result)) delete ssData.tooLarge[u.key];
       { const ms = performance.now() - t0; if (ms > (T.slowest || 0)) { T.slowest = ms; T.slowestKey = u.key; } } await breathe();
       results.push({ ...r, place: r.result === 'unplaced' ? r.why : undefined, label: u.label || u.key, emu: u.emu, emuName: SS.labelOf(u.emu), romId: u.romId, romIds: u.card ? u.romIds || [] : undefined, card: u.card, states: !!u.states, remote: !!u.remote, why: u.why || null, likely: u.likely?.length ? u.likely : undefined });

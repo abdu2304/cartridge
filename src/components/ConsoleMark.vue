@@ -1,5 +1,6 @@
 <template>
-  <svg v-if="slug === 'steam'" class="cmark cmark-steam" viewBox="0 0 24 24" role="img" :aria-label="label || 'Steam'" :style="{ '--opt': opticalOf('', 'steam') }"><title>{{ label || 'Steam' }}</title><path :d="STEAM" /></svg>
+  <!-- 0.9.88 (owner): a port's mark is Steam's logo and its name, not the logo alone -->
+  <span v-if="slug === 'steam'" class="cmark cmark-steam" role="img" :aria-label="label || 'Steam'" :style="{ '--opt': opticalOf('', 'steam') }"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="STEAM" /></svg><b>Steam</b></span>
   <img v-else-if="url && !bad" class="cmark" :src="url" :alt="label" :title="label" :style="optical" @error="bad = true" />
   <span v-else class="cmark-t">{{ label }}</span>
 </template>
@@ -28,5 +29,8 @@ watch(() => props.slug, (k) => {
 /* a page sizes the mark with --cm-h; the optical factor (--opt) scales on top, the margins keep the line height */
 .cmark { display: inline-block; height: calc(var(--cm-h, 0.8em) * var(--opt, 1)); margin-block: calc(var(--cm-h, 0.8em) * (1 - var(--opt, 1)) / 2); width: auto; vertical-align: middle; filter: brightness(0) invert(1); opacity: 0.92; }
 .cmark-t { font-weight: 700; }
-.cmark-steam { aspect-ratio: 1; fill: #000; } /* inverted to white with the wordmarks (filter above) */
+/* logo at the optical size, the word at the wordmarks' cap height (--cm-h); black, inverted to white with them (filter above) */
+.cmark-steam { height: auto; margin-block: 0; display: inline-flex; align-items: center; gap: calc(var(--cm-h, 0.8em) * 0.32); color: #000; fill: #000; white-space: nowrap; }
+.cmark-steam svg { height: calc(var(--cm-h, 0.8em) * var(--opt, 1)); aspect-ratio: 1; flex: none; }
+.cmark-steam b { font-weight: 800; font-size: calc(var(--cm-h, 0.8em) / 0.72); line-height: 1; letter-spacing: 0.01em; text-transform: uppercase; }
 </style>

@@ -211,14 +211,21 @@ function placeFor(emu, key, { home = os.homedir(), extra = {}, extraAt = {} } = 
 }
 
 // ---------------------------------------------------------------- 3. files and RomM's hash
+// 0.9.88 (owner's log: the app froze up to 165 s, 6 GB of memory, on every sync): a PC port's save folder is often its
+// data folder, where the port also keeps caches, texture packs and logs (P.T.'s game/data: two 128-byte saves beside
+// 1.9 GB of enhanced-textures and pipeline-cache). Those are never saves: left out of a port's unit and its backups.
+const NOT_SAVE_DIR = /^(\.?cache|caches|.*[-_ ]cache|shader-?cache|shaders?|pipelines?|enhanced[-_ ]?textures|textures?|texture[-_ ]?packs?|dumps?|logs?|crash[-_ ]?(dumps|reports)|screenshots?|mods?)$/i;
+const NOT_SAVE_FILE = /\.(log|dmp|tmp|pttex|dds|ktx2?)$|^(.+-)?(previous|stderr|stdout)\.log$/i;
+const notSave = (name, dir) => (dir ? NOT_SAVE_DIR : NOT_SAVE_FILE).test(name);
 // the unit's files as [name inside the archive, path on disk]; folders keep their layout, dir entries end in "/"
 function entriesOf(u) {
   if (u.kind === 'file') return exists(u.path) ? [[path.basename(u.path), u.path]] : [];
   if (u.kind === 'files') return (u.files || []).map((f) => [f, path.join(u.path, f)]).filter(([, p]) => exists(p));
-  const out = [];
+  const out = [], port = u.emu === 'recomp';
   const walk = (d, rel, depth) => {
     for (const e of ls(d).sort((a, b) => a.name.localeCompare(b.name))) {
       const p = path.join(d, e.name), r = rel ? rel + '/' + e.name : e.name;
+      if (port && notSave(e.name, e.isDirectory())) continue;
       if (e.isDirectory()) { out.push([r + '/', null]); if (depth < 12) walk(p, r, depth + 1); }
       else if (e.isFile()) out.push([r, p]);
     }
@@ -246,6 +253,10 @@ async function hashUnitAsync(u, cache = {}) {
   }
   return lines.length ? md5(lines.join('\n')) : null;
 }
+// a unit's size from stat alone (nothing read): over SAVE_MAX it isn't a save, and reading, hashing and zipping it in
+// memory on the main thread is what froze the app; it's refused before any of that
+const SAVE_MAX = 512 * 1048576;
+async function sizeOf(u) { let n = 0; for (const [, p] of entriesOf(u)) if (p) { try { n += (await fs.promises.stat(p)).size; } catch {} } return n; }
 // newest change in a unit (to look again only at saves that changed)
 function changedAt(u) { let t = 0; for (const [, p] of entriesOf(u)) if (p) { try { t = Math.max(t, fs.statSync(p).mtimeMs); } catch {} } return t; }
 
@@ -391,6 +402,7 @@ async function syncUnit(u, rpc, ledger, opts = {}) {
   const home = remote && fitsRom(u.emu, remote.romId, opts) ? remote.romId : u.romId;
   const misfiled = !!remote && remote.romId != null && home !== remote.romId && u.romId != null && fitsRom(u.emu, u.romId, opts);
   const target = u.path || placeFor(u.emu, u.key, opts);
+  if (u.path) { const n = await sizeOf(u); if (n > SAVE_MAX) return { key: u.key, result: 'toolarge', skipped: true, error: `This save folder holds ${(n / 1073741824).toFixed(1)} GB, far more than a save: it likely holds game data or caches too. It isn't sent.` }; }
   const local = u.path ? (opts.hashCache ? await hashUnitAsync(u, opts.hashCache) : hashUnit(u)) : null;
   const base = ledger.get(u.key) || null;
   let what = decide(local, remote, base);
@@ -528,4 +540,4 @@ function remoteOnly(remotes, localKeys, opts = {}) {
   return [...out.values()];
 }
 
-module.exports = { progRuns, FAMILY_SLUGS, fitsConsole, fitsRom, moveInto, FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashUnitAsync, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };
+module.exports = { notSave, sizeOf, SAVE_MAX, progRuns, FAMILY_SLUGS, fitsConsole, fitsRom, moveInto, FAMILY, familyOf, parseSlot, remotesFor, SWITCH_FAMILY, labelOf, rommRpc, restore, units, shape, slotOf, placeFor, entriesOf, hashEntries, hashUnit, hashUnitAsync, hashArchive, changedAt, zip, unzip, decide, backup, writeUnit, running, syncUnit, remoteOnly, retroarchStates, retroarchDirs, whyUnmatched, CONSOLE, LABEL, SUPPORTED };
