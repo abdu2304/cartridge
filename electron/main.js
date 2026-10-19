@@ -4399,7 +4399,7 @@ const handlers09 = {
 };
 // What the moved areas share with main.js (0.9.71, the split by area): functions, and getters for state that changes
 const MAIN = {
-  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob, platformDirs, sfoIndex, childRun, watchGameRun,
+  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob, platformDirs, sfoIndex, childRun, watchGameRun, saveConfig,
   get broadcast() { return broadcast; }, get webFetch() { return webFetch; }, get romName() { return romName; }, get isDir() { return isDir; }, get romIndexMain() { return romIndexMain; },
   get steamMgr() { return steamMgr; }, get config() { return config; }, get installedMap() { return installedMap; }, get library() { return library; }, get runOn() { return runOn; }, get gameFocus() { return gameFocus; }, get trophySvc() { return trophySvc; }, get win() { return win; },
   USER_DATA,

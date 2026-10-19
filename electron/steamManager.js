@@ -1091,9 +1091,7 @@ module.exports = function createSteamManager(ctx) {
       if (a.recomp) {
         const r = a.recomp;
         if (!exists(r.exe)) { skipped.push({ recomp: r.id, name: r.name, why: 'The recomp isn’t installed any more.' }); continue; }
-        const win = /\.exe$/i.test(r.exe);
-        let target = q(r.exe), launch = r.args || '';
-        if (FLATPAK_STEAM && !win) ({ target, launch } = hostLaunch(r.exe, launch, r.start));
+        const win = /\.exe$/i.test(r.exe), { target, launch } = recompLaunch(r);
         const appid = shortcutId(target, r.name);
         entries.push({ recomp: r.id, romId: null, artRomId: r.artRomId || null, game: r.game || r.name, console: 'recomp', sig: ['recomp', r.exe, launch].join('|'), name: r.name, exe: r.exe, target, start: r.start || path.dirname(r.exe), lo: launch, directLo: launch, directExe: r.exe, directStart: r.start, appid, how: 'recomp', from: r.name, fallback: null, emu: null,
           proton: win ? (cfg().proton || steamDefaultProton(env.account) || 'proton_experimental') : null, collections: ['Recomps'] });
@@ -1892,6 +1890,33 @@ module.exports = function createSteamManager(ctx) {
   // no cores yet as a download); the same places candidatesNow looks
   const retroarchHere = () => flatpakApps().includes('org.libretro.RetroArch') || APP_DIRS().some((d) => ls(d).some((n) => /^retroarch.*\.appimage$/i.test(n)))
     || foundFor('retroarch').length > 0 || !!findBin(['retroarch']) || steamRoots().some((r) => exists(path.join(r, 'steamapps/common/RetroArch/retroarch')));
+  // a port's Target and Launch options (0.9.89: with its frame generation wrapper, r.fg, before the one %command%, as
+  // launchFor does for console games; a Windows .exe is left as it is, Proton runs it)
+  function recompLaunch(r) {
+    const win = /\.exe$/i.test(r.exe), args = r.args || '', fg = !win && r.fg ? [q(r.fg)] : [];
+    if (FLATPAK_STEAM && !win) return hostLaunch(r.exe, args, r.start, fg);
+    return { target: q(r.exe), launch: fg.length ? [...fg, '%command%', args].filter(Boolean).join(' ') : args };
+  }
+  // a port's shortcut changed in place (0.9.89, its frame generation): live when Steam can be changed while it runs,
+  // else the old one goes and the new one is queued (Apply in Settings → Steam)
+  async function recompUpdate(spec) {
+    const sc = recompShortcut(spec.id), env = environment();
+    if (!sc) return { inSteam: false };
+    const { target, launch } = recompLaunch(spec);
+    if (env.account && (await live.available(env.account.root).catch(() => false))) {
+      try { if ((await live.updateShortcut(sc.appid, { exe: target, start: q(spec.start || path.dirname(spec.exe)), lo: launch })) === 'ok') { if (reg[sc.appid]) Object.assign(reg[sc.appid], { sig: ['recomp', spec.exe, launch].join('|'), lo: launch, inPlace: Date.now() }); saveReg(); return { inSteam: true, live: true }; } } catch (e) { log('recomp update live', e.message); }
+    }
+    queueRemove([sc.appid]); queueAdd([{ recomp: spec }]);
+    return { inSteam: true, queued: true };
+  }
+  // a port's shortcut into Steam collections (0.9.89, port More → Steam), as addRomToCollections does for a game
+  async function addAppidToCollections(appid, names) {
+    const env = environment();
+    if (!env.account || !(await live.available(env.account.root))) throw new Error('Collections can be changed while Steam runs once instant Steam changes are on (Settings → Steam).');
+    await live.addToCollections(appid, names);
+    const c = cfg(); c.lastCollections ||= {}; c.lastCollections.recomp = names; ctx.saveConfig();
+    return true;
+  }
   // a recomp's shortcut waiting in the queue (0.9.72 playtest: the port sheet says it's on its way to Steam)
   const recompQueued = (id) => queue.add.some((a) => a.recomp?.id === id);
   function recompShortcut(id) {
@@ -1918,7 +1943,7 @@ module.exports = function createSteamManager(ctx) {
   }
   const liveNow = async () => { const env = environment(); return !!(env.account && (await live.available(env.account.root).catch(() => false))); };
   const api = {
-    recompShortcut, recompQueued, retroarchHere, runAppid, recompRepoint, liveNow, applySoon, pendingOnStart,
+    recompShortcut, recompQueued, recompUpdate, addAppidToCollections, retroarchHere, runAppid, recompRepoint, liveNow, applySoon, pendingOnStart,
     overview, preview, apply, undo, restartSteam, removeAllOurs, queueAdd, queueRemove, queueClear, queueInfo, test, setTemplate, setMode, verifyCollections,
     collections: () => { const env = environment(); return env.account ? readCollections(env.account) : []; },
     // live changes: is Steam's interface reachable, and turning on its local debugging port
