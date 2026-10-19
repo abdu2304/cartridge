@@ -740,6 +740,7 @@ const MARKS_FILE = path.join(USER_DATA, 'marked.json');
 const marks = loadJson(MARKS_FILE, {}); // romId -> { at }
 function saveMarks() { try { fs.writeFileSync(MARKS_FILE, JSON.stringify(marks, null, 1)); } catch {} }
 const titleId = (s) => (String(s || '').match(/\b(CUSA|PPSA)\d{5}\b/i) || [])[0]?.toUpperCase() || '';
+let manifestMoved = false; // installedState: a record moved to where its game is now
 function installedState(roms, platform) {
   // 0.9.38: the console's folder on every drive (platformDirs), the first match wins
   const dirs = platformDirs(platform).map((dir) => { let entries = new Set(); try { entries = new Set(fs.readdirSync(dir)); } catch {} return { dir, entries, ids: null }; }).filter((x) => x.entries.size);
@@ -773,9 +774,16 @@ function installedState(roms, platform) {
         if (hit2) { found = path.join(D.dir, hit2.entry, hit2.rel); break; } // the folder holding sce_sys, which emulators and ports open
       }
     }
-    if (found) { out[rom.id] = found; continue; }
+    if (found) {
+      out[rom.id] = found;
+      // 0.9.86 (PC playtest: Table Tennis moved into xbox360/roms/ kept its old path here): the record follows a game
+      // found somewhere new, so Re-download and package installs (which read it first) use where it is now
+      if (m && m.path !== found) { m.path = found; manifestMoved = true; }
+      continue;
+    }
     if (marks[rom.id]) out[rom.id] = MARKED;
   }
+  if (manifestMoved) { manifestMoved = false; saveManifest(); }
   return out;
 }
 const MARKED = '(marked as installed)';
