@@ -1413,7 +1413,7 @@ onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G
 
 /* the parts every tile shares; sizes follow the tile (container units) */
 /* 0.9.32 (owner: "no trailing anywhere, a new line is fine"): a tile's name wraps instead of ending in … */
-.st-label { font-size: clamp(11px, min(10cqh, 6cqw), 15px); font-weight: 600; color: var(--muted); letter-spacing: -0.005em; position: relative; z-index: 1; flex: none; line-height: 1.2; text-wrap: balance; overflow-wrap: anywhere; }
+.st-label { font-size: clamp(11px, min(10cqh, 6cqw), 15px); font-weight: 600; color: var(--muted); letter-spacing: -0.005em; position: relative; z-index: 1; flex: none; line-height: 1.2; text-wrap: balance; overflow-wrap: break-word; } /* 0.9.86: anywhere let the row tile squeeze the label to "Recommen / ded" */
 .st-label.on-art { color: rgba(255, 255, 255, 0.92); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45); }
 .st-num { display: flex; align-items: baseline; gap: 4px; margin-top: auto; line-height: 1; }
 .st-big { font-family: var(--display); font-stretch: var(--display-stretch); font-weight: 800; font-size: clamp(22px, min(32cqh, 20cqw), 104px); letter-spacing: -0.02em; }
@@ -1479,7 +1479,9 @@ onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G
 .t-surprise { --glow: rgba(255, 120, 190, 0.16); }
 .st-count { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); color: var(--muted); font-size: 0.85em; font-weight: 600; flex: none; white-space: nowrap; }
 /* 0.9.29 (owner: "1 / …" cut off): the name gives way, never the count */
-.st-label:has(.st-lname) { display: flex; align-items: center; min-width: 0; }
+/* 0.9.86: the count goes under the name when both don't fit (it squeezed "Recommended" into "Recommen / ded") */
+.st-label:has(.st-lname) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.st-label:has(.st-lname) .st-count { margin-left: 0; }
 .st-lname { min-width: 0; text-wrap: balance; }
 
 /* pages: the board slides a little and settles, its tiles arriving as they do on opening */
