@@ -12,7 +12,7 @@ main, `window.cart.on()` in the UI).
 
 | Engine | Where | What it does | Docs |
 |---|---|---|---|
-| CAE, the Cartridge Animation Engine | `src/motion.js` | one frame loop, spring curves for CSS and script, shared-element flights, sliding pills, the governor (idle and in-game quiet) | `docs/cae.md` |
+| CAE, the Cartridge Animation Engine | `src/motion.js`, `src/gsapEngine.js` | one frame loop (GSAP's ticker), GSAP tweens, Flip and timelines (card flights, arranging Start, the welcome), spring curves for CSS and script, sliding pills, the governor (idle and in-game quiet) | `docs/cae.md` |
 | Glass engine | `src/glassEngine.js` | refraction through generated lens maps, rim light that follows you, step down to frost on slow frames | `docs/glass-engine.md` |
 | Game identity | `electron/gameId.js` | which library game a file, save, trophy set or Syncthing folder is: IDs from names and read from the game itself (cached per file version in `game-ids.json`), then the same title, oldest copy on ties | `test/gameId.test.js` |
 | CIDE (Cartridge ID Engine) | `electron/cide.js` | every console's game ID (PlayStation serials, Nintendo title IDs, GameCube/Wii and Xbox 360 IDs): what it looks like, how it's written in names, which readers take it from the game, family rules (a Switch update or add-on maps to its game), and which consoles have none and why. Detection is unchanged: the parse is the same function as before | `test/cide.test.js`, `cide:map` |
