@@ -190,6 +190,13 @@ function updateAway() {
 const setAway = (src, v) => { awayBy[src] = v; updateAway(); };
 // background jobs Cartridge runs by itself (0.9.48): a game in front (Game Mode) or one started from Cartridge counts as playing
 const scheduler = require('./scheduler').createScheduler({ playing: () => !!(gameFocus.away || runOn), file: path.join(USER_DATA, 'scheduler.json'), log });
+// a game Cartridge started as its own process (a PC port, 0.9.86, PC playtest: Bloodborne ran with Cartridge drawing
+// at about 95% of a core behind it): counted as our game running, so quiet mode and the scheduler's pause apply on
+// the desktop too, and Cartridge comes back when it ends, as for a game started through Steam
+function childRun(p, what) {
+  runOn = true; gameFocus.gameApp = null; gameFocus.endedAt = 0; log('game running', what); setAway('run', true);
+  p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setAway('run', false); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
+}
 function watchGameRun(romId) {
   clearInterval(runT);
   gameFocus.gameApp = null; gameFocus.endedAt = 0;
@@ -733,6 +740,7 @@ const MARKS_FILE = path.join(USER_DATA, 'marked.json');
 const marks = loadJson(MARKS_FILE, {}); // romId -> { at }
 function saveMarks() { try { fs.writeFileSync(MARKS_FILE, JSON.stringify(marks, null, 1)); } catch {} }
 const titleId = (s) => (String(s || '').match(/\b(CUSA|PPSA)\d{5}\b/i) || [])[0]?.toUpperCase() || '';
+let manifestMoved = false; // installedState: a record moved to where its game is now
 function installedState(roms, platform) {
   // 0.9.38: the console's folder on every drive (platformDirs), the first match wins
   const dirs = platformDirs(platform).map((dir) => { let entries = new Set(); try { entries = new Set(fs.readdirSync(dir)); } catch {} return { dir, entries, ids: null }; }).filter((x) => x.entries.size);
@@ -766,9 +774,16 @@ function installedState(roms, platform) {
         if (hit2) { found = path.join(D.dir, hit2.entry, hit2.rel); break; } // the folder holding sce_sys, which emulators and ports open
       }
     }
-    if (found) { out[rom.id] = found; continue; }
+    if (found) {
+      out[rom.id] = found;
+      // 0.9.86 (PC playtest: Table Tennis moved into xbox360/roms/ kept its old path here): the record follows a game
+      // found somewhere new, so Re-download and package installs (which read it first) use where it is now
+      if (m && m.path !== found) { m.path = found; manifestMoved = true; }
+      continue;
+    }
     if (marks[rom.id]) out[rom.id] = MARKED;
   }
+  if (manifestMoved) { manifestMoved = false; saveManifest(); }
   return out;
 }
 const MARKED = '(marked as installed)';
@@ -1680,7 +1695,26 @@ function publicItem(it) {
   const { abort, dlw, dlwIdle, dlJob, ...rest } = it; // the worker and its timer never go to the screen
   return rest;
 }
-function emitQueue() { broadcast('downloads', queue.map(publicItem)); }
+function emitQueue() { broadcast('downloads', queue.map(publicItem)); savePending(); }
+// 0.9.86 (PC playtest: a 19.7 GB download stopped when Cartridge closed on leaving Game Mode, and was gone at the next
+// start, its .part left behind): downloads not finished yet are kept in downloads-pending.json and start again at the
+// next start, resuming from their .part (downloadTo asks for the rest with Range) in the folder they started in
+const PENDING_FILE = path.join(USER_DATA, 'downloads-pending.json');
+let pendingT = null;
+function savePending() {
+  if (pendingT) return; // at most once a second (progress comes four times a second)
+  pendingT = setTimeout(() => {
+    pendingT = null;
+    const keep = require('./dlPending').pick(queue);
+    try { if (keep.length) fs.writeFileSync(PENDING_FILE, JSON.stringify(keep)); else fs.rmSync(PENDING_FILE, { force: true }); } catch {}
+  }, 1000);
+}
+function restorePending() {
+  let list = []; try { list = JSON.parse(fs.readFileSync(PENDING_FILE, 'utf8')); } catch { return; }
+  if (!Array.isArray(list) || !list.length) return;
+  log('downloads: picking up', list.length, 'not finished last time');
+  for (const job of list) if (job?.romId != null) enqueue({ ...job, resumed: true });
+}
 let emitTimer = null;
 function emitQueueThrottled() {
   if (emitTimer) return;
@@ -1970,7 +2004,9 @@ async function runJob(it) {
   try {
     const rom = await api(`/api/roms/${it.romId}`);
     // 0.9.65 Download More Files: more of a game's files go into the folder it already has, wherever that is
-    const target = it.into ? path.dirname(it.into) : downloadDir({ slug: rom.platform_slug, fs_slug: rom.platform_fs_slug }, rom.fs_size_bytes || 0, it.root || null); // 0.9.38: any drive; 0.9.49: the one asked for
+    // 0.9.86: a download picked up from last time goes on in the folder it started in, where its .part is
+    const target = it.into ? path.dirname(it.into) : it.target && isDir(it.target) ? it.target : downloadDir({ slug: rom.platform_slug, fs_slug: rom.platform_fs_slug }, rom.fs_size_bytes || 0, it.root || null); // 0.9.38: any drive; 0.9.49: the one asked for
+    if (!it.into && it.target !== target) { it.target = target; savePending(); }
     if (!target) throw new Error('No folder set for this platform. Set it in Settings.');
     await fsp.mkdir(target, { recursive: true });
     // 0.9.63 (owner: a game with several files asks which to download): only the files picked, when some were
@@ -3041,24 +3077,7 @@ function gameEmuOf(romId, slugs) {
   return d ? { id: d[1], exe: '', args: '', start: '', core: '' } : null;
 }
 // where that copy keeps its settings: portable beside it (or in its Start in folder), a Flatpak's own, else the usual
-function emuCfgDir(id, g) {
-  const home = os.homedir(), xc = process.env.XDG_CONFIG_HOME || path.join(home, '.config'), xd = process.env.XDG_DATA_HOME || path.join(home, '.local/share');
-  const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
-  const near = [g.start, g.exe && path.dirname(g.exe)].filter(Boolean), fp = (app, sub) => path.join(home, '.var/app', app, sub);
-  const pick = (portable, flat, normal) => near.map(portable).find(isDir) || (flat && (g.args.includes(flat[0]) || /flatpak/.test(g.exe)) && isDir(fp(...flat)) ? fp(...flat) : normal);
-  if (id === 'eden') return pick((d) => path.join(d, 'user', 'config'), ['dev.eden_emu.eden', 'config/eden'], path.join(xc, 'eden'));
-  if (id === 'azahar') return pick((d) => path.join(d, 'user', 'config'), ['org.azahar_emu.Azahar', 'config/azahar-emu'], path.join(xc, 'azahar-emu'));
-  if (id === 'cemu') return pick((d) => path.join(d, 'portable'), ['info.cemu.Cemu', 'config/Cemu'], path.join(xc, 'Cemu'));
-  if (id === 'vita3k') return pick((d) => path.join(d, 'portable'), null, path.join(xc, 'Vita3K'));
-  if (id === 'ryujinx') return pick((d) => path.join(d, 'portable'), ['io.github.ryubing.Ryujinx', 'config/Ryujinx'], path.join(xc, 'Ryujinx'));
-  if (id === 'retroarch') return near.find((d) => fs.existsSync(path.join(d, 'retroarch.cfg'))) || pick(() => '', ['org.libretro.RetroArch', 'config/retroarch'], path.join(xc, 'retroarch'));
-  if (id === 'xenia') { // the Windows build is portable by default; the Linux one with portable.txt beside it
-    const dir = g.exe && path.dirname(g.exe);
-    if (dir && (/\.exe$/i.test(g.exe) || fs.existsSync(path.join(dir, 'portable.txt')))) return dir;
-    return path.join(xd, 'Xenia');
-  }
-  return '';
-}
+const emuCfgDir = (id, g) => require('./emuCfg').emuCfgDir(id, g); // emuCfg.js (0.9.86, tested)
 const GS_MAIN = { eden: 'qt-config.ini', azahar: 'qt-config.ini', cemu: 'settings.xml', vita3k: 'config.yml', xenia: 'xenia-canary.config.toml', ryujinx: 'Config.json', retroarch: 'retroarch.cfg' };
 // Dreamcast: the product number Flycast names a game's section after (IP.BIN "SEGA SEGAKATANA", product at 0x40), read
 // from the first sector of each track in turn until found (GDI's track 3, CHD, CDI, raw images); cached per file
@@ -3505,20 +3524,16 @@ let win;
 
 let broadcast = (ch, data) => { if (win && !win.isDestroyed()) win.webContents.send(ch, data); }; // wrapped by the background jobs (0.9.32)
 
-// Interface size. The UI is laid out for 1920x1080 (what the Ally shows in Game Mode). Bigger
-// windows, like a 4K TV, zoom in by the same ratio so text and art keep their size on screen.
-// Smaller windows (Steam Deck 1280x800) stay at 100%, which is what they were designed around.
+// Interface size: electron/zoom.js (tested)
 function autoZoom() {
   if (!win || win.isDestroyed()) return 1;
   const [w, h] = win.getContentSize();
-  // 0.9.17 (owner: clipped in a Desktop Mode window): smaller than the Deck's 1280x800, it zooms out to fit
-  if (w < 1280 || h < 800) return Math.max(0.6, Math.round(Math.min(w / 1280, h / 800) * 20) / 20);
-  const z = Math.min(w / 1920, h / 1080);
-  return Math.max(1, Math.min(3, Math.round(z * 20) / 20));
+  return require('./zoom').autoZoom(w, h);
 }
 function currentZoom() {
-  const s = config.ui.scale;
-  return !s || s === 'auto' ? autoZoom() : Math.max(0.75, Math.min(3, Number(s) || 1));
+  if (!win || win.isDestroyed()) return 1;
+  const [w, h] = win.getContentSize();
+  return require('./zoom').zoomFor(w, h, config.ui.scale);
 }
 let zoomT = null;
 function applyZoom() {
@@ -4373,7 +4388,7 @@ const handlers09 = {
 };
 // What the moved areas share with main.js (0.9.71, the split by area): functions, and getters for state that changes
 const MAIN = {
-  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob,
+  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob, platformDirs, sfoIndex, childRun,
   get broadcast() { return broadcast; }, get webFetch() { return webFetch; }, get romName() { return romName; }, get isDir() { return isDir; }, get romIndexMain() { return romIndexMain; },
   get steamMgr() { return steamMgr; }, get config() { return config; }, get installedMap() { return installedMap; }, get library() { return library; }, get runOn() { return runOn; }, get gameFocus() { return gameFocus; }, get trophySvc() { return trophySvc; }, get win() { return win; },
   USER_DATA,
@@ -6359,6 +6374,7 @@ app.whenReady().then(() => {
   // readable by the page's canvas too (Theme from this game reads a cover's colours)
   protocol.handle('romimg', async (req) => { const r = await handleImage(req); try { r.headers.set('Access-Control-Allow-Origin', '*'); } catch {} return r; });
   createWindow();
+  setTimeout(restorePending, 8000); // downloads not finished last time (0.9.86), once the window and library are up
   if (library) computeInstalled();
   win.webContents.once('did-finish-load', () => {
     if (config.configured && (config.sync.onLaunch || !library)) syncLibrary().catch(() => {});

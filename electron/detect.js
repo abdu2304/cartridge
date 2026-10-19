@@ -400,9 +400,11 @@ function extraBinDirs(home) {
 // as long as it took (seconds on a Deck), which made Steam dim Cartridge as not responding. An app is installed when
 // <installation>/app/<id>/current/active exists, in the user and system installations and any extra ones named in
 // /etc/flatpak/installations.d. null when no installation folder exists (the caller can ask `flatpak` then).
+// the system installation: FLATPAK_SYSTEM_DIR when set, as flatpak itself reads it (tests point it away from the PC's own)
+const FP_SYSTEM = () => process.env.FLATPAK_SYSTEM_DIR || '/var/lib/flatpak';
 function flatpakApps(home = require('os').homedir()) {
-  const bases = [process.env.FLATPAK_USER_DIR || path.join(home, '.local/share/flatpak'), '/var/lib/flatpak'];
-  try { for (const f of fs.readdirSync('/etc/flatpak/installations.d')) { const m = /^Path=(.+)$/m.exec(fs.readFileSync(path.join('/etc/flatpak/installations.d', f), 'utf8')); if (m) bases.push(m[1].trim()); } } catch {}
+  const bases = [process.env.FLATPAK_USER_DIR || path.join(home, '.local/share/flatpak'), FP_SYSTEM()];
+  if (!process.env.FLATPAK_SYSTEM_DIR) try { for (const f of fs.readdirSync('/etc/flatpak/installations.d')) { const m = /^Path=(.+)$/m.exec(fs.readFileSync(path.join('/etc/flatpak/installations.d', f), 'utf8')); if (m) bases.push(m[1].trim()); } } catch {}
   const roots = bases.map((b) => path.join(b, 'app')).filter((d) => { try { return fs.statSync(d).isDirectory(); } catch { return false; } });
   if (!roots.length) return null;
   const ids = new Set();
@@ -434,19 +436,21 @@ function missingFuse2(file) {
 function flatpakCanSee(id, target, home = require('os').homedir()) {
   const realp = (p) => { try { return fs.realpathSync(p); } catch { return p; } };
   const tgt = realp(target);
-  const metas = [path.join(home, '.local/share/flatpak/app', id, 'current/active/metadata'), path.join('/var/lib/flatpak/app', id, 'current/active/metadata')];
-  const overrides = [path.join('/var/lib/flatpak/overrides', 'global'), path.join('/var/lib/flatpak/overrides', id), path.join(home, '.local/share/flatpak/overrides', 'global'), path.join(home, '.local/share/flatpak/overrides', id)];
-  const fsList = []; let known = false;
-  for (const f of [metas.find((m) => fs.existsSync(m)), ...overrides].filter(Boolean)) {
+  const metas = [path.join(home, '.local/share/flatpak/app', id, 'current/active/metadata'), path.join(FP_SYSTEM(), 'app', id, 'current/active/metadata')];
+  const overrides = [path.join(FP_SYSTEM(), 'overrides', 'global'), path.join(FP_SYSTEM(), 'overrides', id), path.join(home, '.local/share/flatpak/overrides', 'global'), path.join(home, '.local/share/flatpak/overrides', id)];
+  // 0.9.86: known only from the app's own metadata; a global override (Bazzite ships one) said nothing about an app
+  // that isn't installed, and it was then judged on that alone
+  const meta = metas.find((m) => fs.existsSync(m));
+  if (!meta) return { ok: true, known: false };
+  const fsList = [];
+  for (const f of [meta, ...overrides]) {
     let t = ''; try { t = fs.readFileSync(f, 'utf8'); } catch { continue; }
-    known = true;
     const ctx = t.split(/\n(?=\[)/).find((s) => /^\[Context\]/.test(s)) || '';
     const m = ctx.match(/^filesystems=(.*)$/m);
     if (m) for (const x of m[1].split(';').map((s) => s.trim()).filter(Boolean)) {
       if (x.startsWith('!')) { const i = fsList.indexOf(x.slice(1).replace(/:(ro|rw|create)$/, '')); if (i >= 0) fsList.splice(i, 1); } else fsList.push(x.replace(/:(ro|rw|create)$/, ''));
     }
   }
-  if (!known) return { ok: true, known: false };
   const xdg = (name, def) => { try { const m = fs.readFileSync(path.join(home, '.config/user-dirs.dirs'), 'utf8').match(new RegExp(`^XDG_${name}_DIR="([^"]+)"`, 'm')); if (m) return m[1].replace('$HOME', home); } catch {} return path.join(home, def); };
   const XDG = { 'xdg-documents': xdg('DOCUMENTS', 'Documents'), 'xdg-download': xdg('DOWNLOAD', 'Downloads'), 'xdg-music': xdg('MUSIC', 'Music'), 'xdg-pictures': xdg('PICTURES', 'Pictures'), 'xdg-videos': xdg('VIDEOS', 'Videos'), 'xdg-desktop': xdg('DESKTOP', 'Desktop') };
   const dirs = [];

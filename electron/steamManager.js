@@ -1417,6 +1417,7 @@ module.exports = function createSteamManager(ctx) {
     let missing = [];
     try { if (Object.keys(reg).length) missing = (await verifyCollections()) || []; } catch {}
     try { reconcile(last); } catch (e) { log('steam reconcile', e.message); }
+    pendingOnStart();
     return { last: report, missing };
   }
   // 0.9.19 (HANDOFF F4): apply() writes the registry before the helper finishes (play.sh needs it), so
@@ -1467,17 +1468,23 @@ module.exports = function createSteamManager(ctx) {
   // 0.9.24 (owner: with auto add on, no trip to Settings → Steam → Apply): when Steam can be changed while it
   // runs, the queue is applied right away (a few seconds after the last download, so several go in together).
   // Without that, Steam has to close first, so it waits for you as before.
-  let applyT = null;
-  function applySoon() {
+  // 0.9.86 (PC playtest): Steam not running or not yet answering made it give up for good, so an add stayed queued
+  // until Apply was pressed by hand. Now it looks again every minute (for up to an hour) while the queue holds
+  // something, and pendingOnStart() picks up a queue left from a Cartridge that closed before it went in.
+  let applyT = null, applyTries = 0;
+  function applySoon(delay = 4000) {
     clearTimeout(applyT);
+    if (delay === 4000) applyTries = 0;
     applyT = setTimeout(async () => {
+      if (!queue.add.length && !queue.remove.length) return;
       try {
         const env = environment();
-        if (!env.account || !(await live.available(env.account.root).catch(() => false))) return;
+        if (!env.account || !(await live.available(env.account.root).catch(() => false))) { if (++applyTries < 60) applySoon(60e3); return; }
         await apply({ restart: false }); ctx.broadcast('steam-auto', { action: 'applied' }); log('auto add applied live');
       } catch (e) { log('auto apply', e.message); }
-    }, 4000);
+    }, delay);
   }
+  function pendingOnStart() { if (cfg().autoAdd && queue.add.length) { log('auto add: queue left from before', queue.add.length); applySoon(); } }
   function onDeleted(romId) {
     if (!cfg().autoRemove) return false;
     const ids = Object.entries(reg).filter(([, r]) => r.romId === romId).map(([id]) => Number(id));
@@ -1604,6 +1611,14 @@ module.exports = function createSteamManager(ctx) {
     const scs = shortcutsOf(env.account);
     const byRom = new Map(installedGames().map((g) => [g.rom.id, g]));
     const problems = [];
+    // 0.9.86 (PC playtest: P.T. was in Steam twice, both Cartridge's): two of our shortcuts for one game; the one played
+    // last stays (Steam's LastPlayTime), the other is offered for removal
+    const extra = new Set(), seenRom = new Map();
+    for (const sc of [...scs].sort((a, b) => (b.last || 0) - (a.last || 0))) {
+      const r = reg[sc.appid];
+      if (!r || r.recomp || r.romId == null) continue;
+      if (seenRom.has(r.romId)) extra.add(sc.appid >>> 0); else seenRom.set(r.romId, sc.appid);
+    }
     for (const sc of scs) {
       if (/cartridge/i.test(sc.name + ' ' + sc.exe) && !reg[sc.appid]) continue; // Cartridge itself
       const r = reg[sc.appid];
@@ -1623,9 +1638,10 @@ module.exports = function createSteamManager(ctx) {
         const to = key ? replacementFor(id, sc.exe, key) : null;
         p.issues.push({ kind: 'emulator', text: isTempMount(sc.exe) ? 'It points inside an AppImage\'s temporary folder, which is gone after a restart.' : `The emulator isn't at ${shortPath(sc.exe)} any more.`, fix: to ? { to: shortPath(to.exe), label: `Point it at ${path.basename(to.exe)}` } : null });
       }
-      if (r) {
+      if (r && extra.has(sc.appid >>> 0)) p.issues.push({ kind: 'duplicate', text: 'A second shortcut for this game. The other one, played more recently, stays.', fix: { label: 'Remove This One' } });
+      else if (r) {
         const g = byRom.get(r.romId);
-        if (!g) p.issues.push({ kind: 'game', text: 'The game isn’t on this device any more.', fix: { label: 'Remove from Steam' } });
+        if (!g) p.issues.push({ kind: 'game', text: ctx.romById?.(r.romId) ? 'The game isn’t on this device any more.' : 'The game isn’t in your RomM library any more.', fix: { label: 'Remove from Steam' } });
         else if (g.file && !exists(g.file)) p.issues.push({ kind: 'game', text: 'The game’s files are gone.', fix: { label: 'Remove from Steam' } });
       } else if (l?.template?.sample && l.template.sample.startsWith('/') && !exists(l.template.sample) && (!l.template.romRoot || isDir(l.template.romRoot))) {
         // a shortcut you (or an emulator, like shadPS4) made for a game that's gone: offer to remove it
@@ -1667,7 +1683,7 @@ module.exports = function createSteamManager(ctx) {
             try { if ((await live.updateShortcut(sc.appid, { exe: exeRaw, start: q(to.start), lo: sc.loRaw })) === 'ok') { if (r) Object.assign(r, { exe: to.exe, emuExe: to.exe, inPlace: Date.now() }); fixed++; continue; } } catch (e) { log('health relink', e.message); }
           }
           if (r) { refreshKeys.add(p.console); r.sig = 'moved'; queued++; } else left.push(p.name);
-        } else if (is.kind === 'game' && is.fix) { queueRemove([p.appid]); queued++; } // only when you pick it in Shortcut health
+        } else if ((is.kind === 'game' || is.kind === 'duplicate') && is.fix) { queueRemove([p.appid]); queued++; } // only when you pick it in Shortcut health
         else if (is.kind === 'outdated') { refreshKeys.add(p.console); }
       }
     }
@@ -1902,7 +1918,7 @@ module.exports = function createSteamManager(ctx) {
   }
   const liveNow = async () => { const env = environment(); return !!(env.account && (await live.available(env.account.root).catch(() => false))); };
   const api = {
-    recompShortcut, recompQueued, retroarchHere, runAppid, recompRepoint, liveNow, applySoon,
+    recompShortcut, recompQueued, retroarchHere, runAppid, recompRepoint, liveNow, applySoon, pendingOnStart,
     overview, preview, apply, undo, restartSteam, removeAllOurs, queueAdd, queueRemove, queueClear, queueInfo, test, setTemplate, setMode, verifyCollections,
     collections: () => { const env = environment(); return env.account ? readCollections(env.account) : []; },
     // live changes: is Steam's interface reachable, and turning on its local debugging port

@@ -101,7 +101,7 @@ test('start scripts: Linux directly; Windows through umu, Steam\'s runtime or Pr
   const umu = RC.script(bb, bb.builds[0], wrec, wo.starts[0], { kind: 'umu', umu: '/usr/bin/umu-run', proton: '/s/Proton 10.0' }, wo.vars);
   assert.match(umu, /^export WINEPREFIX='\/E\/B\/\.cartridge\/proton\/pfx' GAMEID=0 STORE=none$/m);
   assert.match(umu, /^'\/usr\/bin\/umu-run' '\/E\/B\/Bloodborne\.exe' '--play' "\$@" 2>&1 \| tee -a /m);
-  const sn = RC.script(bb, bb.builds[0], wrec, wo.starts[0], { kind: 'sniper', proton: '/s/P', sniper: '/s/SLR', steam: '/s' }, wo.vars);
+  const sn = RC.script(bb, bb.builds[0], wrec, wo.starts[0], { kind: 'runtime', proton: '/s/P', runtime: '/s/SLR', steam: '/s' }, wo.vars);
   assert.match(sn, /^'\/s\/SLR\/_v2-entry-point' --verb=waitforexitandrun -- '\/s\/P\/proton' waitforexitandrun '\/E\/B\/Bloodborne\.exe' '--play' "\$@" 2>&1 \| tee -a /m);
   assert.match(sn, /^export STEAM_COMPAT_DATA_PATH='\/E\/B\/\.cartridge\/proton' STEAM_COMPAT_CLIENT_INSTALL_PATH='\/s'$/m);
   assert.throws(() => RC.script(bb, bb.builds[0], wrec, wo.starts[0], null, wo.vars), /Proton/);
@@ -139,19 +139,44 @@ test('your copy: files, title ID and version checked; inFAMOUS\'s update found b
   assert.ok(RC.checkGame(recipe('pt'), path.join(d, 'g.pkg'), { sfo }).ok, 'P.T. takes a fake PKG');
 });
 
-test('the Proton runner: umu first, else the newest Proton in Steam\'s runtime, else none', () => {
+test('the Proton runner: each Proton in the runtime it asks for, umu only with a Proton it knows, else none', () => {
   const home = tmp(), steam = path.join(home, '.local/share/Steam');
-  const mk = (rel) => { fs.mkdirSync(path.join(steam, rel), { recursive: true }); fs.writeFileSync(path.join(steam, rel, 'proton'), ''); };
-  assert.strictEqual(PR.find({ home, roots: [steam], env: { PATH: '' } }), null);
-  mk('steamapps/common/Proton 9.0'); mk('steamapps/common/Proton 10.0'); mk('steamapps/common/Proton - Experimental'); mk('compatibilitytools.d/GE-Proton10-4');
-  let r = PR.find({ home, roots: [steam], env: { PATH: '' } });
-  assert.deepStrictEqual([r.kind, r.name], ['proton', 'Proton 10.0']);
-  fs.mkdirSync(path.join(steam, 'steamapps/common/SteamLinuxRuntime_sniper'), { recursive: true }); fs.writeFileSync(path.join(steam, 'steamapps/common/SteamLinuxRuntime_sniper/_v2-entry-point'), '');
-  r = PR.find({ home, roots: [steam], env: { PATH: '' } });
-  assert.deepStrictEqual([r.kind, r.steam], ['sniper', steam]);
+  const mk = (rel, appid) => { fs.mkdirSync(path.join(steam, rel), { recursive: true }); fs.writeFileSync(path.join(steam, rel, 'proton'), ''); if (appid) fs.writeFileSync(path.join(steam, rel, 'toolmanifest.vdf'), `"manifest"\n{\n  "require_tool_appid" "${appid}"\n}\n`); };
+  const rt = (name, appid) => { fs.mkdirSync(path.join(steam, 'steamapps/common', name), { recursive: true }); fs.writeFileSync(path.join(steam, 'steamapps/common', name, '_v2-entry-point'), ''); if (appid) fs.writeFileSync(path.join(steam, 'steamapps', `appmanifest_${appid}.acf`), `"AppState"\n{\n\t"installdir"\t\t"${name}"\n}\n`); };
+  assert.strictEqual(PR.find({ home, roots: [steam], env: { PATH: '' }, system: false }), null);
+  mk('steamapps/common/Proton 9.0'); mk('steamapps/common/Proton 10.0', '1628350'); mk('steamapps/common/Proton 11.0', '4183110'); mk('steamapps/common/Proton - Experimental', '4183110'); mk('compatibilitytools.d/GE-Proton10-4', '1628350');
+  let r = PR.find({ home, roots: [steam], env: { PATH: '' }, system: false });
+  assert.deepStrictEqual([r.kind, r.name], ['proton', 'Proton 11.0']);
+  // only sniper installed: Proton 11 can't run in it, so Proton 10 does
+  rt('SteamLinuxRuntime_sniper');
+  r = PR.find({ home, roots: [steam], env: { PATH: '' }, system: false });
+  assert.deepStrictEqual([r.kind, r.name, r.runtime, r.steam], ['runtime', 'Proton 10.0', path.join(steam, 'steamapps/common/SteamLinuxRuntime_sniper'), steam]);
+  // runtime 4 found by its appmanifest: Proton 11 in it, even with umu installed
   fs.mkdirSync(path.join(home, '.local/bin'), { recursive: true }); fs.writeFileSync(path.join(home, '.local/bin/umu-run'), '');
-  r = PR.find({ home, roots: [steam], env: { PATH: '' } });
+  rt('SteamLinuxRuntime_4', '4183110');
+  r = PR.find({ home, roots: [steam], env: { PATH: '' }, system: false });
+  assert.deepStrictEqual([r.kind, r.name, path.basename(r.runtime)], ['runtime', 'Proton 11.0', 'SteamLinuxRuntime_4']);
+  // no runtime at all: umu, with the newest Proton whose runtime it knows (the owner's PC: umu 1.2.9 and Proton 11)
+  fs.rmSync(path.join(steam, 'steamapps/common/SteamLinuxRuntime_4'), { recursive: true }); fs.rmSync(path.join(steam, 'steamapps/common/SteamLinuxRuntime_sniper'), { recursive: true });
+  r = PR.find({ home, roots: [steam], env: { PATH: '' }, system: false });
   assert.deepStrictEqual([r.kind, r.name], ['umu', 'Proton 10.0']);
+  const lib = path.join(home, '.local/lib/python3.14/site-packages/umu'); fs.mkdirSync(lib, { recursive: true });
+  fs.writeFileSync(path.join(lib, '__init__.py'), '__runtime_versions__ = (\n    ("steamrt4", "steamrt4", "4183110"),\n    ("sniper", "steamrt3", "1628350"),\n)\n');
+  r = PR.find({ home, roots: [steam], env: { PATH: '' }, system: false });
+  assert.deepStrictEqual([r.kind, r.name], ['umu', 'Proton 11.0'], 'a newer umu that knows runtime 4 takes Proton 11');
+  fs.writeFileSync(path.join(lib, '__init__.py'), '("soldier", "steamrt2", "1391110"),');
+  r = PR.find({ home, roots: [steam], env: { PATH: '' }, system: false });
+  assert.deepStrictEqual([r.kind, r.proton], ['umu', null], 'no Proton umu can match: umu brings its own');
+});
+
+test('Steam\'s own launch never reaches what Cartridge starts', () => {
+  const CE = require('../electron/childEnv');
+  const env = CE.clean({ STEAM_COMPAT_DATA_PATH: '/p' }, { HOME: '/h', LD_PRELOAD: 'x.so', APPIMAGE: '/a', SteamGameId: '1', STEAM_COMPAT_DATA_PATH: '/steam', STEAM_COMPAT_TOOL_PATHS: '/t', PRESSURE_VESSEL_RUNTIME: 'r', STEAM_RUNTIME_LIBRARY_PATH: 'l' });
+  assert.deepStrictEqual(env, { HOME: '/h', SteamGameId: '1', STEAM_COMPAT_DATA_PATH: '/p' });
+  const sh = path.join(tmp(), 'u.sh');
+  fs.writeFileSync(sh, `${CE.SHELL_UNSET}\nenv | grep -cE '^(STEAM_COMPAT_|PRESSURE_VESSEL_|STEAM_RUNTIME|LD_LIBRARY_PATH)' || true\necho "$SteamGameId"\n`);
+  const out = require('child_process').execFileSync('/bin/sh', [sh], { env: { PATH: process.env.PATH, STEAM_COMPAT_APP_ID: '7', PRESSURE_VESSEL_X: '1', STEAM_RUNTIME: '1', LD_LIBRARY_PATH: '/l', SteamGameId: '9' } }).toString().trim().split('\n');
+  assert.deepStrictEqual(out, ['0', '9']);
 });
 
 test('the engine: a verified game installed from its release, set up with your copy, its settings changed', async () => {

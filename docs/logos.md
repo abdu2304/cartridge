@@ -24,6 +24,7 @@ Every wordmark gets the same box height, but many carry a symbol or a second lin
 | PlayStation (psx, ps, ps1, playstation) | 1.6 | the symbol takes the height; the word is about 40% of it (0.9.47) |
 | Switch | 1.7 | owner: PS4 looked bigger (0.9.42) |
 | GameCube, Dreamcast | 1.45 | the cube and the swirl take most of the height |
+| Steam (a PC port's mark, 0.9.86) | 1.45 | the round mark takes the whole height |
 | NES, Game Boy Advance | 1.35 | |
 | Wii, Wii U, Genesis, Famicom, Game Boy Color, Virtual Boy | 1.3 | |
 | Master System, Game Gear, Sega CD, 32X | 1.25 | |

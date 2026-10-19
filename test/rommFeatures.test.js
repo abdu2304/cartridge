@@ -35,3 +35,8 @@ test('an older RomM: saves without slots, no play sessions, no notes, no QR, old
   assert.equal(f.on.upload, true); // the older one-request upload still works
   assert.deepEqual(f.off, ['Cartridge Save Sync', 'Play Time From Other Devices', 'Trophy Sync', 'Sign In With a QR Code']);
 });
+
+test('0.9.86: RomM 5.3 (no content_hash upload parameter, the hash in what it lists) keeps Save Sync on', () => {
+  const f = fromOpenApi({ paths: { '/api/saves': { post: op('rom_id', 'emulator', 'slot', 'device_id', 'session_id', 'overwrite', 'autocleanup', 'autocleanup_limit') } } });
+  assert.equal(f.on.saves, true);
+});

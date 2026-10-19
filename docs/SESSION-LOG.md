@@ -7,6 +7,19 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 19 Oct 2026 · The PC playtest (in progress, 0.9.86 not released yet)
+Running on the owner's Bazzite PC (4K TV, KDE at 150%, Steam with Proton 10/11/Experimental/GE, umu 1.2.9, games on an ext4 drive "Expansion"). The owner is at work and gave full permission; release to main when done (standing instruction). Committed and pushed on the branch so far:
+- Windows ports never made a prefix: umu 1.2.9 can't match Proton 11/Experimental/Hotfix (they need SteamLinuxRuntime_4, appid 4183110). `protonRunner` runs each Proton in the runtime its toolmanifest asks for; umu only as a fallback with a Proton it knows. Uncharted and Bloodborne set up and reach their title screens from Cartridge and from Steam.
+- Steam's launch variables (STEAM_COMPAT_*, PRESSURE_VESSEL_*, STEAM_RUNTIME*) are dropped for everything Cartridge starts (`electron/childEnv.js`) and in Windows start scripts.
+- Auto-add retried while Steam is away, and a queue left from before is applied at start (`pendingOnStart`).
+- Hand-placed PS4/PS5 dumps are offered to ports (`recomps.matchDumps` over `sfoIndex`).
+- Ports show as ports: Steam mark (ConsoleMark slug 'steam') in Continue Playing, Home's header, Start; the game page's More has a PC Port tab only.
+- Interface size: a picked size never leaves less than 1280x800 (`electron/zoom.js`).
+- Start labels: count under the name instead of "Recommen / ded".
+- Tests: detect tests honour FLATPAK_SYSTEM_DIR (Bazzite's system Flatpaks broke six); flatpakCanSee no longer "knows" an uninstalled app from a global override.
+Found and not a Cartridge bug: inFAMOUS (EU dump CUSA00004) boots to black; the port needs the US CUSA00223. Chromium sees no gamepads at all in this Desktop session (bare Electron too, Steam's virtual pad included); pads work in Game Mode (owner's logs). Controller tests use a scripted pad inside the page (nav.js, rumble recorded). Scratchpad rig: a long-lived app session plus `ctl.sh` (not in the repo).
+Next: Settings sections by pad, Steam console game launch, downloads, saves (copies only), emulators sheets, Look & Feel, CPU while a game runs; then audits, handover Part 33, release 0.9.86.
+
 ## 18 Oct 2026 · Next: a playtest on the owner's PC
 The owner will run Claude Code on their Linux PC (teleported or fresh) and wants everything in Cartridge tested by me alone, fixed for every setup. Brief and first job (Windows PC ports, the Proton prefix and symlinks, Steam variables leaking into Proton): docs/PLAYTEST-ON-A-REAL-PC.md.
 

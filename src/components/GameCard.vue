@@ -13,7 +13,7 @@
       <div v-if="del != null" class="deleting"><Ring :pct="del" /><span>Deleting</span></div>
     </div>
     <div v-if="!hideTitle" class="title">{{ rom.name }}</div>
-    <div v-if="showPlatform" class="sub"><ConsoleMark :slug="rom.platform_slug" :label="rom.platform_display_name" /></div>
+    <div v-if="showPlatform" class="sub"><ConsoleMark :slug="port ? 'steam' : rom.platform_slug" :label="port ? 'Steam' : rom.platform_display_name" /></div>
     <!-- its own line, wrapping inside the card's width, never cut short (0.9.3 F7: device names) -->
     <div v-if="extra && device" class="sub extra"><span class="dev-pill"><Icon name="mdiDevices" :size="12" />{{ extra.replace(/^on /, '') }}</span></div>
     <div v-else-if="extra" class="sub extra">{{ extra }}</div>
@@ -26,7 +26,8 @@ import Icon from './Icon.vue';
 import Ring from './Ring.vue';
 import ConsoleMark from './ConsoleMark.vue';
 // device: extra is where it was played ("on Steam Deck"), shown as a quiet pill (0.9.16)
-const props = defineProps({ rom: Object, showPlatform: Boolean, extra: String, device: Boolean, hideTitle: Boolean, selected: { type: Boolean, default: null } });
+// port: played last as its PC port (0.9.86, owner): the Steam mark in place of the console's, nothing else
+const props = defineProps({ rom: Object, showPlatform: Boolean, extra: String, device: Boolean, hideTitle: Boolean, port: Boolean, selected: { type: Boolean, default: null } });
 const emit = defineEmits(['open', 'focused']);
 const failed = ref(false);
 // covers that arrive late fade in instead of popping; ones already loaded show at once (0.9.17, fluidity)

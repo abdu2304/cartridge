@@ -15,8 +15,8 @@
       <circle v-if="phase.k !== 'night'" class="sc-sun" :cx="orb.x" :cy="orb.y" r="14" :fill="pal.orb" />
       <circle v-else :cx="orb.x" :cy="orb.y" r="12" :fill="pal.orb" :mask="`url(#${uid}moon)`" />
       <g v-if="phase.k === 'morning' || phase.k === 'afternoon'" class="sc-clouds" fill="#fff">
-        <g class="c1"><ellipse cx="80" cy="58" rx="34" ry="9" /><ellipse cx="96" cy="51" rx="18" ry="10" /></g>
-        <g class="c2"><ellipse cx="270" cy="38" rx="28" ry="7" /><ellipse cx="282" cy="33" rx="14" ry="8" /></g>
+        <g v-ambient="{ kind: 'cloud', period: 70 }" class="c1"><ellipse cx="80" cy="58" rx="34" ry="9" /><ellipse cx="96" cy="51" rx="18" ry="10" /></g>
+        <g v-ambient="{ kind: 'cloud', period: 90, reverse: true }" class="c2"><ellipse cx="270" cy="38" rx="28" ry="7" /><ellipse cx="282" cy="33" rx="14" ry="8" /></g>
       </g>
       <path d="M0,150 C60,118 110,128 160,140 C220,154 260,112 320,118 C360,122 384,134 400,140 L400,200 L0,200 Z" :fill="pal.far" />
       <path d="M0,172 C70,150 120,160 180,170 C240,180 300,150 400,162 L400,200 L0,200 Z" :fill="pal.near" />
@@ -32,6 +32,7 @@
 // beautiful). The location isn't known, so the day runs 6 to 18 and the phases use round hours. Nothing
 // here is a picture: the sky, hills, sun, moon, stars and clouds are drawn, so they stay sharp at any size.
 import { computed } from 'vue';
+import { vAmbient } from '../ambient.js'; // clouds drift at two steps a second (0.9.86)
 const props = defineProps({ time: String, ampm: String, day: String, hour: Number, small: Boolean, tiny: Boolean });
 const uid = 'sc' + Math.random().toString(36).slice(2, 7);
 const PHASES = [
@@ -59,9 +60,7 @@ const STARS = Array.from({ length: 34 }, (_, i) => ({ i, x: rnd() * 400, y: rnd(
 .sc-stars circle { fill: #fff; animation: sc-twinkle 5s ease-in-out infinite; }
 @keyframes sc-twinkle { 0%, 100% { opacity: 0.9; } 50% { opacity: 0.25; } }
 .sc-clouds { opacity: 0.5; }
-.sc-clouds .c1 { animation: sc-drift 70s linear infinite alternate; }
-.sc-clouds .c2 { animation: sc-drift 90s linear infinite alternate-reverse; opacity: 0.7; }
-@keyframes sc-drift { from { transform: translateX(-24px); } to { transform: translateX(24px); } }
+.sc-clouds .c2 { opacity: 0.7; } /* both drift 24px each way (70 s and 90 s) through v-ambient: an SVG loop repainted the tile every frame */
 :global(body.motion-reduce .sc-stars circle), :global(body.motion-reduce .sc-clouds g.c1), :global(body.motion-reduce .sc-clouds g.c2) { animation: none; }
 /* without the GPU nothing here moves on its own: a drifting cloud repaints the tile all the time.
    0.9.29: `g.c1`/`g.c2`, as specific as the drift rules; the old `g` lost to them, so the clouds kept

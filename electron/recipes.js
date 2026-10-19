@@ -22,6 +22,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { SHELL_UNSET } = require('./childEnv');
 
 const SHIPPED = path.join(__dirname, 'recipes');
 const TYPES = new Set(['choice', 'bool', 'number', 'text']);
@@ -225,6 +226,7 @@ function script(r, build, rec, start, runner, vars, { env = {} } = {}) {
   if (build.os === 'linux') { run(`${q(program)}${args ? ' ' + args : ''} "$@"`); return L.join('\n') + '\n'; }
   if (!runner) throw new Error('Proton isn’t installed, and this game’s port is a Windows build.');
   const pfx = vars.prefix;
+  L.push(SHELL_UNSET); // started by Steam, the script carries Steam's launch of it (childEnv.js)
   if (runner.kind === 'umu') {
     L.push(`export WINEPREFIX=${q(path.join(pfx, 'pfx'))} GAMEID=0 STORE=none`);
     if (runner.proton) L.push(`export PROTONPATH=${q(runner.proton)}`);
@@ -232,7 +234,8 @@ function script(r, build, rec, start, runner, vars, { env = {} } = {}) {
   } else {
     L.push(`export STEAM_COMPAT_DATA_PATH=${q(pfx)} STEAM_COMPAT_CLIENT_INSTALL_PATH=${q(runner.steam || '')}`);
     const proton = `${q(path.join(runner.proton, 'proton'))} waitforexitandrun ${q(program)}${args ? ' ' + args : ''} "$@"`;
-    run(runner.sniper ? `${q(path.join(runner.sniper, '_v2-entry-point'))} --verb=waitforexitandrun -- ${proton}` : proton);
+    const rt = runtimeOf(runner);
+    run(rt ? `${q(path.join(rt, '_v2-entry-point'))} --verb=waitforexitandrun -- ${proton}` : proton);
   }
   return L.join('\n') + '\n';
 }
@@ -243,12 +246,15 @@ function achievementsOf(r, build, rec, vars) {
   if (!a || !rec?.dir) return null;
   return { format: 'ps4', files: [...(a.files || []).map((f) => expand(f, vars)), ...(a.output ? [outputLog(rec)] : [])], list: a.list || null, game: rec.game?.path || null };
 }
+// the Steam runtime a runner starts Proton in (0.9.86 'runtime'; 0.9.70 to 0.9.85 called it 'sniper')
+const runtimeOf = (runner) => runner.runtime || runner.sniper || null;
 // the same runner once with wineboot, so Proton makes the prefix before Cartridge puts settings.json in it
 function prefixCommand(runner, vars) {
   if (runner.kind === 'umu') return { cmd: runner.umu, args: ['wineboot', '-u'], env: { WINEPREFIX: path.join(vars.prefix, 'pfx'), GAMEID: '0', STORE: 'none', ...(runner.proton ? { PROTONPATH: runner.proton } : {}) } };
   const proton = [path.join(runner.proton, 'proton'), 'run', 'wineboot', '-u'];
   const env = { STEAM_COMPAT_DATA_PATH: vars.prefix, STEAM_COMPAT_CLIENT_INSTALL_PATH: runner.steam || '' };
-  return runner.sniper ? { cmd: path.join(runner.sniper, '_v2-entry-point'), args: ['--verb=run', '--', ...proton], env } : { cmd: proton[0], args: proton.slice(1), env };
+  const rt = runtimeOf(runner);
+  return rt ? { cmd: path.join(rt, '_v2-entry-point'), args: ['--verb=run', '--', ...proton], env } : { cmd: proton[0], args: proton.slice(1), env };
 }
 
 // a Windows program started with the same runner (0.9.71: an update's trial start, as Linux builds get since 0.9.66)
@@ -256,7 +262,8 @@ function runCommand(runner, program, args, prefix) {
   if (runner.kind === 'umu') return { cmd: runner.umu, args: [program, ...args], env: { WINEPREFIX: path.join(prefix, 'pfx'), GAMEID: '0', STORE: 'none', ...(runner.proton ? { PROTONPATH: runner.proton } : {}) } };
   const proton = [path.join(runner.proton, 'proton'), 'run', program, ...args];
   const env = { STEAM_COMPAT_DATA_PATH: prefix, STEAM_COMPAT_CLIENT_INSTALL_PATH: runner.steam || '' };
-  return runner.sniper ? { cmd: path.join(runner.sniper, '_v2-entry-point'), args: ['--verb=run', '--', ...proton], env } : { cmd: proton[0], args: proton.slice(1), env };
+  const rt = runtimeOf(runner);
+  return rt ? { cmd: path.join(rt, '_v2-entry-point'), args: ['--verb=run', '--', ...proton], env } : { cmd: proton[0], args: proton.slice(1), env };
 }
 
 // ---- your copy: a dump folder (eboot.bin, sce_sys/param.sfo), its title ID and version, and what's missing

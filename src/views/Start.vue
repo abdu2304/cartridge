@@ -25,12 +25,12 @@
           <template v-if="t.type === 'continue'">
             <template v-if="cur">
               <!-- 0.9.60 (owner: switching games just cut): the next game's art is decoded first, then crossfades, panning in step -->
-              <Transition name="st-xf"><div :key="steadyArt('c' + t.id, cur).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(steadyArt('c' + t.id, cur).url), animationDelay: panDelay() }" /></Transition>
+              <Transition name="st-xf"><div :key="steadyArt('c' + t.id, cur).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" v-ambient="bigArt(t) ? PAN : null" :style="{ backgroundImage: bgUrl(steadyArt('c' + t.id, cur).url) }" /></Transition>
               <div class="st-scrim" />
               <div class="st-label on-art">Continue playing</div>
               <div class="st-cp">
                 <GameLogo :logo="store.config.ui.logos !== false ? logoOf(cur) : null" :name="cur.name" cls="st-cp-name" :area="Math.min(30000, box(t).pw * box(t).ph * 0.11)" :max-w="Math.min(420, box(t).pw * 0.72)" :max-h="Math.min(120, box(t).ph * 0.3)" />
-                <span class="st-cp-when">{{ whenText(cur) }}</span>
+                <span class="st-cp-when"><ConsoleMark v-if="store.play[cur.id]?.port" slug="steam" label="Steam" />{{ whenText(cur) }}</span>
                 <span v-if="box(t).ph >= 230 && box(t).pw >= 200" class="st-cp-go"><Btn b="A" />{{ store.installed[cur.id] ? 'Continue' : 'Open' }}</span>
               </div>
               <div v-if="playing.length > 1 && box(t).pw >= 280" class="st-dots"><i v-for="(g, i) in playing.slice(0, 5)" :key="g.id" :class="{ on: i === cpIndex }" /></div>
@@ -106,7 +106,7 @@
                   <div class="st-lead-wrap" :style="t.h > 1 ? { height: Math.round(Math.min(56, box(t).ph * 0.16) + 30) + 'px' } : null"><Transition name="st-lead">
                     <div :key="rowView(t)[0].id" class="st-row-lead">
                       <GameLogo :logo="store.config.ui.logos !== false ? logoOf(rowView(t)[0]) : null" :name="rowView(t)[0].name" cls="st-row-name" :area="Math.min(16000, box(t).pw * box(t).ph * 0.07)" :max-w="Math.min(300, box(t).pw * (t.h > 1 ? 0.5 : 0.36))" :max-h="t.h > 1 ? Math.min(56, box(t).ph * 0.16) : Math.min(64, box(t).ph * 0.3)" />
-                      <span class="st-sub">{{ firstLine(t.type, rowView(t)[0]) }}</span>
+                      <span class="st-sub"><ConsoleMark v-if="store.play[rowView(t)[0].id]?.port" slug="steam" label="Steam" />{{ firstLine(t.type, rowView(t)[0]) }}</span>
                     </div>
                   </Transition></div>
                 </div>
@@ -212,7 +212,7 @@
           <!-- Console Spotlight (0.9.28): a console's games take turns, with their art -->
           <template v-else-if="t.type === 'spotlight'">
             <template v-if="spotOf(t)">
-              <Transition name="st-xf"><div :key="spotOf(t).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(spotOf(t), true) : artOf(spotOf(t)) || cover(spotOf(t), true)), animationDelay: panDelay() }" /></Transition>
+              <Transition name="st-xf"><div :key="spotOf(t).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" v-ambient="bigArt(t) ? PAN : null" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(spotOf(t), true) : artOf(spotOf(t)) || cover(spotOf(t), true)) }" /></Transition>
               <div class="st-scrim" />
               <div class="st-label on-art">{{ platformById(t.platformId)?.display_name }} Spotlight</div>
               <div class="st-pin">
@@ -290,7 +290,7 @@
           </template>
           <template v-else-if="t.type === 'daily'">
             <template v-if="daily">
-              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(daily, true) : artOf(daily) || cover(daily, true)) }" />
+              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" v-ambient="bigArt(t) ? PAN : null" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(daily, true) : artOf(daily) || cover(daily, true)) }" />
               <div class="st-scrim" />
               <div class="st-label on-art">Game of the Day</div>
               <div class="st-pin">
@@ -312,7 +312,7 @@
           <!-- One game, pinned -->
           <template v-else-if="t.type === 'game'">
             <template v-if="romById(t.romId)">
-              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(romById(t.romId), true) : artOf(romById(t.romId))) }" />
+              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" v-ambient="bigArt(t) ? PAN : null" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(romById(t.romId), true) : artOf(romById(t.romId))) }" />
               <div class="st-scrim" />
               <!-- 0.9.23 (owner): its logo, not its name in text -->
               <div class="st-pin">
@@ -385,6 +385,7 @@
 
 <script setup>
 import { timing } from '../motion.js';
+import { vAmbient } from '../ambient.js';
 // Start (0.9.19): a menu of tiles the user arranges (owner: inspired by a frontend on someone's device;
 // its widget look wasn't wanted, these follow docs/design.md). 0.9.21 (owner: drag to any size, resize
 // per edge, smooth weighted motion, more character): tiles sit on an 8-column board at their own place
@@ -468,8 +469,8 @@ function steadyArt(key, r) {
 const artOf = (r) => heroArt(r)?.src || ''; // SteamGridDB's hero only, no RomM picture first (0.9.21)
 // every pan runs on one clock (0.9.60): a picture that replaces another starts where the last one was, so the two line up
 // through the crossfade instead of jumping back to the start of the pan
-const PAN_S = 52; // st-pan: 26 s each way
-const panDelay = () => `-${((performance.now() / 1000) % PAN_S).toFixed(2)}s`;
+// big tiles' pan: 26 s each way, one clock for every tile (v-ambient, 0.9.86: a few steps a second, not every frame)
+const PAN = { kind: 'pan', period: 26 };
 const platformById = (id) => store.lib?.platforms.find((p) => p.id === id) || null;
 
 // ---- the board: cell size from the screen (8 columns, 4 rows fill it), tiles placed in pixels
@@ -1413,7 +1414,7 @@ onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G
 
 /* the parts every tile shares; sizes follow the tile (container units) */
 /* 0.9.32 (owner: "no trailing anywhere, a new line is fine"): a tile's name wraps instead of ending in … */
-.st-label { font-size: clamp(11px, min(10cqh, 6cqw), 15px); font-weight: 600; color: var(--muted); letter-spacing: -0.005em; position: relative; z-index: 1; flex: none; line-height: 1.2; text-wrap: balance; overflow-wrap: anywhere; }
+.st-label { font-size: clamp(11px, min(10cqh, 6cqw), 15px); font-weight: 600; color: var(--muted); letter-spacing: -0.005em; position: relative; z-index: 1; flex: none; line-height: 1.2; text-wrap: balance; overflow-wrap: break-word; } /* 0.9.86: anywhere let the row tile squeeze the label to "Recommen / ded" */
 .st-label.on-art { color: rgba(255, 255, 255, 0.92); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.45); }
 .st-num { display: flex; align-items: baseline; gap: 4px; margin-top: auto; line-height: 1; }
 .st-big { font-family: var(--display); font-stretch: var(--display-stretch); font-weight: 800; font-size: clamp(22px, min(32cqh, 20cqw), 104px); letter-spacing: -0.02em; }
@@ -1440,8 +1441,7 @@ onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G
    26 s each way. The picture is a little bigger than the tile so its edge never shows; `translate` and `scale` leave the
    focus zoom's transform alone. It runs with light effects too (one layer, nothing redrawn); Reduce Motion, arranging
    and Cartridge being away (body.away) stop it. */
-.st-art.st-pan { inset: -4%; animation: st-pan 26s var(--ease-in-out) infinite alternate; will-change: translate, scale; }
-@keyframes st-pan { from { translate: 2.5% 1%; scale: 1; } to { translate: -2.5% -1%; scale: 1.05; } }
+.st-art.st-pan { inset: -4%; will-change: translate, scale; } /* moved by v-ambient: 2.5% 1% to -2.5% -1% and scale 1 to 1.05 */
 :global(body.motion-reduce .st-art.st-pan), .st-board.editing .st-art.st-pan { animation: none; translate: none; scale: none; will-change: auto; }
 @media (prefers-reduced-motion: reduce) { .st-art.st-pan { animation: none; } }
 /* 0.9.52: a soft band at the top too, so the tile's label reads on a bright cover */
@@ -1449,7 +1449,9 @@ onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G
 .st-cp { margin-top: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; max-width: 100%; }
 .st-cp :deep(.game-logo) { margin: 0 0 4px; filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.55)); }
 .st-cp :deep(.st-cp-name) { margin: 0; font-family: var(--display); font-stretch: var(--display-stretch); font-weight: 800; font-size: clamp(16px, min(14cqh, 9cqw), 44px); line-height: 1.05; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.st-cp-when { font-size: clamp(11px, min(8cqh, 5cqw), 15px); font-weight: 500; color: rgba(255, 255, 255, 0.86); }
+.st-cp-when { font-size: clamp(11px, min(8cqh, 5cqw), 15px); font-weight: 500; color: rgba(255, 255, 255, 0.86); --cm-h: 0.8em; }
+.st-cp-when .cmark, .st-row-lead .st-sub .cmark { margin-right: 0.45em; position: relative; top: -0.08em; }
+.st-row-lead .st-sub { --cm-h: 0.8em; } /* a port played last carries the Steam mark here too (0.9.86) */
 .st-cp-go { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; padding: 8px 18px 8px 10px; border-radius: 999px; background: #fff; color: #0c0d10; font-weight: 700; font-size: var(--t-sm); }
 @container (max-height: 140px) { .st-cp-when { display: none; } }
 .st-dots { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
@@ -1479,7 +1481,9 @@ onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G
 .t-surprise { --glow: rgba(255, 120, 190, 0.16); }
 .st-count { margin-left: 8px; padding: 1px 7px; border-radius: 999px; background: rgba(255, 255, 255, 0.08); color: var(--muted); font-size: 0.85em; font-weight: 600; flex: none; white-space: nowrap; }
 /* 0.9.29 (owner: "1 / …" cut off): the name gives way, never the count */
-.st-label:has(.st-lname) { display: flex; align-items: center; min-width: 0; }
+/* 0.9.86: the count goes under the name when both don't fit (it squeezed "Recommended" into "Recommen / ded") */
+.st-label:has(.st-lname) { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; min-width: 0; }
+.st-label:has(.st-lname) .st-count { margin-left: 0; }
 .st-lname { min-width: 0; text-wrap: balance; }
 
 /* pages: the board slides a little and settles, its tiles arriving as they do on opening */

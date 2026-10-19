@@ -69,7 +69,7 @@
           <div v-else class="game-grid">
             <GameCard v-for="r in shown" :key="r.id" :rom="r" :show-platform="mode !== 'platform'" :selected="selecting ? picked.has(r.id) : null" @open="open" @focused="focusRom" />
           </div>
-          <div v-if="shown.length < list.length" ref="moreEl" class="more"><div class="spinner" /></div>
+          <div v-if="shown.length < list.length" ref="moreEl" class="more"><div class="spinner" :class="{ idle: !moreNear }" /></div>
         </div>
         <aside class="detail glass" v-if="cur">
           <Transition name="fadeup" mode="out-in">
@@ -110,7 +110,7 @@ const props = defineProps({ platformId: Number, collectionId: String, genre: Str
 const mode = computed(() => (props.platformId ? 'platform' : props.collectionId ? 'collection' : props.genre ? 'genre' : 'all'));
 const el = ref(null);
 const gridEl = ref(null);
-const moreEl = ref(null);
+const moreEl = ref(null), moreNear = ref(false); // 0.9.86: the marker turns only near the view (it kept a 4K screen redrawing)
 const filter = ref('all');
 // a Home row's Show all keeps the row's order ('list')
 const sort = ref(mode.value === 'all' ? 'new' : collectionById(props.collectionId)?.ordered ? 'list' : 'name');
@@ -244,7 +244,7 @@ const groups = computed(() => {
 });
 watch([filter, sort, q, consoleFilter, ext], () => { limit.value = PAGE; gridEl.value?.scrollTo({ top: 0 }); });
 let io;
-watch(moreEl, (m) => { io?.disconnect(); if (m) { io = new IntersectionObserver((e) => { if (e[0].isIntersecting) limit.value += PAGE; }, { root: gridEl.value, rootMargin: '600px' }); io.observe(m); } });
+watch(moreEl, (m) => { io?.disconnect(); if (m) { io = new IntersectionObserver((e) => { moreNear.value = e[0].isIntersecting; if (e[0].isIntersecting) limit.value += PAGE; }, { root: gridEl.value, rootMargin: '600px' }); io.observe(m); } });
 onBeforeUnmount(() => io?.disconnect());
 
 const missingCount = computed(() => list.value.filter((r) => !store.installed[r.id]).length);
@@ -416,4 +416,5 @@ onMounted(async () => {
 .hicon.art img { width: 100%; height: 100%; object-fit: cover; }
 /* room above each console's games so a highlighted (raised, zoomed) card never covers its header */
 .con-sec .game-grid { padding-top: 14px; }
+.more .spinner.idle { animation-play-state: paused; }
 </style>

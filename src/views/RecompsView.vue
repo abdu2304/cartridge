@@ -23,7 +23,7 @@
     </div>
     <div v-else class="game-grid">
       <template v-for="e in mine" :key="e.id">
-        <GameCard v-if="romOf(e)" :rom="romOf(e)" :show-platform="true" :extra="stateOf(e)" @open="open(e)" @focused="focus(e)" />
+        <GameCard v-if="romOf(e)" :rom="romOf(e)" :show-platform="true" :port="true" :extra="stateOf(e)" @open="open(e)" @focused="focus(e)" />
         <!-- a port from a link that matches no game in your library: its project's own picture -->
         <button v-else class="card" data-focus :data-key="'port-' + e.id" @click="open(e)">
           <div class="art"><img v-if="pics[e.id]" :src="pics[e.id]" alt="" /><div v-else class="ph"><span class="ph-t">{{ e.name }}</span></div></div>

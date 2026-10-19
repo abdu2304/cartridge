@@ -69,7 +69,7 @@
   --move-slow: var(--d-move-slow) var(--ease-out);        /* a slow, deliberate move: a gauge needle, a tile gliding across a big board */
   --move-ambient: 1600ms var(--ease-out);     /* scenery settling: a header picture, the sun crossing the clock */
   --press: 90ms;                              /* how fast a press goes down (it comes back on --spring-pop) */
-  --loop-spin: 1.1s linear;                   /* things that turn: spinners, rings */
+  --loop-spin: 1.1s steps(33);                /* things that turn: spinners, rings. 0.9.86: 30 steps a second, not every frame (at 120 Hz in 4K a spinner kept most of a core busy) */
   --loop-pulse: 1.2s var(--ease-in-out);      /* things that breathe: live bars, a picked handle */
   --stagger: 40ms;                            /* one row after another */
 }

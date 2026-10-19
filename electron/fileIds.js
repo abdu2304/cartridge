@@ -59,6 +59,19 @@ function pspSerial(rom, file) {
   let id = /\.(iso|cso|zso|chd)$/i.test(file) ? (() => { const b = P.isoFile(file, ['PSP_GAME', 'PARAM.SFO']); return b ? P.parseSfo(b).DISC_ID : null; })() : /\.pbp$/i.test(file) ? require('./discImage').pbpDiscId(file) : null;
   return id || (`${rom?.fs_name || ''} ${rom?.name || ''} ${path.basename(file)}`.match(/\b([A-Z]{4})-?(\d{5})\b/) || []).slice(1).join('') || null;
 }
+// a Wii U game's title ID (00050000xxxxxxxx, the game itself, not its update or DLC): from a .wua's title folders
+// (wua.js), else a folder dump's meta/meta.xml <title_id> (the game folder or the one holding code/ content/ meta/)
+function wiiuTitle(where) {
+  if (!where) return null;
+  const base = (id) => (/^00050000[0-9A-F]{8}$/.test(id) ? id : null);
+  if (/\.wua$/i.test(where)) return require('./wua').titles(where).map((t) => base(t.id)).find(Boolean) || null;
+  for (const dir of [where, path.dirname(where), path.dirname(path.dirname(where))]) {
+    let x = ''; try { x = fs.readFileSync(path.join(dir, 'meta', 'meta.xml'), 'utf8'); } catch { continue; }
+    const m = /<title_id[^>]*>\s*([0-9a-fA-F]{16})\s*</.exec(x);
+    if (m) return base(m[1].toUpperCase());
+  }
+  return null;
+}
 function read({ slugs = '', where, fsName = '', name = '', emulationRoot = '', kind }) {
   if (kind === 'ps3serial') return [ps3SerialOf({ fs_name: fsName, name }, where)]; // Steam matching's serial (steamManager gameSerial)
   const file = mainFile(where), A = require('./addons'), rom = { fs_name: fsName, name };
@@ -70,6 +83,9 @@ function read({ slugs = '', where, fsName = '', name = '', emulationRoot = '', k
   if (/\bps2\b/i.test(slugs) && /\.(iso|chd|cso|zso)$/i.test(file)) return [require('./patches').ps2IsoInfo(file)?.serial];
   if (/\b(ngc|gc|gamecube|wii)\b/i.test(slugs) && /\.(iso|gcm|rvz|wia|wbfs|ciso|gcz)$/i.test(file)) return [require('./cheats').gcWiiId(file)];
   if (/\b(3ds|n3ds)\b/i.test(slugs) && /\.(3ds|cci|cia|cxi)$/i.test(file)) return [A.n3dsTitleId(file)];
+  // 0.9.86 (PC playtest: New Super Mario Bros. U's Cemu save was never matched): Wii U and Xbox 360 had no reader
+  if (/\bwiiu\b/i.test(slugs)) return [wiiuTitle(where)];
+  if (/xbox-?360/i.test(slugs)) return [require('./x360Id').titleId(where)];
   return [];
 }
 

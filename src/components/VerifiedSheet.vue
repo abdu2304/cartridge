@@ -76,7 +76,7 @@ const runsWith = computed(() => {
   const r = runner.value;
   if (r === undefined) return 'Its Windows build, through Proton.';
   if (!r) return 'Its Windows build, through Proton, which isn’t installed here. Installing Steam brings it.';
-  return `Its Windows build, through ${r.kind === 'umu' ? 'umu-launcher and ' : ''}${r.name}${r.kind === 'sniper' ? ' in Steam’s runtime' : ''}. Cartridge keeps its own Proton folder for it.`;
+  return `Its Windows build, through ${r.kind === 'umu' ? 'umu-launcher and ' : ''}${r.name}${r.kind === 'runtime' || r.kind === 'sniper' ? ' in Steam’s runtime' : ''}. Cartridge keeps its own Proton folder for it.`;
 });
 const checked = computed(() => { const v = e.value.verified; if (!v) return ''; const d = new Date(v.on); return `${isNaN(d) ? v.on : d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}, with release ${v.release}. ${v.played ? 'Played through on a device.' : 'Installs and starts are checked; tell Cartridge’s author how it plays.'}`; });
 const steamText = computed(() => { const i = e.value.installed; return i.steam ? 'In Steam, in the Recomps collection.' : i.steamQueued ? 'Waiting to go in: Settings → Steam → Apply (Steam restarts).' : 'Not in Steam yet: More → Add to Steam.'; });

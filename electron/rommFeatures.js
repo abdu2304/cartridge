@@ -3,8 +3,10 @@
 // endpoints it needs being there, never by a guessed version number. No description = everything stays on, as before.
 const FEATURES = {
   collections: { label: 'Collections', need: [['get', '/api/collections']] },
-  // Save Sync writes slots and RomM's content hash (RomM saves.py add_save); older save APIs had neither
-  saves: { label: 'Cartridge Save Sync', need: [['post', '/api/saves', ['slot', 'content_hash']]] },
+  // Save Sync writes slots (RomM saves.py add_save); older save APIs had none. 0.9.86 (PC playtest, RomM 5.3.1 with 82
+  // saves showed Save Sync as missing): RomM 5.3 works the content hash out itself and dropped it as an upload
+  // parameter, keeping it in what it lists, so the slot is the test (Cartridge's extra parameter is ignored)
+  saves: { label: 'Cartridge Save Sync', need: [['post', '/api/saves', ['slot']]] },
   playSessions: { label: 'Play Time From Other Devices', need: [['post', '/api/play-sessions'], ['get', '/api/devices']] },
   notes: { label: 'Trophy Sync', need: [['get', '/api/roms/{}/notes']] },
   qr: { label: 'Sign In With a QR Code', need: [['post', '/api/auth/device/init']] },

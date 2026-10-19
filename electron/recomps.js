@@ -65,6 +65,15 @@ function matchRoms(entry, roms) {
   return [...out];
 }
 
+// 0.9.86 (PC playtest: an inFAMOUS dump copied in by hand, not in RomM, was never offered): dumps found in the
+// console's folders, [{ path, id, title }] from their param.sfo, that are this game: one of the recipe's title IDs
+// (any region is fine, checkGame notes another one), else the same title
+function matchDumps(entry, dumps) {
+  const keys = new Set((entry.games || []).flatMap((g) => titleKeys(g.title).concat((g.also || []).flatMap(titleKeys))));
+  const ids = new Set(entry.recipe?.game?.ids || []);
+  return (dumps || []).filter((d) => (d.id && ids.has(d.id)) || titleKeys(d.title).some((k) => keys.has(k)));
+}
+
 // ---------------------------------------------------------------- builds
 const NOT_FILE = /\.(sha\d*|md5|sig|asc|zsync|txt|json|pdb|dbg)$/i;
 const rx = (s) => { try { return s ? new RegExp(s, 'i') : null; } catch { return null; } };
@@ -415,8 +424,13 @@ function createRecomps(ctx) {
   function catalogue() {
     if (cat) return cat;
     const out = [], ids = new Set(), repos = new Set();
+    // 0.9.86 (PC playtest: P.T. and GoW3 installed from links before they were verified vanished from every list, still
+    // on the drive and in Steam, with no way to update or remove them): one project is listed once, unless that copy is
+    // installed: an install always has its entry
     const add = (e, from) => {
-      if (!e?.id || ids.has(e.id) || (e.repo && repos.has(e.repo.toLowerCase()))) return;
+      if (!e?.id || ids.has(e.id) || (e.repo && repos.has(e.repo.toLowerCase()) && !installs[e.id])) return;
+      const twin = e.repo && repos.has(e.repo.toLowerCase()) ? out.find((x) => x.repo?.toLowerCase() === e.repo.toLowerCase()) : null;
+      if (twin) e = { ...e, name: `${twin.name} (From a Link)`, games: twin.games }; // the same project's older copy, beside it
       ids.add(e.id); if (e.repo) repos.add(e.repo.toLowerCase());
       // a place with no rule Cartridge can follow (a patcher, a mod folder inside another game): you put it in place
       // yourself, then press It's Set Up (0.9.68)
@@ -1170,7 +1184,7 @@ function createRecomps(ctx) {
       const c = RC.prefixCommand(runner, vars);
       // umu-launcher fetches Steam's runtime on its first run: that can take minutes
       let why = '';
-      await ctx.runProgram(c.cmd, c.args, { env: c.env, cwd: rec.dir, timeoutMs: 15 * 60e3 }).catch((er) => { why = er.message; log('verified prefix', id, vars.prefix, er.message); });
+      await ctx.runProgram(c.cmd, c.args, { env: c.env, cwd: rec.dir, timeoutMs: 15 * 60e3 }).catch((er) => { why = er.message; log('verified prefix', id, vars.prefix, runner.kind, runner.name, runner.proton || '', runner.runtime || runner.umu || '', '|', String(er.tail || er.message).trim().split('\n').slice(-12).join(' / ')); });
       if (!exists(path.join(vars.prefix, 'pfx', 'drive_c'))) throw new Error(`Proton couldn’t make ${r.name}’s Windows folder (its prefix) in ${vars.prefix.replace(os.homedir(), '~')}${why ? `: ${why.slice(0, 200)}` : '.'} Press Set Up to try again; if it fails again, send Cartridge’s log (Settings → Help and About → Report a Problem).`);
     }
     onProgress({ step: 'write' });
@@ -1262,4 +1276,4 @@ function createRecomps(ctx) {
   return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : e?.saves?.length ? saveDirs(e, installs[id]) : (installs[id]?.syncSaves || []).filter(exists); }, saveChoices, setSyncSaves, pendingSetup, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes };
 }
 
-module.exports = { ciBuildOf, checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
+module.exports = { ciBuildOf, checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, matchDumps, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
