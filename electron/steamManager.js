@@ -1611,6 +1611,14 @@ module.exports = function createSteamManager(ctx) {
     const scs = shortcutsOf(env.account);
     const byRom = new Map(installedGames().map((g) => [g.rom.id, g]));
     const problems = [];
+    // 0.9.86 (PC playtest: P.T. was in Steam twice, both Cartridge's): two of our shortcuts for one game; the one played
+    // last stays (Steam's LastPlayTime), the other is offered for removal
+    const extra = new Set(), seenRom = new Map();
+    for (const sc of [...scs].sort((a, b) => (b.last || 0) - (a.last || 0))) {
+      const r = reg[sc.appid];
+      if (!r || r.recomp || r.romId == null) continue;
+      if (seenRom.has(r.romId)) extra.add(sc.appid >>> 0); else seenRom.set(r.romId, sc.appid);
+    }
     for (const sc of scs) {
       if (/cartridge/i.test(sc.name + ' ' + sc.exe) && !reg[sc.appid]) continue; // Cartridge itself
       const r = reg[sc.appid];
@@ -1630,9 +1638,10 @@ module.exports = function createSteamManager(ctx) {
         const to = key ? replacementFor(id, sc.exe, key) : null;
         p.issues.push({ kind: 'emulator', text: isTempMount(sc.exe) ? 'It points inside an AppImage\'s temporary folder, which is gone after a restart.' : `The emulator isn't at ${shortPath(sc.exe)} any more.`, fix: to ? { to: shortPath(to.exe), label: `Point it at ${path.basename(to.exe)}` } : null });
       }
-      if (r) {
+      if (r && extra.has(sc.appid >>> 0)) p.issues.push({ kind: 'duplicate', text: 'A second shortcut for this game. The other one, played more recently, stays.', fix: { label: 'Remove This One' } });
+      else if (r) {
         const g = byRom.get(r.romId);
-        if (!g) p.issues.push({ kind: 'game', text: 'The game isn’t on this device any more.', fix: { label: 'Remove from Steam' } });
+        if (!g) p.issues.push({ kind: 'game', text: ctx.romById?.(r.romId) ? 'The game isn’t on this device any more.' : 'The game isn’t in your RomM library any more.', fix: { label: 'Remove from Steam' } });
         else if (g.file && !exists(g.file)) p.issues.push({ kind: 'game', text: 'The game’s files are gone.', fix: { label: 'Remove from Steam' } });
       } else if (l?.template?.sample && l.template.sample.startsWith('/') && !exists(l.template.sample) && (!l.template.romRoot || isDir(l.template.romRoot))) {
         // a shortcut you (or an emulator, like shadPS4) made for a game that's gone: offer to remove it
@@ -1674,7 +1683,7 @@ module.exports = function createSteamManager(ctx) {
             try { if ((await live.updateShortcut(sc.appid, { exe: exeRaw, start: q(to.start), lo: sc.loRaw })) === 'ok') { if (r) Object.assign(r, { exe: to.exe, emuExe: to.exe, inPlace: Date.now() }); fixed++; continue; } } catch (e) { log('health relink', e.message); }
           }
           if (r) { refreshKeys.add(p.console); r.sig = 'moved'; queued++; } else left.push(p.name);
-        } else if (is.kind === 'game' && is.fix) { queueRemove([p.appid]); queued++; } // only when you pick it in Shortcut health
+        } else if ((is.kind === 'game' || is.kind === 'duplicate') && is.fix) { queueRemove([p.appid]); queued++; } // only when you pick it in Shortcut health
         else if (is.kind === 'outdated') { refreshKeys.add(p.console); }
       }
     }

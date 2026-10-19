@@ -45,7 +45,7 @@ const h = ref(null);
 const busy = ref(false);
 const canFix = (p) => p.issues.some((i) => i.fix);
 const fixable = computed(() => (h.value?.problems || []).filter(canFix));
-const icon = (p) => ({ emulator: 'mdiLinkVariantOff', game: 'mdiFileHidden', core: 'mdiPuzzleRemoveOutline', flatpak: 'mdiPackageVariantRemove', outdated: 'mdiUpdate' })[p.issues[0]?.kind] || 'mdiAlertCircleOutline';
+const icon = (p) => ({ emulator: 'mdiLinkVariantOff', game: 'mdiFileHidden', duplicate: 'mdiContentDuplicate', core: 'mdiPuzzleRemoveOutline', flatpak: 'mdiPackageVariantRemove', outdated: 'mdiUpdate' })[p.issues[0]?.kind] || 'mdiAlertCircleOutline';
 const label = (p) => p.issues.find((i) => i.fix)?.fix.label || 'How to fix';
 async function load() {
   busy.value = true; h.value = null;

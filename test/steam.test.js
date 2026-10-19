@@ -140,6 +140,26 @@ test('Shortcut health: emulator moved, and the fix points at the one installed n
   assert.match(out[0][1][0][1] || '', /pcsx2-v2\.2\.0/);
 });
 
+// 0.9.86 (PC playtest): two of Cartridge's shortcuts for one game; the one played last stays, the other is offered
+test('Shortcut health: a second shortcut for the same game is offered for removal, the one played last stays', () => {
+  const H = fs.mkdtempSync(path.join(os.tmpdir(), 'cs-dupe-'));
+  test.after(() => fs.rmSync(H, { recursive: true, force: true }));
+  const cfg = path.join(H, '.local/share/Steam/userdata/123/config');
+  for (const d of [cfg, H + '/cfg', H + '/bin']) fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(H + '/bin/emu', '');
+  const { writeVdf } = require('../electron/steamArt.js');
+  const sc = (appid, last) => ({ appid, AppName: 'P.T.', Exe: `"${H}/bin/emu"`, StartDir: `"${H}/bin"`, LaunchOptions: '-g x', LastPlayTime: last });
+  fs.writeFileSync(path.join(cfg, 'shortcuts.vdf'), writeVdf({ shortcuts: { 0: sc(11, 100), 1: sc(12, 900) } }));
+  const reg = { 11: { romId: 5, name: 'P.T.', console: 'ps4', exe: H + '/bin/emu' }, 12: { romId: 5, name: 'P.T.', console: 'ps4', exe: H + '/bin/emu' } };
+  fs.writeFileSync(H + '/cfg/steam-games.json', JSON.stringify(reg));
+  const code = `
+    const sm = require(${JSON.stringify(path.join(ROOT, 'electron/steamManager.js'))})({ USER_DATA: ${JSON.stringify(H + '/cfg')}, log() {}, PLATFORM_MAP: { ps4: ['ps4'] }, getConfig: () => ({}), saveConfig() {}, broadcast() {},
+      emulationRoots: () => [], getLibrary: () => null, installed: () => ({}), romById: () => null, isGamescope: () => false, artFor: () => ({}), MARKED: 'm', markedPath: () => null });
+    console.log(JSON.stringify(sm.health().problems.map((p) => [p.appid, p.issues.map((i) => i.kind)])));`;
+  const out = JSON.parse(execFileSync(process.execPath, ['-e', code], { env: { ...process.env, HOME: H, XDG_DATA_HOME: '' }, encoding: 'utf8' }).trim().split('\n').pop());
+  assert.deepStrictEqual(Object.fromEntries(out), { 11: ['duplicate'], 12: ['game'] });
+});
+
 // 0.9.17: frame generation goes first in Launch options, after environment variables, before the one %command%
 test('frame generation: lsfg-vk or MAKO per game, console or all, placed before %command%', () => {
   const H = path.join(TMP, 'fg');
