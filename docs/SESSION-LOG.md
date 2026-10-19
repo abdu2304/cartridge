@@ -18,7 +18,7 @@ Running on the owner's Bazzite PC (4K TV, KDE at 150%, Steam with Proton 10/11/E
 - Start labels: count under the name instead of "Recommen / ded".
 - Tests: detect tests honour FLATPAK_SYSTEM_DIR (Bazzite's system Flatpaks broke six); flatpakCanSee no longer "knows" an uninstalled app from a global override.
 Found and not a Cartridge bug: inFAMOUS (EU dump CUSA00004) boots to black; the port needs the US CUSA00223. Chromium sees no gamepads at all in this Desktop session (bare Electron too, Steam's virtual pad included); pads work in Game Mode (owner's logs). Controller tests use a scripted pad inside the page (nav.js, rumble recorded). Scratchpad rig: a long-lived app session plus `ctl.sh` (not in the repo).
-Next: Settings sections by pad, Steam console game launch, downloads, saves (copies only), emulators sheets, Look & Feel, CPU while a game runs; then audits, handover Part 33, release 0.9.86.
+Released as 0.9.86 (handover Part 33). After it: GoW3 downloaded (resumed across restarts), unpacked and its port set up and started. Open: real pad input in Desktop Mode, inFAMOUS EU dump, the owner's choice on the two older link ports and the inFAMOUS shortcut (Part 9).
 
 ## 18 Oct 2026 · Next: a playtest on the owner's PC
 The owner will run Claude Code on their Linux PC (teleported or fresh) and wants everything in Cartridge tested by me alone, fixed for every setup. Brief and first job (Windows PC ports, the Proton prefix and symlinks, Steam variables leaking into Proton): docs/PLAYTEST-ON-A-REAL-PC.md.
