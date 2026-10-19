@@ -605,6 +605,9 @@ async function more() {
     ...(coverSrc.value ? [{ label: 'Theme from this game', sub: 'Cartridge takes its colours from the cover', value: 'theme', icon: 'mdiPaletteOutline' }] : []),
     ...(store.config.ui.gameTheme ? [{ label: 'Back to your own theme', sub: store.config.ui.gameTheme.name ? `Now using ${store.config.ui.gameTheme.name}` : '', value: 'untheme', icon: 'mdiUndoVariant' }] : []),
   ];
+  // 0.9.86 (owner: a port is not its console game): a game shown as its PC port gets none of the emulator's rows
+  const port = usePort.value;
+  if (!port) {
   if (installedPath.value) {
     const st = await call('steam:forRom', { romId: Number(props.romId) }).catch(() => null);
     if (st?.steam) {
@@ -659,6 +662,7 @@ async function more() {
   if (saveSyncOn()) play.push({ label: 'Saves in RomM', sub: 'Cartridge Save Sync: sync now, or put an older version back', value: 'cloudsaves', icon: 'mdiCloudSyncOutline' }); // 0.9.51
   if (sv?.length) play.push({ label: 'Saves on This Device', sub: `${sv.length} ${sv.length === 1 ? 'save' : 'saves'} · ${sv.some((x) => x.synced) ? 'synced with Syncthing' : 'not synced'} · changed ${ago(Math.max(...sv.map((x) => x.at || 0)))}`, value: 'saves', icon: 'mdiContentSaveOutline' });
   if (installedPath.value) play.push({ label: 'Show file location', value: 'path', icon: 'mdiFolderOutline' });
+  }
   const rcs = await Promise.race([call('recomps:forRom', { romId: Number(props.romId) }).catch(() => []), new Promise((r) => setTimeout(() => r([]), 1200))]);
   const top = [
     { label: fav.value ? 'Remove from favourites' : 'Add to favourites', sub: 'Saved in RomM', value: 'fav', icon: fav.value ? 'mdiHeartOff' : 'mdiHeartOutline' },
@@ -694,8 +698,12 @@ async function more() {
   ];
   // one sheet, its groups as tabs (0.9.3 K, G4 B): LB/RB move between them. Steam and Emulator are
   // separate tabs since 0.9.16, plus Options.
-  const v = await choose({ title: base.value.name, tabs: [{ label: 'Game', options: top }, ...(steam.length ? [{ label: 'Steam', options: steam }] : []), ...(play.length ? [{ label: 'Emulator', options: play }] : []), { label: 'Details and Artwork', options: details }, { label: 'Options', options }] });
+  // a port: its own tab first (play, its settings, updates and saves, set up, folder, Steam, remove), the library
+  // game's Game and Details tabs, and nothing of the console's emulator, its Steam shortcut or its copy
+  const v = port ? await choose({ title: port.name, tabs: [{ label: 'PC Port', options: portRows(port) }, { label: 'Game', options: top.filter((o) => !/^(verified|recomp):/.test(o.value)) }, { label: 'Details and Artwork', options: details }] })
+    : await choose({ title: base.value.name, tabs: [{ label: 'Game', options: top }, ...(steam.length ? [{ label: 'Steam', options: steam }] : []), ...(play.length ? [{ label: 'Emulator', options: play }] : []), { label: 'Details and Artwork', options: details }, { label: 'Options', options }] });
   if (!v) return;
+  if (typeof v === 'string' && v.startsWith('p:')) return portAction(port, v.slice(2));
   if (v === 'pin') return pinToStart({ type: 'game', romId: props.romId });
   if (v === 'fav') {
     const on = !fav.value;
@@ -814,7 +822,7 @@ async function more() {
 const ports = ref([]);
 async function loadPorts() { const r = await call('recomps:forRom', { romId: Number(props.romId) }).catch(() => []); ports.value = (r || []).filter((x) => x.from === 'verified' || x.installed); }
 // your Play With choice first; else the port this page was opened for (PC Ports), else the port last played (0.9.85)
-const usePort = computed(() => { const w = store.config?.ui?.playWith?.[props.romId] || props.port || store.play[props.romId]?.port; return w && w !== 'emu' ? ports.value.find((x) => x.id === w) || null : null; });
+const usePort = computed(() => { const w = store.config?.ui?.playWith?.[props.romId] || props.port || store.play[props.romId]?.port; return w && w !== 'emu' ? ports.value.find((x) => x.id === w || String(w).startsWith(x.id + ':')) || null : null; }); // 0.9.86: a port with several starts is played as "<id>:<start>"
 // what the main button says: a link port sets itself up when it starts; a verified one not ready opens its sheet
 const portLabel = (x) => (x.from !== 'verified' ? (x.installed?.ready ? 'Play the PC Port' : 'Set Up the PC Port') : x.state === 'play' ? 'Play the PC Port' : x.state === 'update' ? 'Update the PC Port' : 'Set Up the PC Port');
 const readyPort = computed(() => usePort.value || ports.value.find((x) => x.state === 'play' || (x.from !== 'verified' && x.installed?.ready)) || null);
@@ -826,6 +834,31 @@ async function pickWay() {
   ] });
   if (!v) return;
   await saveConfig({ ui: { playWith: { ...(store.config.ui.playWith || {}), [props.romId]: v } } });
+}
+// the PC Port tab of More (0.9.86)
+function portRows(x) {
+  const verified = x.from === 'verified', inst = x.installed, ready = verified ? x.state === 'play' || x.state === 'update' : !!inst?.ready;
+  const sheet = verified ? 'Versions, updates, save backups and your copy' : 'Versions, updates, setup and save backups';
+  return [
+    ...(ready ? [{ label: 'Play', sub: x.name, value: 'p:play', icon: 'mdiPlay', raw: true }] : [{ label: portLabel(x), sub: x.name, value: 'p:sheet', icon: 'mdiCheckDecagramOutline', raw: true }]),
+    ...(verified && inst ? [{ label: 'Port Settings', sub: 'Resolution, frame rate and the rest, in its own settings', value: 'p:settings', icon: 'mdiTune' }] : []),
+    ...(inst ? [{ label: 'Manage the Port', sub: inst.tag ? `${inst.tag} · ${sheet}` : sheet, value: 'p:sheet', icon: verified ? 'mdiCheckDecagramOutline' : 'mdiRocketLaunchOutline' }] : []),
+    ...(verified && inst && ready ? [{ label: 'Set Up Again', sub: 'Checks your copy and writes its settings and starts again', value: 'p:setup', icon: 'mdiWrenchOutline' }] : []),
+    ...(inst?.dir ? [{ label: 'Show Its Folder', sub: inst.dir.split('/').filter(Boolean).pop(), value: 'p:dir', icon: 'mdiFolderOutline', raw: true }] : []),
+    ...(inst && ready ? [{ label: inst.steam ? 'In Steam' : 'Add to Steam', sub: 'Its own shortcut, in a Recomps collection', value: 'p:steam', icon: 'mdiSteam', disabled: !!inst.steam }] : []),
+    ...(ports.value.length || store.installed[props.romId] ? [{ label: 'Play With', sub: 'This port, or the console game with its emulator', value: 'p:way', icon: 'mdiSwapHorizontal' }] : []),
+  ].filter((o) => !o.disabled);
+}
+async function portAction(x, what) {
+  try {
+    if (what === 'play') return playPort(x);
+    if (what === 'sheet') return openModal(x.from === 'verified' ? 'verified' : 'recomp', { id: x.id }).then(loadPorts);
+    if (what === 'settings') return openModal('gamesettings', { recomp: x.id, name: x.name, romId: Number(props.romId) });
+    if (what === 'setup') { toast(`Setting up ${x.name}…`, 'info', 2500, 'mdiWrenchOutline'); const r = await call('recomps:prepare', { id: x.id }); if (r?.ok === false) toast(r.why || 'It couldn’t be set up.', 'error', 6000); else toast(`${x.name} is set up`, 'ok', 2500, 'mdiCheck'); return loadPorts(); }
+    if (what === 'dir') return toast(x.installed.dir, 'info', 5000, 'mdiFolder');
+    if (what === 'steam') { const r = await call('recomps:steam', { id: x.id }); toast(r.added ? 'Added to Steam, in Recomps' : 'Queued: it goes into Steam as soon as Steam can take it', r.added ? 'ok' : 'info', 4000, 'mdiSteam'); return loadPorts(); }
+    if (what === 'way') return pickWay();
+  } catch (e) { toast(e.message, 'error', 6000); }
 }
 async function playPort(x) {
   if (x.from !== 'verified' && !x.installed?.ready) return openModal('recomp', { id: x.id });

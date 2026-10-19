@@ -172,6 +172,14 @@ module.exports = function recompsIpc(m) {
   // a recomp's Steam shortcut: its program, its folder as Start In, its arguments; art from the game when it's in the library
   // ---- Cartridge Verified (0.9.70)
   // your copies of a verified game: the library's matching games, on this device or not, with where they are
+  // an installed port's Steam shortcut (its first start's for a port with several), or queued (game page More, 0.9.86)
+  function steamOf(e) {
+    if (!e.installed) return e;
+    const key = e.starts?.length > 1 ? `${e.id}:${e.starts[0].id}` : e.id;
+    const sc = (() => { try { return m.steamMgr.recompShortcut(key); } catch { return null; } })();
+    e.installed.steam = sc ? sc.appid : null; e.installed.steamQueued = !sc && !!m.steamMgr.recompQueued?.(key);
+    return e;
+  }
   function verifiedCopies(id) {
     const R = recomps(), e = R.byId(id);
     if (!e) return [];
@@ -235,9 +243,9 @@ module.exports = function recompsIpc(m) {
 
   const handlers = {
   // ---- recomps (0.9.65)
-  'recomps:list': () => { const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) if (e.installed) { const key = e.starts?.length > 1 ? `${e.id}:${e.starts[0].id}` : e.id; const sc = (() => { try { return m.steamMgr.recompShortcut(key); } catch { return null; } })(); e.installed.steam = sc ? sc.appid : null; e.installed.steamQueued = !sc && !!m.steamMgr.recompQueued?.(key); } return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
+  'recomps:list': () => { const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) steamOf(e); return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
   // the recomps of one library game (game page More, 0.9.65)
-  'recomps:forRom': ({ romId }) => { const rom = romIndexMain().get(Number(romId)); if (!rom) return []; return recomps().list({ roms: [rom] }).entries.filter((e) => e.roms.includes(rom.id)).map((e) => ({ id: e.id, name: e.name, installed: e.installed, from: e.from, state: e.state || null })); },
+  'recomps:forRom': ({ romId }) => { const rom = romIndexMain().get(Number(romId)); if (!rom) return []; return recomps().list({ roms: [rom] }).entries.filter((e) => e.roms.includes(rom.id)).map((e) => ({ id: e.id, name: e.name, installed: steamOf(e).installed, from: e.from, state: e.state || null })); },
   'recomps:check': ({ id, force }) => recomps().check(id, { force }),
   // 0.9.66: the project's stars, newest version, release notes and first README picture (read once a day)
   'recomps:details': ({ id, fresh }) => recomps().details(id, { fresh }),
