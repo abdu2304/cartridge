@@ -24,7 +24,7 @@ module.exports = function recompsIpc(m) {
     if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
     return new Promise((ok, bad) => {
       p.once('error', (er) => bad(new Error(er.code === 'EACCES' ? 'It isn’t allowed to run (its file isn’t executable).' : `It didn’t start: ${er.message}`)));
-      p.once('spawn', () => { log('recomp opened', id, args ? 'with arguments' : ''); if (isGamescope()) { broadcast('background', { away: true }); p.once('exit', () => { broadcast('background', { away: false }); refocus(); }); } p.unref(); ok({ via: 'direct' }); });
+      p.once('spawn', () => { log('recomp opened', id, args ? 'with arguments' : ''); m.childRun(p, 'recomp ' + id); p.unref(); ok({ via: 'direct' }); });
     });
   }
   async function recompSetupWatch(id) {
@@ -223,7 +223,7 @@ module.exports = function recompsIpc(m) {
     if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
     return new Promise((ok, bad) => {
       p.once('error', (er) => bad(new Error(`It didn’t start: ${er.message}`)));
-      p.once('spawn', () => { log('verified opened', id, st.id); if (isGamescope()) { broadcast('background', { away: true }); p.once('exit', () => { broadcast('background', { away: false }); refocus(); }); } p.unref(); ok({ via: 'script', start: st.id }); });
+      p.once('spawn', () => { log('verified opened', id, st.id); m.childRun(p, 'port ' + id); p.unref(); ok({ via: 'script', start: st.id }); });
     });
   }
   // one Steam shortcut per start: its start script as the program (Proton, settings and the right game are in it),

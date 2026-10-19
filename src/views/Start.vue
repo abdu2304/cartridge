@@ -25,7 +25,7 @@
           <template v-if="t.type === 'continue'">
             <template v-if="cur">
               <!-- 0.9.60 (owner: switching games just cut): the next game's art is decoded first, then crossfades, panning in step -->
-              <Transition name="st-xf"><div :key="steadyArt('c' + t.id, cur).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(steadyArt('c' + t.id, cur).url), animationDelay: panDelay() }" /></Transition>
+              <Transition name="st-xf"><div :key="steadyArt('c' + t.id, cur).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" v-ambient="bigArt(t) ? PAN : null" :style="{ backgroundImage: bgUrl(steadyArt('c' + t.id, cur).url) }" /></Transition>
               <div class="st-scrim" />
               <div class="st-label on-art">Continue playing</div>
               <div class="st-cp">
@@ -212,7 +212,7 @@
           <!-- Console Spotlight (0.9.28): a console's games take turns, with their art -->
           <template v-else-if="t.type === 'spotlight'">
             <template v-if="spotOf(t)">
-              <Transition name="st-xf"><div :key="spotOf(t).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(spotOf(t), true) : artOf(spotOf(t)) || cover(spotOf(t), true)), animationDelay: panDelay() }" /></Transition>
+              <Transition name="st-xf"><div :key="spotOf(t).id" class="st-art" :class="{ 'st-pan': bigArt(t) }" v-ambient="bigArt(t) ? PAN : null" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(spotOf(t), true) : artOf(spotOf(t)) || cover(spotOf(t), true)) }" /></Transition>
               <div class="st-scrim" />
               <div class="st-label on-art">{{ platformById(t.platformId)?.display_name }} Spotlight</div>
               <div class="st-pin">
@@ -290,7 +290,7 @@
           </template>
           <template v-else-if="t.type === 'daily'">
             <template v-if="daily">
-              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(daily, true) : artOf(daily) || cover(daily, true)) }" />
+              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" v-ambient="bigArt(t) ? PAN : null" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(daily, true) : artOf(daily) || cover(daily, true)) }" />
               <div class="st-scrim" />
               <div class="st-label on-art">Game of the Day</div>
               <div class="st-pin">
@@ -312,7 +312,7 @@
           <!-- One game, pinned -->
           <template v-else-if="t.type === 'game'">
             <template v-if="romById(t.romId)">
-              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(romById(t.romId), true) : artOf(romById(t.romId))) }" />
+              <div class="st-art" :class="{ 'st-pan': bigArt(t) }" v-ambient="bigArt(t) ? PAN : null" :style="{ backgroundImage: bgUrl(t.h > t.w ? cover(romById(t.romId), true) : artOf(romById(t.romId))) }" />
               <div class="st-scrim" />
               <!-- 0.9.23 (owner): its logo, not its name in text -->
               <div class="st-pin">
@@ -385,6 +385,7 @@
 
 <script setup>
 import { timing } from '../motion.js';
+import { vAmbient } from '../ambient.js';
 // Start (0.9.19): a menu of tiles the user arranges (owner: inspired by a frontend on someone's device;
 // its widget look wasn't wanted, these follow docs/design.md). 0.9.21 (owner: drag to any size, resize
 // per edge, smooth weighted motion, more character): tiles sit on an 8-column board at their own place
@@ -468,8 +469,8 @@ function steadyArt(key, r) {
 const artOf = (r) => heroArt(r)?.src || ''; // SteamGridDB's hero only, no RomM picture first (0.9.21)
 // every pan runs on one clock (0.9.60): a picture that replaces another starts where the last one was, so the two line up
 // through the crossfade instead of jumping back to the start of the pan
-const PAN_S = 52; // st-pan: 26 s each way
-const panDelay = () => `-${((performance.now() / 1000) % PAN_S).toFixed(2)}s`;
+// big tiles' pan: 26 s each way, one clock for every tile (v-ambient, 0.9.86: a few steps a second, not every frame)
+const PAN = { kind: 'pan', period: 26 };
 const platformById = (id) => store.lib?.platforms.find((p) => p.id === id) || null;
 
 // ---- the board: cell size from the screen (8 columns, 4 rows fill it), tiles placed in pixels
@@ -1440,8 +1441,7 @@ onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G
    26 s each way. The picture is a little bigger than the tile so its edge never shows; `translate` and `scale` leave the
    focus zoom's transform alone. It runs with light effects too (one layer, nothing redrawn); Reduce Motion, arranging
    and Cartridge being away (body.away) stop it. */
-.st-art.st-pan { inset: -4%; animation: st-pan 26s var(--ease-in-out) infinite alternate; will-change: translate, scale; }
-@keyframes st-pan { from { translate: 2.5% 1%; scale: 1; } to { translate: -2.5% -1%; scale: 1.05; } }
+.st-art.st-pan { inset: -4%; will-change: translate, scale; } /* moved by v-ambient: 2.5% 1% to -2.5% -1% and scale 1 to 1.05 */
 :global(body.motion-reduce .st-art.st-pan), .st-board.editing .st-art.st-pan { animation: none; translate: none; scale: none; will-change: auto; }
 @media (prefers-reduced-motion: reduce) { .st-art.st-pan { animation: none; } }
 /* 0.9.52: a soft band at the top too, so the tile's label reads on a bright cover */

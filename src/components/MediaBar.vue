@@ -1,6 +1,6 @@
 <template>
   <div class="media" :class="{ empty: !shown, still }">
-    <img v-for="(l, i) in layers" :key="i" :src="l.src || undefined" :class="{ on: l.on, blur: l.blur }" decoding="async" alt="" />
+    <img v-for="(l, i) in layers" :key="i" v-ambient="l.on ? { kind: 'drift', period: 90, delay: 1100 } : null" :src="l.src || undefined" :class="{ on: l.on, blur: l.blur }" decoding="async" alt="" />
   </div>
 </template>
 <script>
@@ -10,6 +10,7 @@ const last = { src: '', blur: false };
 </script>
 <script setup>
 import { reactive, ref, watch } from 'vue';
+import { vAmbient } from '../ambient.js'; // the slow drift after it settles (0.9.86: a few steps a second, ambient.js)
 // Two stacked images; the next one is decoded off-screen first, then swapped in with a short fade.
 // 0.9.23 bug sweep: the layer fading out kept its own picture (it was overwritten mid-fade, so there was
 // no crossfade), a picture that fails to load clears the old game's instead of leaving it up, and the
@@ -63,8 +64,9 @@ watch(() => props.src, async (v) => {
    zooms very slowly (60 s each way, a few percent), on its own layer so it's the compositor's work. Only with the
    GPU: without it an endless animation keeps the CPU busy, so there it stays still; never while Cartridge is behind
    a game (body.away pauses all animation) or with reduced motion. */
-.media img.on { opacity: 1; animation: media-settle var(--move-slow) both, media-drift 90s var(--ease-in-out, ease-in-out) 1100ms infinite alternate; transform-origin: 62% 38%; }
-@keyframes media-drift { from { transform: scale(1.03) translateX(0.8%); } to { transform: scale(1.03) translateX(-0.8%); } } /* 0.9.49: a pan only, no zoom (zooming made people feel sick) */
+.media img.on { opacity: 1; animation: media-settle var(--move-slow) both; transform-origin: 62% 38%; }
+/* the drift (0.9.49: a pan only, no zoom; 0.8% each way over 90 s) is v-ambient's since 0.9.86: as a CSS loop it had
+   Chromium draw every frame, most of a core on a 4K TV at 120 Hz */
 :global(body.light-fx .media img.on) { animation: media-settle var(--move-slow) both; }
 /* 0.9.19: each new picture settles in from slightly closer, once (a weighted arrival, not a loop) */
 @keyframes media-settle { from { transform: scale(1.055) translateX(0.8%); } to { transform: scale(1.03) translateX(0.8%); } } /* 0.9.23: calmer, it changes with every game you pass */

@@ -190,6 +190,13 @@ function updateAway() {
 const setAway = (src, v) => { awayBy[src] = v; updateAway(); };
 // background jobs Cartridge runs by itself (0.9.48): a game in front (Game Mode) or one started from Cartridge counts as playing
 const scheduler = require('./scheduler').createScheduler({ playing: () => !!(gameFocus.away || runOn), file: path.join(USER_DATA, 'scheduler.json'), log });
+// a game Cartridge started as its own process (a PC port, 0.9.86, PC playtest: Bloodborne ran with Cartridge drawing
+// at about 95% of a core behind it): counted as our game running, so quiet mode and the scheduler's pause apply on
+// the desktop too, and Cartridge comes back when it ends, as for a game started through Steam
+function childRun(p, what) {
+  runOn = true; gameFocus.gameApp = null; gameFocus.endedAt = 0; log('game running', what); setAway('run', true);
+  p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setAway('run', false); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
+}
 function watchGameRun(romId) {
   clearInterval(runT);
   gameFocus.gameApp = null; gameFocus.endedAt = 0;
@@ -4369,7 +4376,7 @@ const handlers09 = {
 };
 // What the moved areas share with main.js (0.9.71, the split by area): functions, and getters for state that changes
 const MAIN = {
-  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob, platformDirs, sfoIndex,
+  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob, platformDirs, sfoIndex, childRun,
   get broadcast() { return broadcast; }, get webFetch() { return webFetch; }, get romName() { return romName; }, get isDir() { return isDir; }, get romIndexMain() { return romIndexMain; },
   get steamMgr() { return steamMgr; }, get config() { return config; }, get installedMap() { return installedMap; }, get library() { return library; }, get runOn() { return runOn; }, get gameFocus() { return gameFocus; }, get trophySvc() { return trophySvc; }, get win() { return win; },
   USER_DATA,
