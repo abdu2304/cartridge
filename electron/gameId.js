@@ -39,7 +39,7 @@ function ps4Ids(where) {
   for (const e of ents) { const p = path.join(where, e.name); if (e.isDirectory()) fromDir(p); else if (/\.pkg$/i.test(e.name)) fromPkg(p); }
   return [...out];
 }
-const READERS = 2; // 2: PS4 (0.9.59)
+const READERS = 3; // 2: PS4 (0.9.59); 3: Wii U and Xbox 360 (0.9.86)
 
 // ctx: { file (cache path), roms() -> [rom], whereOf(id) -> path or '', extract(rom, where) -> [id], log }
 function createIdentity(ctx) {

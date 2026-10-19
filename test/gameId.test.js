@@ -73,3 +73,17 @@ test('lazy identity (0.9.60): a game not read yet answers its name IDs at once a
   await idn2.ready();
   assert.strictEqual(reads2, 1);
 });
+
+test('0.9.86: Wii U games give their title ID (a .wua, or a folder dump\'s meta.xml); updates and DLC are not the game', () => {
+  const F = require('../electron/fileIds');
+  const wua = require('../electron/wua').titles(path.join(__dirname, 'fixtures/mario-tennis.wua'));
+  const game = wua.find((t) => t.id.startsWith('00050000'));
+  assert.strictEqual(F.read({ slugs: 'wiiu', where: path.join(__dirname, 'fixtures/mario-tennis.wua') })[0], game ? game.id : null);
+  const d = fs.mkdtempSync(path.join(os.tmpdir(), 'wiiu-')); test.after(() => fs.rmSync(d, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(d, 'Game/meta'), { recursive: true }); fs.mkdirSync(path.join(d, 'Game/code'));
+  fs.writeFileSync(path.join(d, 'Game/meta/meta.xml'), '<?xml version="1.0"?><menu><title_id type="hexBinary" length="8">0005000010101D00</title_id></menu>');
+  fs.writeFileSync(path.join(d, 'Game/code/game.rpx'), 'x');
+  assert.strictEqual(F.read({ slugs: 'wiiu', where: path.join(d, 'Game') })[0], '0005000010101D00');
+  fs.writeFileSync(path.join(d, 'Game/meta/meta.xml'), '<menu><title_id>0005000E10101D00</title_id></menu>');
+  assert.strictEqual(F.read({ slugs: 'wiiu', where: path.join(d, 'Game') })[0], null);
+});
