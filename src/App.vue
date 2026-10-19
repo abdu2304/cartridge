@@ -101,6 +101,7 @@
   </Transition>
   <FirstTour v-if="store.tour" v-bind="store.tour.props" />
   <CloudSync v-if="store.cloudSync" />
+  <GameStarting v-if="store.starting && !store.cloudSync" />
   <IdleScreen v-if="store.config?.configured" />
   <PerfOverlay v-if="store.config?.ui?.perfOverlay && !store.away" />
 
@@ -154,6 +155,7 @@ import SaveLocations from './components/SaveLocations.vue';
 import FolderView from './components/FolderView.vue';
 import FirstTour from './components/FirstTour.vue';
 import CloudSync from './components/CloudSync.vue';
+import GameStarting from './components/GameStarting.vue';
 // the manual reader brings pdf.js: loaded the first time a manual opens, not at start
 const ManualViewer = defineAsyncComponent(() => import('./components/ManualViewer.vue'));
 import PatchesSheet from './components/PatchesSheet.vue';
@@ -376,7 +378,16 @@ onMounted(async () => {
   window.cart.on('open-game', openGame);
   // another app in front in Game Mode (0.9.21, owner: still laggy in the background): gamescope never
   // hides or blurs the window, so stop the pad, the animated background and every CSS animation here
-  window.cart.on('game-run', (g) => gameEnded(g?.state === 'ended'));
+  window.cart.on('game-run', (g) => {
+    gameEnded(g?.state === 'ended');
+    // the starting screen (0.9.87): the game seen running = its window is near; ended or never seen = it's over. A game
+    // that ends within 25 s of starting, before it ever came in front, closed before it opened: said so
+    const s = store.starting;
+    if (!s) return;
+    if (g?.state === 'started') { store.starting = { ...s, state: 'opening' }; setTimeout(() => { if (store.starting?.at === s.at && store.starting.state === 'opening') store.starting = null; }, 15000); }
+    else if (g?.state === 'ended') store.starting = Date.now() - s.at < 25000 && s.state === 'starting' ? { ...s, state: 'closed' } : null;
+    else if (g?.state === 'unseen') store.starting = null;
+  });
   window.cart.on('background', (b) => { setBackground(b?.away); governorAway(b?.away); store.away = !!b?.away; document.body.classList.toggle('away', !!b?.away); });
   // background jobs (0.9.32): what's running now, and every change after; the Downloads page lists them
   window.cart.on('bg-job', (j) => { if (j.gone) delete store.bgJobs[j.key]; else store.bgJobs[j.key] = j; });

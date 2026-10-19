@@ -50,7 +50,7 @@
 // The steps are Install (the port, for this system), Your Copy (from your library, downloaded if needed), then Play;
 // Settings opens the port's own settings in Cartridge. Nested pop-ups save this sheet's resolve and reopen it.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { store, call, toast, closeModal, choose, confirm, romById, cover, img, bgJob, ago, pickFolder, openModal, download, plural } from '../store.js';
+import { store, call, toast, closeModal, choose, confirm, romById, cover, img, bgJob, ago, pickFolder, openModal, download, plural, openPort } from '../store.js';
 import { pushLayer, focusFirst } from '../nav.js';
 import Icon from './Icon.vue';
 import Btn from './Btn.vue';
@@ -164,7 +164,7 @@ async function pickCopy() {
   reopen();
   if (dir) await prepare(dir);
 }
-async function play(start) { why.value = ''; try { await call('recomps:open', { id: props.id, start }); toast(`Starting ${e.value.starts.length > 1 ? curStart.value.name : e.value.name}`, 'info', 2500, 'mdiPlay'); } catch (er) { why.value = er.message; } }
+async function play(start) { why.value = ''; try { await openPort({ id: props.id, start, name: e.value.starts.length > 1 ? curStart.value.name : e.value.name, romId: e.value.roms?.[0] }); } catch (er) { why.value = er.message; } }
 function settings() { openModal('gamesettings', { recomp: props.id, name: e.value.name, romId: e.value.roms?.[0] ?? null }).then(() => load()); }
 async function more() {
   const x = e.value, inst = x.installed;

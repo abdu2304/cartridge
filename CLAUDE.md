@@ -737,5 +737,9 @@ LT/RT switch top tabs. LB/RB only switch sections inside a page. A select, B bac
 - Tests honour `FLATPAK_SYSTEM_DIR` (detect.js `FP_SYSTEM`); `flatpakCanSee` is known only from the app's own metadata.
 - Desktop Mode on the owner's PC: Chromium lists no gamepads (Steam Input turns uinput pads into keyboard/mouse there); controller tests used a scripted pad in the page. Real pad input in Game Mode works (owner's logs).
 
+## 0.9.87 · Starting Up (19 Oct 2026; handover Part 34)
+- `GameStarting.vue` (store `starting`, `startingGame`, `openPort`): shown from `playGame` and every `recomps:open` (Game.vue, VerifiedSheet, RecompSheet) until the game is in front (`store.away`), seen running (`game-run` `started`, 15 s), never seen (`unseen`), ended within 25 s (`closed`), B, or 5 min. In Game Mode a port Cartridge started quiets Cartridge at once, so there it waits for the port to end. `test/e2e/starting.js` (in e2e.yml).
+- main.js `awayBy.child`: a port Cartridge started (`childRun`) wins over gamescope's focus in Game Mode (the port carries Cartridge's SteamGameId, so focus said Cartridge was in front), counts like `run` on the desktop; `childRun` broadcasts `game-run` starting/ended again (nav.js `gameEnded`). watchGameRun broadcasts `started` and `unseen`.
+
 ## Releases (full steps: HANDOFF D8)
 Only when the owner asks. Bump `version` and `build.releaseInfo.releaseName` ("Cartridge X.Y.Z") in `package.json`, and set `versionName` (what Settings → About and update messages show). **0.9.3 is shipped in parts (owner, 1 Oct 2026):** the number goes up as usual (0.9.4, 0.9.5...) but `versionName` and the release title are "0.9.3 B", "0.9.3 C"... until the 0.9.3 plan is done; notes heading `## Cartridge 0.9.3 B · Title`. Then put only this version's notes in `RELEASE_NOTES.md` (heading `## Cartridge X.Y.Z · Title`), add them to the top of `CHANGELOG.md`, grouped as New / Changed / Fixed with bold lead-ins. CI builds, launch-checks and publishes.

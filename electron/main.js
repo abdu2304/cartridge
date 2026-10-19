@@ -179,11 +179,14 @@ const runActive = () => runOn;
 // about 22% of a core and GPU time in front, 0.1% and none once quiet. gamescope's focus (xprop) decides when it can be
 // read; without it, a game Cartridge started or any Steam launch counts; on the desktop, our game running while
 // Cartridge's window isn't focused.
-const awayBy = { focus: null, run: false, launch: false };
+// 0.9.87: child = a PC port Cartridge started itself. In Game Mode it inherits Cartridge's SteamGameId, so gamescope
+// names Cartridge as the app in front while it runs and the focus reading kept Cartridge awake (pad on) behind it;
+// there it wins over the focus, as before 0.9.86. On the desktop it counts like run (quiet while unfocused).
+const awayBy = { focus: null, run: false, launch: false, child: false };
 let awaySent = false;
 function updateAway() {
-  const desk = !isGamescope();
-  const a = awayBy.focus != null ? awayBy.focus : desk ? awayBy.run && !(win && !win.isDestroyed() && win.isFocused()) : awayBy.run || awayBy.launch;
+  const desk = !isGamescope(), run = awayBy.run || awayBy.child;
+  const a = !desk && awayBy.child ? true : awayBy.focus != null ? awayBy.focus : desk ? run && !(win && !win.isDestroyed() && win.isFocused()) : run || awayBy.launch;
   if (a === awaySent) return;
   awaySent = a; broadcast('background', { away: a }); log('quiet while a game runs:', a ? 'on' : 'off');
 }
@@ -194,8 +197,10 @@ const scheduler = require('./scheduler').createScheduler({ playing: () => !!(gam
 // at about 95% of a core behind it): counted as our game running, so quiet mode and the scheduler's pause apply on
 // the desktop too, and Cartridge comes back when it ends, as for a game started through Steam
 function childRun(p, what) {
-  runOn = true; gameFocus.gameApp = null; gameFocus.endedAt = 0; log('game running', what); setAway('run', true);
-  p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setAway('run', false); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
+  // 0.9.87: game-run as for a game started through Steam, so the page shows it starting and nav.js gameEnded() takes
+  // the pad back when it ends (0.9.86 left that out, and the controller did nothing in Cartridge after a port)
+  runOn = true; gameFocus.gameApp = null; gameFocus.endedAt = 0; log('game running', what); setAway('child', true); broadcast('game-run', { state: 'starting', port: what });
+  p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setAway('child', false); broadcast('game-run', { state: 'ended', port: what }); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
 }
 function watchGameRun(romId) {
   clearInterval(runT);
@@ -222,11 +227,11 @@ function watchGameRun(romId) {
   runT = setInterval(async () => {
     if (looking) return; looking = true;
     let on = false; try { on = await running(); } catch {} finally { looking = false; }
-    if (on && !seen) { seen = true; seenAt = Date.now(); runOn = true; log('game running', romId); setAway('run', true); }
+    if (on && !seen) { seen = true; seenAt = Date.now(); runOn = true; log('game running', romId); setAway('run', true); broadcast('game-run', { state: 'started', romId }); }
     // 0.9.49 (owner: Vita3K "doesn't launch, nothing happens"): a Vita game that never shows, or closes within 15 s,
     // gets Vita3K's own reason (its log, or the title not being in its storage) instead of silence
     if (vita && !asked && ((!on && !seen && Date.now() - started > 20000) || (!on && seen && Date.now() - seenAt < 15000))) { asked = true; vitaQuickExit(romId, serial); }
-    if (!on && !seen && Date.now() - started > 180000) { clearInterval(runT); return; } // never seen: give up after 3 min
+    if (!on && !seen && Date.now() - started > 180000) { clearInterval(runT); broadcast('game-run', { state: 'unseen', romId }); return; } // never seen: give up after 3 min
     // 0.9.63 (owner: the system froze in a Vita game and had to be forced off): Vita3K's log is copied every 30 s
     // while its game runs, so a freeze that takes everything down still leaves the last of it (emulator-runs/)
     if (vita && on && Date.now() - (copiedAt || 0) > 30000) { copiedAt = Date.now(); keepEmuLog('vita3k', require('./pkgInstall').vita3kLogFile(steamMgr.vita3kCommand?.()?.exe)); }

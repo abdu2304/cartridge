@@ -63,7 +63,7 @@
 // One recomp (0.9.65): what it is and needs, then everything to do with it. Nested pop-ups (the picker, the folder
 // browser, confirmations) save this sheet's resolve and reopen it, as the single pop-up slot needs.
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
-import { store, call, toast, closeModal, choose, confirm, romById, cover, bgJob, ago, pickFolder } from '../store.js';
+import { store, call, toast, closeModal, choose, confirm, romById, cover, bgJob, ago, pickFolder, openPort } from '../store.js';
 import { pushLayer, focusFirst } from '../nav.js';
 import Icon from './Icon.vue';
 
@@ -211,7 +211,7 @@ async function toSteam() {
   } catch (er) { why.value = er.message; }
   load();
 }
-async function openIt() { why.value = ''; try { await call('recomps:open', { id: props.id }); } catch (er) { why.value = er.message; } }
+async function openIt() { why.value = ''; try { await openPort({ id: props.id, name: e.value?.name, romId: e.value?.roms?.[0] }); } catch (er) { why.value = er.message; } }
 async function channel() {
   const v = await choose({ title: 'Which Releases?', options: [{ label: 'Stable', sub: 'Its normal releases', value: 'stable' }, { label: 'Pre-releases', sub: 'Test builds as they come out', value: 'pre' }] });
   reopen();
