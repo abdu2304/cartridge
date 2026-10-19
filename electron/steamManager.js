@@ -1417,6 +1417,7 @@ module.exports = function createSteamManager(ctx) {
     let missing = [];
     try { if (Object.keys(reg).length) missing = (await verifyCollections()) || []; } catch {}
     try { reconcile(last); } catch (e) { log('steam reconcile', e.message); }
+    pendingOnStart();
     return { last: report, missing };
   }
   // 0.9.19 (HANDOFF F4): apply() writes the registry before the helper finishes (play.sh needs it), so
@@ -1467,17 +1468,23 @@ module.exports = function createSteamManager(ctx) {
   // 0.9.24 (owner: with auto add on, no trip to Settings → Steam → Apply): when Steam can be changed while it
   // runs, the queue is applied right away (a few seconds after the last download, so several go in together).
   // Without that, Steam has to close first, so it waits for you as before.
-  let applyT = null;
-  function applySoon() {
+  // 0.9.86 (PC playtest): Steam not running or not yet answering made it give up for good, so an add stayed queued
+  // until Apply was pressed by hand. Now it looks again every minute (for up to an hour) while the queue holds
+  // something, and pendingOnStart() picks up a queue left from a Cartridge that closed before it went in.
+  let applyT = null, applyTries = 0;
+  function applySoon(delay = 4000) {
     clearTimeout(applyT);
+    if (delay === 4000) applyTries = 0;
     applyT = setTimeout(async () => {
+      if (!queue.add.length && !queue.remove.length) return;
       try {
         const env = environment();
-        if (!env.account || !(await live.available(env.account.root).catch(() => false))) return;
+        if (!env.account || !(await live.available(env.account.root).catch(() => false))) { if (++applyTries < 60) applySoon(60e3); return; }
         await apply({ restart: false }); ctx.broadcast('steam-auto', { action: 'applied' }); log('auto add applied live');
       } catch (e) { log('auto apply', e.message); }
-    }, 4000);
+    }, delay);
   }
+  function pendingOnStart() { if (cfg().autoAdd && queue.add.length) { log('auto add: queue left from before', queue.add.length); applySoon(); } }
   function onDeleted(romId) {
     if (!cfg().autoRemove) return false;
     const ids = Object.entries(reg).filter(([, r]) => r.romId === romId).map(([id]) => Number(id));
@@ -1902,7 +1909,7 @@ module.exports = function createSteamManager(ctx) {
   }
   const liveNow = async () => { const env = environment(); return !!(env.account && (await live.available(env.account.root).catch(() => false))); };
   const api = {
-    recompShortcut, recompQueued, retroarchHere, runAppid, recompRepoint, liveNow, applySoon,
+    recompShortcut, recompQueued, retroarchHere, runAppid, recompRepoint, liveNow, applySoon, pendingOnStart,
     overview, preview, apply, undo, restartSteam, removeAllOurs, queueAdd, queueRemove, queueClear, queueInfo, test, setTemplate, setMode, verifyCollections,
     collections: () => { const env = environment(); return env.account ? readCollections(env.account) : []; },
     // live changes: is Steam's interface reachable, and turning on its local debugging port
