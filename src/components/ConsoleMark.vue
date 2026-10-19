@@ -1,6 +1,6 @@
 <template>
   <!-- 0.9.88 (owner): a port's mark is Steam's logo and its name, not the logo alone -->
-  <span v-if="slug === 'steam'" class="cmark cmark-steam" role="img" :aria-label="label || 'Steam'" :style="{ '--opt': opticalOf('', 'steam') }"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="STEAM" /></svg><b>Steam</b></span>
+  <span v-if="slug === 'steam'" class="cmark cmark-steam" role="img" :aria-label="label || 'Steam'" :title="label || 'Steam'" :style="{ '--opt': opticalOf('', 'steam') }"><svg viewBox="0 0 24 24" aria-hidden="true"><path :d="STEAM" /></svg><b>Steam</b></span>
   <img v-else-if="url && !bad" class="cmark" :src="url" :alt="label" :title="label" :style="optical" @error="bad = true" />
   <span v-else class="cmark-t">{{ label }}</span>
 </template>

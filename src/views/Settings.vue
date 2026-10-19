@@ -464,7 +464,7 @@
                   <div class="eyebrow">Signed in to RetroAchievements</div>
                   <div style="font-family: var(--display); font-size: 22px; font-weight: 700">{{ store.config.ra.user }}</div>
                 </div>
-                <button class="btn" data-focus @click="tab('achievements')"><Icon name="mdiTrophyOutline" />Open Achievements</button>
+                <button class="btn" data-focus @click="go('achievements')"><Icon name="mdiTrophyOutline" />Open Achievements</button>
                 <button class="btn" data-focus @click="raSignOut"><Icon name="mdiLogout" />Sign out</button>
               </div>
               <!-- 0.9.21 (owner: it kept saying "Sign in" after signing in): says who's signed in, opens a list -->
@@ -626,7 +626,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
-import { store, call, go, tab, saveConfig, pickFolder, choose, confirm, toast, openModal, bytes, ago, resync, scanServer, allRoms, romById, cover, resetLogos, askText, activeTabs, TAB_DEFS, consoleName, openTour, plural } from '../store.js';
+import { store, call, go, saveConfig, pickFolder, choose, confirm, toast, openModal, bytes, ago, resync, scanServer, allRoms, romById, cover, resetLogos, askText, activeTabs, TAB_DEFS, consoleName, openTour, plural } from '../store.js';
 import { useView } from '../useView.js';
 import { input, focusFirst, setPointerPref, setRumble, rumble, stopScroll } from '../nav.js';
 import { THEMES, STYLES, styleOf, dockOf, TEXTS, FONTS, CARD_SHAPES, CARD_SIZES, DENSITIES, themeFrom, themeOf, paletteOf, autoColors } from '../themes.js';
@@ -1029,7 +1029,7 @@ async function chooseSrc(s) {
 }
 async function removeDir(s, dir) { trophySrc.value = await call('trophies:removeDir', { src: s.id, dir }); store.config = await call('config:get'); }
 async function scanTrophies() { trophySrc.value = await call('trophies:scan').catch((e) => (toast(e.message, 'error'), trophySrc.value)); store.config = await call('config:get'); }
-function openOthers() { tab('achievements'); }
+function openOthers() { go('achievements'); } // on top of Settings, so B comes back (0.9.88)
 const syncLine = computed(() => {
   const s = store.trophySync;
   if (s.state === 'ok') return `Last synced ${ago(s.at)}.`;

@@ -395,7 +395,7 @@ import { vAmbient } from '../ambient.js';
 // to move it, drag an edge or a corner to resize. Saved in config.ui.start.
 import { computed, ref, reactive, onMounted, onBeforeUnmount, onBeforeUpdate, onUpdated, nextTick, watch } from 'vue';
 import { Flip, EASE } from '../gsapEngine.js';
-import { store, heroArt, call, go, goPlayed, tab, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour, plural, ago } from '../store.js';
+import { store, heroArt, call, go, goPlayed, openModal, img, cover, logoOf, allRoms, visible, visiblePlatforms, romById, isNew, collections, setBg, backdropOf, wantSharp, bytes, saveConfig, choose, confirm, askText, pickFolder, playtimeText, loadPlay, toast, openTour, plural, ago } from '../store.js';
 import { useView } from '../useView.js';
 import { recommend } from '../recs.js';
 import { ensureFocus, input, pushLayer, focusFirst, rumble } from '../nav.js';
@@ -801,7 +801,7 @@ function openTile(t, ev) {
   if (suppressClick) { suppressClick = false; ev?.preventDefault(); return; }
   if (editing.value) return; // arranging: A (accept) and the mouse handle tiles themselves
   const T = t.type;
-  if (T === 'continue') return cur.value ? goPlayed(cur.value.id) : tab('library');
+  if (T === 'continue') return cur.value ? goPlayed(cur.value.id) : go('library');
   if (T === 'clock') return;
   if (T === 'week') {
     const most = roms.value.filter((r) => store.play[r.id]?.min).sort((a, b) => store.play[b.id].min - store.play[a.id].min);
@@ -810,13 +810,14 @@ function openTile(t, ev) {
     return go('collection', { collectionId: 'start-most' });
   }
   if (T === 'storage') { store.settingsSection = 'storage'; store.settingsDirect = true; return go('settings'); }
-  if (T === 'consoles') return tab('consoles');
-  if (T === 'trophies') { const a = achView(t)[0]; return a ? a.open() : tab('achievements'); }
-  if (T === 'downloads') return tab('downloads');
+  // 0.9.88 (crawl: B didn't come back): a tile opens its page on top of Start, so B returns here, as Home's Show all
+  if (T === 'consoles') return go('consoles');
+  if (T === 'trophies') { const a = achView(t)[0]; return a ? a.open() : go('achievements'); }
+  if (T === 'downloads') return go('downloads');
   if (T === 'saves') { store.settingsSection = 'syncthing'; store.settingsDirect = true; return go('settings'); }
   if (T === 'surprise') { const r = deck.value[0]; if (r) go('game', { romId: r.id }); return; }
   if (T === 'daily') return daily.value && go('game', { romId: daily.value.id });
-  if (T === 'stats') return tab('library');
+  if (T === 'stats') return go('library');
   if (T === 'cstats') return platformById(t.platformId) && go('platform', { platformId: t.platformId });
   if (T === 'spotlight') { const r = spotOf(t); return r && go('game', { romId: r.id }); }
   if (T === 'media' || T === 'shelf') { const r = mediaOf(t); return r && go('game', { romId: r.id }); }

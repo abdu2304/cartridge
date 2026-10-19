@@ -857,7 +857,7 @@ async function portAction(x, what) {
     if (what === 'remove') {
       if (!(await confirm(`Remove ${x.name}?`, 'Its saves are backed up first, and its folder goes to the Trash. Your copy of the game isn’t touched.', 'Remove', true))) return;
       await call('recomps:remove', { id: x.id, steam: !!x.installed?.steam }); toast(`${x.name} removed`, 'ok', 2500, 'mdiCheck');
-      return go('game', { romId: Number(props.romId) }); // the port is gone: its game's own page
+      store.route = { name: 'game', params: { romId: Number(props.romId) } }; return; // the port is gone: its game's own page in its place (B never leads back to it)
     }
   } catch (e) { toast(e.message, 'error', 6000); }
 }

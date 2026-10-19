@@ -898,6 +898,9 @@ local control port (scratchpad, not in the repo); Game Mode reproduced with a ne
   tab row, where focus lands, was above the pane (timing-dependent). Pages now reset scroll like sections. Two clean
   runs locally.
 - **CLAUDE.md** was 176 KB; per-version notes moved to docs/VERSIONS.md (13 KB left).
+- **Found by the crawl and the e2e run here:** Start's Consoles/Downloads/Library/Achievements tiles used `tab()` (history cleared, B dead): now `go()`, as Settings' Open Achievements and AddonsSheet's jump to Downloads. `test/e2e/steam.js` failed 3 checks on a desktop with Steam open: `steamArt.steamRunning()` counted any Steam on the machine (another user's too); now `oursSteam(pid)` (same uid, HOME ours or inside it, Snap's ~/snap/steam/common included, paths resolved through /home -> /var/home), tested with real processes. The owner's real shortcuts.vdf was checked unchanged (204 shortcuts).
+- **Renamed AppImages:** electron-updater keeps a name without a version (the owner's lowercase `.appimage`: checked in AppImageUpdater.doInstall) but gives a versioned one the release's name and deletes the old file, leaving steam-launch.sh pointing at nothing. Rewritten on `appimage-filename-updated`; the script falls back to the newest `*[Cc]artridge*.[Aa]pp[Ii]mage` beside the old path (checked in a shell).
+- **exFAT, on a real drive:** a udisks loop mount of an exFAT image (fmask 0022: scripts and programs run; symlinks: EPERM). The 0.9.83 prefix test run against it: the port installed on exFAT, its prefix went to the internal drive, the start script used it.
 - **Looked into and left:** Cartridge on the desktop sees no gamepad with a Steam Controller: Steam creates no virtual
   pad for it, started from Steam or not, Wayland or X11 (tried live with `--ozone-platform=x11` as launch options,
   then restored them). Steam may create it on the first button press; a "Reopen Through Steam" offer was built and taken
