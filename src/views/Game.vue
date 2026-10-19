@@ -162,7 +162,7 @@
 import { similarTo } from '../recs.js';
 import { addGame, removeGame, applyChanges, pickEmulator, pickCollections, pickFrameGen } from '../steam.js';
 import { computed, onMounted, onBeforeUnmount, ref, nextTick, watch } from 'vue';
-import { store, heroArt, call, img, go, cover, bytes, year, rating, toast, confirm, download, downloadMore, downloadFor, romById, platformById, isNew, setBg, logoOf, resetLogos, artFor, choose, openModal, allRoms, visible, isFavourite, addToCollection, playOf, playtimeText, ago, askText, saveConfig, backdropOf, wantSharp, bgJob, playGame, saveSyncOn, plural } from '../store.js';
+import { store, heroArt, call, img, go, cover, bytes, year, rating, toast, confirm, download, downloadMore, downloadFor, romById, platformById, isNew, setBg, logoOf, resetLogos, artFor, choose, openModal, allRoms, visible, isFavourite, addToCollection, playOf, playtimeText, ago, askText, saveConfig, backdropOf, wantSharp, bgJob, playGame, openPort, saveSyncOn, plural } from '../store.js';
 import { pinToStart } from '../startTiles.js';
 import { useView } from '../useView.js';
 import { ensureFocus, focusFirst } from '../nav.js';
@@ -862,16 +862,16 @@ async function portAction(x, what) {
 }
 async function playPort(x) {
   if (x.from !== 'verified' && !x.installed?.ready) return openModal('recomp', { id: x.id });
-  if (x.from !== 'verified') { try { await call('recomps:open', { id: x.id }); toast(`Starting ${x.name}…`, 'info', 2500, 'mdiPlay'); } catch (e) { toast(e.message, 'error', 5000); } return; }
+  if (x.from !== 'verified') { try { await openPort({ id: x.id, name: x.name, romId: props.romId }); } catch (e) { toast(e.message, 'error', 5000); } return; }
   if (x.state !== 'play') return openModal('verified', { id: x.id });
   const starts = (await call('recomps:list').catch(() => null))?.entries?.find((e) => e.id === x.id)?.starts || [];
   let start;
   if (starts.length > 1) { start = await choose({ title: x.name, message: 'Which game?', options: starts.map((s) => ({ label: s.name, value: s.id, icon: 'mdiPlay', raw: true })) }); if (!start) return; }
-  try { await call('recomps:open', { id: x.id, start }); toast(`Starting ${x.name}…`, 'info', 2500, 'mdiPlay'); } catch (e) { toast(e.message, 'error', 5000); }
+  try { await openPort({ id: x.id, start, name: starts.find((s) => s.id === start)?.name || x.name, romId: props.romId }); } catch (e) { toast(e.message, 'error', 5000); }
 }
 // Ready to play (0.9.21, owner: it did nothing): starts the game's Steam shortcut; not in Steam yet: offers to add it
 async function playNow() {
-  try { await playGame(Number(props.romId)); toast('Starting through Steam…', 'info', 2500, 'mdiPlay'); }
+  try { await playGame(Number(props.romId)); }
   catch (e) {
     if (/Add it to Steam/.test(e.message) && (await confirm('Add to Steam to play?', 'Cartridge starts games through their Steam shortcut, so they launch with your emulator setup.', 'Add to Steam'))) return addGame({ ...base.value, id: Number(props.romId) });
     toast(e.message, 'error', 5000);

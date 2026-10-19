@@ -31,6 +31,7 @@ export const store = reactive({
   quickMenu: false,
   tour: null, // the interactive tour (FirstTour.vue)
   cloudSync: null, // Cartridge Cloud Sync before a game (CloudSync.vue, 0.9.51)
+  starting: null, // a game or PC port on its way (GameStarting.vue, 0.9.87): { name, romId, port, at, state }
   welcoming: false, // the welcome (0.9.15) is on screen
   welcomeBg: false, // a background was picked in the welcome's Look step (0.9.47), so it shows instead of Ribbons
   lastSearch: '',
@@ -184,7 +185,18 @@ export async function playGame(romId) {
     await new Promise((ok) => setTimeout(ok, Math.max(r?.offline || auth ? 1800 : 700, 1100 - (Date.now() - t0))));
     store.cloudSync = null;
   }
-  return call('steam:play', { romId });
+  startingGame({ romId, name: romById(romId)?.name });
+  try { return await call('steam:play', { romId }); } catch (e) { store.starting = null; throw e; }
+}
+// 0.9.87 (owner: a PC port like Uncharted takes a while to open, and nothing showed it was on its way): a screen with
+// the game's cover that stays until the game is in front (GameStarting.vue ends it), so a slow start never looks broken
+export function startingGame({ romId, name, port }) {
+  store.starting = { romId: romId != null ? Number(romId) : null, name: name || romById(romId)?.name || 'Your game', port: port || null, at: Date.now(), state: 'starting' };
+}
+// a PC port started from Cartridge (game page, its sheets): with the starting screen, which leaves if it fails
+export async function openPort({ id, start, name, romId }) {
+  startingGame({ romId, name, port: id });
+  try { return await call('recomps:open', { id, start }); } catch (e) { store.starting = null; throw e; }
 }
 export const confirm = (title, message, okLabel = 'Confirm', danger = false) =>
   openModal('menu', { title, message, options: [{ label: okLabel, value: true, danger, icon: danger ? 'mdiAlertOutline' : 'mdiCheck' }, { label: 'Cancel', value: false, icon: 'mdiClose' }] });
