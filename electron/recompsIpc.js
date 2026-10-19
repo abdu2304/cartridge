@@ -175,7 +175,25 @@ module.exports = function recompsIpc(m) {
   function verifiedCopies(id) {
     const R = recomps(), e = R.byId(id);
     if (!e) return [];
-    return require('./recomps').matchRoms(e, libraryRoms()).map((rid) => { const where = m.installedMap[rid] || null; return { romId: rid, name: romName(rid), path: where, here: !!(where && fs.existsSync(where)) }; });
+    const RS = require('./recomps');
+    const lib = RS.matchRoms(e, libraryRoms()).map((rid) => { const where = m.installedMap[rid] || null; return { romId: rid, name: romName(rid), path: where, here: !!(where && fs.existsSync(where)) }; });
+    return lib.concat(dumpsHere(e, lib));
+  }
+  // 0.9.86: dumps of the game in the console's folders on every drive that aren't a library copy (put there by hand,
+  // or from before RomM), read from their param.sfo (main's sfoIndex, cached by folder date)
+  function dumpsHere(e, lib) {
+    const con = e.recipe?.game?.console;
+    if (!/^ps[45]$/.test(con || '')) return [];
+    const real = (p) => { try { return fs.realpathSync(p); } catch { return p; } };
+    const known = new Set(lib.filter((c) => c.path).map((c) => real(c.path)));
+    const dirs = new Set([...(m.library?.platforms || []).filter((p) => require('./recomps').consoleOfSlug(p.slug) === con).flatMap((p) => { try { return m.platformDirs(p); } catch { return []; } }),
+      ...emulationFolders().map((r) => path.join(r, 'roms', con))].map(real));
+    const found = [];
+    for (const d of dirs) {
+      let names = []; try { names = fs.readdirSync(d); } catch { continue; }
+      for (const x of m.sfoIndex(d, names)) found.push({ path: path.join(d, x.entry, x.rel || ''), id: x.id, title: x.title });
+    }
+    return require('./recomps').matchDumps(e, found).filter((x) => !known.has(real(x.path))).map((x) => ({ romId: null, name: x.title.replace(/[™®]/g, ''), path: x.path, here: true, found: true }));
   }
   // folders that may hold an update for a game: beside it, inside it (one level) and the library's other PS4 copies
   function updateCandidates(dir) {

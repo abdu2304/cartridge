@@ -503,3 +503,15 @@ test('0.9.80: pending setups for a start from Steam; a Windows update gets its o
   assert.strictEqual(u.started, true);
   assert.ok(trials.some((t) => /proton$/.test(t.program) && t.argv.includes('run')), 'started through Proton');
 });
+
+test('0.9.86: a dump copied in by hand is offered to its port by title ID or title, any region', () => {
+  const R = require('../electron/recomps');
+  const e = { games: [{ title: 'inFAMOUS Second Son', console: 'ps4' }], recipe: { game: { ids: ['CUSA00223'] } } };
+  const dumps = [
+    { path: '/r/ps4/inFamous - Second Son', id: 'CUSA00004', title: 'inFAMOUS™ Second Son' }, // Europe, by title
+    { path: '/r/ps4/x', id: 'CUSA00223', title: 'Something Else' }, // by ID
+    { path: '/r/ps4/inFamous First Light', id: 'CUSA00575', title: 'inFAMOUS™ First Light' },
+  ];
+  assert.deepStrictEqual(R.matchDumps(e, dumps).map((d) => d.path), ['/r/ps4/inFamous - Second Son', '/r/ps4/x']);
+  assert.deepStrictEqual(R.matchDumps({ games: [], recipe: {} }, dumps), []);
+});

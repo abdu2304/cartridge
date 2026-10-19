@@ -65,6 +65,15 @@ function matchRoms(entry, roms) {
   return [...out];
 }
 
+// 0.9.86 (PC playtest: an inFAMOUS dump copied in by hand, not in RomM, was never offered): dumps found in the
+// console's folders, [{ path, id, title }] from their param.sfo, that are this game: one of the recipe's title IDs
+// (any region is fine, checkGame notes another one), else the same title
+function matchDumps(entry, dumps) {
+  const keys = new Set((entry.games || []).flatMap((g) => titleKeys(g.title).concat((g.also || []).flatMap(titleKeys))));
+  const ids = new Set(entry.recipe?.game?.ids || []);
+  return (dumps || []).filter((d) => (d.id && ids.has(d.id)) || titleKeys(d.title).some((k) => keys.has(k)));
+}
+
 // ---------------------------------------------------------------- builds
 const NOT_FILE = /\.(sha\d*|md5|sig|asc|zsync|txt|json|pdb|dbg)$/i;
 const rx = (s) => { try { return s ? new RegExp(s, 'i') : null; } catch { return null; } };
@@ -1262,4 +1271,4 @@ function createRecomps(ctx) {
   return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : e?.saves?.length ? saveDirs(e, installs[id]) : (installs[id]?.syncSaves || []).filter(exists); }, saveChoices, setSyncSaves, pendingSetup, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes };
 }
 
-module.exports = { ciBuildOf, checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
+module.exports = { ciBuildOf, checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, matchDumps, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
