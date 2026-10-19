@@ -206,7 +206,7 @@
    "type": "bool",
    "def": false,
    "at": [
-    "app",
+    "ini",
     "show_fps"
    ]
   },
@@ -588,5 +588,5 @@
   "output": true,
   "why": "runtime_services.c prints Runtime: trophy N unlocked; names come from your copy's trophy file when a shadPS4 trophy key is set up"
  },
- "rev": 2
+ "rev": 3
 }

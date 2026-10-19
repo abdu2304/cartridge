@@ -202,15 +202,16 @@ function childRun(p, what) {
   runOn = true; gameFocus.gameApp = null; gameFocus.endedAt = 0; log('game running', what); setAway('child', true); broadcast('game-run', { state: 'starting', port: what });
   p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setAway('child', false); broadcast('game-run', { state: 'ended', port: what }); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
 }
-function watchGameRun(romId) {
+// o.needles: what to look for instead of the game's own file (0.9.88: a PC port started through Steam, by its start script)
+function watchGameRun(romId, o = {}) {
   clearInterval(runT);
   gameFocus.gameApp = null; gameFocus.endedAt = 0;
   const where = installedMap[romId];
-  if (!where || where === MARKED) return;
+  if (!o.needles && (!where || where === MARKED)) return;
   const r = romIndexMain().get(romId) || {};
   // RPCS3 and Vita3K start installed games by serial, not by file
-  let serial = ''; try { serial = /ps3/i.test(`${r.platform_slug} ${r.platform_fs_slug}`) ? ps3Serial(romId, where) || '' : installs[romId]?.serial || ''; } catch {}
-  const needles = [...new Set([where, mainFile(where)].filter(Boolean).map((p) => path.basename(p)).concat(serial ? [serial] : []))].filter((n) => n.length > 3);
+  let serial = ''; try { serial = o.needles ? '' : /ps3/i.test(`${r.platform_slug} ${r.platform_fs_slug}`) ? ps3Serial(romId, where) || '' : installs[romId]?.serial || ''; } catch {}
+  const needles = o.needles || [...new Set([where, mainFile(where)].filter(Boolean).map((p) => path.basename(p)).concat(serial ? [serial] : []))].filter((n) => n.length > 3);
   // read without holding the main thread (0.9.82): it was a full synchronous /proc read every 2 s for the whole game
   const running = async () => {
     let ids = []; try { ids = (await fsp.readdir('/proc')).filter((d) => /^\d+$/.test(d) && Number(d) !== process.pid); } catch { return false; }
@@ -4393,7 +4394,7 @@ const handlers09 = {
 };
 // What the moved areas share with main.js (0.9.71, the split by area): functions, and getters for state that changes
 const MAIN = {
-  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob, platformDirs, sfoIndex, childRun,
+  log, refocus, isGamescope, emulationFolders, progRunning, downloadTo, unpackTo, toTrash, bgJob, platformDirs, sfoIndex, childRun, watchGameRun,
   get broadcast() { return broadcast; }, get webFetch() { return webFetch; }, get romName() { return romName; }, get isDir() { return isDir; }, get romIndexMain() { return romIndexMain; },
   get steamMgr() { return steamMgr; }, get config() { return config; }, get installedMap() { return installedMap; }, get library() { return library; }, get runOn() { return runOn; }, get gameFocus() { return gameFocus; }, get trophySvc() { return trophySvc; }, get win() { return win; },
   USER_DATA,
