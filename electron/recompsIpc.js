@@ -16,7 +16,7 @@ module.exports = function recompsIpc(m) {
   // a Linux recomp started from its own folder, with the arguments given (0.9.68: one place for Open and a one-off
   // setup run; Open used to leave out the catalogue's own arguments, PGR4's GPU options and WiiCompiled's launch-base)
   function startRecomp(id, rec, args) {
-    const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+    const env = require('./childEnv').clean();
     const runLog = path.join(m.USER_DATA, 'emulator-runs', `recomp-${id}.log`);
     let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
     const extra = (args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
@@ -57,7 +57,7 @@ module.exports = function recompsIpc(m) {
       // argv/env (0.9.71): a Windows build through Proton, the runner's command and its environment
       trialRun: ({ program, args, argv, env: more, cwd, ready }) => new Promise((resolve) => {
         if (m.gameFocus.away || m.runOn) return resolve({ skipped: 'playing' });
-        const env = { ...process.env, ...(more || {}) }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+        const env = require('./childEnv').clean(more || {});
         const extra = argv || (args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
         let out = '', done = false, p;
         const end = (r) => { if (done) return; done = true; clearTimeout(t); try { process.kill(-p.pid, 'SIGTERM'); } catch {} setTimeout(() => { try { process.kill(-p.pid, 'SIGKILL'); } catch {} }, 1500); if (isGamescope()) { broadcast('background', { away: false }); refocus(); } log('recomp trial', program, JSON.stringify(r)); resolve(r); };
@@ -91,7 +91,7 @@ module.exports = function recompsIpc(m) {
       recipesUrl: 'https://raw.githubusercontent.com/abdu2304/cartridge/main/electron/recipes/index.json',
       runner: () => require('./protonRunner').find({ roots: (() => { try { return m.steamMgr.steamRoots(); } catch { return []; } })() }),
       runProgram: (cmd, args, { cwd, env: extra = {}, timeoutMs = 10 * 60e3, signal } = {}) => new Promise((ok, bad) => {
-        const env = { ...process.env, ...extra }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+        const env = require('./childEnv').clean(extra);
         let tail = '';
         const p = require('child_process').spawn(cmd, args, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
         const keep = (b) => { tail = (tail + b).slice(-3000); };
@@ -100,7 +100,8 @@ module.exports = function recompsIpc(m) {
         // stopped from outside (0.9.81: an installer that stopped writing): the whole process group, then the reason
         signal?.addEventListener?.('abort', () => { clearTimeout(t); try { process.kill(-p.pid, 'SIGTERM'); } catch {} setTimeout(() => { try { process.kill(-p.pid, 'SIGKILL'); } catch {} }, 3000); bad(new Error('stopped')); });
         p.once('error', (e) => { clearTimeout(t); bad(new Error(e.code === 'EACCES' ? 'It isn’t allowed to run.' : e.message)); });
-        p.once('exit', (code) => { clearTimeout(t); log('verified run', path.basename(cmd), args[0] || '', 'exit', code); if (code === 0) ok(tail); else bad(new Error(tail.trim().split('\n').pop() || `It stopped (exit ${code}).`)); });
+        // 0.9.86: a signal is named, and a failure carries the whole tail for the log (the last line alone said little)
+        p.once('exit', (code, sig) => { clearTimeout(t); log('verified run', path.basename(cmd), args[0] || '', 'exit', code ?? sig); if (code === 0) return ok(tail); const er = new Error(tail.trim().split('\n').pop() || `It stopped (${code ?? sig}).`); er.tail = tail; bad(er); });
       }),
     });
     return recompsEng;
@@ -191,7 +192,7 @@ module.exports = function recompsIpc(m) {
     const st = rec.starts.find((x) => x.id === start) || rec.starts[0];
     const runLog = path.join(m.USER_DATA, 'emulator-runs', `verified-${id}.log`);
     let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
-    const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k];
+    const env = require('./childEnv').clean();
     const p = require('child_process').spawn('/bin/sh', [st.script], { cwd: rec.dir, env, detached: true, stdio: ['ignore', fd, fd] });
     if (typeof fd === 'number') try { fs.closeSync(fd); } catch {}
     return new Promise((ok, bad) => {

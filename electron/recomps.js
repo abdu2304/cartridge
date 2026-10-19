@@ -1170,7 +1170,7 @@ function createRecomps(ctx) {
       const c = RC.prefixCommand(runner, vars);
       // umu-launcher fetches Steam's runtime on its first run: that can take minutes
       let why = '';
-      await ctx.runProgram(c.cmd, c.args, { env: c.env, cwd: rec.dir, timeoutMs: 15 * 60e3 }).catch((er) => { why = er.message; log('verified prefix', id, vars.prefix, er.message); });
+      await ctx.runProgram(c.cmd, c.args, { env: c.env, cwd: rec.dir, timeoutMs: 15 * 60e3 }).catch((er) => { why = er.message; log('verified prefix', id, vars.prefix, runner.kind, runner.name, runner.proton || '', runner.runtime || runner.umu || '', '|', String(er.tail || er.message).trim().split('\n').slice(-12).join(' / ')); });
       if (!exists(path.join(vars.prefix, 'pfx', 'drive_c'))) throw new Error(`Proton couldn’t make ${r.name}’s Windows folder (its prefix) in ${vars.prefix.replace(os.homedir(), '~')}${why ? `: ${why.slice(0, 200)}` : '.'} Press Set Up to try again; if it fails again, send Cartridge’s log (Settings → Help and About → Report a Problem).`);
     }
     onProgress({ step: 'write' });

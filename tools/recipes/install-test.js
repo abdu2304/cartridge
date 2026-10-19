@@ -92,7 +92,7 @@ const ok = (id, what, good, detail = '') => { report.push({ id, what, good: !!go
     dataDir: data, log: () => {}, fetchImpl, download, unpackTo, isElf,
     isRunning: () => false, trash: async (p) => fs.rmSync(p, { recursive: true, force: true }),
     recompRoot: () => path.join(emu, 'recomp'), recompRoots: () => [path.join(emu, 'recomp')],
-    runner: () => ({ kind: 'sniper', proton: '/steam/steamapps/common/Proton 10.0', sniper: '/steam/steamapps/common/SteamLinuxRuntime_sniper', steam: '/steam', name: 'Proton 10.0' }),
+    runner: () => ({ kind: 'runtime', proton: '/steam/steamapps/common/Proton 10.0', runtime: '/steam/steamapps/common/SteamLinuxRuntime_sniper', steam: '/steam', name: 'Proton 10.0' }),
     runProgram: async (cmd, args, o) => {
       if (/wineboot/.test(args.join(' '))) { fs.mkdirSync(path.join(o.env.STEAM_COMPAT_DATA_PATH, 'pfx/drive_c/users/steamuser'), { recursive: true }); return ''; }
       return new Promise((done, bad) => cp.execFile(cmd, args, { cwd: o.cwd, timeout: o.timeoutMs || 600000, env: o.env }, (e, out, err) => (e ? bad(new Error(String(err || e.message).slice(0, 400))) : done(out))));

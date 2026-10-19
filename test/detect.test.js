@@ -12,6 +12,7 @@ const { execFileSync } = require('child_process');
 const ROOT = path.join(__dirname, '..');
 const FIX = path.join(__dirname, 'fixtures');
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'cartridge-detect-'));
+process.env.FLATPAK_SYSTEM_DIR = path.join(TMP, 'no-system-flatpak'); // the PC's own Flatpaks stay out (children inherit it)
 test.after(() => fs.rmSync(TMP, { recursive: true, force: true }));
 
 // A minimal AppImage: an ELF header stamped "AI" type 2, a .upd_info section, then the squashfs.
