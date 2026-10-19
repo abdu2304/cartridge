@@ -175,10 +175,51 @@ module.exports = function recompsIpc(m) {
   // an installed port's Steam shortcut (its first start's for a port with several), or queued (game page More, 0.9.86)
   function steamOf(e) {
     if (!e.installed) return e;
-    const key = e.starts?.length > 1 ? `${e.id}:${e.starts[0].id}` : e.id;
-    const sc = (() => { try { return m.steamMgr.recompShortcut(key); } catch { return null; } })();
-    e.installed.steam = sc ? sc.appid : null; e.installed.steamQueued = !sc && !!m.steamMgr.recompQueued?.(key);
+    const sc = portShortcut(e.id, e.starts);
+    e.installed.steam = sc ? sc.appid : null; e.installed.steamQueued = !sc && !!m.steamMgr.recompQueued?.(e.id);
+    e.installed.oldStarts = oldStartShortcuts(e.id, e.starts).length; // shortcuts per game from before 0.9.89
     return e;
+  }
+  // 0.9.89 (owner: "it makes 3 shortcuts for each game ... make it just one"): a port with several games (Uncharted's
+  // three) has one Steam shortcut, to .cartridge/play.sh, which starts the game picked last in Cartridge (written to
+  // .cartridge/start when you press Play), else the first. Before, each game had its own shortcut (<id>:<start>).
+  const oldStartShortcuts = (id, starts) => ((starts || []).length > 1 ? starts.map((st) => { try { return m.steamMgr.recompShortcut(`${id}:${st.id}`); } catch { return null; } }).filter(Boolean) : []);
+  function portShortcut(id, starts) { try { return m.steamMgr.recompShortcut(id) || oldStartShortcuts(id, starts)[0] || null; } catch { return null; } }
+  function launcherOf(rec) {
+    if (rec.starts.length < 2) return rec.starts[0].script;
+    const dir = path.dirname(rec.starts[0].script), file = path.join(dir, 'play.sh');
+    const body = ['#!/bin/sh', '# Cartridge\'s one Steam start for this port: the game picked last in Cartridge (start), else the first', 'd="$(dirname "$0")"', 's="$(cat "$d/start" 2>/dev/null)"', `[ -n "$s" ] && [ -f "$d/play-$s.sh" ] || s=${rec.starts[0].id}`, 'exec /bin/sh "$d/play-$s.sh" "$@"', ''].join('\n');
+    let now = ''; try { now = fs.readFileSync(file, 'utf8'); } catch {}
+    if (now !== body) fs.writeFileSync(file, body, { mode: 0o755 });
+    return file;
+  }
+  const pickStart = (rec, sid) => { if (rec.starts.length > 1) try { fs.writeFileSync(path.join(path.dirname(rec.starts[0].script), 'start'), String(sid)); } catch (er) { log('port start pick', er.message); } };
+  // its frame generation (0.9.89, port More → Steam): only what you picked for this port, never the console default
+  const fgKey = (id) => `recomp:${id}`;
+  function fgFor(id) {
+    const v = (m.config.steam?.frameGen?.games || {})[fgKey(id)];
+    if (v !== 'lsfg' && v !== 'mako') return null;
+    return require('./frameGen').detect()[v] || null;
+  }
+  // the shortcut a port has, put right: one per port, the old per-game ones out (owner's three Uncharted shortcuts)
+  async function oneShortcut(id) {
+    const R = recomps(), rec = R.record(id);
+    if (!rec?.starts || rec.starts.length < 2) return false;
+    const old = oldStartShortcuts(id, rec.starts);
+    if (!old.length) return false;
+    if (!m.steamMgr.recompShortcut(id)) m.steamMgr.queueAdd(verifiedShortcutSpecs(id).map((sp) => ({ recomp: sp })));
+    m.steamMgr.queueRemove(old.map((x) => x.appid));
+    log('port shortcuts made one', id, old.length);
+    return true;
+  }
+  let oneDone = false;
+  function oneShortcutsSoon() {
+    if (oneDone) return; oneDone = true;
+    setTimeout(async () => {
+      let any = false;
+      for (const e of recomps().list({ roms: [] }).entries) if (e.from === 'verified' && e.installed) try { any = (await oneShortcut(e.id)) || any; } catch (er) { log('port shortcuts', e.id, er.message); }
+      if (any) m.steamMgr.applySoon();
+    }, 20000);
   }
   function verifiedCopies(id) {
     const R = recomps(), e = R.byId(id);
@@ -219,15 +260,31 @@ module.exports = function recompsIpc(m) {
     // 0.9.88 (owner: Uncharted saw no controller): pads that Steam Input holds (a Steam Controller always, any pad on
     // the desktop) reach only games Steam started; a port Cartridge spawned itself got Steam's desktop mouse and
     // keyboard. With its shortcut in Steam and Steam running, it starts through Steam, as console games do.
-    const sc = m.steamMgr.recompShortcut(rec.starts.length > 1 ? `${id}:${st.id}` : id);
+    pickStart(rec, st.id); // its one Steam shortcut starts the game picked here (0.9.89)
+    const sc = m.steamMgr.recompShortcut(id) || m.steamMgr.recompShortcut(`${id}:${st.id}`);
     if (sc && require('./steamArt').steamRunning()) {
       try {
         const r = await m.steamMgr.runAppid(sc.appid);
         log('verified opened', id, st.id, 'through steam', r.via);
         m.watchGameRun(require('./recomps').matchRoms(e, libraryRoms())[0] ?? null, { needles: [st.script] });
+        // 0.9.89 (owner: Bloodborne doesn't start): Steam can take the request and start nothing (a shortcut left
+        // from before, Steam busy). When the start script isn't running 25 s later, it starts directly instead
+        setTimeout(async () => { if (!(await scriptRuns(st.script))) { log('verified through steam: nothing started after 25 s, starting directly', id, st.id); spawnStart(id, rec, st).catch((er) => log('verified direct', id, er.message)); } }, 25000);
         return { via: 'steam', start: st.id };
       } catch (er) { log('verified through steam failed', id, er.message); }
     }
+    return spawnStart(id, rec, st);
+  }
+  // a start script running anywhere (Steam's launch or ours): its path in a process's command line
+  async function scriptRuns(script) {
+    let ids = []; try { ids = (await fs.promises.readdir('/proc')).filter((d) => /^\d+$/.test(d)); } catch { return true; }
+    for (let i = 0; i < ids.length; i += 64) {
+      const got = await Promise.all(ids.slice(i, i + 64).map((d) => fs.promises.readFile(`/proc/${d}/cmdline`, 'utf8').catch(() => '')));
+      if (got.some((c) => c.includes(script) || c.includes(path.join(path.dirname(script), 'play.sh')))) return true;
+    }
+    return false;
+  }
+  function spawnStart(id, rec, st) {
     const runLog = path.join(m.USER_DATA, 'emulator-runs', `verified-${id}.log`);
     let fd = 'ignore'; try { fs.mkdirSync(path.dirname(runLog), { recursive: true }); fd = fs.openSync(runLog, 'w'); } catch {}
     const env = require('./childEnv').clean();
@@ -238,24 +295,24 @@ module.exports = function recompsIpc(m) {
       p.once('spawn', () => { log('verified opened', id, st.id); m.childRun(p, 'port ' + id); p.unref(); ok({ via: 'script', start: st.id }); });
     });
   }
-  // one Steam shortcut per start: its start script as the program (Proton, settings and the right game are in it),
-  // art from your copy in the library
+  // its one Steam shortcut (0.9.89; one per game before): the start script as the program (Proton, settings and the
+  // right game are in it), art from your copy in the library, frame generation when picked for it
   function verifiedShortcutSpecs(id) {
     const R = recomps(), e = R.byId(id), rec = R.record(id);
     if (!e || !rec?.starts?.length) throw new Error('Set it up first.');
     const romIds = require('./recomps').matchRoms(e, libraryRoms());
-    return rec.starts.map((st) => ({ id: rec.starts.length > 1 ? `${id}:${st.id}` : id, name: st.name, exe: st.script, start: rec.dir, args: '', game: e.recipe.game.title, artRomId: romIds[0] ?? null }));
+    return [{ id, name: e.name, exe: launcherOf(rec), start: rec.dir, args: '', game: e.recipe.game.title, artRomId: romIds[0] ?? null, fg: fgFor(id) }];
   }
   function recompShortcutSpec(id) {
     const R = recomps(), e = R.byId(id), rec = R.record(id);
     if (!e || !rec) throw new Error('Install it first.');
     const romIds = require('./recomps').matchRoms(e, libraryRoms());
-    return { id, name: e.name, exe: rec.program, start: path.dirname(rec.program), args: R.launchArgs(id), game: e.games?.[0]?.title || e.name, artRomId: romIds[0] ?? null };
+    return { id, name: e.name, exe: rec.program, start: path.dirname(rec.program), args: R.launchArgs(id), game: e.games?.[0]?.title || e.name, artRomId: romIds[0] ?? null, fg: fgFor(id) };
   }
 
   const handlers = {
   // ---- recomps (0.9.65)
-  'recomps:list': () => { const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) steamOf(e); return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
+  'recomps:list': () => { oneShortcutsSoon(); const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) steamOf(e); return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
   // the recomps of one library game (game page More, 0.9.65)
   'recomps:forRom': ({ romId }) => { const rom = romIndexMain().get(Number(romId)); if (!rom) return []; return recomps().list({ roms: [rom] }).entries.filter((e) => e.roms.includes(rom.id)).map((e) => ({ id: e.id, name: e.name, installed: steamOf(e).installed, from: e.from, state: e.state || null })); },
   'recomps:check': ({ id, force }) => recomps().check(id, { force }),
@@ -391,6 +448,7 @@ module.exports = function recompsIpc(m) {
     if (recomps().byId(id)?.from === 'verified') {
       const specs = verifiedShortcutSpecs(id);
       m.steamMgr.queueAdd(specs.map((sp) => ({ recomp: sp })));
+      const old = oldStartShortcuts(id, recomps().record(id)?.starts); if (old.length) m.steamMgr.queueRemove(old.map((x) => x.appid));
       if (await m.steamMgr.liveNow()) { await m.steamMgr.apply({ restart: false }); const sc = m.steamMgr.recompShortcut(specs[0].id); return { added: true, appid: sc?.appid || null, count: specs.length }; }
       return { queued: true, count: specs.length };
     }
@@ -403,6 +461,32 @@ module.exports = function recompsIpc(m) {
       return { added: true, appid: sc?.appid || null };
     }
     return { queued: true };
+  },
+  // port More → Steam (0.9.89, owner): its shortcut out of Steam, into collections, and its frame generation
+  'recomps:steamRemove': async ({ id }) => {
+    const R = recomps(), scs = [m.steamMgr.recompShortcut(id), ...oldStartShortcuts(id, R.record(id)?.starts)].filter(Boolean);
+    if (!scs.length) return { removed: false };
+    m.steamMgr.queueRemove(scs.map((x) => x.appid));
+    if (await m.steamMgr.liveNow()) { await m.steamMgr.apply({ restart: false }); return { removed: true }; }
+    return { queued: true };
+  },
+  'recomps:steamCollections': async ({ id, names }) => {
+    const sc = portShortcut(id, recomps().record(id)?.starts);
+    if (!sc) throw new Error('Add the port to Steam first.');
+    return m.steamMgr.addAppidToCollections(sc.appid, names || []);
+  },
+  'recomps:frameGen': ({ id }) => {
+    const found = require('./frameGen').detect();
+    return { found: { lsfg: !!found.lsfg, mako: !!found.mako }, own: (m.config.steam?.frameGen?.games || {})[fgKey(id)] || null, inSteam: !!portShortcut(id, recomps().record(id)?.starts), last: (m.config.steam?.lastCollections || {}).recomp || null };
+  },
+  'recomps:setFrameGen': async ({ id, value }) => {
+    const conf = ((m.config.steam ||= {}).frameGen ||= {}), games = (conf.games ||= {});
+    if (value === 'lsfg' || value === 'mako') games[fgKey(id)] = value; else delete games[fgKey(id)];
+    m.saveConfig();
+    const R = recomps(), spec = R.byId(id)?.from === 'verified' ? verifiedShortcutSpecs(id)[0] : recompShortcutSpec(id);
+    const r = await m.steamMgr.recompUpdate(spec);
+    if (r.queued) m.steamMgr.applySoon();
+    return r;
   },
   // open it: a Linux build directly (its folder as the working folder), a Windows build through its Steam shortcut so
   // Proton uses the same prefix as play (owner: Windows setup must run through Proton)

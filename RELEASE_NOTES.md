@@ -1,16 +1,10 @@
-## Cartridge 0.9.88 · Smooth Again
+## Cartridge 0.9.89 · Ports in Steam
 
-### Fixed
-- **Cartridge no longer freezes for minutes at a time.** Save Sync treated a PC port's whole data folder as its save. For P.T. that folder holds two tiny saves beside 1.9 GB of texture and shader caches, so every sync packed gigabytes into memory: Cartridge froze for up to three minutes, used 6 GB of memory, and pages like Settings → Emulators, PC Ports and Game Add-ons seemed to load forever. RomM then refused the upload anyway. Saves of a PC port now leave out its caches, textures and logs, and anything far too big to be a save is skipped without being read. This also ends the PSP save (Peace Walker's installed game data) that was refused every half hour.
-- **Your controller works in PC ports started from Cartridge.** A Steam Controller, or any controller Steam Input looks after, only reaches games that Steam starts. A port Cartridge started by itself got Steam's mouse and keyboard instead, so Uncharted saw no controller. A port that's in Steam now starts through Steam, with its own controller setup, the same way your console games do.
-- **Uncharted's Show the FPS Counter works.** It was saved where the game never looks; it now goes into the game's own settings file.
-- **A PC port opened from the PC Ports page opens that port.** The second P.T. card opened the first one, because a choice made earlier in Play With won over the card you picked.
-- **B comes back to Start.** Start's Consoles, Downloads, Library and Achievements tiles opened their page as a new tab, so B went nowhere. The same for Settings' Open Achievements and an add-on sent to Downloads.
-- **Cartridge still starts from Steam after an update renames it.** An AppImage with a version in its name (like Cartridge-0.9.80-x86_64.AppImage) gets the release's name when it updates, and Steam's shortcut kept pointing at the old name. It now follows the new one, and finds Cartridge beside the old path if you rename or replace the file yourself.
-- **Adding games to Steam isn't blocked by someone else's Steam.** On a PC where another user has Steam open, Cartridge waited for that Steam to close before writing your shortcuts, forever. Only your own Steam counts now.
-- **A Settings page opened with LB or RB starts at its top.** It kept the previous page's scroll, so the page's tabs, where the highlight lands, were out of sight.
+### New
+- **A Steam tab in a PC port's More.** Add to a Steam Collection, Frame Generation for that port's shortcut, and Remove from Steam (the port stays installed). Nothing from the console's emulator is in it.
 
 ### Changed
-- **PC ports and console games are kept apart.** A port's page shows only the port: the Steam mark and "PC Port", its own Play button, its own folder, and its More menu with Play, Port Settings, Manage the Port, Set Up Again, Show Its Folder, Steam and Remove the Port. A console game's page is the console game with its emulator, with no Play With. Its More still lists the game's PC ports, and an installed one opens its own page. A port installed from a GitHub link says "From a Link" on its card and its page.
-- **Continue Playing shows "Steam" beside the Steam logo** for a game you last played as its PC port, and opens that port. Other rows show the console game.
-- **Animations run on GSAP.** It was a test option; it is now the one engine for everything Cartridge moves by script: a cover flying to its game page, tiles moving while you arrange Start, the welcome's opening and the scroll glide. The GSAP Motion (Test) switch is gone. Measured as smooth as before on a slowed-down CPU.
+- **One Steam shortcut per PC port.** Uncharted made a shortcut for each of its three games; now it has one, named after the collection, and it starts the game you picked last in Cartridge (the first one until you pick). Ports that already have one shortcut per game are tidied up on their own: the single shortcut goes in and the old ones come out.
+
+### Fixed
+- **A PC port that Steam doesn't start is started anyway.** Since 0.9.88 a port in Steam starts through its Steam shortcut. If Steam takes the request and nothing starts within 25 seconds (an old shortcut, Steam busy), Cartridge starts the port itself and writes why in its log. This is the likely cause of Bloodborne not starting; if it still doesn't, Report a Problem sends the log that says why.

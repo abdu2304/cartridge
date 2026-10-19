@@ -703,7 +703,7 @@ async function more() {
   // separate tabs since 0.9.16, plus Options.
   // a port: its own tab first (play, its settings, updates and saves, set up, folder, Steam, remove), the library
   // game's Game and Details tabs, and nothing of the console's emulator, its Steam shortcut or its copy
-  const v = port ? await choose({ title: port.name, tabs: [{ label: 'PC Port', options: portRows(port) }, { label: 'Game', options: top.filter((o) => !/^(verified|recomp):/.test(o.value)) }, { label: 'Details and Artwork', options: details }] })
+  const v = port ? await choose({ title: port.name, tabs: [{ label: 'PC Port', options: portRows(port) }, { label: 'Steam', options: portSteamRows(port) }, { label: 'Game', options: top.filter((o) => !/^(verified|recomp):/.test(o.value)) }, { label: 'Details and Artwork', options: details }] })
     : await choose({ title: base.value.name, tabs: [{ label: 'Game', options: top }, ...(steam.length ? [{ label: 'Steam', options: steam }] : []), ...(play.length ? [{ label: 'Emulator', options: play }] : []), { label: 'Details and Artwork', options: details }, { label: 'Options', options }] });
   if (!v) return;
   if (typeof v === 'string' && v.startsWith('p:')) return portAction(port, v.slice(2));
@@ -842,13 +842,48 @@ function portRows(x) {
     ...(inst ? [{ label: 'Manage the Port', sub: inst.tag ? `${inst.tag} · ${sheet}` : sheet, value: 'p:sheet', icon: verified ? 'mdiCheckDecagramOutline' : 'mdiRocketLaunchOutline' }] : []),
     ...(verified && inst && ready ? [{ label: 'Set Up Again', sub: 'Checks your copy and writes its settings and starts again', value: 'p:setup', icon: 'mdiWrenchOutline' }] : []),
     ...(inst?.dir ? [{ label: 'Show Its Folder', sub: inst.dir.split('/').filter(Boolean).pop(), value: 'p:dir', icon: 'mdiFolderOutline', raw: true }] : []),
-    ...(inst && ready ? [{ label: inst.steam ? 'In Steam' : 'Add to Steam', sub: 'Its own shortcut, in a Recomps collection', value: 'p:steam', icon: 'mdiSteam', disabled: !!inst.steam }] : []),
     ...(inst ? [{ label: 'Remove the Port', sub: 'Its saves are backed up first; your copy of the game isn’t touched', value: 'p:remove', icon: 'mdiDeleteOutline', danger: true }] : []),
   ].filter((o) => !o.disabled);
+}
+// the Steam tab of a port's More (0.9.89, owner): its own shortcut, never the console game's emulator rows
+function portSteamRows(x) {
+  const inst = x.installed, ready = x.from === 'verified' ? x.state === 'play' || x.state === 'update' : !!inst?.ready;
+  if (!inst || !ready) return [{ label: 'Set It Up First', sub: 'Steam options show once the port is ready to play', value: 'p:sheet', icon: 'mdiSteam' }];
+  if (!inst.steam) return [{ label: inst.steamQueued ? 'On Its Way to Steam' : 'Add to Steam', sub: inst.steamQueued ? 'It goes in when Steam can take it' : 'One shortcut for the port, in a Recomps collection', value: 'p:steam', icon: 'mdiSteam' }];
+  return [
+    { label: 'Add to a Steam Collection', sub: 'One of yours, or a new one', value: 'p:steamcol', icon: 'mdiBookmarkPlusOutline' },
+    { label: 'Frame Generation', sub: 'For this port’s Steam shortcut', value: 'p:framegen', icon: 'mdiAnimationPlay' },
+    ...(inst.oldStarts ? [{ label: 'Make It One Shortcut', sub: `It has ${inst.oldStarts} in Steam, one per game: one is enough`, value: 'p:steam', icon: 'mdiSteam' }] : []),
+    { label: 'Remove from Steam', sub: 'Its shortcut goes; the port stays installed', value: 'p:steamrm', icon: 'mdiDeleteOutline', danger: true },
+  ];
+}
+async function portFrameGen(x) {
+  const f = await call('recomps:frameGen', { id: x.id });
+  if (!f.found.lsfg && !f.found.mako) return toast('Frame generation needs lsfg-vk or mako-run on this device (Settings → Steam → Frame Generation).', 'info', 6000, 'mdiAnimationPlay');
+  const v = await choose({ title: 'Frame Generation', message: `For ${x.name} only. Its Steam shortcut is updated at once.`, sheet: true, options: [
+    ...(f.found.lsfg ? [{ label: 'Lossless Scaling (lsfg-vk)', value: 'lsfg', selected: f.own === 'lsfg', raw: true }] : []),
+    ...(f.found.mako ? [{ label: 'mako-run', value: 'mako', selected: f.own === 'mako', raw: true }] : []),
+    { label: 'Off', value: 'off', icon: 'mdiClose', selected: !f.own },
+  ] });
+  if (!v) return;
+  const r = await call('recomps:setFrameGen', { id: x.id, value: v });
+  toast(r.live ? 'Saved. Its Steam shortcut is updated.' : r.queued ? 'Saved. Its Steam shortcut changes when Steam can take it.' : 'Saved.', 'ok', 3000, 'mdiAnimationPlay');
 }
 async function portAction(x, what) {
   try {
     if (what === 'play') return playPort(x);
+    if (what === 'framegen') return portFrameGen(x);
+    if (what === 'steamcol') {
+      const f = await call('recomps:frameGen', { id: x.id }).catch(() => ({}));
+      const names = await pickCollections('recomp', f.last, true);
+      if (!names?.length) return;
+      await call('recomps:steamCollections', { id: x.id, names }); return toast(`Added to ${names.join(', ')}`, 'ok', 3000, 'mdiSteam');
+    }
+    if (what === 'steamrm') {
+      if (!(await confirm(`Remove ${x.name} from Steam?`, 'Its Steam shortcut goes. The port stays installed and you can add it again.', 'Remove from Steam', true))) return;
+      const r = await call('recomps:steamRemove', { id: x.id });
+      toast(r.removed ? 'Removed from Steam' : r.queued ? 'It leaves Steam when Steam can take the change' : 'It wasn’t in Steam', 'ok', 3000, 'mdiSteam'); return loadPorts();
+    }
     if (what === 'sheet') return openModal(x.from === 'verified' ? 'verified' : 'recomp', { id: x.id }).then(loadPorts);
     if (what === 'settings') return openModal('gamesettings', { recomp: x.id, name: x.name, romId: Number(props.romId) });
     if (what === 'setup') { toast(`Setting up ${x.name}…`, 'info', 2500, 'mdiWrenchOutline'); const r = await call('recomps:prepare', { id: x.id }); if (r?.ok === false) toast(r.why || 'It couldn’t be set up.', 'error', 6000); else toast(`${x.name} is set up`, 'ok', 2500, 'mdiCheck'); return loadPorts(); }

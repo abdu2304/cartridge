@@ -911,3 +911,10 @@ local control port (scratchpad, not in the repo); Game Mode reproduced with a ne
   only "connected"), Cartridge's own controller after a port that started through Steam, Show the FPS counter in
   Uncharted, the PC Ports page and a port's More on the TV, and Cartridge on the desktop with the Steam Controller
   (does pressing a button make the pad appear?).
+
+## Part 36. 0.9.89 · Ports in Steam (20 Oct 2026)
+Owner: a Steam tab in a port's More (collections, remove from Steam, frame generation); one Steam shortcut for Uncharted instead of three ("it doesn't matter, just one"); Bloodborne's port doesn't start.
+- Built as in docs/VERSIONS.md 0.9.89. The one shortcut starts the game picked last in Cartridge (the owner was offered the port's own menu or the last pick; the last pick was built because whether `Uncharted.exe` without `--play` shows a game picker is unverified).
+- Bloodborne: no log from the owner. 0.9.88 starts ports through their Steam shortcut; a request Steam takes but doesn't act on left nothing running. Now a direct start follows after 25 s. Ask the owner for `~/.config/Cartridge/emulator-runs/verified-bloodborne.log` and the `verified` lines of cartridge.log if it still doesn't start.
+- Checked: `npm test` 413, `vite build`, `test/e2e/steam.js` 15, `setups.js` 21, `starting.js` 8, the play.sh dispatcher run with stand-in scripts (default, picked, unknown pick). Not checked on a device: the Steam tab with real Steam (collections need instant Steam changes), frame generation on a Proton port, the old three Uncharted shortcuts replaced in the owner's Steam.
+

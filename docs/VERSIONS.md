@@ -687,3 +687,8 @@ layout and "do not change" list stay in `CLAUDE.md`.
 - Steam: `steamArt.oursSteam(pid)` (same uid, HOME ours or inside it, paths through /home -> /var/home) in `steamRunning()`, and the same rule inline in `steamHelper.js`; steam-launch.sh follows `appimage-filename-updated` and falls back to the newest Cartridge AppImage beside the old path. Start tiles, Settings' Open Achievements and AddonsSheet's Downloads jump use `go()`, not `tab()`.
 - CLAUDE.md keeps rules and layout; these notes live here.
 
+## 0.9.89 · Ports in Steam (20 Oct 2026; handover Part 36)
+- One shortcut per port: recompsIpc `launcherOf(rec)` writes `.cartridge/play.sh` for a port with several starts (runs `play-<start>.sh` named in `.cartridge/start`, else the first), `pickStart` writes the start on Play, `verifiedShortcutSpecs` returns one spec (key = port id). `oldStartShortcuts`/`portShortcut` read the old `<id>:<start>` shortcuts; `oneShortcut`/`oneShortcutsSoon` (20 s after the first `recomps:list`) add the one and remove the old ones; `recomps:steam` removes them too. `steamOf` adds `installed.oldStarts`.
+- Port More → Steam tab (Game.vue `portSteamRows`, `portFrameGen`): `recomps:steamCollections` (steamManager `addAppidToCollections`), `recomps:frameGen`/`recomps:setFrameGen` (`steam.frameGen.games['recomp:<id>']`, only an explicit pick; steamManager `recompLaunch` puts the wrapper before `%command%`, `recompUpdate` changes the shortcut live, else remove + queue), `recomps:steamRemove`.
+- openVerified through Steam: `scriptRuns` checks /proc for the start script 25 s later and `spawnStart` starts it directly when nothing ran (log `verified through steam: nothing started`).
+
