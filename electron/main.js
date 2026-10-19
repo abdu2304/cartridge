@@ -3505,20 +3505,16 @@ let win;
 
 let broadcast = (ch, data) => { if (win && !win.isDestroyed()) win.webContents.send(ch, data); }; // wrapped by the background jobs (0.9.32)
 
-// Interface size. The UI is laid out for 1920x1080 (what the Ally shows in Game Mode). Bigger
-// windows, like a 4K TV, zoom in by the same ratio so text and art keep their size on screen.
-// Smaller windows (Steam Deck 1280x800) stay at 100%, which is what they were designed around.
+// Interface size: electron/zoom.js (tested)
 function autoZoom() {
   if (!win || win.isDestroyed()) return 1;
   const [w, h] = win.getContentSize();
-  // 0.9.17 (owner: clipped in a Desktop Mode window): smaller than the Deck's 1280x800, it zooms out to fit
-  if (w < 1280 || h < 800) return Math.max(0.6, Math.round(Math.min(w / 1280, h / 800) * 20) / 20);
-  const z = Math.min(w / 1920, h / 1080);
-  return Math.max(1, Math.min(3, Math.round(z * 20) / 20));
+  return require('./zoom').autoZoom(w, h);
 }
 function currentZoom() {
-  const s = config.ui.scale;
-  return !s || s === 'auto' ? autoZoom() : Math.max(0.75, Math.min(3, Number(s) || 1));
+  if (!win || win.isDestroyed()) return 1;
+  const [w, h] = win.getContentSize();
+  return require('./zoom').zoomFor(w, h, config.ui.scale);
 }
 let zoomT = null;
 function applyZoom() {
