@@ -515,3 +515,19 @@ test('0.9.86: a dump copied in by hand is offered to its port by title ID or tit
   assert.deepStrictEqual(R.matchDumps(e, dumps).map((d) => d.path), ['/r/ps4/inFamous - Second Son', '/r/ps4/x']);
   assert.deepStrictEqual(R.matchDumps({ games: [], recipe: {} }, dumps), []);
 });
+
+test('0.9.86: a port installed from a link stays listed when its project is listed again (made Cartridge Verified)', async () => {
+  const w = fakeWorld([]);
+  const r = w.eng.addLink({ repo: 'github:o/game', console: 'n64', title: 'Game', name: 'game' });
+  w.publish('v1', 'x', 600 * 1024);
+  await w.eng.install(r.id);
+  // later the same project is in the list Cartridge ships (as the verified recipes are)
+  fs.writeFileSync(path.join(w.d, 'shipped.json'), JSON.stringify({ updated: '2026-10-19', entries: [{ id: 'game-verified', name: 'Game Recompiled', games: [{ title: 'Game', console: 'n64' }], repo: 'github:o/game', builds: 'linux', needs: null, setup: { how: 'none' } }] }));
+  w.eng.reload();
+  const list = w.eng.list().entries;
+  const old = list.find((e) => e.id === r.id);
+  assert.ok(old && old.installed, 'the installed copy keeps its entry, so it can be updated or removed');
+  assert.strictEqual(old.name, 'Game Recompiled (From a Link)');
+  assert.deepStrictEqual(old.games, [{ title: 'Game', console: 'n64' }]);
+  assert.ok(list.find((e) => e.id === 'game-verified'), 'and the listed one is there too');
+});

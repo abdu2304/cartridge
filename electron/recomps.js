@@ -424,8 +424,13 @@ function createRecomps(ctx) {
   function catalogue() {
     if (cat) return cat;
     const out = [], ids = new Set(), repos = new Set();
+    // 0.9.86 (PC playtest: P.T. and GoW3 installed from links before they were verified vanished from every list, still
+    // on the drive and in Steam, with no way to update or remove them): one project is listed once, unless that copy is
+    // installed: an install always has its entry
     const add = (e, from) => {
-      if (!e?.id || ids.has(e.id) || (e.repo && repos.has(e.repo.toLowerCase()))) return;
+      if (!e?.id || ids.has(e.id) || (e.repo && repos.has(e.repo.toLowerCase()) && !installs[e.id])) return;
+      const twin = e.repo && repos.has(e.repo.toLowerCase()) ? out.find((x) => x.repo?.toLowerCase() === e.repo.toLowerCase()) : null;
+      if (twin) e = { ...e, name: `${twin.name} (From a Link)`, games: twin.games }; // the same project's older copy, beside it
       ids.add(e.id); if (e.repo) repos.add(e.repo.toLowerCase());
       // a place with no rule Cartridge can follow (a patcher, a mod folder inside another game): you put it in place
       // yourself, then press It's Set Up (0.9.68)
