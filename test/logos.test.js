@@ -8,7 +8,7 @@ let O, M;
 test.before(async () => { O = await import('../src/consoleOptical.js'); M = await import('../src/makers.js'); });
 
 // optical sizes the owner approved (0.9.21, 0.9.42 Switch, 0.9.47 PlayStation)
-const EXPECT = { psx: 1.6, playstation: 1.6, switch: 1.7, gc: 1.45, ngc: 1.45, wii: 1.3, wiiu: 1.3, nes: 1.35, snes: 1.2, n64: 1.15, gba: 1.35, dreamcast: 1.45, dc: 1.45, saturn: 1.2, genesis: 1.3, xbox: 1.05, xbox360: 1.1 };
+const EXPECT = { steam: 1.45, psx: 1.6, playstation: 1.6, switch: 1.7, gc: 1.45, ngc: 1.45, wii: 1.3, wiiu: 1.3, nes: 1.35, snes: 1.2, n64: 1.15, gba: 1.35, dreamcast: 1.45, dc: 1.45, saturn: 1.2, genesis: 1.3, xbox: 1.05, xbox360: 1.1 };
 
 test('optical sizes stay as approved', () => {
   for (const [k, v] of Object.entries(EXPECT)) assert.strictEqual(O.OPTICAL[k], v, `${k} should be ${v}`);

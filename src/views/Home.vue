@@ -12,7 +12,8 @@
         <MediaBar v-if="store.config.ui.mediaBar !== false" :src="heroArt" />
         <Transition name="hero">
           <div v-if="heroRom" :key="'r' + heroRom.id" class="hero-in">
-            <div class="eyebrow row" style="gap: 8px"><PIcon :p="{ slug: heroRom.platform_slug, fs_slug: heroRom.platform_fs_slug }" :size="18" />{{ heroRom.platform_display_name }}</div>
+            <div v-if="store.play[heroRom.id]?.port" class="eyebrow row" style="gap: 8px; --cm-h: 14px"><ConsoleMark slug="steam" label="Steam" />PC Port</div>
+            <div v-else class="eyebrow row" style="gap: 8px"><PIcon :p="{ slug: heroRom.platform_slug, fs_slug: heroRom.platform_fs_slug }" :size="18" />{{ heroRom.platform_display_name }}</div>
             <GameLogo :logo="store.config.ui.logos !== false ? logoOf(heroRom) : null" :name="heroRom.name" cls="hero-title" :area="42000" :max-w="500" :max-h="logoMaxH" />
             <div class="meta">
               <span v-if="isNew(heroRom)" class="chip new">NEW</span>
@@ -75,7 +76,7 @@
               <CollTile v-for="c in s.items.slice(0, ROW)" :key="c.id" :c="c" wide @open="openCol" @focused="focusCol" />
             </template>
             <template v-else>
-              <GameCard v-for="r in s.items.slice(0, ROW)" :key="r.id" :rom="r" :show-platform="true" :extra="s.sub ? s.sub(r) : ''" :device="s.id === 'playing'" @open="openGame" @focused="focusRom" />
+              <GameCard v-for="r in s.items.slice(0, ROW)" :key="r.id" :rom="r" :show-platform="true" :extra="s.sub ? s.sub(r) : ''" :device="s.id === 'playing'" :port="s.id === 'playing' && !!store.play[r.id]?.port" @open="openGame" @focused="focusRom" />
             </template>
             <!-- a row shows its first 15; the 16th card opens the whole list (0.9.3) -->
             <button v-if="s.type !== 'ra' && s.items.length > ROW" class="card show-all" :class="{ wide: s.type === 'col' || s.type === 'genre' || s.type === 'sys' }" data-focus :data-key="'all-' + s.id" @click="showAll(s)" @focus="clearHero">
@@ -129,6 +130,7 @@ function watchRows() {
 import Icon from '../components/Icon.vue';
 import Logo from '../components/Logo.vue';
 import PIcon from '../components/PIcon.vue';
+import ConsoleMark from '../components/ConsoleMark.vue';
 import GameCard from '../components/GameCard.vue';
 import SysTile from '../components/SysTile.vue';
 import CollTile from '../components/CollTile.vue';
@@ -262,7 +264,7 @@ const shelves = computed(() => {
   // One row for what you're playing (0.9.3 L: "Continue playing" and "Recently played" were two rows
   // that looked the same): marked as playing in RomM, or played lately on any device, newest first
   const playing = roms.filter((r) => r.user?.playing || r.user?.status === 'incomplete' || lastPlay(r)).sort((a, b) => lastPlay(b) - lastPlay(a));
-  if (playing.length) out.push({ id: 'playing', title: 'Continue playing', icon: 'mdiPlayCircleOutline', count: '', items: playing, sub: (r) => [store.play[r.id]?.device ? 'on ' + store.play[r.id].device : '', store.play[r.id]?.port ? 'PC Port' : ''].filter(Boolean).join(' · ') });
+  if (playing.length) out.push({ id: 'playing', title: 'Continue playing', icon: 'mdiPlayCircleOutline', count: '', items: playing, sub: (r) => (store.play[r.id]?.port ? '' : store.play[r.id]?.device ? 'on ' + store.play[r.id].device : '') });
   // started (played a while, or marked in RomM) but not finished, and not already near the front above
   const inPlaying = new Set(playing.slice(0, 15).map((r) => r.id));
   const started = roms.filter((r) => !inPlaying.has(r.id) && !DONE.has(r.user?.status) && (minsOf(r) >= 30 || r.user?.status === 'incomplete')).sort((a, b) => lastPlay(b) - lastPlay(a));

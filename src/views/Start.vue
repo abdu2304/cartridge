@@ -30,7 +30,7 @@
               <div class="st-label on-art">Continue playing</div>
               <div class="st-cp">
                 <GameLogo :logo="store.config.ui.logos !== false ? logoOf(cur) : null" :name="cur.name" cls="st-cp-name" :area="Math.min(30000, box(t).pw * box(t).ph * 0.11)" :max-w="Math.min(420, box(t).pw * 0.72)" :max-h="Math.min(120, box(t).ph * 0.3)" />
-                <span class="st-cp-when">{{ whenText(cur) }}</span>
+                <span class="st-cp-when"><ConsoleMark v-if="store.play[cur.id]?.port" slug="steam" label="Steam" />{{ whenText(cur) }}</span>
                 <span v-if="box(t).ph >= 230 && box(t).pw >= 200" class="st-cp-go"><Btn b="A" />{{ store.installed[cur.id] ? 'Continue' : 'Open' }}</span>
               </div>
               <div v-if="playing.length > 1 && box(t).pw >= 280" class="st-dots"><i v-for="(g, i) in playing.slice(0, 5)" :key="g.id" :class="{ on: i === cpIndex }" /></div>
@@ -1449,7 +1449,8 @@ onUpdated(() => { const G = gsapReady(), st = flipState; flipState = null; if (G
 .st-cp { margin-top: auto; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; max-width: 100%; }
 .st-cp :deep(.game-logo) { margin: 0 0 4px; filter: drop-shadow(0 4px 14px rgba(0, 0, 0, 0.55)); }
 .st-cp :deep(.st-cp-name) { margin: 0; font-family: var(--display); font-stretch: var(--display-stretch); font-weight: 800; font-size: clamp(16px, min(14cqh, 9cqw), 44px); line-height: 1.05; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.st-cp-when { font-size: clamp(11px, min(8cqh, 5cqw), 15px); font-weight: 500; color: rgba(255, 255, 255, 0.86); }
+.st-cp-when { font-size: clamp(11px, min(8cqh, 5cqw), 15px); font-weight: 500; color: rgba(255, 255, 255, 0.86); --cm-h: 0.8em; }
+.st-cp-when .cmark { margin-right: 0.45em; position: relative; top: -0.08em; }
 .st-cp-go { display: inline-flex; align-items: center; gap: 8px; margin-top: 6px; padding: 8px 18px 8px 10px; border-radius: 999px; background: #fff; color: #0c0d10; font-weight: 700; font-size: var(--t-sm); }
 @container (max-height: 140px) { .st-cp-when { display: none; } }
 .st-dots { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 6px; }
