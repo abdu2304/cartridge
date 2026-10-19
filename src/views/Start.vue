@@ -106,7 +106,7 @@
                   <div class="st-lead-wrap" :style="t.h > 1 ? { height: Math.round(Math.min(56, box(t).ph * 0.16) + 30) + 'px' } : null"><Transition name="st-lead">
                     <div :key="rowView(t)[0].id" class="st-row-lead">
                       <GameLogo :logo="store.config.ui.logos !== false ? logoOf(rowView(t)[0]) : null" :name="rowView(t)[0].name" cls="st-row-name" :area="Math.min(16000, box(t).pw * box(t).ph * 0.07)" :max-w="Math.min(300, box(t).pw * (t.h > 1 ? 0.5 : 0.36))" :max-h="t.h > 1 ? Math.min(56, box(t).ph * 0.16) : Math.min(64, box(t).ph * 0.3)" />
-                      <span class="st-sub"><ConsoleMark v-if="store.play[rowView(t)[0].id]?.port" slug="steam" label="Steam" />{{ firstLine(t.type, rowView(t)[0]) }}</span>
+                      <span class="st-sub"><ConsoleMark v-if="t.type === 'recent' && store.play[rowView(t)[0].id]?.port" slug="steam" label="Steam" />{{ firstLine(t.type, rowView(t)[0]) }}</span>
                     </div>
                   </Transition></div>
                 </div>
@@ -824,7 +824,7 @@ function openTile(t, ev) {
   if (T === 'image' || T === 'html') return;
   if (T === 'game') return romById(t.romId) && go('game', { romId: t.romId });
   if (T === 'console') return platformById(t.platformId) && go('platform', { platformId: t.platformId });
-  if (COVER_ROWS[T] && sel[t.id]) return goPlayed(rowView(t)[0].id); // stepped to a game: that one (as its port when its Steam mark shows)
+  if (COVER_ROWS[T] && sel[t.id]) return T === 'recent' ? goPlayed(rowView(t)[0].id) : go('game', { romId: rowView(t)[0].id }); // stepped to a game: that one (Recently Played: as its port when its Steam mark shows)
   if (COVER_ROWS[T]) {
     const list = listOf(t);
     if (!list.length) return;

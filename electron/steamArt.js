@@ -93,6 +93,18 @@ function applySteamArt(artDir) {
 
 // Steam saves its own copy of shortcuts.vdf when it exits, so writing while it runs gets undone.
 // Look at every process (name and command line) plus Steam's pid file, not just one pgrep pattern.
+// 0.9.88: only this user's Steam for this home counts. Another user's Steam (two people signed in on one PC) never
+// closes for us and kept shortcuts from being written; so did the real Steam for the tests' own homes. A Steam whose
+// HOME is inside ours still counts (Snap's Steam runs with HOME=~/snap/steam/common): when unsure, it's running.
+function oursSteam(pid) {
+  try { if (typeof process.getuid === 'function' && fs.statSync(`/proc/${pid}`).uid !== process.getuid()) return false; } catch {}
+  let home = null; try { home = /(?:^|\0)HOME=([^\0]*)/.exec(fs.readFileSync(`/proc/${pid}/environ`, 'utf8'))?.[1] || null; } catch {}
+  if (!home) return true;
+  // a path that doesn't exist yet still resolves through its folders (/home -> /var/home on Bazzite and Fedora Atomic)
+  const real = (p) => { const rest = []; let d = path.resolve(p); for (;;) { try { return path.join(fs.realpathSync(d), ...rest); } catch { const up = path.dirname(d); if (up === d) return path.resolve(p); rest.unshift(path.basename(d)); d = up; } } };
+  const mine = real(os.homedir()), its = real(home);
+  return its === mine || its.startsWith(mine + path.sep);
+}
 function steamRunning() {
   const me = String(process.pid);
   let procOk = true;
@@ -101,9 +113,9 @@ function steamRunning() {
       if (!/^\d+$/.test(pid) || pid === me) continue;
       let comm = '', cmd = '';
       try { comm = fs.readFileSync(`/proc/${pid}/comm`, 'utf8').trim(); } catch { continue; }
-      if (comm === 'steam' || comm === 'steamwebhelper' || comm === 'steam.sh') return true;
+      if ((comm === 'steam' || comm === 'steamwebhelper' || comm === 'steam.sh') && oursSteam(pid)) return true;
       try { cmd = fs.readFileSync(`/proc/${pid}/cmdline`, 'utf8').split('\0')[0]; } catch {}
-      if (/(ubuntu12_32|ubuntu12_64)\/steam(webhelper)?$|\/steam\.sh$/.test(cmd)) return true;
+      if (/(ubuntu12_32|ubuntu12_64)\/steam(webhelper)?$|\/steam\.sh$/.test(cmd) && oursSteam(pid)) return true;
     }
   } catch { procOk = false; }
   for (const f of [path.join(os.homedir(), '.steam/steam.pid'), path.join(os.homedir(), '.var/app/com.valvesoftware.Steam/.steam/steam.pid')]) {
@@ -181,4 +193,4 @@ function cartridgeInSteam() {
   return false;
 }
 
-module.exports = { cartridgeInSteam, applySteamArt, addToSteam, parseVdf, writeVdf, shortcutId, steamRunning };
+module.exports = { oursSteam, cartridgeInSteam, applySteamArt, addToSteam, parseVdf, writeVdf, shortcutId, steamRunning };

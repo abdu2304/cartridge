@@ -337,3 +337,12 @@ test('play time: a PC port\'s shortcut counts for its library game, and says it 
   const out = JSON.parse(execFileSync(process.execPath, ['-e', code], { env: { ...process.env, HOME: H, XDG_DATA_HOME: '' }, encoding: 'utf8' }).trim().split('\n').pop());
   assert.deepStrictEqual(out, { 900: { min: 95, last: 1760000000000, src: 'Steam', port: 'pt' } });
 });
+
+test('a running Steam counts only when it is this home’s: Snap’s home inside ours does, another home doesn’t (0.9.88)', async () => {
+  const { spawn } = require('child_process'), SA = require('../electron/steamArt'), os2 = require('os');
+  const run = (home) => { const env = { ...process.env }; if (home == null) delete env.HOME; else env.HOME = home; return spawn('sleep', ['5'], { env }); };
+  const kids = [run(os2.homedir()), run(require('path').join(os2.homedir(), 'snap/steam/common')), run('/var/empty-elsewhere'), run(null)];
+  await new Promise((r) => setTimeout(r, 150));
+  try { assert.deepStrictEqual(kids.map((k) => SA.oursSteam(String(k.pid))), [true, true, false, true]); }
+  finally { kids.forEach((k) => k.kill()); }
+});

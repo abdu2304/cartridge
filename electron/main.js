@@ -426,8 +426,7 @@ log('start', app.getVersion(), 'gpu=' + (useGpu ? 'hardware' : 'software'), 'ses
 // The script drops both, starts without the Chromium sandbox, and writes everything to
 // steam-launch.log so a failed launch always leaves a trace.
 const STEAM_LAUNCHER = path.join(USER_DATA, 'steam-launch.sh');
-function writeSteamLauncher() {
-  const ai = process.env.APPIMAGE;
+function writeSteamLauncher(ai = process.env.APPIMAGE) {
   if (!ai) return null;
   const q = (v) => "'" + String(v).replace(/'/g, "'\\''") + "'";
   const body = `#!/bin/bash
@@ -439,7 +438,11 @@ LOG=${q(path.join(USER_DATA, 'steam-launch.log'))}
 } > "$LOG" 2>&1
 unset LD_PRELOAD LD_LIBRARY_PATH
 export CARTRIDGE_FROM_STEAM=1
-exec ${q(ai)} --no-sandbox "$@" >> "$LOG" 2>&1
+AI=${q(ai)}
+# an update gives a versioned file name the release's name, and a file can be moved or renamed by hand: the newest
+# Cartridge AppImage beside it then, so Steam's shortcut never points at nothing (0.9.88)
+[ -x "$AI" ] || AI="$(ls -t -- ${q(path.dirname(ai))}/*[Cc]artridge*.[Aa]pp[Ii]mage 2>/dev/null | head -n 1)"
+exec "$AI" --no-sandbox "$@" >> "$LOG" 2>&1
 `;
   fs.mkdirSync(USER_DATA, { recursive: true });
   fs.writeFileSync(STEAM_LAUNCHER, body, { mode: 0o755 });
@@ -3484,6 +3487,8 @@ function setupUpdater() {
   autoUpdater.on('update-not-available', () => set({ state: 'current', version: versionName() }));
   autoUpdater.on('update-downloaded', (i) => { try { recovery.backup(CONFIG_FILE, 'update'); } catch {} set({ state: 'ready', version: nameOf(i) }); if (config.updateSwitched) { delete config.updateSwitched; saveConfig(); } });
   autoUpdater.on('error', (e) => set({ state: 'error', error: String(e?.message || e).slice(0, 200) }));
+  // a versioned file name takes the release's name on install: Steam's launcher follows it at once (0.9.88)
+  autoUpdater.on('appimage-filename-updated', (dest) => { try { if (fs.existsSync(STEAM_LAUNCHER)) writeSteamLauncher(dest); log('appimage renamed by the update', path.basename(dest)); } catch {} });
   const check = () => autoUpdater.checkForUpdates().catch(() => {});
   setTimeout(check, 8000);
   setInterval(check, 6 * 3600e3);

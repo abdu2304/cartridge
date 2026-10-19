@@ -12,7 +12,7 @@
         <MediaBar v-if="store.config.ui.mediaBar !== false" :src="heroArt" />
         <Transition name="hero">
           <div v-if="heroRom" :key="'r' + heroRom.id" class="hero-in">
-            <div v-if="store.play[heroRom.id]?.port" class="eyebrow row" style="gap: 8px; --cm-h: 14px"><ConsoleMark slug="steam" label="Steam" />PC Port</div>
+            <div v-if="heroPort" class="eyebrow row" style="gap: 8px; --cm-h: 14px"><ConsoleMark slug="steam" label="Steam" />PC Port</div>
             <div v-else class="eyebrow row" style="gap: 8px"><PIcon :p="{ slug: heroRom.platform_slug, fs_slug: heroRom.platform_fs_slug }" :size="18" />{{ heroRom.platform_display_name }}</div>
             <GameLogo :logo="store.config.ui.logos !== false ? logoOf(heroRom) : null" :name="heroRom.name" cls="hero-title" :area="42000" :max-w="500" :max-h="logoMaxH" />
             <div class="meta">
@@ -76,7 +76,7 @@
               <CollTile v-for="c in s.items.slice(0, ROW)" :key="c.id" :c="c" wide @open="openCol" @focused="focusCol" />
             </template>
             <template v-else>
-              <GameCard v-for="r in s.items.slice(0, ROW)" :key="r.id" :rom="r" :show-platform="true" :extra="s.sub ? s.sub(r) : ''" :device="s.id === 'playing'" :port="s.id === 'playing' && !!store.play[r.id]?.port" @open="(r) => (s.id === 'playing' ? goPlayed(r.id) : openGame(r))" @focused="focusRom" />
+              <GameCard v-for="r in s.items.slice(0, ROW)" :key="r.id" :rom="r" :show-platform="true" :extra="s.sub ? s.sub(r) : ''" :device="s.id === 'playing'" :port="s.id === 'playing' && !!store.play[r.id]?.port" @open="(r) => (s.id === 'playing' ? goPlayed(r.id) : openGame(r))" @focused="(r) => focusRom(r, s.id === 'playing')" />
             </template>
             <!-- a row shows its first 15; the 16th card opens the whole list (0.9.3) -->
             <button v-if="s.type !== 'ra' && s.items.length > ROW" class="card show-all" :class="{ wide: s.type === 'col' || s.type === 'genre' || s.type === 'sys' }" data-focus :data-key="'all-' + s.id" @click="showAll(s)" @focus="clearHero">
@@ -180,7 +180,7 @@ let ro;
 const noteAspect = () => { const h = heroEl.value; if (h?.clientHeight) store.heroAspect = Math.round((h.clientWidth / h.clientHeight) * 100) / 100; };
 onMounted(() => { noteAspect(); if (window.ResizeObserver) { ro = new ResizeObserver(() => requestAnimationFrame(() => { noteAspect(); fitHero(); })); if (heroEl.value) ro.observe(heroEl.value); } });
 onBeforeUnmount(() => ro?.disconnect());
-const heroRom = ref(null);
+const heroRom = ref(null), heroPort = ref(false); // heroPort: focused in Continue Playing as its PC port (0.9.88: ports apart from consoles)
 const heroSys = ref(null);
 const heroCol = ref(null);
 // Media bar art: a screenshot of the highlighted game (or its cover), or art from the highlighted console/collection
@@ -307,7 +307,7 @@ const shelves = computed(() => {
   return out;
 });
 
-function focusRom(r) { heroRom.value = r; heroSys.value = null; heroCol.value = null; setBg(backdropOf(r)); wantSharp(r); }
+function focusRom(r, row = false) { heroRom.value = r; heroPort.value = row && !!store.play[r.id]?.port; heroSys.value = null; heroCol.value = null; setBg(backdropOf(r)); wantSharp(r); }
 function focusSys(p) {
   heroSys.value = p; heroRom.value = null; heroCol.value = null;
   const withArt = romsOf(p.id).find((r) => r.shot) || romsOf(p.id).find((r) => r.path_cover_large);
