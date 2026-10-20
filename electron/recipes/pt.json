@@ -54,7 +54,8 @@
   "game"
  ],
  "saves": [
-  "{dir}/game/data"
+  "{dir}/game/data/PT_Save_Data0",
+  "{dir}/game/data/PT_Save_Data1"
  ],
  "settings": [
   {

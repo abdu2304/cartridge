@@ -66,7 +66,8 @@ function emulationRootsNow(extra = []) {
       if (isDir(p)) roots.add(p);
     }
   }
-  for (const e of extra) if (isDir(e)) roots.add(e);
+  // 0.9.90: a passed folder counts only with roms/ in it (a wrong EmuDeck path got bios/ copies made beside Emulation)
+  for (const e of extra) if (isDir(path.join(e, 'roms'))) roots.add(e);
   return [...roots];
 }
 

@@ -1,10 +1,11 @@
-## Cartridge 0.9.89 · Ports in Steam
-
-### New
-- **A Steam tab in a PC port's More.** Add to a Steam Collection, Frame Generation for that port's shortcut, and Remove from Steam (the port stays installed). Nothing from the console's emulator is in it.
-
-### Changed
-- **One Steam shortcut per PC port.** Uncharted made a shortcut for each of its three games; now it has one, named after the collection, and it starts the game you picked last in Cartridge (the first one until you pick). Ports that already have one shortcut per game are tidied up on their own: the single shortcut goes in and the old ones come out.
+## Cartridge 0.9.90 · Ports Start Again
 
 ### Fixed
-- **A PC port that Steam doesn't start is started anyway.** Since 0.9.88 a port in Steam starts through its Steam shortcut. If Steam takes the request and nothing starts within 25 seconds (an old shortcut, Steam busy), Cartridge starts the port itself and writes why in its log. This is the likely cause of Bloodborne not starting; if it still doesn't, Report a Problem sends the log that says why.
+- **inFAMOUS Second Son starts again after its game is downloaded again.** A PC port remembered the folder of the game copy it was set up with. When that copy moved (downloaded again from RomM under a new folder name, a dump moved by hand, a drive renamed), the port opened and closed at once with "Missing: eboot.bin". Cartridge now notices a copy that's gone and sets the port up again with one that's here: before a start, at start-up and after a PS4 or PS5 download. This works from Steam too, because the Steam shortcut runs the start script Cartridge rewrites.
+- **No more recomp and bios folders beside your Emulation folder.** EmuDeck writes its paths as `"/run/media/you/Drive"/Emulation`, and Cartridge read only the quoted part. On an SD card or an external drive picked in EmuDeck, Cartridge then made recomp folders and a second copy of your BIOS files one folder too high. The path is now read as the shell reads it, and a folder only counts as an Emulation folder when it has `roms` in it. What was made in the wrong place is cleared up once: empty recomp console folders, and BIOS files byte for byte the same as the ones in your real bios folder. Nothing else is touched.
+- **Your system stays awake while games download, unpack or install, then sleeps as usual.** Cartridge already asked the desktop to stay awake during downloads, but Game Mode has no such service, so SteamOS could still go to sleep. Cartridge now also holds a system sleep lock (the one Steam's own sleep respects) while a game downloads or unpacks, and while an emulator, PC port or game update installs or a game moves. The lock goes as soon as the last one finishes, and it ends with Cartridge if it closes or crashes.
+- **Updating a PC port doesn't freeze Cartridge.** The new release was copied into place on the main thread; a few hundred MB onto an external drive held the window still for 14 seconds.
+- **A PC port's update no longer ends with "Close it first".** After an update Cartridge starts the new release once to check it runs. It moved on before that check had closed, so setting the port up afterwards found it still running and stopped.
+- **A port Steam starts isn't started twice.** Since 0.9.89 Cartridge starts a port itself when Steam hasn't after 25 seconds. It looked only once, at 25 seconds, so a port that Steam started and that closed quickly was started again. It now looks every 2 seconds.
+- **P.T.'s Save Sync takes only its saves.** Its recipe named the whole data folder (1.9 GB with the enhanced textures); it now names the two save files.
+- **The log no longer calls a night's sleep a stall.** A wake after sleep is logged as that, so real freezes stand out.

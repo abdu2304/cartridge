@@ -766,10 +766,12 @@ function createRecomps(ctx) {
         for (const old of FV.list(store).slice(2)) FV.drop(store, old.tag);
       }
       fs.mkdirSync(dest, { recursive: true });
-      fs.cpSync(inner, dest, { recursive: true, force: true });
+      // 0.9.90 (PC playtest: Cartridge froze 14 s on inFAMOUS's update): copied and cleaned up off the main thread; a
+      // few hundred MB onto an external drive held the whole window still
+      await fs.promises.cp(inner, dest, { recursive: true, force: true });
       program = path.join(dest, pick.rel);
       if (kind === 'linux') { for (const f of entries) if (f.elf || f.appimage || f.path === pick.path) { try { fs.chmodSync(path.join(dest, f.rel), 0o755); } catch {} } }
-    } finally { fs.rmSync(tmp, { force: true }); fs.rmSync(tmpNow, { force: true }); fs.rmSync(out, { recursive: true, force: true }); }
+    } finally { fs.rmSync(tmp, { force: true }); fs.rmSync(tmpNow, { force: true }); await fs.promises.rm(out, { recursive: true, force: true }).catch(() => {}); }
     const saves = checkSaves(meta);
     installs[id] = { ...(prev || {}), id, repo: e.repo, dir: dest, program, kind, tag: rel.tag, date: rel.date, files, channel: ch, at: Date.now(), asset: b.asset.name, ...(local ? { ci: true } : {}) };
     // set up again? Its done file went with the update, or the release brought files where its setup had made them
