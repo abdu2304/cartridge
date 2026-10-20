@@ -267,5 +267,23 @@
   "output": true,
   "why": "runtime_services.c prints Runtime: trophy N unlocked; names come from your copy's trophy file when a shadPS4 trophy key is set up"
  },
- "rev": 2
+ "rev": 3,
+ "known": {
+  "app": [
+   "game_dir",
+   "close_on_play",
+   "display_mode",
+   "vsync",
+   "show_fps",
+   "game_language",
+   "stick_deadzone",
+   "vram_budget_mb",
+   "precompile_shaders",
+   "gpu_readbacks",
+   "eager_readback",
+   "write_merge",
+   "deferred_readback"
+  ],
+  "ini": []
+ }
 }

@@ -6,7 +6,7 @@
     <section v-else-if="!items.length && !unlocks.length" class="aa-empty glass">
       <div class="eyebrow">Achievements</div>
       <h1 class="big">Nothing here yet</h1>
-      <p class="muted">RetroAchievements and the trophies your emulators keep (RPCS3, shadPS4, Xenia, Vita3K, KytyPS5) all show up here together.</p>
+      <p class="muted">RetroAchievements and the trophies your emulators keep (RPCS3, shadPS4, Xenia, Vita3K, KytyPS5) and PC ports all show up here together.</p>
       <div class="row" style="gap: 12px; flex-wrap: wrap">
         <button v-if="!raOn" class="btn primary" data-focus @click="openSettings"><img class="ra-mark" :src="raLogo" alt="" />Sign in to RetroAchievements</button>
         <button class="btn" data-focus @click="openSettings"><Grade g="P" :size="18" />Find Emulator Trophies</button>
@@ -37,6 +37,9 @@
       </header>
 
       <div v-if="shadNoKey" class="aa-note"><Icon name="mdiInformationOutline" :size="20" /><span>PS4 trophies need shadPS4's trophy key.</span><button class="btn small" data-focus @click="keyGuide"><Icon name="mdiHelpCircleOutline" :size="18" />How to Set It</button></div>
+
+      <!-- 0.9.90 (owner): which installed PC ports record achievements here and which have none -->
+      <div v-if="portsAch.length" class="aa-note"><Icon name="mdiSteam" :size="20" /><span>{{ portsAch }}</span></div>
 
       <template v-if="unlocks.length">
         <div class="shelf-title">Latest unlocks</div>
@@ -109,7 +112,12 @@ import Grade from '../components/Grade.vue';
 import raLogo from '../assets/ra-logo.png';
 
 const el = ref(null);
-const ra = ref(null), tro = ref(null), loading = ref(true);
+const ra = ref(null), tro = ref(null), loading = ref(true), ports = ref([]);
+const listOf = (a) => (a.length < 3 ? a.join(' and ') : a.slice(0, -1).join(', ') + ' and ' + a.at(-1));
+const portsAch = computed(() => {
+  const yes = ports.value.filter((e) => e.ach).map((e) => e.name), no = ports.value.filter((e) => !e.ach).map((e) => e.name);
+  return [yes.length ? `PC ports with achievements: ${listOf(yes)}.` : '', no.length ? `${listOf(no)} ${no.length === 1 ? 'has' : 'have'} none Cartridge can show.` : ''].filter(Boolean).join(' ');
+});
 const raOn = computed(() => !!store.config.ra?.user && !!store.config.ra?.key);
 const fmt = (n) => (n || 0).toLocaleString();
 const raDate = (d) => { const t = new Date(String(d || '').replace(' ', 'T') + (/[zZ]|[+-]\d\d:?\d\d$/.test(d || '') ? '' : 'Z')).getTime(); return isNaN(t) ? 0 : t; };
@@ -180,6 +188,7 @@ async function load(force = false) {
   await Promise.all([
     raOn.value ? call('ra:overview', { force }).then((d) => (ra.value = d)).catch(() => {}) : (ra.value = null),
     call('trophies:overview').then((d) => { tro.value = d; if (d.sync) store.trophySync = d.sync; }).catch(() => {}),
+    call('recomps:list').then((d) => (ports.value = (d?.entries || []).filter((e) => e.installed))).catch(() => {}),
   ]);
   loading.value = false;
 }

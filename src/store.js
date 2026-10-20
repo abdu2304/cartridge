@@ -235,6 +235,9 @@ export const platformById = (id) => (store.libVersion, store.lib?.platforms.find
 // 0.9.3 L): from the game's console when the game is in the library, else by slug, else the fallback
 const SRC_SLUG = { rpcs3: ['ps3'], shadps4: ['ps4'], xenia: ['xbox360'], vita3k: ['psvita', 'vita'], kytyps5: ['ps5'], recomp: [] };
 export function consoleName({ romId, slug, src, fallback = '' } = {}) {
+  // 0.9.90 (owner: ports were shown as PS4 games in Achievements): a port's trophies are the port's, whatever console
+  // its library game is on
+  if (src === 'recomp') return 'PC Ports';
   const r = romId ? romById(romId) : null;
   const p = r ? platformById(r.platform_id) : null;
   if (p) return p.display_name || p.name || fallback;
@@ -246,6 +249,7 @@ export function consoleName({ romId, slug, src, fallback = '' } = {}) {
 // else RetroAchievements' console name
 const RA_SLUG = { 'playstation': 'psx', 'playstation 2': 'ps2', 'playstation portable': 'psp', 'nintendo 64': 'n64', 'snes/super famicom': 'snes', 'nes/famicom': 'nes', 'game boy': 'gb', 'game boy color': 'gbc', 'game boy advance': 'gba', 'nintendo ds': 'nds', 'nintendo dsi': 'nds', 'gamecube': 'ngc', 'wii': 'wii', 'genesis/mega drive': 'genesis', 'master system': 'sms', 'game gear': 'gamegear', 'sega cd': 'segacd', '32x': 'sega32', 'saturn': 'saturn', 'dreamcast': 'dc', 'atari 2600': 'atari2600', 'atari 7800': 'atari7800', 'atari lynx': 'lynx', 'atari jaguar': 'jaguar', 'pc engine/turbografx-16': 'tg16', 'neo geo pocket': 'ngp', 'virtual boy': 'virtualboy', 'arcade': 'arcade', 'msx': 'msx', '3do interactive multiplayer': '3do', 'wonderswan': 'wonderswan' };
 export function consoleSlug({ romId, src, name } = {}) {
+  if (src === 'recomp') return 'steam'; // the Steam mark, as ports have on their pages (0.9.88)
   const r = romId ? romById(romId) : null;
   if (r?.platform_slug) return r.platform_slug;
   if (src && SRC_SLUG[src]) return SRC_SLUG[src][0];

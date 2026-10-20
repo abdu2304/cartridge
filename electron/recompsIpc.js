@@ -60,7 +60,17 @@ module.exports = function recompsIpc(m) {
         const env = require('./childEnv').clean(more || {});
         const extra = argv || (args || '').match(/"[^"]*"|\S+/g)?.map((a) => a.replace(/^"(.*)"$/, '$1')) || [];
         let out = '', done = false, p;
-        const end = (r) => { if (done) return; done = true; clearTimeout(t); try { process.kill(-p.pid, 'SIGTERM'); } catch {} setTimeout(() => { try { process.kill(-p.pid, 'SIGKILL'); } catch {} }, 1500); if (isGamescope()) { broadcast('background', { away: false }); refocus(); } log('recomp trial', program, JSON.stringify(r)); resolve(r); };
+        // 0.9.90 (PC playtest: inFAMOUS's update said "Close inFAMOUS Second Son first."): the answer waits until the
+        // trial has really closed, or the set up right after it found the program still running
+        const end = (r) => {
+          if (done) return; done = true; clearTimeout(t);
+          try { process.kill(-p.pid, 'SIGTERM'); } catch {}
+          setTimeout(() => { try { process.kill(-p.pid, 'SIGKILL'); } catch {} }, 1500);
+          if (isGamescope()) { broadcast('background', { away: false }); refocus(); }
+          log('recomp trial', program, JSON.stringify(r));
+          const t0 = Date.now(), gone = () => (!progRunning(program) || Date.now() - t0 > 3000 ? resolve(r) : setTimeout(gone, 150));
+          gone();
+        };
         try { p = require('child_process').spawn(program, extra, { cwd, env, detached: true, stdio: ['ignore', 'pipe', 'pipe'] }); } catch (e) { return resolve({ failed: true, why: e.message }); }
         if (isGamescope()) broadcast('background', { away: true });
         const keep = (b) => { out = (out + b).slice(-4000); };
@@ -170,6 +180,9 @@ module.exports = function recompsIpc(m) {
   const libraryRoms = () => { const r = m.library?.roms || null; if (libRomsMemo.roms !== r) libRomsMemo = { roms: r, list: r ? Object.values(r).flat() : [] }; return libRomsMemo.list; };
   let recompRun = null;
   // a recomp's Steam shortcut: its program, its folder as Start In, its arguments; art from the game when it's in the library
+  // 0.9.90 (owner: show which ports have achievements): true when Cartridge reads the port's unlocks (a recipe's
+  // achievements, a link port whose format is known), false when it has none Cartridge can read
+  const achKnown = (e) => !!(e.recipe?.achievements || (e.achievements && typeof e.achievements === 'object'));
   // ---- Cartridge Verified (0.9.70)
   // your copies of a verified game: the library's matching games, on this device or not, with where they are
   // an installed port's Steam shortcut (its first start's for a port with several), or queued (game page More, 0.9.86)
@@ -251,8 +264,44 @@ module.exports = function recompsIpc(m) {
     for (const r of libraryRoms()) if (/^ps4/i.test(r.platform_slug || '') && m.installedMap[r.id]) { out.add(m.installedMap[r.id]); for (const d of kids(m.installedMap[r.id])) out.add(d); }
     return [...out].slice(0, 600);
   }
+  // 0.9.90 (PC playtest: inFAMOUS opened and closed at once, "Missing: eboot.bin"): the copy a port was set up with
+  // moved (downloaded again from RomM under a new folder name, a drive renamed, a dump moved by hand), and its start
+  // script still named the old folder. Before a start, at start-up and after a download, a port whose copy is gone is
+  // set up again with a copy that is here: the library's, else a dump in the console's folders.
+  const healing = new Map();
+  function healGame(id) {
+    if (healing.has(id)) return healing.get(id);
+    const job = (async () => {
+      const R = recomps(), rec = R.record(id), e = R.byId(id);
+      if (!require('./recomps').copyGone(e, rec)) return false;
+      const src = rec.game.source || rec.game.path;
+      for (const c of verifiedCopies(id).filter((x) => x.here && x.path)) {
+        if (path.resolve(c.path) === path.resolve(src)) continue;
+        try {
+          const r = await R.setVerifiedGame(id, c.path, { candidates: updateCandidates(c.path) });
+          if (r.ok) { log('verified copy moved, set up again', id, src, '->', c.path); return true; }
+          log('verified copy moved, not this one', id, c.path, r.why || '');
+        } catch (er) { log('verified copy moved, set up failed', id, er.message); }
+      }
+      log('verified copy moved and none found', id, src);
+      return false;
+    })().finally(() => healing.delete(id));
+    healing.set(id, job);
+    return job;
+  }
+  async function healGames() {
+    const R = recomps();
+    for (const e of R.catalogue().entries) if (e.from === 'verified' && R.record(e.id)?.game?.path) await healGame(e.id).catch(() => {});
+    await portFilesFollow();
+  }
+  // 0.9.90: settings files a port rewrote (recomps.refreshPortFiles), after a game ends and at start-up
+  async function portFilesFollow() {
+    const R = recomps();
+    for (const e of R.catalogue().entries) if (e.from === 'verified' && R.record(e.id)) await R.refreshPortFiles(e.id).catch(() => {});
+  }
   // a verified game started: its start script (one per game for Uncharted), the window stepping aside in Game Mode
   async function openVerified(id, start) {
+    await healGame(id);
     const R = recomps(), rec = R.record(id), e = R.byId(id);
     if (!rec) throw new Error('Install it first.');
     if (!R.ready(id)) throw new Error(rec.game?.path ? `${e.name} isn’t set up yet. Press Set Up.` : `Pick your copy of ${e.recipe.game.title} first.`);
@@ -269,7 +318,15 @@ module.exports = function recompsIpc(m) {
         m.watchGameRun(require('./recomps').matchRoms(e, libraryRoms())[0] ?? null, { needles: [st.script] });
         // 0.9.89 (owner: Bloodborne doesn't start): Steam can take the request and start nothing (a shortcut left
         // from before, Steam busy). When the start script isn't running 25 s later, it starts directly instead
-        setTimeout(async () => { if (!(await scriptRuns(st.script))) { log('verified through steam: nothing started after 25 s, starting directly', id, st.id); spawnStart(id, rec, st).catch((er) => log('verified direct', id, er.message)); } }, 25000);
+        // 0.9.90 (PC playtest: inFAMOUS, started by Steam and closed at once, was started a second time): looked for
+        // every 2 s, so a start that ended quickly still counts as Steam's
+        const t0 = Date.now(), look = async () => {
+          if (await scriptRuns(st.script)) return;
+          if (Date.now() - t0 < 25000) return setTimeout(look, 2000);
+          log('verified through steam: nothing started after 25 s, starting directly', id, st.id);
+          spawnStart(id, rec, st).catch((er) => log('verified direct', id, er.message));
+        };
+        setTimeout(look, 2000);
         return { via: 'steam', start: st.id };
       } catch (er) { log('verified through steam failed', id, er.message); }
     }
@@ -312,7 +369,7 @@ module.exports = function recompsIpc(m) {
 
   const handlers = {
   // ---- recomps (0.9.65)
-  'recomps:list': () => { oneShortcutsSoon(); const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) steamOf(e); return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
+  'recomps:list': () => { oneShortcutsSoon(); const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) { steamOf(e); e.ach = achKnown(e); } return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
   // the recomps of one library game (game page More, 0.9.65)
   'recomps:forRom': ({ romId }) => { const rom = romIndexMain().get(Number(romId)); if (!rom) return []; return recomps().list({ roms: [rom] }).entries.filter((e) => e.roms.includes(rom.id)).map((e) => ({ id: e.id, name: e.name, installed: steamOf(e).installed, from: e.from, state: e.state || null })); },
   'recomps:check': ({ id, force }) => recomps().check(id, { force }),
@@ -558,5 +615,5 @@ module.exports = function recompsIpc(m) {
   'recomps:setSettings': async ({ id, changes }) => { const d = await recomps().setSettings(id, changes); log('verified settings', id, (changes || []).map((x) => `${x.id}=${x.value}`).join(' ')); return d; },
   'recomps:runner': () => { const r = require('./protonRunner').find({ roots: (() => { try { return m.steamMgr.steamRoots(); } catch { return []; } })() }); return r ? { kind: r.kind, name: r.name } : null; },
   };
-  return { handlers, recomps, ssUnits, recompTrophies, watchFromSteam };
+  return { handlers, recomps, ssUnits, recompTrophies, watchFromSteam, healGames, portFilesFollow };
 };

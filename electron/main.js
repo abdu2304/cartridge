@@ -200,7 +200,7 @@ function childRun(p, what) {
   // 0.9.87: game-run as for a game started through Steam, so the page shows it starting and nav.js gameEnded() takes
   // the pad back when it ends (0.9.86 left that out, and the controller did nothing in Cartridge after a port)
   runOn = true; gameFocus.gameApp = null; gameFocus.endedAt = 0; log('game running', what); setAway('child', true); broadcast('game-run', { state: 'starting', port: what });
-  p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setAway('child', false); broadcast('game-run', { state: 'ended', port: what }); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
+  p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setTimeout(() => RIPC.portFilesFollow().catch(() => {}), 3000); setAway('child', false); broadcast('game-run', { state: 'ended', port: what }); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
 }
 // o.needles: what to look for instead of the game's own file (0.9.88: a PC port started through Steam, by its start script)
 function watchGameRun(romId, o = {}) {
@@ -237,7 +237,7 @@ function watchGameRun(romId, o = {}) {
     // while its game runs, so a freeze that takes everything down still leaves the last of it (emulator-runs/)
     if (vita && on && Date.now() - (copiedAt || 0) > 30000) { copiedAt = Date.now(); keepEmuLog('vita3k', require('./pkgInstall').vita3kLogFile(steamMgr.vita3kCommand?.()?.exe)); }
     if (!on && seen) {
-      clearInterval(runT); runOn = false; gameFocus.endedAt = Date.now(); log('game ended', romId); setAway('run', false);
+      clearInterval(runT); runOn = false; gameFocus.endedAt = Date.now(); log('game ended', romId); setAway('run', false); setTimeout(() => RIPC.portFilesFollow().catch(() => {}), 3000); // 0.9.90
       broadcast('game-run', { state: 'ended', romId });
       saveSyncAfter(romId); // Cartridge Save Sync (0.9.51)
       bringBack();
@@ -579,10 +579,8 @@ function readEmuDeckSettings() {
   const file = path.join(os.homedir(), '.config/EmuDeck/settings.sh');
   const out = {};
   try {
-    for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-      const m = line.match(/^\s*(?:export\s+)?(romsPath|emulationPath|biosPath|toolsPath)=["']?([^"'\n]*)["']?/);
-      if (m) out[m[1]] = expandHome(m[2].trim());
-    }
+    const v = require('./shellValue').read(fs.readFileSync(file, 'utf8'), ['romsPath', 'emulationPath', 'biosPath', 'toolsPath']);
+    for (const k of Object.keys(v)) if (v[k]) out[k] = expandHome(v[k]);
   } catch {}
   return out;
 }
@@ -1730,10 +1728,27 @@ function emitQueueThrottled() {
   emitTimer = setTimeout(() => { emitTimer = null; emitQueue(); }, 250);
 }
 
+// awake while a game downloads, unpacks or installs (a download stays 'downloading' until it's unpacked), and while
+// an emulator, port, update or game move runs; otherwise the system sleeps as it normally would.
+// 0.9.90 (owner: SteamOS went to sleep during a download): Electron's blocker asks the desktop's screensaver service,
+// which Game Mode (gamescope) doesn't have, so a logind sleep lock is held as well: Steam's own sleep goes through
+// logind and waits for it. tail --pid ends with Cartridge, so a crash never leaves the lock behind.
+let sleepLock = null;
+const AWAKE_JOBS = (j) => j.state === 'run' && !['Search', 'Save Sync'].includes(j.kind);
 function updatePowerBlock() {
-  const active = queue.some((q) => q.status === 'downloading' || q.status === 'queued');
+  const active = queue.some((q) => q.status === 'downloading' || q.status === 'queued') || [...bgJobs.values()].some(AWAKE_JOBS);
   if (active && psbId === null) psbId = powerSaveBlocker.start('prevent-app-suspension');
   if (!active && psbId !== null) { powerSaveBlocker.stop(psbId); psbId = null; }
+  if (active && !sleepLock) {
+    try {
+      sleepLock = require('child_process').spawn('systemd-inhibit', ['--what=sleep:idle', '--who=Cartridge', '--why=Downloading or installing games', '--mode=block', 'tail', `--pid=${process.pid}`, '-f', '/dev/null'], { stdio: 'ignore', env: require('./childEnv').clean() });
+      const me = sleepLock;
+      me.once('error', () => { if (sleepLock === me) sleepLock = false; }); // no systemd-inhibit: Electron's blocker only
+      me.once('exit', () => { if (sleepLock === me) sleepLock = null; });
+      log('awake: sleep held off while games download or install');
+    } catch { sleepLock = false; }
+  }
+  if (!active && sleepLock) { try { sleepLock.kill(); } catch {} sleepLock = null; log('awake: sleep allowed again'); }
 }
 
 const DISC_EXT = new Set(['chd', 'cue', 'gdi', 'cdi', 'ccd', 'mds', 'iso', 'pbp', 'cso', 'rvz', 'wbfs']);
@@ -2129,6 +2144,7 @@ async function runJob(it) {
     if (!it.redo && !it.into && it.notice !== 'pkg') rpcs3Settings(rom.id);
     if (!it.redo && !it.into && it.notice !== 'pkg') try { if (steamMgr.onDownloaded(rom.id)) broadcast('steam-auto', { romId: rom.id, name: rom.name, action: 'add' }); } catch (e) { log('steam auto add', e.message); }
     autoBios(rom.platform_id, rom.platform_slug); // in the background, never holds the download up
+    if (/^ps[45]/i.test(rom.platform_slug || '')) setTimeout(() => RIPC.healGames().catch(() => {}), 2000); // 0.9.90: a port whose copy this replaced
   } catch (e) {
     // stopped on purpose: keep a status set since (paused, or queued again by Resume)
     if (ac.signal.aborted) { if (!['paused', 'queued'].includes(it.status)) it.status = 'cancelled'; }
@@ -3598,7 +3614,7 @@ function createWindow() {
     scheduler.add('rpcs3-relocate', { once: true, firstAfter: 20000, deferWhilePlaying: true, run: async () => rpcs3Relocate() }); // 0.9.63
     // recomps (0.9.65): recomp/<console> in every Emulation folder once, and the catalogue, PCGamingWiki and installed
     // recomps' releases checked once a day, silently (owner: "without consuming many resources")
-    scheduler.add('recomp-folders', { once: true, firstAfter: 25000, deferWhilePlaying: true, run: async () => { try { recomps().ensureFolders(); } catch (e) { log('recomp folders', e.message); } recompTrophies(); } });
+    scheduler.add('recomp-folders', { once: true, firstAfter: 25000, deferWhilePlaying: true, run: async () => { tidyShortEmuDeckRoot(); try { recomps().ensureFolders(); } catch (e) { log('recomp folders', e.message); } recompTrophies(); await RIPC.healGames().catch(() => {}); } });
     // 0.9.80 (agreed plan 7.1 #10): a recomp not set up yet, started from Steam instead of Cartridge's Open, gets the same
     // setup watch: looked for every 30 s, only while one with a done file is waiting
     scheduler.add('recomp-setup-steam', { every: 30000, firstAfter: 60000, run: () => RIPC.watchFromSteam() });
@@ -4694,6 +4710,7 @@ const handlers = {
     saveManifest();
     delete installedMap[romId];
     broadcast('installed-changed', { romId, path: null });
+    setTimeout(() => RIPC.healGames().catch(() => {}), 500); // 0.9.90: a port set up with this copy takes another one that's here
     try { if (steamMgr.onDeleted(romId)) broadcast('steam-auto', { romId, action: 'remove' }); } catch (e) { log('steam auto remove', e.message); }
     return true;
   },
@@ -5941,6 +5958,7 @@ const handlers = {
       computeInstalled();
       let steam = false; try { await steamMgr.refreshGame(romId, { force: true }); steam = true; } catch (e) { log('move: steam shortcut', e.message); }
       log('game moved', from, '->', to);
+      if (/^ps[45]/i.test(r.platform_slug || '')) setTimeout(() => RIPC.healGames().catch(() => {}), 500); // 0.9.90: a port set up with this copy follows it
       return { to, steam };
     }
   },
@@ -6168,6 +6186,7 @@ function bgJob(key, o) {
   if (!prev && !o.state) return; // progress for a job that isn't one (or has gone)
   const j = { ...(prev || { key, at: Date.now() }), ...o, upd: Date.now() };
   bgJobs.set(key, j);
+  if (o.state) updatePowerBlock();
   // progress at most every 300 ms; starts and ends at once
   const now = Date.now();
   if (o.state || now - (jobSent.get(key) || 0) > 300) { jobSent.set(key, now); broadcast('bg-job', j); }
@@ -6332,11 +6351,14 @@ const loopDelay = require('perf_hooks').monitorEventLoopDelay({ resolution: 20 }
 // answering for seconds makes Steam dim the window and take the pad; when it answers again the page may have lost focus
 // and Steam may keep the pad. A stall over 2 s is logged and followed by the steps that bring the pad back after a game:
 // refocus (until the page has focus) and, when gamescope doesn't name Cartridge, Steam asked to show it
-let beatAt = Date.now();
+// 0.9.90: the wall clock runs on while the system sleeps and the monotonic one doesn't, so a wake isn't logged as a
+// stall of hours (the log said "stalled 27349884 ms" after a night asleep); the steps after it still run
+let beatAt = Date.now(), beatMono = process.hrtime.bigint();
 setInterval(() => {
-  const now = Date.now(), gap = now - beatAt - 500; beatAt = now;
+  const now = Date.now(), mono = process.hrtime.bigint(), gap = now - beatAt - 500, run = Number((mono - beatMono) / 1000000n) - 500; beatAt = now; beatMono = mono;
   if (gap < 2000) return;
-  log('main thread stalled', gap, 'ms');
+  if (gap - run > 5000) log('system woke after sleeping', Math.round((gap - run) / 60000), 'min', run >= 2000 ? `(and the main thread stalled ${run} ms)` : '');
+  else log('main thread stalled', gap, 'ms');
   if (isGamescope() && !gameFocus.away && !runOn && win && !win.isDestroyed()) { refocus(); setTimeout(steamFront, 1500); }
 }, 500).unref?.();
 loopDelay.enable();
@@ -6467,11 +6489,40 @@ async function linuxNow(e) {
 // every one of them (owner: "added to every emulation folder").
 function emulationFolders() {
   const out = [], seen = new Set();
-  const add = (d) => { if (!d || !isDir(d)) return; let r = d; try { r = fs.realpathSync(d); } catch {} if (seen.has(r)) return; seen.add(r); out.push(d); };
+  // 0.9.90: only a folder with roms/ in it; a wrong path (EmuDeck's settings read short, a drive's top folder) got
+  // recomp/ and bios/ made beside the real Emulation folder
+  const add = (d) => { if (!d || !isDir(path.join(d, 'roms'))) return; let r = d; try { r = fs.realpathSync(d); } catch {} if (seen.has(r)) return; seen.add(r); out.push(d); };
   if (config.emulationRoot) add(config.emulationRoot);
   for (const r of [config.romsRoot, ...extraRoots()].filter(Boolean)) if (/^roms$/i.test(path.basename(r))) add(path.dirname(r));
   try { const emu = readEmuDeckSettings(); if (emu.emulationPath) add(emu.emulationPath); } catch {}
   return out;
+}
+// 0.9.90: what the short read of EmuDeck's settings made (EmuDeck writes emulationPath="/run/media/x/Drive"/Emulation,
+// and 0.9.89 and before read "/run/media/x/Drive"): recomp/<console> folders and bios/ copies beside the real
+// Emulation folder. Only what Cartridge made goes: empty console folders, and files byte for byte the same as the one
+// in the real bios/. Anything else (and any folder with roms/ in it) is left alone.
+function tidyShortEmuDeckRoot() {
+  try {
+    const text = fs.readFileSync(path.join(os.homedir(), '.config/EmuDeck/settings.sh'), 'utf8');
+    const m = text.match(/^\s*(?:export\s+)?emulationPath=["']?([^"'\n]*)["']?/m);
+    const real = readEmuDeckSettings().emulationPath, short = m && expandHome(m[1].trim());
+    if (!short || !real || path.resolve(short) === path.resolve(real) || isDir(path.join(short, 'roms'))) return;
+    const same = (a, b) => { try { const sa = fs.statSync(a), sb = fs.statSync(b); return sa.isFile() && sb.isFile() && sa.size === sb.size && fs.readFileSync(a).equals(fs.readFileSync(b)); } catch { return false; } };
+    let gone = 0;
+    const rec = path.join(short, 'recomp');
+    for (const k of (() => { try { return fs.readdirSync(rec); } catch { return []; } })()) { try { fs.rmdirSync(path.join(rec, k)); gone++; } catch {} }
+    try { fs.rmdirSync(rec); } catch {}
+    const bios = path.join(short, 'bios'), realBios = readEmuDeckSettings().biosPath || path.join(real, 'bios');
+    const walk = (rel) => {
+      let names = []; try { names = fs.readdirSync(path.join(bios, rel), { withFileTypes: true }); } catch { return; }
+      for (const n of names) {
+        const r = path.join(rel, n.name);
+        if (n.isDirectory()) { walk(r); try { fs.rmdirSync(path.join(bios, r)); } catch {} } else if (same(path.join(bios, r), path.join(realBios, r))) { fs.rmSync(path.join(bios, r)); gone++; }
+      }
+    };
+    if (path.resolve(bios) !== path.resolve(realBios)) { walk(''); try { fs.rmdirSync(bios); } catch {} }
+    if (gone) log('tidied what the short EmuDeck path made', short, gone);
+  } catch {}
 }
 // recomps and Cartridge Verified ports: electron/recompsIpc.js (0.9.71); these names stay callable from here
 function recomps() { return RIPC.recomps(); }

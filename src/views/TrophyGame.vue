@@ -70,7 +70,7 @@ const filters = [{ v: 'all', l: 'All' }, { v: 'unlocked', l: 'Unlocked' }, { v: 
 const l = computed(() => g.value?.light || {});
 const pct = computed(() => (l.value.total ? Math.round((l.value.earned / l.value.total) * 100) : 0));
 const rom = computed(() => romById(g.value?.romId));
-const SLUG = { rpcs3: 'ps3', shadps4: 'ps4', xenia: 'xbox360', vita3k: 'psvita', kytyps5: 'ps5', recomp: null };
+const SLUG = { rpcs3: 'ps3', shadps4: 'ps4', xenia: 'xbox360', vita3k: 'psvita', kytyps5: 'ps5', recomp: 'steam' };
 const hash = (t) => { let h = 5381; for (const c of String(t)) h = ((h * 33) ^ c.charCodeAt(0)) >>> 0; return h.toString(36); };
 const gameLogo = computed(() => (!g.value ? null : rom.value ? logoOf(rom.value) : logoOf({ id: 'tro' + hash(g.value.title), name: g.value.title.replace(/[™®©]/g, '') })));
 const totals = computed(() => { const o = { P: 0, G: 0, S: 0, B: 0 }; for (const t of g.value?.trophies || []) if (o[t.grade] !== undefined) o[t.grade]++; return o; });
@@ -95,8 +95,8 @@ watch(() => store.trophyVer, load);
 // More: change or reset the game's icon (SteamGridDB)
 // trophies Cartridge can't name: pick the library game they belong to (its name is used from then on)
 async function linkGame() {
-  const slug = SLUG[g.value.src];
-  const roms = allRoms().filter((r) => r.platform_slug === slug || r.platform_fs_slug === slug).sort((a, b) => a.name.localeCompare(b.name));
+  const slug = g.value.src === 'recomp' ? null : SLUG[g.value.src]; // a port's game can be on any console
+  const roms = allRoms().filter((r) => !slug || r.platform_slug === slug || r.platform_fs_slug === slug).sort((a, b) => a.name.localeCompare(b.name));
   if (!roms.length) return toast(`No ${g.value.platform} games in your library to link to.`, 'info', 4000);
   const id = await choose({ sheet: true, title: 'Link to a Game', message: `${plural(l.value.total, 'trophy', 'trophies')}${g.value.code ? ` · ${g.value.code}` : ''}`, options: roms.map((r) => ({ label: r.name, value: r.id, selected: r.id === g.value.romId, raw: true })) });
   if (!id) return;

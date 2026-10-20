@@ -13,6 +13,8 @@
           <span class="l-mid"><b>{{ e.name }}</b><span class="l-sub">{{ vSub(e) }}</span></span>
           <!-- played through on a device by Cartridge's author (the recipe's verified.played, set only when they say so) -->
           <span v-if="e.verified?.played" class="status ok" title="Played through on a device"><Icon name="mdiGamepadVariant" :size="14" />Played</span>
+          <!-- 0.9.90 (owner): whether the port records achievements Cartridge can show -->
+          <span class="status" :class="{ ok: e.ach }"><Icon :name="e.ach ? 'mdiTrophyOutline' : 'mdiTrophyBroken'" :size="14" />{{ e.ach ? 'Achievements' : 'No Achievements' }}</span>
           <span class="l-end"><span class="status" :class="vStatus(e).cls"><Icon v-if="vStatus(e).icon" :name="vStatus(e).icon" :size="14" />{{ vStatus(e).text }}</span></span>
         </button>
       </section>
@@ -23,6 +25,7 @@
           <img v-if="coverOf(e)" class="rc-cover" :src="coverOf(e)" alt="" loading="lazy" />
           <span v-else class="rc-cover rc-none"><Icon name="mdiGamepadVariantOutline" :size="22" /></span>
           <span class="l-mid"><b>{{ e.name }}</b><span class="l-sub">{{ subOf(e) }}</span></span>
+          <span v-if="e.ach" class="status ok"><Icon name="mdiTrophyOutline" :size="14" />Achievements</span>
           <span class="l-end"><span class="status" :class="statusOf(e).cls"><Icon v-if="statusOf(e).icon" :name="statusOf(e).icon" :size="14" />{{ statusOf(e).text }}</span></span>
         </button>
         <LinkInput v-model="link" />

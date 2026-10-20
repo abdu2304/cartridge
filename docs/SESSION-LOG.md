@@ -7,6 +7,17 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 20 Oct 2026 · 0.9.90 · Ports Start Again (third session on the owner's PC)
+Owner: inFAMOUS and Bloodborne ports don't launch; recomp/ and bios/ made outside the Emulation folder; stay awake only while games download or install; go through the logs; fix for everyone. Details and evidence: handover Part 37.
+- inFAMOUS: its game copy had moved (downloaded again under a new folder name). Ports now re-find their copy. Played through Steam on the PC.
+- Bloodborne: starts and plays here through Steam, play.sh and a 4K gamescope; about 35 s with nothing on screen while it prepares. The owner's Game Mode run looks like Exit Game during that wait. The starting screen now says a port prepares with nothing on screen and to leave it running (owner agreed).
+- EmuDeck's quoted paths read short: fixed, roots need roms/, stray folders tidied once.
+- Sleep lock (logind) while downloads, unpacks and installs run.
+- From the logs: update freeze, "Close it first" after an update, double start, sleep logged as a stall, P.T. save list.
+- Next: the owner tries both ports in Game Mode on the TV; Uncharted's controller and settings (still open from Part 35).
+
+---
+
 ## 19 Oct 2026 · 0.9.88 · Smooth Again (second session on the owner's PC)
 Owner: "playtest everything and iterate until everything is perfect", fixes for everyone, not only this PC; also GSAP for good and "Steam" beside the Steam logo in Continue Playing. Each report reproduced here first (handover Part 35 has causes and evidence):
 - Freezes and slow Settings pages: Save Sync zipped P.T.'s 1.9 GB of caches on the main thread every sync. Fixed for every port and every save over 512 MB.

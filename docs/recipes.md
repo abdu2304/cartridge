@@ -17,6 +17,7 @@ Unverified: Cartridge installs it and keeps versions, the port sets itself up by
 | `settings` | Every setting of the port's launcher, read from its source: `id`, `tab`, `label`, `type` choice/bool/number/text, `def`, `options`, `at` (`['app', key]` or `['ini', [section, key]]`), `desc`, `os` |
 | `saves` | Where saves live, for backups and Save Sync |
 | `verified` | Date, the release checked, whether the owner has played it |
+| `known` | The keys the port's own settings files held when the recipe was written (`app`: JSON keys, `ini`: `key` or `section/key`). A key the port writes beyond these (a setting an update added) shows in Game Settings under More, typed by its value; a recipe setting the port stops writing for a release is hidden (0.9.90, `recipes.settingsNow`). Record it from a real install after the port has run once. Without it no extras show. |
 
 Paths take `{dir}` (the install folder), `{game}`, `{home}`, `{config}`, `{data}`, `{appdata}` (the Proton prefix's
 AppData for Windows builds) and `{result}`.

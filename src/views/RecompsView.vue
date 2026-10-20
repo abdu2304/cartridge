@@ -29,6 +29,7 @@
           <div class="art"><img v-if="pics[e.id]" :src="pics[e.id]" alt="" /><div v-else class="ph"><span class="ph-t">{{ e.name }}</span></div></div>
           <div class="title">{{ e.name }}</div>
           <div class="sub extra">{{ stateOf(e) }}</div>
+          <div class="sub">{{ e.ach ? 'Achievements' : 'No achievements' }}</div>
         </button>
       </template>
     </div>

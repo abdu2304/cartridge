@@ -56,6 +56,17 @@ function indexOf(roms) {
   return ix;
 }
 // library games this recomp is for: same console family, same title
+// 0.9.90: a verified port's game copy that has gone (moved, downloaded again under a new folder name, deleted): its
+// source folder missing, or the folder in use (a view of links when an update is laid over) without the recipe's first
+// file. Never when the port itself isn't here (its drive unplugged): nothing could be set up then.
+function copyGone(e, rec) {
+  if (e?.from !== 'verified' || !rec?.game?.path || !rec.program || !fs.existsSync(rec.program)) return false;
+  const src = rec.game.source || rec.game.path;
+  if (!fs.existsSync(src)) return true;
+  try { if (fs.statSync(rec.game.path).isFile()) return false; } catch { return true; }
+  const first = (e.recipe?.game?.has || [])[0];
+  return !!first && !fs.existsSync(path.join(rec.game.path, first));
+}
 function matchRoms(entry, roms) {
   const ix = indexOf(roms || []), out = new Set();
   for (const g of entry.games || []) {
@@ -766,10 +777,12 @@ function createRecomps(ctx) {
         for (const old of FV.list(store).slice(2)) FV.drop(store, old.tag);
       }
       fs.mkdirSync(dest, { recursive: true });
-      fs.cpSync(inner, dest, { recursive: true, force: true });
+      // 0.9.90 (PC playtest: Cartridge froze 14 s on inFAMOUS's update): copied and cleaned up off the main thread; a
+      // few hundred MB onto an external drive held the whole window still
+      await fs.promises.cp(inner, dest, { recursive: true, force: true });
       program = path.join(dest, pick.rel);
       if (kind === 'linux') { for (const f of entries) if (f.elf || f.appimage || f.path === pick.path) { try { fs.chmodSync(path.join(dest, f.rel), 0o755); } catch {} } }
-    } finally { fs.rmSync(tmp, { force: true }); fs.rmSync(tmpNow, { force: true }); fs.rmSync(out, { recursive: true, force: true }); }
+    } finally { fs.rmSync(tmp, { force: true }); fs.rmSync(tmpNow, { force: true }); await fs.promises.rm(out, { recursive: true, force: true }).catch(() => {}); }
     const saves = checkSaves(meta);
     installs[id] = { ...(prev || {}), id, repo: e.repo, dir: dest, program, kind, tag: rel.tag, date: rel.date, files, channel: ch, at: Date.now(), asset: b.asset.name, ...(local ? { ci: true } : {}) };
     // set up again? Its done file went with the update, or the release brought files where its setup had made them
@@ -1017,6 +1030,7 @@ function createRecomps(ctx) {
   const recipeOf = (e) => (e?.from === 'verified' ? e.recipe : null);
   const buildOf = (e, rec) => recipeOf(e)?.builds.find((b) => b.os === rec?.build) || null;
   const readText = (p) => { try { return fs.readFileSync(p, 'utf8'); } catch { return null; } };
+  const hashText = (t) => (t == null ? null : require('crypto').createHash('sha1').update(String(t)).digest('hex'));
   function writeFileSafe(p, text, mode) {
     fs.mkdirSync(path.dirname(p), { recursive: true });
     fs.writeFileSync(p + '.cartridge-tmp', text);
@@ -1192,8 +1206,15 @@ function createRecomps(ctx) {
     onProgress({ step: 'write' });
     // the first time: what you chose in the port's own launcher before is kept
     if (!rec.settings) { rec.settings = RC.readBack(r, build, rec, { read: readText }); saveInstalls(); }
-    const out = RC.render(r, build, rec, RC.effective(r, build, rec.settings), { read: readText });
+    // 0.9.90: the recipe's settings as this release of the port has them, and the ones only its own file names
+    const sets = RC.settingsNow(r, build, rec, { read: readText });
+    const out = RC.render(r, build, rec, RC.effective(r, build, rec.settings, sets), { read: readText, sets });
     for (const f of out.files) writeFileSafe(f.path, f.text);
+    // what each of the port's files holds as Cartridge wrote it (the app file arrives by the start script's copy), so a
+    // file the port rewrote is told apart afterwards (portWrote)
+    rec.wrote = {};
+    for (const st of out.starts) if (st.copy) rec.wrote[st.copy.to] = hashText(out.files.find((f) => f.path === st.copy.from)?.text);
+    if (build.files?.ini) { const ip = RC.expand(build.files.ini.path, out.vars); rec.wrote[ip] = hashText(out.files.find((f) => f.path === ip)?.text); }
     rec.starts = out.starts.map((st) => { writeFileSafe(st.script, RC.script(r, build, rec, st, runner, out.vars), 0o755); return { id: st.id, name: st.name, sub: st.sub, script: st.script }; });
     rec.runner = runner ? runner.kind : null;
     saveInstalls();
@@ -1208,14 +1229,14 @@ function createRecomps(ctx) {
     const mine = rec?.settings || {};
     return {
       name: r.name, version: rec?.tag || null, port: true,
-      items: RC.settingsFor(r, build).map((s) => ({ id: s.id, label: s.label, tab: s.tab, desc: s.desc || '', type: s.type === 'text' ? 'text' : s.type, num: s.type === 'number' ? s.num || { min: -1e9, max: 1e9 } : null, options: s.type === 'bool' ? [{ value: true, label: 'On' }, { value: false, label: 'Off' }] : (s.options || []).map(([v, l]) => ({ value: v, label: l })), base: s.def, game: mine[s.id] != null ? mine[s.id] : null })),
+      items: (rec ? RC.settingsNow(r, build, rec, { read: readText }) : RC.settingsFor(r, build)).map((s) => ({ id: s.id, label: s.label, tab: s.tab, desc: s.desc || '', type: s.type === 'text' ? 'text' : s.type, num: s.type === 'number' ? s.num || { min: -1e9, max: 1e9 } : null, options: s.type === 'bool' ? [{ value: true, label: 'On' }, { value: false, label: 'Off' }] : (s.options || []).map(([v, l]) => ({ value: v, label: l })), base: s.def, game: mine[s.id] != null ? mine[s.id] : null })),
     };
   }
   async function setSettings(id, changes = []) {
     const e = byId(id), r = recipeOf(e), rec = installs[id];
     if (!r || !rec) throw new Error('Install it first.');
     const build = buildOf(e, rec);
-    const by = new Map(RC.settingsFor(r, build).map((s) => [s.id, s]));
+    const by = new Map(RC.settingsNow(r, build, rec, { read: readText }).map((s) => [s.id, s]));
     const next = { ...(rec.settings || {}) };
     for (const c of changes) {
       const s = by.get(c.id);
@@ -1230,6 +1251,23 @@ function createRecomps(ctx) {
     rec.settings = next; saveInstalls();
     if (rec.game?.path) await configure(id);
     return settings(id);
+  }
+  // 0.9.90: after the port ran (and at start-up, for a start from Steam while Cartridge was closed): when the port
+  // rewrote one of its settings files, the keys it wrote are recorded for this release (an update that added or took
+  // away a setting shows in Game Settings) and Cartridge's staged copy is made again from the port's file, so the start
+  // script's copy no longer puts back an older file over keys the port added
+  async function refreshPortFiles(id) {
+    const e = byId(id), r = recipeOf(e), rec = installs[id];
+    if (!r || !rec?.game?.path || !rec.wrote || !exists(rec.program)) return false;
+    const build = buildOf(e, rec);
+    if (!build) return false;
+    const changed = Object.entries(rec.wrote).some(([p, h]) => { const t = readText(p); return t != null && hashText(t) !== h; });
+    if (!changed) return false;
+    rec.portKeys = { tag: rec.tag, ...RC.keysOf(RC.portKeys(r, build, rec, { read: readText })) };
+    saveInstalls();
+    if (ctx.isRunning(rec.program)) return true;
+    try { await configure(id); log('verified settings follow the port', id, rec.tag); } catch (er) { log('verified settings follow the port', id, er.message); }
+    return true;
   }
   // a verified game's save folders on this device (the recipe's, per build)
   function verifiedSaves(e, rec) {
@@ -1275,7 +1313,7 @@ function createRecomps(ctx) {
   const pendingSetup = () => catalogue().entries.filter((e) => e.done && installs[e.id] && !readyOf(e, installs[e.id])).map((e) => ({ id: e.id, program: installs[e.id].flatpak || installs[e.id].program }));
   const record = (id) => installs[id] || null;
   const reload = () => { cat = null; repaired = false; installs = readJson(F('recomp-installs.json'), {}); };
-  return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : e?.saves?.length ? saveDirs(e, installs[id]) : (installs[id]?.syncSaves || []).filter(exists); }, saveChoices, setSyncSaves, pendingSetup, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes };
+  return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : e?.saves?.length ? saveDirs(e, installs[id]) : (installs[id]?.syncSaves || []).filter(exists); }, saveChoices, setSyncSaves, pendingSetup, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes, refreshPortFiles };
 }
 
-module.exports = { ciBuildOf, checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, matchDumps, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
+module.exports = { ciBuildOf, checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, matchDumps, copyGone, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
