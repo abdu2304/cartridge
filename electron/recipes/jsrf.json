@@ -1,0 +1,120 @@
+{
+ "schema": 1,
+ "id": "jsrf",
+ "name": "JSRF Unleashed",
+ "by": "JuMatt",
+ "repo": "github:JuMatt/JetSetRadioFuture-Unleashed",
+ "licence": "MIT",
+ "about": "Jet Set Radio Future statically recompiled and running natively, drawn at up to four times the Xbox’s resolution, with 16:9 widescreen and any controller. Plays from the files of your own USA disc: Cartridge unpacks an .iso once (or uses an unpacked folder).",
+ "verified": {
+  "on": "2026-10-20",
+  "release": "v0.4.7",
+  "played": false
+ },
+ "game": {
+  "console": "xbox",
+  "title": "Jet Set Radio Future",
+  "also": [
+   "JSRF",
+   "JSRF - Jet Set Radio Future"
+  ],
+  "kind": "file",
+  "ext": [
+   ".iso",
+   ".xiso"
+  ],
+  "unpack": "xiso",
+  "has": [
+   "default.xbe",
+   "Media"
+  ],
+  "why": "Your own copy of the USA release: an Xbox disc image (.iso), or the folder with default.xbe and Media in it.",
+  "keep": [
+   "UDATA"
+  ]
+ },
+ "builds": [
+  {
+   "os": "linux",
+   "asset": "^JSRF-Unleashed-linux-x86_64\\.tar\\.gz$",
+   "program": "jsrf-unleashed",
+   "args": [
+    "{gamePosix}"
+   ],
+   "files": {
+    "ini": {
+     "path": "{config}/jsrf-unleashed/settings",
+     "format": "flat"
+    }
+   }
+  }
+ ],
+ "settings": [
+  {
+   "id": "scale",
+   "tab": "Display",
+   "label": "Internal resolution",
+   "type": "choice",
+   "def": "2",
+   "at": [
+    "ini",
+    "scale"
+   ],
+   "options": [
+    [
+     "1",
+     "1x (640x480)"
+    ],
+    [
+     "2",
+     "2x (1280x960)"
+    ],
+    [
+     "3",
+     "3x (1920x1440)"
+    ],
+    [
+     "4",
+     "4x (2560x1920)"
+    ]
+   ],
+   "desc": "The game is drawn at this many times the Xbox’s 640x480. F9 changes it in the game (it restarts, so save first)."
+  },
+  {
+   "id": "widescreen",
+   "tab": "Display",
+   "label": "Widescreen 16:9",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "ini",
+    "widescreen"
+   ],
+   "desc": "A wider view, not a stretch; the HUD keeps its shape and the title screen stays 4:3. F10 in the game."
+  },
+  {
+   "id": "fullscreen",
+   "tab": "Display",
+   "label": "Start full screen",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "env",
+    "RECOMP_FULLSCREEN"
+   ],
+   "desc": "F11 or Alt+Return switches it in the game."
+  }
+ ],
+ "saves": [
+  "{game}/UDATA"
+ ],
+ "known": {
+  "app": [],
+  "ini": [
+   "game_dir",
+   "scale",
+   "widescreen"
+  ]
+ },
+ "rev": 1
+}

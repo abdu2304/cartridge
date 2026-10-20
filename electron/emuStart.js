@@ -21,7 +21,10 @@ const has = (id) => !!CHECKS[String(id || '').split('@')[0]];
 function plainEnv(extra = {}) {
   const env = { ...process.env };
   for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD', 'QT_PLUGIN_PATH', 'QT_QPA_PLATFORM_PLUGIN_PATH']) delete env[k];
-  return { ...env, ...extra };
+  // 0.9.91 (PC playtest: "Allow Vita3K.AppImage to check for updates?" in a kdialog after the check): AppImages made
+  // with pkgforge's tools (Vita3K's since October 2026) carry a self-updater hook that asks from the second start on, in
+  // the background; Cartridge updates emulators itself, and DISABLE_AUTO_UPDATES is the hook's own switch
+  return { ...env, DISABLE_AUTO_UPDATES: '1', ...extra };
 }
 
 // what went wrong, in a few plain words, from what the program printed

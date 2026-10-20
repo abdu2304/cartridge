@@ -75,7 +75,22 @@ function dump(dir, id, ver, files = []) {
   for (const f of files) { fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true }); if (!fs.existsSync(path.join(dir, f))) fs.writeFileSync(path.join(dir, f), f + ' ' + ver); }
 }
 // ports whose own installer reads the game's data: the few bytes it checks (P.T.'s installer, its source)
+// a made-up Xbox disc image (XDVDFS): the volume descriptor at sector 32, a root folder with default.xbe and Media/
+function xiso(file, names) {
+  const S = 2048, img = Buffer.alloc(S * 40);
+  img.write('MICROSOFT*XBOX*MEDIA', 32 * S, 'latin1');
+  const entry = (name, sector, size, attr) => { const b = Buffer.alloc((14 + name.length + 3) & ~3, 0xff); b.writeUInt16LE(0, 0); b.writeUInt16LE(0, 2); b.writeUInt32LE(sector, 4); b.writeUInt32LE(size, 8); b[12] = attr; b[13] = name.length; b.write(name, 14, 'latin1'); return b; };
+  // the root: default.xbe, its right subtree Media (offsets in 4-byte units)
+  const e1 = entry('default.xbe', 36, 4, 0x20), e2 = entry('Media', 37, S, 0x10);
+  e1.writeUInt16LE(e1.length / 4, 2);
+  const root = Buffer.concat([e1, e2]);
+  root.copy(img, 34 * S); img.write('XBE!', 36 * S, 'latin1');
+  entry('song.xwb', 38, 3, 0x20).copy(img, 37 * S); img.write('mus', 38 * S, 'latin1');
+  img.writeUInt32LE(34, 32 * S + 20); img.writeUInt32LE(root.length, 32 * S + 24);
+  fs.writeFileSync(file, img);
+}
 const SHAPES = {
+  jsrf: (dir) => { for (const n of fs.readdirSync(dir)) fs.rmSync(path.join(dir, n)); xiso(path.join(dir, 'jsrf.iso')); },
   pt: (dir) => {
     const a = path.join(dir, 'CUSA01127-app'); fs.mkdirSync(a, { recursive: true });
     fs.writeFileSync(path.join(a, 'chunk1.psarc'), Buffer.concat([Buffer.from('PSAR'), Buffer.alloc(60)]));
@@ -90,10 +105,15 @@ const ok = (id, what, good, detail = '') => { report.push({ id, what, good: !!go
 (async () => {
   const eng = R.createRecomps({
     dataDir: data, log: () => {}, fetchImpl, download, unpackTo, isElf,
+    // a Flatpak bundle (Unleashed's Linux release) is named, not installed: the runner is no place to install apps
+    flatpakBundle: async (file) => path.basename(file).replace(/\.flatpak$/i, ''),
     isRunning: () => false, trash: async (p) => fs.rmSync(p, { recursive: true, force: true }),
     recompRoot: () => path.join(emu, 'recomp'), recompRoots: () => [path.join(emu, 'recomp')],
     runner: () => ({ kind: 'runtime', proton: '/steam/steamapps/common/Proton 10.0', runtime: '/steam/steamapps/common/SteamLinuxRuntime_sniper', steam: '/steam', name: 'Proton 10.0' }),
     runProgram: async (cmd, args, o) => {
+      // a port's own build step (Wind Waker HD's setup.py) can't build from a made-up copy: it is stood in for,
+      // leaving the file it would leave (it runs for real when a port is set up on a device)
+      if (o.prepareDone) { fs.mkdirSync(path.dirname(o.prepareDone), { recursive: true }); fs.writeFileSync(o.prepareDone, '#!/bin/sh\n', { mode: 0o755 }); return ''; }
       if (/wineboot/.test(args.join(' '))) { fs.mkdirSync(path.join(o.env.STEAM_COMPAT_DATA_PATH, 'pfx/drive_c/users/steamuser'), { recursive: true }); return ''; }
       return new Promise((done, bad) => cp.execFile(cmd, args, { cwd: o.cwd, timeout: o.timeoutMs || 600000, env: o.env }, (e, out, err) => (e ? bad(new Error(String(err || e.message).slice(0, 400))) : done(out))));
     },
@@ -112,13 +132,16 @@ const ok = (id, what, good, detail = '') => { report.push({ id, what, good: !!go
         ok(r.id, 'its program is where the recipe says', there, path.relative(rec.dir, prog));
         if (there && build.os === 'windows') ok(r.id, 'the Windows program is a Windows program', head(prog, 2).toString('latin1') === 'MZ');
         if (there && build.os === 'linux') {
-          ok(r.id, 'the Linux program is a program', isElf(prog) || /\.AppImage$/i.test(prog));
+          ok(r.id, 'the Linux program is a program', isElf(prog) || /\.AppImage$/i.test(prog) || head(prog, 2).toString('latin1') === '#!');
           if (isElf(prog) && !/\.AppImage$/i.test(prog)) { const missing = (cp.spawnSync('ldd', [prog], { encoding: 'utf8' }).stdout || '').split('\n').filter((l) => /not found/.test(l)).map((l) => l.trim().split(' ')[0]); if (missing.length) console.log(`     ${r.id}: libraries this runner lacks (fine on a Deck if Vulkan or SDL): ${missing.join(', ')}`); }
         }
       } else ok(r.id, 'its installer is a Linux program', isElf(rec.installer));
       // the game: base version, or 1.00 with the update beside it when the recipe lays an update over
       const g = r.game, dir = path.join(games, r.id), v = g.version?.want || '01.00';
-      dump(dir, g.ids[0], g.version?.update ? '01.00' : v, g.has || []);
+      // 0.9.91: a ROM or disc image (a made-up file with the right ending: a recipe that checks SHA-1 strictly gets
+      // one from SHAPES), or nothing for a port that needs no game files
+      if (g.kind === 'file') { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, `${r.id}${g.ext[0]}`), 'game'); }
+      else if (g.kind !== 'none') dump(dir, g.ids[0], g.version?.update ? '01.00' : v, g.has || []);
       SHAPES[r.id]?.(dir);
       const cands = [];
       if (g.version?.update) { const u = path.join(games, r.id + '-update'); dump(u, g.ids[0], v, (g.has || []).filter((f) => !/sce_module/.test(f))); cands.push(u); }
@@ -136,7 +159,8 @@ const ok = (id, what, good, detail = '') => { report.push({ id, what, good: !!go
         const back = (await eng.settings(r.id)).items.find((i) => i.id === item.id);
         ok(r.id, 'a setting changed in Cartridge reads back', String(back.game) === String(value), `${item.id} = ${value}`);
       }
-      ok(r.id, 'shows as ready to play', eng.list().entries.find((e) => e.id === r.id)?.state === 'play');
+      // a port that finishes in its own setup window (r.setup) waits there, Cartridge's part done
+      ok(r.id, r.setup ? 'waits for its own setup window' : 'shows as ready to play', eng.list().entries.find((e) => e.id === r.id)?.state === (r.setup ? 'finish' : 'play'));
     } catch (e) { ok(r.id, 'set up', false, e.message.slice(0, 300)); }
   }
   const bad = report.filter((x) => !x.good);

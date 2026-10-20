@@ -2780,6 +2780,23 @@ function savesGameList() {
 }
 let savesCache = null;
 // emulator data folders Cartridge knows beyond the usual places: portable shadPS4 builds (user/ beside them), Vita3K's storage
+// 0.9.91 (owner: cloud saves for ports, "there is no RomM section for recomps"): a port's save folders are shared by
+// Syncthing too, beside the emulators', so a port whose game isn't in RomM (or isn't matched to it) still syncs.
+// One folder per save place, its id from the port's id, the same on every device.
+function syncRootsAll() {
+  const roots = require('./saves').syncRoots({ extra: saveExtras() }), P = require('./saves').SYNC_PREFIX;
+  try {
+    const R = recomps();
+    for (const e of R.catalogue().entries) {
+      if (!R.record(e.id)) continue;
+      R.saveDirs(e.id).filter((d) => !path.extname(d)).forEach((d, i) => {
+        let at = 0, exists = false; try { at = fs.statSync(d).mtimeMs; exists = true; } catch {}
+        roots.push({ id: `${P}port-${e.id}${i ? '-' + i : ''}`, label: `${e.name} saves`, emu: 'recomp', emuName: 'PC Ports', path: d, exists, at });
+      });
+    }
+  } catch (er) { log('syncthing: port save folders', er.message); }
+  return roots;
+}
 function saveExtras() {
   const extra = {};
   try { for (const v of require('./shadVersions').installed()) if (v.path) (extra.shadps4 ||= []).push(path.dirname(v.path)); } catch {}
@@ -2795,7 +2812,7 @@ function watchJoin() {
   clearInterval(joinT);
   if (config.syncthing?.role !== 'member') return;
   const tick = async () => {
-    try { const r = await require('./syncthing').acceptFolders(require('./saves').syncRoots({ extra: saveExtras() })); if (r.added.length) { log('syncthing: took save folders', r.added.join(' ')); savesCache = null; broadcast('syncsaves', r); } } catch {}
+    try { const r = await require('./syncthing').acceptFolders(syncRootsAll()); if (r.added.length) { log('syncthing: took save folders', r.added.join(' ')); savesCache = null; broadcast('syncsaves', r); } } catch {}
   };
   tick(); joinT = setInterval(tick, 30000);
 }
@@ -4026,10 +4043,10 @@ const handlers08 = {
   'syncsaves:state': async () => {
     const S = require('./syncthing');
     let st = null, error = null; try { st = await S.saveSync(); } catch (e) { error = e.message; }
-    return { ...(st || {}), error, role: config.syncthing?.role || '', mainId: config.syncthing?.mainId || '', roots: require('./saves').syncRoots({ extra: saveExtras() }) };
+    return { ...(st || {}), error, role: config.syncthing?.role || '', mainId: config.syncthing?.mainId || '', roots: syncRootsAll() };
   },
   'syncsaves:makeMain': async () => {
-    const roots = require('./saves').syncRoots({ extra: saveExtras() });
+    const roots = syncRootsAll();
     const r = await require('./syncthing').makeMain(roots, { mine: config.syncthing?.role === 'main' });
     config.syncthing = { ...(config.syncthing || {}), role: 'main', mainId: '' }; saveConfig(); savesCache = null;
     log('syncthing: main device, save folders', r.made.join(' ') || 'none new');
@@ -6297,7 +6314,7 @@ for (const [ch, info] of Object.entries(JOBS)) {
 const JOB_EVENTS = {
   'emu-update': (m) => ['emu:' + m.path, { pct: m.pct, text: m.text || '' }],
   'recomp-progress': (m) => ['recomp:' + m.id, { pct: m.pct, text: { check: 'Checking', download: 'Downloading', unpack: 'Unpacking', installer: 'Running its installer', prefix: 'Preparing Proton', trial: 'Starting it once' }[m.step] || '' }],
-  'recomp-prep': (m) => { const gb = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`); return ['recompprep:' + m.id, { pct: m.pct ?? null, text: ({ check: 'Checking your copy', installer: 'Running its installer', prefix: 'Making its Windows folder with Proton (the first time can take a few minutes)', view: 'Laying the update over it', write: 'Writing its settings' }[m.step] || '') + (m.step === 'installer' && m.got ? ` · ${gb(m.got)}${m.want ? ' of ' + gb(m.want) : ''} copied${m.rate ? ` · ${Math.round(m.rate / 1e6)} MB/s` : ''}${m.left != null ? ` · about ${m.left < 90 ? m.left + ' s' : Math.round(m.left / 60) + ' min'} left` : ''}` : '') }]; },
+  'recomp-prep': (m) => { const gb = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`); return ['recompprep:' + m.id, { pct: m.pct ?? null, text: ({ check: 'Checking your copy', installer: 'Running its installer', prefix: 'Making its Windows folder with Proton (the first time can take a few minutes)', view: 'Laying the update over it', write: 'Writing its settings', unpack: 'Unpacking your disc (once)', convert: 'Converting your disc to an ISO with Dolphin (once, a few minutes)', prepare: 'Building the game from your copy (the first time takes a few minutes)' }[m.step] || '') + (m.step === 'unpack' && m.got ? ` · ${gb(m.got)}${m.want ? ' of ' + gb(m.want) : ''}` : '') + (m.step === 'installer' && m.got ? ` · ${gb(m.got)}${m.want ? ' of ' + gb(m.want) : ''} copied${m.rate ? ` · ${Math.round(m.rate / 1e6)} MB/s` : ''}${m.left != null ? ` · about ${m.left < 90 ? m.left + ' s' : Math.round(m.left / 60) + ' min'} left` : ''}` : '') }]; },
   'emuget-progress': (m) => [`get:${m.key}:${m.id}`, { pct: m.pct }],
   'emuget-custom': (m) => [customJob, { pct: m.pct }],
   'shadv-progress': (m) => ['shadv:' + m.tag, { pct: m.pct }],

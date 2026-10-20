@@ -22,9 +22,9 @@ const path = require('path');
 const os = require('os');
 
 // console folder keys (ES-DE names, as roms/) and the names shown for them
-const CONSOLES = { arcade: 'Arcade', nes: 'NES', snes: 'SNES', n64: 'Nintendo 64', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', gamecube: 'GameCube', nds: 'Nintendo DS', wii: 'Wii', genesis: 'Genesis', psx: 'PlayStation', ps2: 'PlayStation 2', ps4: 'PlayStation 4', xbox360: 'Xbox 360' };
+const CONSOLES = { arcade: 'Arcade', nes: 'NES', snes: 'SNES', n64: 'Nintendo 64', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', gamecube: 'GameCube', nds: 'Nintendo DS', wii: 'Wii', wiiu: 'Wii U', genesis: 'Genesis', psx: 'PlayStation', ps2: 'PlayStation 2', ps4: 'PlayStation 4', xbox: 'Xbox', xbox360: 'Xbox 360' };
 // RomM platform slugs of each, for finding the player's copy in their library
-const SLUGS = { arcade: /^(arcade|mame|model3|naomi|cps\d?|neogeo)$/, nes: /^(nes|famicom|fds)$/, snes: /^(snes|sfam)$/, n64: /^n64$/, gb: /^gb$/, gbc: /^gbc?$/, gba: /^gba$/, gamecube: /^(ngc|gc|gamecube)$/, nds: /^nds$/, wii: /^wii$/, genesis: /^(genesis.*|megadrive|md)$/, psx: /^(psx|ps1|ps|playstation)$/, ps2: /^ps2$/, ps4: /^ps4.*$/, xbox360: /^(xbox360|x360)$/ };
+const SLUGS = { arcade: /^(arcade|mame|model3|naomi|cps\d?|neogeo)$/, nes: /^(nes|famicom|fds)$/, snes: /^(snes|sfam)$/, n64: /^n64$/, gb: /^gb$/, gbc: /^gbc?$/, gba: /^gba$/, gamecube: /^(ngc|gc|gamecube)$/, nds: /^nds$/, wii: /^wii$/, genesis: /^(genesis.*|megadrive|md)$/, psx: /^(psx|ps1|ps|playstation)$/, ps2: /^ps2$/, ps4: /^ps4.*$/, xbox360: /^(xbox360|x360)$/, wiiu: /^(wiiu|wii-u)$/, xbox: /^(xbox|xbox-?og)$/ };
 const consoleOfSlug = (slug) => Object.keys(SLUGS).find((k) => SLUGS[k].test(String(slug || '').toLowerCase())) || null;
 
 // ---------------------------------------------------------------- names
@@ -465,7 +465,7 @@ function createRecomps(ctx) {
   }
   // a recipe as a catalogue entry: everything the screens and the engine read, the recipe itself beside it
   function verifiedEntry(r) {
-    return { id: r.id, name: r.name, games: [{ console: r.game.console, title: r.game.title, also: r.game.also || [] }], origin: 'port', repo: r.repo, description: r.about || '', by: r.by || '', license: r.licence || null, verified: r.verified || null, recipe: r, needs: { what: r.game.why || `Your own copy of ${r.game.title}.`, files: 'folder' }, setup: { how: 'verified' }, saves: [] };
+    return { id: r.id, name: r.name, games: [r.game.console, ...(r.game.alsoOn || [])].map((c) => ({ console: c, title: r.game.title, also: r.game.also || [] })), /* 0.9.91: alsoOn, a port that takes the game from more than one console (Dusklight: GameCube and Wii discs) */ origin: 'port', repo: r.repo, description: r.about || '', by: r.by || '', license: r.licence || null, verified: r.verified || null, recipe: r, needs: { what: r.game.why || `Your own copy of ${r.game.title}.`, files: 'folder' }, setup: { how: 'verified' }, saves: [] };
   }
   const byId = (id) => catalogue().entries.find((e) => e.id === id) || null;
   const folderName = (e) => String(e.name || e.id).replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 80) || e.id;
@@ -486,11 +486,22 @@ function createRecomps(ctx) {
   // installed and set up? A recomp that names a file made by its setup is ready once that file is there
   function readyOf(e, rec) {
     if (!rec || !exists(rec.program)) return false;
-    // verified: its copy picked and checked, and every start script written
-    if (e?.from === 'verified') return !!(rec.game?.path && rec.starts?.length && rec.starts.every((st) => exists(st.script)));
+    // verified: its copy picked and checked, and every start script written; 0.9.91: and, for a port that sets the
+    // game up in its own window (Unleashed's installer), the file that setup leaves (portDone)
+    if (e?.from === 'verified') return baseReady(rec) && portDone(e, rec);
     if (!e?.needs) return true;
     if (e.done) return doneAt(e, rec).some(exists);
     return !!rec.setupDone;
+  }
+  const baseReady = (rec) => !!(rec?.game?.path && rec.starts?.length && rec.starts.every((st) => exists(st.script)));
+  // r.setup { by: 'port', done: [paths], say }: the port's own first-start setup has left any one of its done files
+  function portDone(e, rec) {
+    const r = e?.recipe, d = r?.setup?.done;
+    if (!d?.length) return true;
+    const build = buildOf(e, rec);
+    if (!build) return false;
+    const v = RC.varsFor(r, build, rec);
+    return d.some((f) => exists(RC.expand(f, { ...v, game: v.gamePosix })));
   }
   // the done file: a relative one is beside the program (its working folder, where Ship of Harkinian writes oot.o2r)
   // or in the install folder; 0.9.67 looked only in the install folder, which isn't the program's for nested builds
@@ -579,7 +590,7 @@ function createRecomps(ctx) {
     const r = e.recipe, build = buildOf(e, rec);
     const here = !!rec && (exists(rec.program) || !!rec.installer);
     const ready = readyOf(e, rec);
-    const state = !rec ? 'get' : !here ? 'broken' : !rec.game?.path ? 'game' : !ready ? 'setup' : rec.tag && lt?.tag && lt.tag !== rec.tag && !lt.none ? 'update' : 'play';
+    const state = !rec ? 'get' : !here ? 'broken' : !rec.game?.path ? (e.recipe?.game?.kind === 'none' ? 'setup' : 'game') : !ready ? (baseReady(rec) ? 'finish' : 'setup') : rec.tag && lt?.tag && lt.tag !== rec.tag && !lt.none ? 'update' : 'play';
     return {
       verified: r.verified || null, by: r.by || '', about: r.about || '', licence: r.licence || null,
       builds: r.builds.map((b) => ({ os: b.os, note: b.note || '' })), build: rec?.build || null, buildNote: build?.note || '',
@@ -587,6 +598,8 @@ function createRecomps(ctx) {
       copy: rec?.game || null, starts: (rec?.starts || []).map((st) => ({ id: st.id, name: st.name, sub: st.sub })), plays: (r.play || []).map((p) => ({ id: p.id, name: p.name, sub: p.sub || '' })),
       settingsCount: RC.settingsFor(r, build || RC.chooseBuild(r, { runner: true })).length, changed: Object.keys(rec?.settings || {}).length,
       runner: rec?.runner || null, installNotes: rec?.installNotes || [], state,
+      // 0.9.91: what to do in the port's own setup window, and no copy to pick for a port that needs none
+      finish: state === 'finish' ? { say: r.setup.say, copy: rec?.game?.source || rec?.game?.path || null } : null, noGame: r.game.kind === 'none',
     };
   }
   // the newest release this device can use (remembered for the screens; a check is reused for 6 hours)
@@ -1083,8 +1096,44 @@ function createRecomps(ctx) {
     if (!r) throw new Error('That isn’t a Cartridge Verified game.');
     const sfo = require('./saves').sfo;
     onProgress({ step: 'check' });
+    // 0.9.91: a port that needs no game files (a fan remake) is set up with nothing picked
+    if (r.game?.kind === 'none') dir = rec?.dir || dir;
     const chk = RC.checkGame(r, dir, { sfo });
-    let use = dir, update = null;
+    let use = chk.file || chk.folder || dir, update = null;
+    // 0.9.91: game.convert, a port that reads ISO only (Strikers, SMS Launcher) and a copy kept as RVZ or WIA, Dolphin's
+    // own formats: made into an ISO once with Dolphin's dolphin-tool, in the port's folder, again only when the copy changes
+    if (chk.ok && chk.file && r.game.convert && r.game.convert.from.some((x) => chk.file.toLowerCase().endsWith(x))) {
+      if (!rec) return { ok: true, check: chk, notInstalled: true };
+      const dest = path.join(rec.dir, '.cartridge', 'disc.iso');
+      if (!(rec.game?.source === chk.file && exists(dest))) {
+        const tool = ctx.dolphinTool ? ctx.dolphinTool() : null;
+        if (!tool) return { ok: false, why: `${r.name} reads ${r.game.convert.reads || 'ISO'} files, and your copy is ${path.extname(chk.file).slice(1).toUpperCase()}. Install Dolphin (Get Emulators) and Cartridge converts it for you, or convert it in Dolphin: right-click the game, Convert File, ISO.` };
+        onProgress({ step: 'convert', pct: null });
+        const part = path.join(rec.dir, '.cartridge', 'disc.part.iso'); // dolphin-tool won't write a name not ending in .iso
+        fs.mkdirSync(path.dirname(part), { recursive: true }); fs.rmSync(part, { force: true });
+        const [cmd, ...pre] = tool;
+        await ctx.runProgram(cmd, [...pre, 'convert', '-i', chk.file, '-o', part, '-f', 'iso'], { cwd: rec.dir, timeoutMs: 60 * 60e3 });
+        if (!exists(part)) return { ok: false, why: `Dolphin couldn’t convert your copy of ${r.game.title} to an ISO.` };
+        fs.renameSync(part, dest);
+        log('verified disc converted', id, chk.file);
+      }
+      use = dest;
+    }
+    // 0.9.91: game.unpack 'xiso', a port that plays from the game's files (JSRF Unleashed): an Xbox disc image is
+    // unpacked once into the port's folder (Cartridge's own reader, electron/xiso.js), again only when the copy changes
+    if (chk.ok && chk.file && r.game.unpack === 'xiso') {
+      if (!rec) return { ok: true, check: chk, notInstalled: true };
+      const dest = path.join(rec.dir, '.cartridge', 'disc');
+      const has = (d) => (r.game.has || []).every((f) => exists(path.join(d, f)));
+      if (!(rec.game?.source === chk.file && has(dest))) {
+        onProgress({ step: 'unpack', pct: 0 });
+        let last = 0;
+        await require('./xiso').unpack(chk.file, dest, { keep: r.game.keep || [], onProgress: (got, want) => { if (got - last > 64e6 || got === want) { last = got; onProgress({ step: 'unpack', got, want, pct: want ? Math.floor((got / want) * 100) : null }); } } });
+        log('verified disc unpacked', id, chk.file);
+      }
+      if (!has(dest)) return { ok: false, why: `${r.name} needs ${(r.game.has || []).join(' and ')} from the disc, and the unpacked disc doesn’t have them. Is it the right game?` };
+      use = dest;
+    }
     if (!chk.ok && chk.needsUpdate) {
       const u = RC.findUpdate(r, dir, candidates, { sfo });
       if (!u || RC.verCmp(u.version, chk.needsUpdate) < 0) return { ok: false, problems: chk.problems, needsUpdate: chk.needsUpdate, why: `${r.name} needs update ${chk.needsUpdate}. ${u ? `The update on this device is ${u.version}.` : 'Pick the update’s folder (its dump, with sce_sys inside), or put it beside the game.'}` };
@@ -1097,7 +1146,7 @@ function createRecomps(ctx) {
       chk.notes.push(`Update ${u.version} is laid over it (links, nothing copied).`);
     } else if (!chk.ok) return { ok: false, problems: chk.problems, why: chk.problems.join(' ') };
     if (!rec) return { ok: true, check: chk, notInstalled: true };
-    rec.game = { path: use, source: dir, update: update?.dir || null, id: chk.id || null, version: update?.version || chk.version || null, notes: chk.notes, at: Date.now() };
+    rec.game = { path: use, source: chk.file || chk.folder || dir, update: update?.dir || null, id: chk.id || null, version: update?.version || chk.version || null, notes: chk.notes, at: Date.now() };
     saveInstalls();
     const done = await configure(id, { onProgress });
     return { ok: true, notes: chk.notes, ...done };
@@ -1193,6 +1242,30 @@ function createRecomps(ctx) {
       rec.installedTag = rec.tag; rec.installedFrom = rec.game.path; rec.installNotes = res.split('\n').filter((l) => /^note:/.test(l)).map((l) => l.slice(5).trim());
       saveInstalls();
     }
+    // 0.9.91: build.prepare, a step the port's own release runs with your copy before it can start (Wind Waker HD's
+    // setup.py: extracts the game, translates its code to C and compiles it, a few minutes). Again when the copy
+    // changes or its done file has gone.
+    if (build.prepare) {
+      const pv = { ...vars, game: rec.game.path, gamePosix: rec.game.path }, done = RC.expand(build.prepare.done, pv);
+      if (rec.preparedFrom !== rec.game.path || rec.preparedTag !== rec.tag || !exists(done)) {
+        if (!ctx.runProgram) throw new Error(`${r.name} needs its own setup run, and Cartridge can’t run programs here.`);
+        onProgress({ step: 'prepare', pct: null });
+        let [cmd, ...args] = build.prepare.cmd.map((a) => RC.expand(a, pv)), env;
+        // a Windows build's setup runs through Proton, in the port's prefix (made first: configure below is too late)
+        if (build.os === 'windows') {
+          if (!runner) throw new Error(`${r.name}’s setup is a Windows program, and there’s no Proton here to run it.`);
+          prefixFor(id, rec);
+          const pfx = RC.prefixOf(rec);
+          if (!exists(path.join(pfx, 'pfx', 'drive_c'))) { fs.mkdirSync(pfx, { recursive: true }); const c0 = RC.prefixCommand(runner, { prefix: pfx }); await ctx.runProgram(c0.cmd, c0.args, { env: c0.env, cwd: rec.dir, timeoutMs: 15 * 60e3 }); }
+          const c = RC.runCommand(runner, cmd, args, pfx); cmd = c.cmd; args = c.args; env = c.env;
+        }
+        const t0 = Date.now();
+        await ctx.runProgram(cmd, args, { cwd: rec.dir, env, timeoutMs: 120 * 60e3, prepareDone: done }); // prepareDone: what the install test stands in for
+        if (!exists(done)) throw new Error(`${r.name}’s own setup ran but didn’t finish (${path.basename(done)} wasn’t made). Its log is in ${rec.dir}.`);
+        log('verified prepared', id, `${Math.round((Date.now() - t0) / 1000)} s`);
+        rec.preparedFrom = rec.game.path; rec.preparedTag = rec.tag; saveInstalls();
+      }
+    }
     // a Windows build: Cartridge's own Proton prefix, made by Proton itself before settings go into it
     if (build.os === 'windows' && !exists(path.join(vars.prefix, 'pfx', 'drive_c'))) {
       onProgress({ step: 'prefix', pct: null });
@@ -1208,7 +1281,7 @@ function createRecomps(ctx) {
     if (!rec.settings) { rec.settings = RC.readBack(r, build, rec, { read: readText }); saveInstalls(); }
     // 0.9.90: the recipe's settings as this release of the port has them, and the ones only its own file names
     const sets = RC.settingsNow(r, build, rec, { read: readText });
-    const out = RC.render(r, build, rec, RC.effective(r, build, rec.settings, sets), { read: readText, sets });
+    const out = RC.render(r, build, rec, RC.effective(r, build, rec.settings, sets), { read: readText, sets, saved: rec.settings });
     for (const f of out.files) writeFileSafe(f.path, f.text);
     // what each of the port's files holds as Cartridge wrote it (the app file arrives by the start script's copy), so a
     // file the port rewrote is told apart afterwards (portWrote)
@@ -1263,7 +1336,7 @@ function createRecomps(ctx) {
     if (!build) return false;
     const changed = Object.entries(rec.wrote).some(([p, h]) => { const t = readText(p); return t != null && hashText(t) !== h; });
     if (!changed) return false;
-    rec.portKeys = { tag: rec.tag, ...RC.keysOf(RC.portKeys(r, build, rec, { read: readText })) };
+    rec.portKeys = { tag: rec.tag, ...RC.keysOf(RC.portKeys(r, build, rec, { read: readText }), build) };
     saveInstalls();
     if (ctx.isRunning(rec.program)) return true;
     try { await configure(id); log('verified settings follow the port', id, rec.tag); } catch (er) { log('verified settings follow the port', id, er.message); }
@@ -1313,7 +1386,7 @@ function createRecomps(ctx) {
   const pendingSetup = () => catalogue().entries.filter((e) => e.done && installs[e.id] && !readyOf(e, installs[e.id])).map((e) => ({ id: e.id, program: installs[e.id].flatpak || installs[e.id].program }));
   const record = (id) => installs[id] || null;
   const reload = () => { cat = null; repaired = false; installs = readJson(F('recomp-installs.json'), {}); };
-  return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : e?.saves?.length ? saveDirs(e, installs[id]) : (installs[id]?.syncSaves || []).filter(exists); }, saveChoices, setSyncSaves, pendingSetup, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes, refreshPortFiles };
+  return { catalogue, byId, details, ready, baseReady: (id) => baseReady(installs[id]), watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : e?.saves?.length ? saveDirs(e, installs[id]) : (installs[id]?.syncSaves || []).filter(exists); }, saveChoices, setSyncSaves, pendingSetup, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes, refreshPortFiles };
 }
 
 module.exports = { ciBuildOf, checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, matchDumps, copyGone, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };

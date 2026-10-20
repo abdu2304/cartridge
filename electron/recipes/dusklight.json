@@ -1,0 +1,1922 @@
+{
+ "schema": 1,
+ "id": "dusklight",
+ "name": "Dusklight",
+ "by": "Twilit Realm, on the Twilight Princess decompilation (zeldaret/tp)",
+ "repo": "github:TwilitRealm/dusklight",
+ "licence": "CC0-1.0",
+ "about": "Twilight Princess rebuilt from its decompiled code: higher resolutions and frame rates, quality-of-life options, cheats, gyro and mouse aim, achievements. Plays from your own GameCube or Wii disc image. The first start asks once whether to send crash reports, then shows its game modes: press Play.",
+ "verified": {
+  "on": "2026-10-20",
+  "release": "v2.0.3",
+  "played": false
+ },
+ "game": {
+  "console": "gamecube",
+  "alsoOn": [
+   "wii"
+  ],
+  "title": "The Legend of Zelda: Twilight Princess",
+  "ids": [
+   "GZ2E01",
+   "GZ2P01",
+   "GZ2J01",
+   "RZDE01",
+   "RZDP01",
+   "RZDJ01"
+  ],
+  "kind": "file",
+  "ext": [
+   ".iso",
+   ".gcm",
+   ".ciso",
+   ".gcz",
+   ".nfs",
+   ".rvz",
+   ".wbfs",
+   ".wia",
+   ".tgc"
+  ],
+  "why": "Your own GameCube or Wii disc image of Twilight Princess (any release except the Korean Wii one)."
+ },
+ "builds": [
+  {
+   "os": "linux",
+   "asset": "^Dusklight-v[\\d.]+-linux-x86_64\\.AppImage$",
+   "program": "Dusklight.AppImage",
+   "args": [
+    "{game}"
+   ],
+   "files": {
+    "app": {
+     "path": "{data}/TwilitRealm/Dusklight/config.json",
+     "format": "json"
+    }
+   }
+  },
+  {
+   "os": "windows",
+   "asset": "^Dusklight-v[\\d.]+-win32-x86_64\\.zip$",
+   "program": "dusklight.exe",
+   "args": [
+    "{game}"
+   ],
+   "files": {
+    "app": {
+     "path": "{appdata}/TwilitRealm/Dusklight/config.json",
+     "format": "json"
+    }
+   }
+  }
+ ],
+ "app": {
+  "backend.isoPath": "{game}",
+  "backend.skipPreLaunchUI": true,
+  "backend.checkForUpdates": false,
+  "backend.wasPresetChosen": true
+ },
+ "settings": [
+  {
+   "id": "fullscreen",
+   "tab": "Display",
+   "label": "Fullscreen",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "video.enableFullscreen"
+   ]
+  },
+  {
+   "id": "fps_overlay",
+   "tab": "Display",
+   "label": "Show the FPS counter",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableFpsOverlay"
+   ]
+  },
+  {
+   "id": "fps_corner",
+   "tab": "Display",
+   "label": "FPS counter corner",
+   "type": "choice",
+   "def": 0,
+   "at": [
+    "app",
+    "game.fpsOverlayCorner"
+   ],
+   "options": [
+    [
+     0,
+     "Top left"
+    ],
+    [
+     1,
+     "Top right"
+    ],
+    [
+     2,
+     "Bottom left"
+    ],
+    [
+     3,
+     "Bottom right"
+    ]
+   ]
+  },
+  {
+   "id": "max_fps",
+   "tab": "Display",
+   "label": "Frame rate cap",
+   "type": "number",
+   "def": 240,
+   "at": [
+    "app",
+    "video.maxFrameRate"
+   ],
+   "desc": "Used when frame interpolation is Capped.",
+   "num": {
+    "min": 30,
+    "max": 540,
+    "unit": "FPS"
+   }
+  },
+  {
+   "id": "interp",
+   "tab": "Display",
+   "label": "Frame interpolation",
+   "type": "choice",
+   "def": 0,
+   "at": [
+    "app",
+    "game.enableFrameInterpolation"
+   ],
+   "desc": "Smooths motion above the game’s own 30 FPS.",
+   "options": [
+    [
+     0,
+     "Off (30 FPS)"
+    ],
+    [
+     1,
+     "Capped"
+    ],
+    [
+     2,
+     "Unlimited"
+    ]
+   ]
+  },
+  {
+   "id": "letterbox",
+   "tab": "Display",
+   "label": "Remove letterboxing",
+   "type": "choice",
+   "def": 0,
+   "at": [
+    "app",
+    "game.disableLetterboxing"
+   ],
+   "options": [
+    [
+     0,
+     "Off"
+    ],
+    [
+     1,
+     "On"
+    ],
+    [
+     2,
+     "Gameplay only"
+    ],
+    [
+     3,
+     "Cutscenes only"
+    ]
+   ]
+  },
+  {
+   "id": "ui_scale",
+   "tab": "Display",
+   "label": "Menu scale",
+   "type": "number",
+   "def": 100,
+   "at": [
+    "app",
+    "video.uiScale"
+   ],
+   "desc": "Scales the Dusklight interface; the game’s HUD is unchanged.",
+   "num": {
+    "min": 50,
+    "max": 200,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "internal_res",
+   "tab": "Graphics",
+   "label": "Internal resolution",
+   "type": "choice",
+   "def": 0,
+   "at": [
+    "app",
+    "game.internalResolutionScale"
+   ],
+   "options": [
+    [
+     0,
+     "Automatic (window size)"
+    ],
+    [
+     1,
+     "1x"
+    ],
+    [
+     2,
+     "2x"
+    ],
+    [
+     3,
+     "3x"
+    ],
+    [
+     4,
+     "4x"
+    ],
+    [
+     5,
+     "5x"
+    ],
+    [
+     6,
+     "6x"
+    ],
+    [
+     7,
+     "7x"
+    ],
+    [
+     8,
+     "8x"
+    ],
+    [
+     9,
+     "9x"
+    ],
+    [
+     10,
+     "10x"
+    ],
+    [
+     11,
+     "11x"
+    ],
+    [
+     12,
+     "12x"
+    ]
+   ]
+  },
+  {
+   "id": "shadow_res",
+   "tab": "Graphics",
+   "label": "Shadow resolution",
+   "type": "choice",
+   "def": 1,
+   "at": [
+    "app",
+    "game.shadowResolutionMultiplier"
+   ],
+   "options": [
+    [
+     1,
+     "1x"
+    ],
+    [
+     2,
+     "2x"
+    ],
+    [
+     3,
+     "3x"
+    ],
+    [
+     4,
+     "4x"
+    ],
+    [
+     5,
+     "5x"
+    ],
+    [
+     6,
+     "6x"
+    ],
+    [
+     7,
+     "7x"
+    ],
+    [
+     8,
+     "8x"
+    ]
+   ]
+  },
+  {
+   "id": "resampler",
+   "tab": "Graphics",
+   "label": "Resampler",
+   "type": "choice",
+   "def": 0,
+   "at": [
+    "app",
+    "game.resampler"
+   ],
+   "options": [
+    [
+     0,
+     "Bilinear"
+    ],
+    [
+     1,
+     "Area"
+    ]
+   ]
+  },
+  {
+   "id": "bloom",
+   "tab": "Graphics",
+   "label": "Bloom",
+   "type": "choice",
+   "def": 2,
+   "at": [
+    "app",
+    "game.bloomMode"
+   ],
+   "options": [
+    [
+     0,
+     "Off"
+    ],
+    [
+     1,
+     "Classic"
+    ],
+    [
+     2,
+     "Dusklight"
+    ]
+   ]
+  },
+  {
+   "id": "dof",
+   "tab": "Graphics",
+   "label": "Depth of field",
+   "type": "choice",
+   "def": 2,
+   "at": [
+    "app",
+    "game.depthOfFieldMode"
+   ],
+   "options": [
+    [
+     0,
+     "Off"
+    ],
+    [
+     1,
+     "Classic"
+    ],
+    [
+     2,
+     "Dusklight"
+    ]
+   ]
+  },
+  {
+   "id": "textures",
+   "tab": "Graphics",
+   "label": "Texture packs",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "game.enableTextureReplacements"
+   ],
+   "desc": "Uses texture packs from the texture_replacements folder."
+  },
+  {
+   "id": "backend",
+   "tab": "Graphics",
+   "label": "Graphics API",
+   "type": "choice",
+   "def": "auto",
+   "at": [
+    "app",
+    "backend.graphicsBackend"
+   ],
+   "options": [
+    [
+     "auto",
+     "Automatic"
+    ],
+    [
+     "vulkan",
+     "Vulkan"
+    ],
+    [
+     "d3d12",
+     "Direct3D 12 (Windows)"
+    ],
+    [
+     "d3d11",
+     "Direct3D 11 (Windows)"
+    ]
+   ]
+  },
+  {
+   "id": "output",
+   "tab": "Audio",
+   "label": "Output",
+   "type": "choice",
+   "def": 0,
+   "at": [
+    "app",
+    "audio.outputMode"
+   ],
+   "options": [
+    [
+     0,
+     "Stereo speakers"
+    ],
+    [
+     1,
+     "Headphones (spatial)"
+    ],
+    [
+     2,
+     "5.1 surround"
+    ],
+    [
+     3,
+     "7.1 surround"
+    ]
+   ]
+  },
+  {
+   "id": "vol_masterVolume",
+   "tab": "Audio",
+   "label": "Master volume",
+   "type": "number",
+   "def": 60,
+   "at": [
+    "app",
+    "audio.masterVolume"
+   ],
+   "num": {
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "vol_mainMusicVolume",
+   "tab": "Audio",
+   "label": "Music volume",
+   "type": "number",
+   "def": 100,
+   "at": [
+    "app",
+    "audio.mainMusicVolume"
+   ],
+   "num": {
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "vol_subMusicVolume",
+   "tab": "Audio",
+   "label": "Second music volume",
+   "type": "number",
+   "def": 100,
+   "at": [
+    "app",
+    "audio.subMusicVolume"
+   ],
+   "num": {
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "vol_soundEffectsVolume",
+   "tab": "Audio",
+   "label": "Sound effects volume",
+   "type": "number",
+   "def": 100,
+   "at": [
+    "app",
+    "audio.soundEffectsVolume"
+   ],
+   "num": {
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "vol_fanfareVolume",
+   "tab": "Audio",
+   "label": "Fanfare volume",
+   "type": "number",
+   "def": 100,
+   "at": [
+    "app",
+    "audio.fanfareVolume"
+   ],
+   "num": {
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "language",
+   "tab": "Game",
+   "label": "Language",
+   "type": "choice",
+   "def": 0,
+   "at": [
+    "app",
+    "game.language"
+   ],
+   "desc": "Only languages your copy has.",
+   "options": [
+    [
+     0,
+     "English"
+    ],
+    [
+     1,
+     "German"
+    ],
+    [
+     2,
+     "French"
+    ],
+    [
+     3,
+     "Spanish"
+    ],
+    [
+     4,
+     "Italian"
+    ],
+    [
+     6,
+     "Japanese"
+    ]
+   ]
+  },
+  {
+   "id": "hud_scale",
+   "tab": "Game",
+   "label": "HUD scale",
+   "type": "number",
+   "def": 1,
+   "at": [
+    "app",
+    "game.hudScale"
+   ],
+   "num": {
+    "min": 0.5,
+    "max": 2,
+    "unit": "x"
+   }
+  },
+  {
+   "id": "damage",
+   "tab": "Game",
+   "label": "Damage multiplier",
+   "type": "choice",
+   "def": 1,
+   "at": [
+    "app",
+    "game.damageMultiplier"
+   ],
+   "options": [
+    [
+     1,
+     "1x"
+    ],
+    [
+     2,
+     "2x"
+    ],
+    [
+     3,
+     "3x"
+    ],
+    [
+     4,
+     "4x"
+    ],
+    [
+     8,
+     "8x"
+    ]
+   ]
+  },
+  {
+   "id": "menus",
+   "tab": "Game",
+   "label": "Menu layout",
+   "type": "choice",
+   "def": 1,
+   "at": [
+    "app",
+    "game.menuScalingMode"
+   ],
+   "options": [
+    [
+     0,
+     "GameCube"
+    ],
+    [
+     1,
+     "Wii"
+    ],
+    [
+     2,
+     "Dusklight"
+    ]
+   ]
+  },
+  {
+   "id": "video_enableVsync",
+   "tab": "Display",
+   "label": "Enable VSync",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "video.enableVsync"
+   ],
+   "desc": "Synchronizes the frame rate to your monitor's refresh rate."
+  },
+  {
+   "id": "video_lockAspectRatio",
+   "tab": "Display",
+   "label": "Lock 4:3 Aspect Ratio",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "video.lockAspectRatio"
+   ],
+   "desc": "Lock the game's aspect ratio to the original."
+  },
+  {
+   "id": "game_pauseOnFocusLost",
+   "tab": "Display",
+   "label": "Pause on Focus Lost",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.pauseOnFocusLost"
+   ],
+   "desc": "Pause the game when window focus is lost."
+  },
+  {
+   "id": "game_enableMapBackground",
+   "tab": "Display",
+   "label": "Enable Mini-Map Shadows",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "game.enableMapBackground"
+   ],
+   "desc": "Render a thick shadow around the mini-map. May impact performance."
+  },
+  {
+   "id": "game_disableCutscenePillarboxing",
+   "tab": "Display",
+   "label": "Disable Cutscene Pillarboxing",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.disableCutscenePillarboxing"
+   ],
+   "desc": "Disable black bars on the left and right sides of the screen "
+  },
+  {
+   "id": "game_allowBackgroundInput",
+   "tab": "Controls",
+   "label": "Allow Background Inputs",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "game.allowBackgroundInput"
+   ],
+   "desc": "Allow inputs even when the game window is not focused."
+  },
+  {
+   "id": "game_freeCamera",
+   "tab": "Controls",
+   "label": "Free Camera",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.freeCamera"
+   ],
+   "desc": "Enables free camera control, letting you control the camera fully with the C-Stick."
+  },
+  {
+   "id": "game_invertCameraXAxis",
+   "tab": "Controls",
+   "label": "Invert Camera X Axis",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.invertCameraXAxis"
+   ],
+   "desc": "Invert horizontal camera movement.<br/><br/>Applies to the control stick only."
+  },
+  {
+   "id": "game_invertCameraYAxis",
+   "tab": "Controls",
+   "label": "Invert Camera Y Axis",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.invertCameraYAxis"
+   ],
+   "desc": "Invert vertical camera movement.<br/><br/>Applies to the control stick only."
+  },
+  {
+   "id": "game_invertFirstPersonXAxis",
+   "tab": "Controls",
+   "label": "Invert First Person X Axis",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.invertFirstPersonXAxis"
+   ],
+   "desc": "Invert horizontal movement while aiming with items or first person camera.<br/><br/>Applies to the control stick only."
+  },
+  {
+   "id": "game_invertFirstPersonYAxis",
+   "tab": "Controls",
+   "label": "Invert First Person Y Axis",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.invertFirstPersonYAxis"
+   ],
+   "desc": "Invert vertical movement while aiming with items or first person camera.<br/><br/>Applies to the control stick only."
+  },
+  {
+   "id": "game_enableGyroAim",
+   "tab": "Controls",
+   "label": "Gyro Aim",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableGyroAim"
+   ],
+   "desc": "Enables gyro controls while in look mode, aiming a hawk, and aiming "
+  },
+  {
+   "id": "game_enableGyroRollgoal",
+   "tab": "Controls",
+   "label": "Gyro Rollgoal",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableGyroRollgoal"
+   ],
+   "desc": "Enables gyro controls for Rollgoal in Hena's Cabin."
+  },
+  {
+   "id": "game_gyroInvertPitch",
+   "tab": "Controls",
+   "label": "Invert Gyro Pitch",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.gyroInvertPitch"
+   ],
+   "desc": "Invert vertical gyro aiming."
+  },
+  {
+   "id": "game_gyroInvertYaw",
+   "tab": "Controls",
+   "label": "Invert Gyro Yaw",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.gyroInvertYaw"
+   ],
+   "desc": "Invert horizontal gyro aiming."
+  },
+  {
+   "id": "game_enableMouseAim",
+   "tab": "Controls",
+   "label": "Mouse Aim",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableMouseAim"
+   ],
+   "desc": "Enables mouse input while in look mode, aiming a hawk, and aiming "
+  },
+  {
+   "id": "game_enableMouseCamera",
+   "tab": "Controls",
+   "label": "Mouse Camera",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableMouseCamera"
+   ],
+   "desc": "Enables mouse input for controlling the third-person camera."
+  },
+  {
+   "id": "game_invertMouseY",
+   "tab": "Controls",
+   "label": "Invert Mouse Y",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.invertMouseY"
+   ],
+   "desc": "Invert vertical mouse control for both aiming and camera."
+  },
+  {
+   "id": "game_enableMenuPointer",
+   "tab": "Controls",
+   "label": "Mouse/Touch in Menus",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "game.enableMenuPointer"
+   ],
+   "desc": "Enables mouse and touch input for supported in-game menus."
+  },
+  {
+   "id": "game_invertAirSwimX",
+   "tab": "Controls",
+   "label": "Invert Air/Swim X Axis",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.invertAirSwimX"
+   ],
+   "desc": "Invert horizontal movement while flying or swimming."
+  },
+  {
+   "id": "game_invertAirSwimY",
+   "tab": "Controls",
+   "label": "Invert Air/Swim Y Axis",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.invertAirSwimY"
+   ],
+   "desc": "Invert vertical movement while flying or swimming."
+  },
+  {
+   "id": "game_swapDirectSelect",
+   "tab": "Controls",
+   "label": "Swap Direct Select Input",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.swapDirectSelect"
+   ],
+   "desc": "Swap the controls for using Direct Select on the item wheel, making Direct Select the default and holding L to scroll the wheel."
+  },
+  {
+   "id": "game_enableTurboKeybind",
+   "tab": "Controls",
+   "label": "Turbo Key",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableTurboKeybind"
+   ],
+   "desc": "Hold Tab to increase game speed by up to 4x."
+  },
+  {
+   "id": "audio_enableReverb",
+   "tab": "Audio",
+   "label": "Enable Reverb",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "audio.enableReverb"
+   ],
+   "desc": "Enables the reverb effect in game audio."
+  },
+  {
+   "id": "audio_menuSounds",
+   "tab": "Audio",
+   "label": "Dusklight Menu Sounds",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "audio.menuSounds"
+   ],
+   "desc": "Play sound effects when navigating the Dusklight menu."
+  },
+  {
+   "id": "game_noLowHpSound",
+   "tab": "Audio",
+   "label": "No Low HP Sound",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.noLowHpSound"
+   ],
+   "desc": "Disable the beeping sound when having low health."
+  },
+  {
+   "id": "game_midnasLamentNonStop",
+   "tab": "Audio",
+   "label": "Non-Stop Midna's Lament",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.midnasLamentNonStop"
+   ],
+   "desc": "Prevents enemy music while Midna's Lament is playing."
+  },
+  {
+   "id": "game_enableMirrorMode",
+   "tab": "Game",
+   "label": "Mirror Mode",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableMirrorMode"
+   ],
+   "desc": "Mirrors the world horizontally, matching the Wii version of the game."
+  },
+  {
+   "id": "game_minimalHUD",
+   "tab": "Game",
+   "label": "Minimal HUD",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.minimalHUD"
+   ],
+   "desc": "Disables the elements of the main HUD of the game.<br/>Useful for a more immersive "
+  },
+  {
+   "id": "game_restoreWiiGlitches",
+   "tab": "Game",
+   "label": "Restore Wii 1.0 Glitches",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.restoreWiiGlitches"
+   ],
+   "desc": "Restores patched glitches from Wii USA 1.0, the first released version."
+  },
+  {
+   "id": "game_enableLinkDollRotation",
+   "tab": "Game",
+   "label": "Enable Rotating Link Doll",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableLinkDollRotation"
+   ],
+   "desc": "Enables rotating Link in the collection menu with the C-Stick."
+  },
+  {
+   "id": "game_removeQuestMapMarkers",
+   "tab": "Game",
+   "label": "Hide Owl Statue Markers",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.removeQuestMapMarkers"
+   ],
+   "desc": "Removes completed Owl Statue markers from the map and Minimap."
+  },
+  {
+   "id": "game_instantDeath",
+   "tab": "Game",
+   "label": "Instant Death",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.instantDeath"
+   ],
+   "desc": "Any hit will instantly kill you."
+  },
+  {
+   "id": "game_noHeartDrops",
+   "tab": "Game",
+   "label": "No Heart Drops",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.noHeartDrops"
+   ],
+   "desc": "Hearts will never drop from enemies, pots, and various other places."
+  },
+  {
+   "id": "game_biggerWallets",
+   "tab": "Game",
+   "label": "Bigger Wallets",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.biggerWallets"
+   ],
+   "desc": "Wallet sizes are like in the HD version. (500, 1000, 2000)"
+  },
+  {
+   "id": "game_disableRupeeCutscenes",
+   "tab": "Game",
+   "label": "Disable Rupee Cutscenes",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.disableRupeeCutscenes"
+   ],
+   "desc": "Rupees will not play cutscenes after you have collected them the first time."
+  },
+  {
+   "id": "game_fastTransitions",
+   "tab": "Game",
+   "label": "Faster Scene Transitions",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.fastTransitions"
+   ],
+   "desc": "Reduces how long the transitions take when changing maps."
+  },
+  {
+   "id": "game_fastClimbing",
+   "tab": "Game",
+   "label": "Faster Climbing",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.fastClimbing"
+   ],
+   "desc": "Quicker climbing on ladders and vines like the HD version."
+  },
+  {
+   "id": "game_fastTears",
+   "tab": "Game",
+   "label": "Faster Tears of Light",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.fastTears"
+   ],
+   "desc": "Tears of Light dropped by Shadow Insects pop out faster like the HD version."
+  },
+  {
+   "id": "game_autoSave",
+   "tab": "Game",
+   "label": "Autosave",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.autoSave"
+   ],
+   "desc": "Autosaves the game when going to a new area or opening a dungeon door."
+  },
+  {
+   "id": "game_instantSaves",
+   "tab": "Game",
+   "label": "Instant Saves",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.instantSaves"
+   ],
+   "desc": "Skips the delay when writing to the Memory Card."
+  },
+  {
+   "id": "game_instantText",
+   "tab": "Game",
+   "label": "Hold B for Instant Text",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.instantText"
+   ],
+   "desc": "Makes text scroll immediately by holding B."
+  },
+  {
+   "id": "game_holdToMash",
+   "tab": "Game",
+   "label": "Hold Button to Mash",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.holdToMash"
+   ],
+   "desc": "Hold the indicated button to mash automatically."
+  },
+  {
+   "id": "game_noMissClimbing",
+   "tab": "Game",
+   "label": "No Climbing Miss Animation",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.noMissClimbing"
+   ],
+   "desc": "Prevents Link from playing a struggle animation when grabbing ledges or "
+  },
+  {
+   "id": "game_noReturnRupees",
+   "tab": "Game",
+   "label": "No Rupee Returns",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.noReturnRupees"
+   ],
+   "desc": "Always collect Rupees even if your Wallet is too full."
+  },
+  {
+   "id": "game_noSwordRecoil",
+   "tab": "Game",
+   "label": "No Sword Recoil",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.noSwordRecoil"
+   ],
+   "desc": "Link will not recoil when his sword hits walls."
+  },
+  {
+   "id": "game_no2ndFishForCat",
+   "tab": "Game",
+   "label": "No 2nd Fish for Cat",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.no2ndFishForCat"
+   ],
+   "desc": "Skip needing to catch a second fish for Sera's cat."
+  },
+  {
+   "id": "game_buttonFishing",
+   "tab": "Game",
+   "label": "Button Fishing",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.buttonFishing"
+   ],
+   "desc": "Allow fishing with the Fishing Rod using the button the item is assigned to."
+  },
+  {
+   "id": "game_enhancedMapMenus",
+   "tab": "Game",
+   "label": "Show Poe Count on Map",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enhancedMapMenus"
+   ],
+   "desc": "Displays collected/total number of Poe Souls for a region on the map."
+  },
+  {
+   "id": "game_sunsSong",
+   "tab": "Game",
+   "label": "Sun's Song (R+X)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.sunsSong"
+   ],
+   "desc": "Allows Wolf Link to howl and change the time of day."
+  },
+  {
+   "id": "game_enableQuickTransform",
+   "tab": "Game",
+   "label": "Quick Transform (R+Y)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableQuickTransform"
+   ],
+   "desc": "Transform instantly by pressing R and Y simultaneously."
+  },
+  {
+   "id": "game_aimingReticle",
+   "tab": "Game",
+   "label": "Aiming Reticle",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.aimingReticle"
+   ],
+   "desc": "Shows the aiming reticle for bow and slingshot."
+  },
+  {
+   "id": "game_noHitStun",
+   "tab": "Game",
+   "label": "No Hit Stun",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.noHitStun"
+   ],
+   "desc": "Disables hit stun frames after attacks."
+  },
+  {
+   "id": "game_speedrunMode",
+   "tab": "Game",
+   "label": "Speedrun Mode",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.speedrunMode"
+   ],
+   "desc": "Enables Speedrun game mode option in the Dusklight launch menu."
+  },
+  {
+   "id": "game_liveSplitEnabled",
+   "tab": "Game",
+   "label": "LiveSplit Connection",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.liveSplitEnabled"
+   ],
+   "desc": "Connect to LiveSplit server on localhost:16834. For this to work you must right click LiveSplit, and turn on Control -> Start TCP Server."
+  },
+  {
+   "id": "game_showSpeedrunRTATimer",
+   "tab": "Game",
+   "label": "Show RTA",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "game.showSpeedrunRTATimer"
+   ],
+   "desc": "Display the RTA timer. IGT is always visible."
+  },
+  {
+   "id": "game_infiniteHearts",
+   "tab": "Cheats",
+   "label": "Infinite Hearts",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.infiniteHearts"
+   ],
+   "desc": "Keeps your health full."
+  },
+  {
+   "id": "game_infiniteArrows",
+   "tab": "Cheats",
+   "label": "Infinite Arrows",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.infiniteArrows"
+   ],
+   "desc": "Keeps your arrow count full."
+  },
+  {
+   "id": "game_infiniteSeeds",
+   "tab": "Cheats",
+   "label": "Infinite Seeds",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.infiniteSeeds"
+   ],
+   "desc": "Keeps your slingshot pellets (seeds) full."
+  },
+  {
+   "id": "game_infiniteBombs",
+   "tab": "Cheats",
+   "label": "Infinite Bombs",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.infiniteBombs"
+   ],
+   "desc": "Keeps all bomb bags full."
+  },
+  {
+   "id": "game_infiniteOil",
+   "tab": "Cheats",
+   "label": "Infinite Oil",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.infiniteOil"
+   ],
+   "desc": "Keeps your lantern oil full."
+  },
+  {
+   "id": "game_infiniteOxygen",
+   "tab": "Cheats",
+   "label": "Infinite Oxygen",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.infiniteOxygen"
+   ],
+   "desc": "Keeps your underwater oxygen meter full."
+  },
+  {
+   "id": "game_infiniteRupees",
+   "tab": "Cheats",
+   "label": "Infinite Rupees",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.infiniteRupees"
+   ],
+   "desc": "Keeps your rupee count full."
+  },
+  {
+   "id": "game_enableIndefiniteItemDrops",
+   "tab": "Cheats",
+   "label": "No Item Timer",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableIndefiniteItemDrops"
+   ],
+   "desc": "Item drops such as rupees and hearts will never disappear after they drop."
+  },
+  {
+   "id": "game_moonJump",
+   "tab": "Cheats",
+   "label": "Moon Jump (R+A)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.moonJump"
+   ],
+   "desc": "Hold R and A to rise into the air."
+  },
+  {
+   "id": "game_easyQuickSpin",
+   "tab": "Cheats",
+   "label": "Easy Quick Spin (R+B)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.easyQuickSpin"
+   ],
+   "desc": "Hold R to always do a Quick Spin when attacking with B."
+  },
+  {
+   "id": "game_superClawshot",
+   "tab": "Cheats",
+   "label": "Super Clawshot",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.superClawshot"
+   ],
+   "desc": "Extends Clawshot behavior beyond the normal game rules."
+  },
+  {
+   "id": "game_enableFastIronBoots",
+   "tab": "Cheats",
+   "label": "Fast Iron Boots",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.enableFastIronBoots"
+   ],
+   "desc": "Speeds up movement while heavy, including wearing the Iron Boots, holding the Ball and Chain, wearing Magic Armor without rupees, etc."
+  },
+  {
+   "id": "game_canTransformAnywhere",
+   "tab": "Cheats",
+   "label": "Can Transform Anywhere",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.canTransformAnywhere"
+   ],
+   "desc": "Allows transforming even if NPCs are looking."
+  },
+  {
+   "id": "game_fastRoll",
+   "tab": "Cheats",
+   "label": "Fast Roll",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.fastRoll"
+   ],
+   "desc": "Makes Link's roll animation and movement twice as fast."
+  },
+  {
+   "id": "game_fastSpinner",
+   "tab": "Cheats",
+   "label": "Fast Spinner",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.fastSpinner"
+   ],
+   "desc": "Speeds up Spinner movement while holding R."
+  },
+  {
+   "id": "game_invincibleEnemies",
+   "tab": "Cheats",
+   "label": "Invincible Enemies",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.invincibleEnemies"
+   ],
+   "desc": "Prevents enemies from taking damage."
+  },
+  {
+   "id": "game_infiniteEponaStamina",
+   "tab": "Cheats",
+   "label": "Infinite Epona Stamina",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.infiniteEponaStamina"
+   ],
+   "desc": "Prevents Epona's stamina from depleting."
+  },
+  {
+   "id": "backend_showPipelineCompilation",
+   "tab": "Interface",
+   "label": "Show Shader Compilation",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "backend.showPipelineCompilation"
+   ],
+   "desc": "Show an overlay when shaders are being compiled for your hardware."
+  },
+  {
+   "id": "game_enableDiscordPresence",
+   "tab": "Interface",
+   "label": "Enable Discord Rich Presence",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "game.enableDiscordPresence"
+   ],
+   "desc": "Enable Dusklight to integrate with Discord Rich Presence. This allows Discord to show your status in-game."
+  },
+  {
+   "id": "game_showInputViewer",
+   "tab": "Interface",
+   "label": "Show Input Viewer",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.showInputViewer"
+   ],
+   "desc": "Display a controller input overlay while playing."
+  },
+  {
+   "id": "game_showInputViewerGyro",
+   "tab": "Interface",
+   "label": "Show Gyro Input Viewer",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "game.showInputViewerGyro"
+   ],
+   "desc": "Show gyro sensor values in the input viewer."
+  },
+  {
+   "id": "game_hideTvSettingsScreen",
+   "tab": "Interface",
+   "label": "Skip TV Settings Screen",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "game.hideTvSettingsScreen"
+   ],
+   "desc": "Skips the TV calibration screen shown when loading a save."
+  }
+ ],
+ "saves": {
+  "linux": [
+   "{data}/TwilitRealm/Dusklight/USA",
+   "{data}/TwilitRealm/Dusklight/EUR",
+   "{data}/TwilitRealm/Dusklight/JAP"
+  ],
+  "windows": [
+   "{appdata}/TwilitRealm/Dusklight/USA",
+   "{appdata}/TwilitRealm/Dusklight/EUR",
+   "{appdata}/TwilitRealm/Dusklight/JAP"
+  ]
+ },
+ "achievements": {
+  "format": "keyed",
+  "files": [
+   "{data}/TwilitRealm/Dusklight/achievements.json",
+   "{appdata}/TwilitRealm/Dusklight/achievements.json"
+  ],
+  "list": [
+   [
+    "hero_of_twilight",
+    "Hero of Twilight",
+    "Deliver the finishing blow to Ganondorf.",
+    null
+   ],
+   [
+    "three_heart_clear",
+    "Hero Mode",
+    "Defeat Ganondorf with only 3 heart containers.",
+    null
+   ],
+   [
+    "completionist",
+    "Completionist",
+    "Complete the game after collecting all equipment, heart containers, portals, bugs, poes, and hidden skills.",
+    null
+   ],
+   [
+    "princess_of_bugs",
+    "The Princess of Bugs",
+    "Deliver all 24 golden bugs to Agitha.",
+    null
+   ],
+   [
+    "all_poes",
+    "Poe Collector",
+    "Collect all 60 Poe Souls.",
+    null
+   ],
+   [
+    "hylian_loach",
+    "Legendary Catch",
+    "Obtain the Hylian Loach in your fishing journal.",
+    null
+   ],
+   [
+    "all_fish",
+    "Gone Fishin'",
+    "Obtain all 6 species of fish in your fishing journal.",
+    null
+   ],
+   [
+    "a_big_heart",
+    "A Big Heart",
+    "Reach maximum health with all 20 heart containers.",
+    null
+   ],
+   [
+    "all_bottles",
+    "Glassware Guardian",
+    "Obtain all 4 bottles.",
+    null
+   ],
+   [
+    "all_hidden_skills",
+    "Master of Secrets",
+    "Learn all 7 Hidden Skills.",
+    null
+   ],
+   [
+    "all_letters",
+    "We Deliver!",
+    "Collect all 16 postman letters.",
+    null
+   ],
+   [
+    "cave_of_ordeals",
+    "Conqueror of Ordeals",
+    "Clear all 50 floors of the Cave of Ordeals.",
+    null
+   ],
+   [
+    "cave_of_ordeals_heartless",
+    "Indomitable",
+    "Clear all 50 floors of the Cave of Ordeals with only 3 heart containers.",
+    null
+   ],
+   [
+    "speedrun_12h",
+    "Been There Done That",
+    "Defeat Ganondorf with a total save file play time under 12 hours.",
+    null
+   ],
+   [
+    "speedrun_8h",
+    "Swift Blade",
+    "Defeat Ganondorf with a total save file play time under 6 hours.",
+    null
+   ],
+   [
+    "dark_hammer_one_hit",
+    "Mortal Edge",
+    "Defeat Darkhammer in a single hit.",
+    null
+   ],
+   [
+    "no_deaths_clear",
+    "Deathless",
+    "Defeat Ganondorf with 0 deaths on your save file.",
+    null
+   ],
+   [
+    "untouchable",
+    "Untouchable",
+    "Kill 25 enemies in a row without taking damage.",
+    null
+   ],
+   [
+    "bow_100m_hit",
+    "Long Shot",
+    "Hit an enemy from over 100 meters away with the bow.",
+    null
+   ],
+   [
+    "rollstab_triple",
+    "Surgical Skewer",
+    "Kill 3 enemies with a single rollstab.",
+    null
+   ],
+   [
+    "plumm_max",
+    "Thank You Berry Much",
+    "Score 61,454 points in the Plumm minigame.",
+    null
+   ],
+   [
+    "rollgoal_8",
+    "Rollgoal Novice",
+    "Complete the first 8 rollgoal stages.",
+    null
+   ],
+   [
+    "rollgoal_all",
+    "Lost Your Marbles",
+    "Complete all rollgoal stages.",
+    null
+   ],
+   [
+    "goat_30s",
+    "Ranch Hand",
+    "Herd all 20 goats into the pen in under 30 seconds.",
+    null
+   ],
+   [
+    "goat_20s",
+    "Bane of Howard",
+    "Herd all 20 goats into the pen in under 20 seconds.",
+    null
+   ],
+   [
+    "goat_18s",
+    "King of the Ranch",
+    "Herd all 20 goats into the pen in under 18 seconds.",
+    null
+   ],
+   [
+    "snowboard_70s",
+    "Downhill Dash",
+    "Finish the snowboarding minigame in under 70 seconds.",
+    null
+   ],
+   [
+    "canoe_perfect",
+    "River Raider",
+    "Achieve a perfect score in the canoe minigame.",
+    null
+   ],
+   [
+    "star_2_under_40s",
+    "Rising Star",
+    "Complete the STAR Prize 2 minigame in under 40 seconds.",
+    null
+   ],
+   [
+    "star_2_under_30s",
+    "Shooting Star",
+    "Complete the STAR Prize 2 minigame in under 30 seconds.",
+    null
+   ],
+   [
+    "friendly_fire",
+    "Friendly Fire",
+    "Get hit by your own cannonball.",
+    null
+   ],
+   [
+    "long_jump_attack",
+    "Long Jump Attack",
+    "Travel more than 15 meters in a single jump attack before landing.",
+    null
+   ],
+   [
+    "email_me",
+    "Email Me",
+    "Read a letter during the Dark Beast Ganon fight.",
+    null
+   ],
+   [
+    "heavy_hitter",
+    "Heavy Hitter",
+    "Wear the Iron Boots during the end credits.",
+    null
+   ],
+   [
+    "fishing_rod_ganondorf",
+    "Here Fishy Fishy",
+    "Confuse Ganondorf with the fishing rod.",
+    null
+   ],
+   [
+    "steal_from_trill",
+    "Petty Theft",
+    "Steal from Trill.",
+    null
+   ],
+   [
+    "cucco_control",
+    "Cucco Whisperer",
+    "Take control of a cucco.",
+    null
+   ],
+   [
+    "ganondorf_3hit",
+    "Autospin Annihilation",
+    "Finish off Ganondorf in the final duel after only 3 attacks.",
+    null
+   ],
+   [
+    "back_in_time",
+    "Back in Time",
+    "Perform the Back in Time glitch to play on the title screen.",
+    null
+   ],
+   [
+    "early_master_sword",
+    "Early Master Sword",
+    "Obtain the Master Sword before completing Midna's Desperate Hour.",
+    null
+   ],
+   [
+    "earliest_master_sword",
+    "Earliest Master Sword",
+    "Obtain the Master Sword before meeting Midna.",
+    null
+   ],
+   [
+    "speedrun_4h",
+    "Hero of Time",
+    "Defeat Ganondorf with a total save file play time under 4 hours.",
+    null
+   ],
+   [
+    "no_fish_suit",
+    "No Fish Suit No Problem",
+    "Defeat Morpheel without equipping Zora Armor.",
+    null
+   ],
+   [
+    "null_item",
+    "Null Item",
+    "Obtain the mysterious black rupee in the item wheel.",
+    null
+   ],
+   [
+    "stallord_skip",
+    "Stallord Skip",
+    "Leave Stallord's arena through the exit without defeating Stallord.",
+    null
+   ],
+   [
+    "lakebed_before_lanayru",
+    "White Midna Glitch",
+    "Clear the Lakebed Temple before clearing Lanayru's Twilight.",
+    null
+   ],
+   [
+    "early_hidden_village",
+    "Quick Detour",
+    "Rescue the Hidden Village before clearing Goron Mines.",
+    null
+   ],
+   [
+    "forest_temple_no_boomerang",
+    "Must Have Been The Wind",
+    "Complete the Forest Temple without obtaining the Gale Boomerang.",
+    null
+   ],
+   [
+    "early_city",
+    "Early City",
+    "Obtain the Double Clawshots without obtaining the Dominion Rod.",
+    null
+   ],
+   [
+    "early_kakariko",
+    "Gorge Skip",
+    "Collect the Kakariko warp portal without warping the gorge bridge.",
+    null
+   ]
+  ],
+  "why": "achievements.cpp keeps { key: { progress, unlocked } } in achievements.json; names from its list"
+ },
+ "rev": 1
+}

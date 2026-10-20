@@ -1,0 +1,687 @@
+{
+ "schema": 1,
+ "id": "sotc",
+ "name": "Shadow of the Colossus",
+ "by": "AjncSystem and the community (Lucas-blip-png, Gabriell-os, Oussama268 and others), on the bbport loader",
+ "repo": "github:AjncSystem/ShadowOfTheColossus-PC",
+ "licence": "GPL-2.0",
+ "about": "The PS4 Shadow of the Colossus (Bluepoint, 2018) running natively: the game’s own code on your CPU, its graphics translated to Vulkan. 60 FPS and up, outputs to 4K and ultrawide, PS4 Pro mode, water reflections, mouse camera. Sound needs two modules from your own PS4, which Cartridge finds in shadPS4’s sys_modules.",
+ "verified": {
+  "on": "2026-10-20",
+  "release": "v0.59",
+  "played": false
+ },
+ "game": {
+  "console": "ps4",
+  "title": "Shadow of the Colossus",
+  "ids": [
+   "CUSA08809"
+  ],
+  "kind": "folder",
+  "has": [
+   "eboot.bin",
+   "sce_sys/param.sfo"
+  ],
+  "version": {
+   "want": "01.01",
+   "soft": true,
+   "why": "It is made for the EU 1.01 copy (CUSA08809): the 60 FPS and 16x filtering patches need it; other copies run at 30 FPS."
+  }
+ },
+ "builds": [
+  {
+   "os": "windows",
+   "asset": "^SotC-PC\\.zip$",
+   "program": "SotC.exe",
+   "args": [
+    "--play"
+   ],
+   "files": {
+    "app": {
+     "path": "{appdata}/sotc-launcher/settings.json",
+     "format": "json"
+    }
+   }
+  }
+ ],
+ "look": [
+  {
+   "var": "sysmods",
+   "files": [
+    "libSceNgs2.sprx",
+    "libSceUlt.sprx"
+   ],
+   "dirs": [
+    "{data}/shadPS4/sys_modules",
+    "{home}/.var/app/net.shadps4.shadPS4/data/shadPS4/sys_modules",
+    "{config}/shadPS4/sys_modules",
+    "{dir}/user/sys_modules",
+    "{dir}/sys_modules"
+   ],
+   "why": "libSceNgs2.sprx and libSceUlt.sprx from your own PS4, for sound"
+  }
+ ],
+ "app": {
+  "game_dir": "{game}",
+  "sys_modules": "{sysmods}",
+  "check_updates": false,
+  "close_on_play": true,
+  "auto_setup": false
+ },
+ "settings": [
+  {
+   "id": "fps_mode",
+   "tab": "Graphics",
+   "label": "Frame rate",
+   "type": "choice",
+   "def": "30",
+   "at": [
+    "app",
+    "fps_mode"
+   ],
+   "options": [
+    [
+     "30",
+     "30 FPS (as on PS4)"
+    ],
+    [
+     "60",
+     "60 FPS (game cap off)"
+    ],
+    [
+     "unlimited",
+     "Unlimited (above 60)"
+    ]
+   ],
+   "desc": "Above 30 some scenes behave differently (the second colossus’ wall, colossi flying); use 30 there. 60 FPS needs the EU 1.01 copy."
+  },
+  {
+   "id": "output_res",
+   "tab": "Graphics",
+   "label": "Output",
+   "type": "choice",
+   "def": "1920x1080",
+   "at": [
+    "app",
+    "output_res"
+   ],
+   "options": [
+    [
+     "1280x720",
+     "1280 × 720 (16:9, 720p)"
+    ],
+    [
+     "1920x1080",
+     "1920 × 1080 (16:9, 1080p)"
+    ],
+    [
+     "2560x1440",
+     "2560 × 1440 (16:9, 1440p)"
+    ],
+    [
+     "3840x2160",
+     "3840 × 2160 (16:9, 4K)"
+    ],
+    [
+     "1920x1200",
+     "1920 × 1200 (16:10)"
+    ],
+    [
+     "2560x1600",
+     "2560 × 1600 (16:10)"
+    ],
+    [
+     "2560x1080",
+     "2560 × 1080 (21:9)"
+    ],
+    [
+     "3440x1440",
+     "3440 × 1440 (21:9)"
+    ],
+    [
+     "3840x1600",
+     "3840 × 1600 (21:9)"
+    ],
+    [
+     "3840x1080",
+     "3840 × 1080 (32:9)"
+    ],
+    [
+     "5120x1440",
+     "5120 × 1440 (32:9)"
+    ]
+   ],
+   "desc": "The game draws at the output size up to 1080 lines; FSR 1 scales the rest."
+  },
+  {
+   "id": "upscaler",
+   "tab": "Graphics",
+   "label": "Upscaler",
+   "type": "choice",
+   "def": "fsr1",
+   "at": [
+    "app",
+    "upscaler"
+   ],
+   "options": [
+    [
+     "fsr1",
+     "FSR 1 (AMD, any GPU)"
+    ],
+    [
+     "bilinear",
+     "Bilinear (plain)"
+    ]
+   ]
+  },
+  {
+   "id": "sharpness",
+   "tab": "Graphics",
+   "label": "Sharpening (RCAS)",
+   "type": "choice",
+   "def": "250",
+   "at": [
+    "app",
+    "sharpness"
+   ],
+   "options": [
+    [
+     "0",
+     "High"
+    ],
+    [
+     "250",
+     "Medium (default)"
+    ],
+    [
+     "600",
+     "Low"
+    ],
+    [
+     "off",
+     "Off"
+    ]
+   ]
+  },
+  {
+   "id": "framegen",
+   "tab": "Graphics",
+   "label": "Frame generation",
+   "type": "choice",
+   "def": "off",
+   "at": [
+    "app",
+    "framegen"
+   ],
+   "options": [
+    [
+     "off",
+     "Off"
+    ],
+    [
+     "auto",
+     "Automatic (DLSS-G or FSR 3, experimental)"
+    ],
+    [
+     "dlss",
+     "NVIDIA DLSS-G (RTX 40/50)"
+    ],
+    [
+     "fsr",
+     "AMD FSR 3 (any GPU)"
+    ]
+   ],
+   "desc": "Experimental, and only helps at 30 FPS. F8 in the game switches it."
+  },
+  {
+   "id": "af16",
+   "tab": "Graphics",
+   "label": "Sharp textures (16x anisotropic filtering)",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "af16"
+   ],
+   "desc": "Only with the EU 1.01 copy."
+  },
+  {
+   "id": "hq_textures",
+   "tab": "Graphics",
+   "label": "High quality textures",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "hq_textures"
+   ]
+  },
+  {
+   "id": "neo",
+   "tab": "Graphics",
+   "label": "Present as a PS4 Pro",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "neo"
+   ],
+   "desc": "The game then offers Cinematic and Performance modes in its own menu. 16:9 outputs only."
+  },
+  {
+   "id": "fx_vignette",
+   "tab": "Effects",
+   "label": "Vignette (darkened corners)",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "fx_vignette"
+   ]
+  },
+  {
+   "id": "fx_fog",
+   "tab": "Effects",
+   "label": "Atmospheric fog",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "fx_fog"
+   ]
+  },
+  {
+   "id": "fx_ssao",
+   "tab": "Effects",
+   "label": "Ambient occlusion (SSAO)",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "fx_ssao"
+   ]
+  },
+  {
+   "id": "fullscreen",
+   "tab": "Display",
+   "label": "Fullscreen",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "fullscreen"
+   ]
+  },
+  {
+   "id": "present_mode",
+   "tab": "Display",
+   "label": "Presentation",
+   "type": "choice",
+   "def": "Mailbox",
+   "at": [
+    "app",
+    "present_mode"
+   ],
+   "options": [
+    [
+     "Mailbox",
+     "Mailbox (low latency, no tearing)"
+    ],
+    [
+     "Fifo",
+     "FIFO (VSync)"
+    ],
+    [
+     "Immediate",
+     "Immediate (tearing)"
+    ]
+   ]
+  },
+  {
+   "id": "show_fps",
+   "tab": "Display",
+   "label": "FPS in the log (every 5 s)",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "show_fps"
+   ]
+  },
+  {
+   "id": "volume",
+   "tab": "Game",
+   "label": "Volume",
+   "type": "choice",
+   "def": "100",
+   "at": [
+    "app",
+    "volume"
+   ],
+   "options": [
+    [
+     "100",
+     "100% (original)"
+    ],
+    [
+     "150",
+     "150%"
+    ],
+    [
+     "200",
+     "200%"
+    ],
+    [
+     "300",
+     "300% (maximum)"
+    ]
+   ]
+  },
+  {
+   "id": "language",
+   "tab": "Game",
+   "label": "System language",
+   "type": "choice",
+   "def": "",
+   "at": [
+    "app",
+    "language"
+   ],
+   "options": [
+    [
+     "",
+     "Automatic (the game's)"
+    ],
+    [
+     "7",
+     "Portuguese (Portugal)"
+    ],
+    [
+     "15",
+     "Portuguese (Brazil)"
+    ],
+    [
+     "1",
+     "English"
+    ],
+    [
+     "3",
+     "Spanish"
+    ],
+    [
+     "2",
+     "French"
+    ],
+    [
+     "4",
+     "German"
+    ],
+    [
+     "5",
+     "Italian"
+    ],
+    [
+     "0",
+     "Japanese"
+    ]
+   ],
+   "desc": "The language the game uses; Automatic keeps its own choice."
+  },
+  {
+   "id": "player_name",
+   "tab": "Game",
+   "label": "Player name",
+   "type": "text",
+   "def": "",
+   "at": [
+    "app",
+    "player_name"
+   ]
+  },
+  {
+   "id": "button_icons",
+   "tab": "Controls",
+   "label": "Button icons",
+   "type": "choice",
+   "def": "ps",
+   "at": [
+    "app",
+    "button_icons"
+   ],
+   "options": [
+    [
+     "ps",
+     "PlayStation (the game's)"
+    ],
+    [
+     "xbox",
+     "Xbox (A B X Y)"
+    ]
+   ]
+  },
+  {
+   "id": "mouse",
+   "tab": "Controls",
+   "label": "Mouse camera",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "mouse"
+   ]
+  },
+  {
+   "id": "mouse_sens",
+   "tab": "Controls",
+   "label": "Mouse sensitivity",
+   "type": "choice",
+   "def": "1.0",
+   "at": [
+    "app",
+    "mouse_sens"
+   ],
+   "options": [
+    [
+     "0.5",
+     "0.5 (slow)"
+    ],
+    [
+     "0.75",
+     "0.75"
+    ],
+    [
+     "1.0",
+     "1.0 (default)"
+    ],
+    [
+     "1.5",
+     "1.5"
+    ],
+    [
+     "2.0",
+     "2.0 (fast)"
+    ]
+   ]
+  },
+  {
+   "id": "mouse_invert",
+   "tab": "Controls",
+   "label": "Invert the vertical axis",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    "mouse_invert"
+   ]
+  },
+  {
+   "id": "perf_culling",
+   "tab": "Performance",
+   "label": "Culling without the GPU (recommended)",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "perf_culling"
+   ]
+  },
+  {
+   "id": "perf_record_thread",
+   "tab": "Performance",
+   "label": "Vulkan commands on their own thread (recommended)",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "perf_record_thread"
+   ]
+  },
+  {
+   "id": "perf_dma",
+   "tab": "Performance",
+   "label": "Full water reflections (direct memory access)",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    "perf_dma"
+   ],
+   "desc": "Off gives about 10% more FPS and flatter distant water."
+  },
+  {
+   "id": "gpu_submit",
+   "tab": "Performance",
+   "label": "GPU work submission",
+   "type": "choice",
+   "def": "auto",
+   "at": [
+    "app",
+    "gpu_submit"
+   ],
+   "options": [
+    [
+     "auto",
+     "Automatic (on with NVIDIA)"
+    ],
+    [
+     "on",
+     "On with any card (AMD/Intel: experimental)"
+    ],
+    [
+     "off",
+     "Off"
+    ]
+   ],
+   "desc": "If the screen goes black with On, go back to Automatic."
+  },
+  {
+   "id": "vram_use",
+   "tab": "Performance",
+   "label": "Video memory use",
+   "type": "choice",
+   "def": "normal",
+   "at": [
+    "app",
+    "vram_use"
+   ],
+   "options": [
+    [
+     "low",
+     "Economy (4–6 GB cards)"
+    ],
+    [
+     "normal",
+     "Default"
+    ],
+    [
+     "high",
+     "High (8–12 GB cards)"
+    ],
+    [
+     "max",
+     "Maximum (16 GB cards or more)"
+    ]
+   ]
+  },
+  {
+   "id": "readbacks",
+   "tab": "Performance",
+   "label": "GPU readbacks",
+   "type": "choice",
+   "def": "",
+   "at": [
+    "app",
+    "readbacks"
+   ],
+   "options": [
+    [
+     "",
+     "Precise (default; the game needs them)"
+    ],
+    [
+     "1",
+     "Relaxed (may hang)"
+    ]
+   ]
+  }
+ ],
+ "saves": [
+  "{dir}/user/savedata"
+ ],
+ "achievements": {
+  "files": [
+   "{dir}/user/*.log"
+  ],
+  "output": true,
+  "why": "runtime_services.c prints Runtime: trophy N unlocked; names from your copy’s trophy file when a shadPS4 trophy key is set up"
+ },
+ "known": {
+  "app": [
+   "af16",
+   "auto_setup",
+   "button_icons",
+   "check_updates",
+   "close_on_play",
+   "dlc_dir",
+   "engine_cvars",
+   "extra_env",
+   "fps60",
+   "fps_mode",
+   "framegen",
+   "fullscreen",
+   "fx_fog",
+   "fx_ssao",
+   "fx_vignette",
+   "game_dir",
+   "gamepad",
+   "gpu_submit",
+   "hq_textures",
+   "keys",
+   "language",
+   "library_dirs",
+   "mouse",
+   "mouse_invert",
+   "mouse_sens",
+   "neo",
+   "output_res",
+   "perf_culling",
+   "perf_dma",
+   "perf_record_thread",
+   "player_name",
+   "present_mode",
+   "readbacks",
+   "sharpness",
+   "show_fps",
+   "skip_version",
+   "sys_modules",
+   "ui_language",
+   "upscaler",
+   "user_dir",
+   "volume",
+   "vram_use",
+   "window_icon_file"
+  ],
+  "ini": []
+ },
+ "rev": 1
+}

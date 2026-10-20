@@ -31,13 +31,17 @@ const recipe = (id) => RC.load().find((r) => r.id === id);
 
 test('every shipped recipe passes its checks, and index.json holds exactly them', () => {
   const list = RC.load({ log: (...a) => assert.fail(a.join(' ')) });
-  assert.deepStrictEqual(list.map((r) => r.id).sort(), ['bloodborne', 'gow3', 'iss', 'pt', 'uncharted']);
+  // every file in the folder loads (one that fails validate() fails the log above); 0.9.91: no fixed list, ports are added often
+  const files = fs.readdirSync(RC.SHIPPED).filter((n) => n.endsWith('.json') && n !== 'index.json').map((n) => n.replace(/\.json$/, '')).sort();
+  assert.deepStrictEqual(list.map((r) => r.id).sort(), files);
+  assert.ok(files.length >= 5);
   for (const r of list) {
     assert.ok(r.verified?.on && r.verified?.release, `${r.id} says when it was checked`);
     for (const s of r.settings) {
       assert.ok(s.label && s.tab, `${r.id}.${s.id}`);
       if (s.at[0] === 'app') assert.ok(r.builds.some((b) => b.files?.app), `${r.id}.${s.id} has a settings.json to go in`);
       if (s.at[0] === 'ini') assert.ok(r.builds.some((b) => b.files?.ini), `${r.id}.${s.id} has an ini to go in`);
+      if (s.at[0] === 'list') assert.ok(r.builds.some((b) => b.files?.list), `${r.id}.${s.id} has a list file to go in`);
     }
   }
   const index = JSON.parse(fs.readFileSync(path.join(RC.SHIPPED, 'index.json'), 'utf8'));
@@ -172,7 +176,7 @@ test('the Proton runner: each Proton in the runtime it asks for, umu only with a
 test('Steam\'s own launch never reaches what Cartridge starts', () => {
   const CE = require('../electron/childEnv');
   const env = CE.clean({ STEAM_COMPAT_DATA_PATH: '/p' }, { HOME: '/h', LD_PRELOAD: 'x.so', APPIMAGE: '/a', SteamGameId: '1', STEAM_COMPAT_DATA_PATH: '/steam', STEAM_COMPAT_TOOL_PATHS: '/t', PRESSURE_VESSEL_RUNTIME: 'r', STEAM_RUNTIME_LIBRARY_PATH: 'l' });
-  assert.deepStrictEqual(env, { HOME: '/h', SteamGameId: '1', STEAM_COMPAT_DATA_PATH: '/p' });
+  assert.deepStrictEqual(env, { HOME: '/h', SteamGameId: '1', DISABLE_AUTO_UPDATES: '1', STEAM_COMPAT_DATA_PATH: '/p' });
   const sh = path.join(tmp(), 'u.sh');
   fs.writeFileSync(sh, `${CE.SHELL_UNSET}\nenv | grep -cE '^(STEAM_COMPAT_|PRESSURE_VESSEL_|STEAM_RUNTIME|LD_LIBRARY_PATH)' || true\necho "$SteamGameId"\n`);
   const out = require('child_process').execFileSync('/bin/sh', [sh], { env: { PATH: process.env.PATH, STEAM_COMPAT_APP_ID: '7', PRESSURE_VESSEL_X: '1', STEAM_RUNTIME: '1', LD_LIBRARY_PATH: '/l', SteamGameId: '9' } }).toString().trim().split('\n');
@@ -427,4 +431,87 @@ test('settingsNow: keys the port writes that the recipe lacks show under More; o
   assert.ok(ids(RC.settingsNow(r, build, { ...rec, portKeys: { tag: 'v1', app: ['a'], ini: [] } }, { read })).includes('b'), 'another release: nothing hidden');
   // a port that writes only what you changed (under half the recipe's keys) hides nothing
   assert.ok(ids(RC.settingsNow(r, build, { ...rec, portKeys: { tag: 'v2', app: ['zzz'], ini: [] } }, { read })).includes('b'));
+});
+
+// 0.9.91: the ports beyond PS4 dumps
+test('a file of lines: toggles and choices are their lines, other lines stay', () => {
+  const r = { name: 'X', settings: [
+    { id: 'fps', tab: 'A', label: 'FPS', type: 'choice', def: '', at: ['list'], options: [['', '30'], ['60 FPS with deltatime', '60']] },
+    { id: 'blur', tab: 'A', label: 'Blur', type: 'bool', def: false, at: ['list', 'Disable blur'] },
+  ] };
+  const build = { os: 'windows', program: 'x.exe', files: { list: { path: '{dir}/p.txt', format: 'lines' } } };
+  const rec = { dir: '/i', game: { path: '/g' } };
+  const out = RC.render(r, build, rec, { fps: '60 FPS with deltatime', blur: false }, { read: () => 'Someone else\nDisable blur\n' });
+  assert.strictEqual(out.files[0].text, 'Someone else\n60 FPS with deltatime\n');
+  assert.deepStrictEqual(RC.readBack(r, build, rec, { read: () => 'Disable blur\n60 FPS with deltatime\n' }), { fps: '60 FPS with deltatime', blur: true });
+});
+
+test('sparse files: only what you changed is written, a setting put back is taken out', () => {
+  const r = { name: 'X', settings: [
+    { id: 'fps', tab: 'A', label: 'FPS', type: 'number', def: 20, at: ['app', ['CVars', 'gSettings', 'FPS']] },
+    { id: 'tts', tab: 'A', label: 'TTS', type: 'bool', def: false, int: true, at: ['app', ['CVars', 'gSettings', 'TTS']] },
+    { id: 'res', tab: 'A', label: 'Res', type: 'choice', def: '1', at: ['ini', 'resScale'], options: [['1', '1x'], ['2', '2x']] },
+  ] };
+  const build = { os: 'linux', program: 'p', files: { app: { path: '{dir}/s.json', format: 'json', nested: true, sparse: true }, ini: { path: '{dir}/s.ini', format: 'flat', sparse: true } } };
+  const rec = { dir: '/i', game: { path: '/g' } };
+  const read = (p) => (p.endsWith('.json') ? JSON.stringify({ CVars: { gSettings: { FPS: 60, Controllers: { a: 1 } } } }) : 'resScale=2\nother=1\n');
+  const out = RC.render(r, build, rec, RC.effective(r, build, { tts: true }), { read, saved: { tts: true } });
+  const json = JSON.parse(out.files.find((f) => f.path.endsWith('settings-main.json')).text);
+  assert.deepStrictEqual(json.CVars.gSettings, { Controllers: { a: 1 }, TTS: 1 }, 'FPS taken out (back to default), TTS as 1, mappings kept');
+  assert.strictEqual(out.files.find((f) => f.path.endsWith('s.ini')).text, 'other=1\n');
+});
+
+test('the start script: first-start arguments, settings from the environment, a program the setup made', () => {
+  const r = { name: 'X', settings: [{ id: 'full', tab: 'A', label: 'Full', type: 'bool', def: false, at: ['env', 'RECOMP_FULLSCREEN'] }] };
+  const build = { os: 'linux', program: 'setup', run: 'game/launch', args: ['{gamePosix}'], first: { unless: '{dir}/made.o2r', args: ['--rom', '{gamePosix}'] } };
+  const rec = { dir: '/i', game: { path: '/g/rom.z64' } };
+  const on = RC.render(r, build, rec, { full: true }), off = RC.render(r, build, rec, { full: false });
+  const s = RC.script(r, build, rec, on.starts[0], null, on.vars);
+  assert.match(s, /export RECOMP_FULLSCREEN='1'/);
+  assert.match(s, /\[ -e '\/i\/made\.o2r' \] \|\| set -- '--rom' '\/g\/rom\.z64' "\$@"/);
+  assert.match(s, /exec '\/i\/game\/launch' '\/g\/rom\.z64' "\$@"/);
+  assert.doesNotMatch(RC.script(r, build, rec, off.starts[0], null, off.vars), /RECOMP_FULLSCREEN/);
+});
+
+test('a game that is one file: picked from its folder by ending, checked by SHA-1 when the recipe lists copies', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-file-'));
+  fs.writeFileSync(path.join(dir, 'notes.txt'), 'x'); fs.writeFileSync(path.join(dir, 'game.z64'), 'rom');
+  const sha = require('crypto').createHash('sha1').update('rom').digest('hex');
+  const r = (extra) => ({ name: 'P', game: { kind: 'file', ext: ['.z64'], ...extra } });
+  assert.strictEqual(RC.checkGame(r({}), dir).file, path.join(dir, 'game.z64'));
+  assert.strictEqual(RC.checkGame(r({ sha1: [sha] }), path.join(dir, 'game.z64')).ok, true);
+  assert.strictEqual(RC.checkGame(r({ sha1: ['0'.repeat(40)] }), path.join(dir, 'game.z64')).ok, false);
+  assert.strictEqual(RC.checkGame(r({ sha1: ['0'.repeat(40)], soft: true }), path.join(dir, 'game.z64')).ok, true, 'soft: a note only');
+  assert.strictEqual(RC.checkGame(r({}), path.join(dir, 'notes.txt')).ok, false);
+  // an unpacked Xbox disc folder is used as it is
+  fs.writeFileSync(path.join(dir, 'default.xbe'), 'x');
+  assert.strictEqual(RC.checkGame({ name: 'J', game: { kind: 'file', ext: ['.iso'], unpack: 'xiso', has: ['default.xbe'] } }, dir).folder, dir);
+});
+
+test('an Xbox disc image (XDVDFS) is listed and unpacked', async () => {
+  const X = require('../electron/xiso');
+  const S = 2048, img = Buffer.alloc(S * 40);
+  img.write('MICROSOFT*XBOX*MEDIA', 32 * S, 'latin1');
+  const ent = (name, sector, size, attr, right = 0) => { const b = Buffer.alloc((14 + name.length + 3) & ~3, 0xff); b.writeUInt16LE(0, 0); b.writeUInt16LE(right, 2); b.writeUInt32LE(sector, 4); b.writeUInt32LE(size, 8); b[12] = attr; b[13] = name.length; b.write(name, 14, 'latin1'); return b; };
+  const e1 = ent('default.xbe', 36, 4, 0x20); e1.writeUInt16LE(e1.length / 4, 2);
+  const root = Buffer.concat([e1, ent('Media', 37, S, 0x10)]);
+  root.copy(img, 34 * S); img.write('XBE!', 36 * S, 'latin1');
+  ent('a.bin', 38, 3, 0x20).copy(img, 37 * S); img.write('abc', 38 * S, 'latin1');
+  img.writeUInt32LE(34, 32 * S + 20); img.writeUInt32LE(root.length, 32 * S + 24);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-xiso-')), iso = path.join(dir, 'g.iso');
+  fs.writeFileSync(iso, img);
+  assert.deepStrictEqual((await X.list(iso)).map((x) => x.rel), ['default.xbe', 'Media', 'Media/a.bin']);
+  const dest = path.join(dir, 'out');
+  fs.mkdirSync(path.join(dest, 'UDATA'), { recursive: true }); fs.writeFileSync(path.join(dest, 'UDATA/save'), 'mine');
+  await X.unpack(iso, dest, { keep: ['UDATA'] });
+  assert.strictEqual(fs.readFileSync(path.join(dest, 'Media/a.bin'), 'utf8'), 'abc');
+  assert.strictEqual(fs.readFileSync(path.join(dest, 'UDATA/save'), 'utf8'), 'mine', 'saves kept through unpacking again');
+  fs.writeFileSync(iso, Buffer.alloc(S * 40));
+  await assert.rejects(X.list(iso), /isn’t an Xbox disc image/);
+});
+
+test('programs Cartridge starts keep AppImage self-updaters quiet (Cartridge updates emulators itself)', () => {
+  const CE = require('../electron/childEnv');
+  assert.strictEqual(CE.clean({}, { PATH: '/bin' }).DISABLE_AUTO_UPDATES, '1');
+  assert.strictEqual(CE.clean({ DISABLE_AUTO_UPDATES: '0' }, {}).DISABLE_AUTO_UPDATES, '0', 'a caller can still ask for it');
 });

@@ -9,7 +9,8 @@ const STEAM_LAUNCH = /^(STEAM_COMPAT_|PRESSURE_VESSEL_|STEAM_RUNTIME)/;
 function clean(extra = {}, base = process.env) {
   const env = {};
   for (const [k, v] of Object.entries(base)) if (!DROP.includes(k) && !STEAM_LAUNCH.test(k)) env[k] = v;
-  return Object.assign(env, extra);
+  // DISABLE_AUTO_UPDATES: an AppImage's own self-updater hook (pkgforge's) stays quiet; Cartridge updates emulators (0.9.91)
+  return Object.assign(env, { DISABLE_AUTO_UPDATES: '1' }, extra);
 }
 // the same for a start script run by Steam (a port's .cartridge/play.sh): unset what Steam's launch of it carried
 const SHELL_UNSET = 'for v in $(env | sed -n \'s/^\\(STEAM_COMPAT_[A-Z0-9_]*\\|PRESSURE_VESSEL_[A-Z0-9_]*\\|STEAM_RUNTIME[A-Z0-9_]*\\)=.*/\\1/p\'); do unset "$v"; done; unset LD_LIBRARY_PATH';

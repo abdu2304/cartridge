@@ -1,0 +1,550 @@
+{
+ "schema": 1,
+ "id": "driveclub",
+ "name": "DriveClub",
+ "by": "OverkillLabs3, with the community patches of Kravickas, TonySSS, ZipperedRain, kalaposfos, squidbus, illusion and u/Charlie_Muggins",
+ "repo": "github:OverkillLabs3/driveclub-recomp",
+ "licence": "GPL-2.0",
+ "about": "DriveClub for PS4 (version 1.28) running natively: the game’s own code on your CPU, its graphics translated to Vulkan. About 60 FPS at 4K on a fast PC, an unlocked frame rate, FSR 3.1 or DLAA anti-aliasing, ultrawide sizes and the community patches. Online features don’t work.",
+ "verified": {
+  "on": "2026-10-20",
+  "release": "v0.2.4",
+  "played": false
+ },
+ "game": {
+  "console": "ps4",
+  "title": "DriveClub",
+  "also": [
+   "Driveclub"
+  ],
+  "ids": [
+   "CUSA00093",
+   "CUSA00003"
+  ],
+  "kind": "folder",
+  "has": [
+   "eboot.bin",
+   "sce_sys/param.sfo",
+   "game000.dat"
+  ],
+  "version": {
+   "want": "01.28",
+   "soft": false,
+   "update": true,
+   "why": "It needs the game with update 1.28. Cartridge lays the update over the game for you when the update is on this device."
+  }
+ },
+ "builds": [
+  {
+   "os": "windows",
+   "asset": "^driveclub-recomp-[\\d.]+-win64\\.zip$",
+   "program": "DriveClub.exe",
+   "args": [
+    "--play"
+   ],
+   "files": {
+    "ini": {
+     "path": "{dir}/launcher.ini",
+     "format": "flat"
+    },
+    "list": {
+     "path": "{dir}/data/user/patches_enabled.txt",
+     "format": "lines"
+    }
+   }
+  }
+ ],
+ "ini": {
+  "update": "{game}",
+  "base": "{game}"
+ },
+ "settings": [
+  {
+   "id": "frame_rate",
+   "tab": "Frame Rate and Resolution",
+   "label": "Frame rate",
+   "type": "choice",
+   "at": [
+    "list"
+   ],
+   "options": [
+    [
+     "",
+     "30 FPS"
+    ],
+    [
+     "60 FPS with deltatime",
+     "60 FPS"
+    ],
+    [
+     "60 FPS with fixed tickrate",
+     "60 FPS (fixed tick)"
+    ]
+   ],
+   "desc": "60 FPS scales the game by elapsed time, so its speed stays right if the frame rate dips. Fixed tick uses the engine’s own 60 Hz mode (speed follows the frame rate).",
+   "def": "60 FPS with deltatime"
+  },
+  {
+   "id": "unlocked",
+   "tab": "Frame Rate and Resolution",
+   "label": "No frame cap (with 60 FPS)",
+   "type": "bool",
+   "at": [
+    "ini",
+    "unlocked"
+   ],
+   "desc": "With the 60 FPS choice: the game runs as fast as your PC allows and its speed stays right.",
+   "def": false
+  },
+  {
+   "id": "output_res",
+   "tab": "Frame Rate and Resolution",
+   "label": "Output resolution",
+   "type": "choice",
+   "at": [
+    "list"
+   ],
+   "options": [
+    [
+     "",
+     "Default (1080p)"
+    ],
+    [
+     "720p [1280x720] Output resolution",
+     "720p"
+    ],
+    [
+     "1440p [2560x1440] Output resolution",
+     "1440p"
+    ],
+    [
+     "1800p [3200x1800] Output resolution",
+     "1800p"
+    ],
+    [
+     "4K [3840x2160] Output resolution",
+     "4K"
+    ],
+    [
+     "5K [5120x2880] Output resolution",
+     "5K"
+    ],
+    [
+     "8K [7680x4320] Output resolution",
+     "8K"
+    ]
+   ],
+   "desc": "The size of the picture on screen.",
+   "def": ""
+  },
+  {
+   "id": "render_res",
+   "tab": "Frame Rate and Resolution",
+   "label": "Render resolution",
+   "type": "choice",
+   "at": [
+    "list"
+   ],
+   "options": [
+    [
+     "",
+     "Default (1080p)"
+    ],
+    [
+     "720p [1280x720] Internal resolution",
+     "720p"
+    ],
+    [
+     "1440p [2560x1440] Internal resolution [DEPTH BUG]",
+     "1440p"
+    ],
+    [
+     "1800p [3200x1800] Internal resolution [DEPTH BUG]",
+     "1800p"
+    ],
+    [
+     "4K [3840x2160] Internal resolution [DEPTH BUG]",
+     "4K"
+    ],
+    [
+     "8K [7680x4320] Internal resolution [DEPTH BUG]",
+     "8K"
+    ]
+   ],
+   "desc": "What the game draws internally. Sizes above 1080p use more memory; the launcher adds the memory patch for you.",
+   "def": ""
+  },
+  {
+   "id": "wide",
+   "tab": "Frame Rate and Resolution",
+   "label": "Widescreen (render and output)",
+   "type": "choice",
+   "at": [
+    "list"
+   ],
+   "options": [
+    [
+     "",
+     "Off"
+    ],
+    [
+     "1080p 21:9 [2560x1080] Internal + Output resolution [DEPTH BUG]",
+     "21:9 2560x1080"
+    ],
+    [
+     "1080p 32:9 [3840x1080] Internal + Output resolution [DEPTH BUG]",
+     "32:9 3840x1080"
+    ],
+    [
+     "1440p 21:9 [3440x1440] Internal + Output resolution [DEPTH BUG]",
+     "21:9 3440x1440"
+    ],
+    [
+     "1440p 32:9 [5120x1440] Internal + Output resolution [DEPTH BUG]",
+     "32:9 5120x1440"
+    ]
+   ],
+   "desc": "Ultrawide sizes; these change both the render and the output size.",
+   "def": ""
+  },
+  {
+   "id": "fov",
+   "tab": "Frame Rate and Resolution",
+   "label": "Widescreen field-of-view fix",
+   "type": "bool",
+   "at": [
+    "list",
+    "FOV fix for wide resolutions"
+   ],
+   "desc": "For wide and ultrawide resolutions only.",
+   "def": false
+  },
+  {
+   "id": "aa",
+   "tab": "Anti-aliasing",
+   "label": "Anti-aliasing",
+   "type": "choice",
+   "at": [
+    "ini",
+    "aa"
+   ],
+   "options": [
+    [
+     "0",
+     "Game"
+    ],
+    [
+     "1",
+     "FSR 3.1"
+    ],
+    [
+     "2",
+     "DLAA (GeForce RTX)"
+    ]
+   ],
+   "desc": "FSR 3.1 works on any graphics card; DLAA needs a GeForce RTX and falls back to FSR. Doesn’t work with the motion blur and depth of field patch.",
+   "def": "0"
+  },
+  {
+   "id": "aniso",
+   "tab": "Anti-aliasing",
+   "label": "Anisotropic filtering",
+   "type": "choice",
+   "at": [
+    "ini",
+    "aniso"
+   ],
+   "options": [
+    [
+     "0",
+     "Automatic (16x, 4x on integrated graphics)"
+    ],
+    [
+     "1",
+     "Off"
+    ],
+    [
+     "2",
+     "2x"
+    ],
+    [
+     "3",
+     "4x"
+    ],
+    [
+     "4",
+     "8x"
+    ],
+    [
+     "5",
+     "16x"
+    ]
+   ],
+   "def": "0"
+  },
+  {
+   "id": "name",
+   "tab": "Gameplay",
+   "label": "Player name",
+   "type": "text",
+   "at": [
+    "ini",
+    "name"
+   ],
+   "def": "Player"
+  },
+  {
+   "id": "language",
+   "tab": "Gameplay",
+   "label": "Language",
+   "type": "choice",
+   "at": [
+    "ini",
+    "language"
+   ],
+   "options": [
+    [
+     "0",
+     "Japanese"
+    ],
+    [
+     "1",
+     "English (US)"
+    ],
+    [
+     "2",
+     "French"
+    ],
+    [
+     "3",
+     "Spanish"
+    ],
+    [
+     "4",
+     "German"
+    ],
+    [
+     "5",
+     "Italian"
+    ],
+    [
+     "6",
+     "Dutch"
+    ],
+    [
+     "7",
+     "Portuguese"
+    ],
+    [
+     "8",
+     "Russian"
+    ],
+    [
+     "9",
+     "Korean"
+    ],
+    [
+     "10",
+     "Chinese (Traditional)"
+    ],
+    [
+     "11",
+     "Chinese (Simplified)"
+    ],
+    [
+     "12",
+     "Finnish"
+    ],
+    [
+     "13",
+     "Swedish"
+    ],
+    [
+     "14",
+     "Danish"
+    ],
+    [
+     "15",
+     "Norwegian"
+    ],
+    [
+     "16",
+     "Polish"
+    ],
+    [
+     "17",
+     "Portuguese (Brazil)"
+    ],
+    [
+     "18",
+     "English (UK)"
+    ],
+    [
+     "19",
+     "Turkish"
+    ],
+    [
+     "20",
+     "Spanish (Mexico)"
+    ]
+   ],
+   "desc": "Japanese, Korean and Chinese may show missing characters.",
+   "def": "1"
+  },
+  {
+   "id": "mirror",
+   "tab": "Gameplay",
+   "label": "Mirror and reflection updates",
+   "type": "choice",
+   "at": [
+    "ini",
+    "mirror"
+   ],
+   "options": [
+    [
+     "0",
+     "Live"
+    ],
+    [
+     "1",
+     "Static (faster)"
+    ]
+   ],
+   "desc": "Static draws mirrors, rain and reflections once: much faster, but they stop updating.",
+   "def": "0"
+  },
+  {
+   "id": "full",
+   "tab": "Gameplay",
+   "label": "Fullscreen",
+   "type": "bool",
+   "at": [
+    "ini",
+    "full"
+   ],
+   "def": true
+  },
+  {
+   "id": "dlc",
+   "tab": "Gameplay",
+   "label": "Unlock DLC content",
+   "type": "bool",
+   "at": [
+    "ini",
+    "dlc_unlock"
+   ],
+   "desc": "Add-on cars, bikes, tours and livery decals, built from your own game files. Your game folders aren’t changed.",
+   "def": false
+  },
+  {
+   "id": "fps",
+   "tab": "Gameplay",
+   "label": "Show the FPS counter",
+   "type": "bool",
+   "at": [
+    "ini",
+    "fps"
+   ],
+   "def": false
+  },
+  {
+   "id": "blur",
+   "tab": "Patches",
+   "label": "Disable motion blur and depth of field",
+   "type": "bool",
+   "at": [
+    "list",
+    "Disable motion blur and depth of field"
+   ],
+   "desc": "Leave it off with FSR or DLAA anti-aliasing: they need the game’s blur pass.",
+   "def": false
+  },
+  {
+   "id": "reset",
+   "tab": "Patches",
+   "label": "No reset-to-track timer",
+   "type": "bool",
+   "at": [
+    "list",
+    "Reset Disable"
+   ],
+   "def": false
+  },
+  {
+   "id": "barrier",
+   "tab": "Patches",
+   "label": "Disable track barriers",
+   "type": "bool",
+   "at": [
+    "list",
+    "Barrier Disable"
+   ],
+   "desc": "Removes the invisible barriers at the track edges.",
+   "def": false
+  },
+  {
+   "id": "photo_cam",
+   "tab": "Patches",
+   "label": "Photo mode: free camera through cars",
+   "type": "bool",
+   "at": [
+    "list",
+    "Disable Photomode Free Camera Collision"
+   ],
+   "def": false
+  },
+  {
+   "id": "photo_proc",
+   "tab": "Patches",
+   "label": "Photo mode: skip processing",
+   "type": "bool",
+   "at": [
+    "list",
+    "Disable Photomode Processing"
+   ],
+   "def": false
+  },
+  {
+   "id": "skip_gpu",
+   "tab": "Patches",
+   "label": "Skip the hardware check",
+   "type": "bool",
+   "at": [
+    "ini",
+    "skip_gpu_check"
+   ],
+   "desc": "If the launcher refuses hardware that does work.",
+   "def": false
+  }
+ ],
+ "saves": [
+  "{dir}/data/user/savedata"
+ ],
+ "achievements": {
+  "files": [
+   "{dir}/logs/driveclub_*.log"
+  ],
+  "why": "runtime_services.c prints Runtime: trophy N unlocked into the log of each start; names from your copy’s trophy file when a shadPS4 trophy key is set up"
+ },
+ "known": {
+  "app": [],
+  "ini": [
+   "update",
+   "base",
+   "fps",
+   "fast",
+   "unlocked",
+   "skip_gpu_check",
+   "mirror",
+   "language",
+   "aniso",
+   "up",
+   "aa",
+   "fgen",
+   "name",
+   "full",
+   "dlc_unlock"
+  ]
+ },
+ "rev": 1
+}

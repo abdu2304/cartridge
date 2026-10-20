@@ -73,11 +73,25 @@ function findMeta(dir, depth = 3) {
 }
 // where one installed recomp keeps its unlocks: { format, files, meta } or null.
 // it: { id, name, program, dir, ach: { format, user, file } from the catalogue }
+function globFiles(f) {
+  if (!String(f).includes('*')) return [f];
+  const dir = path.dirname(f), re = new RegExp('^' + path.basename(f).replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$');
+  try { return fs.readdirSync(dir).filter((n) => re.test(n)).sort().map((n) => path.join(dir, n)); } catch { return []; }
+}
+// { "<key>": { "unlocked": true, ... } }: the unlocked keys (no time is kept by the port)
+function readKeyed(text) {
+  const j = JSON.parse(text), out = [];
+  for (const [k, v] of Object.entries(j && typeof j === 'object' ? j : {})) if (v && v.unlocked === true) out.push({ id: k, time: null });
+  return out;
+}
 function locate(it, { home = os.homedir(), env = process.env } = {}) {
   const ach = it.ach || {};
   // 0.9.71, Cartridge Verified PS4 ports: the recipe names the files (recipes.achievementsOf), names come from the
   // recipe's list or the player's own copy (its trophy file, decrypted when a shadPS4 trophy key is set up)
-  if (ach.format === 'ps4') return { format: 'ps4', files: (ach.files || []).filter((f) => fs.existsSync(f)), list: ach.list || null, game: ach.game || null, always: true };
+  // 0.9.91: a name with * in it is every file it matches (DRIVECLUB writes logs\driveclub_<time>.log per start)
+  // 0.9.91: a JSON file of { key: { unlocked } } (Dusklight's achievements.json); names from the recipe's list
+  if (ach.format === 'keyed') return { format: 'keyed', files: (ach.files || []).flatMap(globFiles).filter((f) => fs.existsSync(f)), list: ach.list || null, always: true };
+  if (ach.format === 'ps4') return { format: 'ps4', files: (ach.files || []).flatMap(globFiles).filter((f) => fs.existsSync(f)), list: ach.list || null, game: ach.game || null, always: true };
   if (ach.format === 'hedge' && ach.user && ach.file) {
     const portable = fs.existsSync(path.join(it.dir, 'portable.txt')) ? [path.join(it.dir, 'save', ach.file)] : [];
     // a Flatpak build (Unleashed's Linux release) keeps it inside its own sandbox folder
@@ -105,11 +119,12 @@ function gameOf(it, where, read = (f) => fs.readFileSync(f)) {
   const got = new Map();
   for (const f of where.files) {
     let list = null;
-    try { list = where.format === 'hedge' ? readHedge(read(f)) : where.format === 'ps4' ? readPs4Unlocks(read(f).toString('utf8')) : readRexUnlocks(read(f).toString('utf8')); } catch {}
+    try { list = where.format === 'hedge' ? readHedge(read(f)) : where.format === 'ps4' ? readPs4Unlocks(read(f).toString('utf8')) : where.format === 'keyed' ? readKeyed(read(f).toString('utf8')) : readRexUnlocks(read(f).toString('utf8')); } catch {}
     for (const u of list || []) { const p = got.get(u.id); if (!p || (u.time && (!p.time || u.time < p.time))) got.set(u.id, u); }
   }
   let defs = [];
   if (where.meta) { try { defs = readRexMeta(read(where.meta).toString('utf8')); } catch {} }
+  if (where.format === 'keyed' && where.list) defs = where.list.map(([id, name, desc, grade]) => ({ id, name, desc, grade: grade || null, score: 0 }));
   if (where.format === 'ps4') {
     let own = null;
     try { own = where.game ? require('./trophies').portTrophyDefs(where.game) : null; } catch {}
@@ -124,4 +139,4 @@ function gameOf(it, where, read = (f) => fs.readFileSync(f)) {
     files: where.files,
   };
 }
-module.exports = { readPs4Unlocks, readHedge, readRexUnlocks, readRexMeta, findMeta, locate, gameOf, FILETIME_EPOCH };
+module.exports = { globFiles, readKeyed, readPs4Unlocks, readHedge, readRexUnlocks, readRexMeta, findMeta, locate, gameOf, FILETIME_EPOCH };

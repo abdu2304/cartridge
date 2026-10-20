@@ -49,6 +49,13 @@ module.exports = function recompsIpc(m) {
       unpackTo: (archive, dir) => unpackTo(archive, dir),
       appImageType: (f) => D.appImageType(f), isElf: (f) => D.isElf(f),
       isRunning: (f) => progRunning(f),
+      // 0.9.91: Dolphin's dolphin-tool, for a port that reads ISO only and a copy kept as RVZ: on PATH, else in Dolphin's Flatpak
+      dolphinTool: () => {
+        const cp = require('child_process');
+        for (const n of ['dolphin-tool', 'DolphinTool']) { const r = cp.spawnSync('sh', ['-c', `command -v ${n}`], { encoding: 'utf8' }); if (r.status === 0 && r.stdout.trim()) return [r.stdout.trim()]; }
+        for (const user of [true, false]) { const r = cp.spawnSync('flatpak', ['info', ...(user ? ['--user'] : ['--system']), 'org.DolphinEmu.dolphin-emu'], { encoding: 'utf8' }); if (r.status === 0) return ['flatpak', 'run', '--command=dolphin-tool', 'org.DolphinEmu.dolphin-emu']; }
+        return null;
+      },
       playing: () => !!(m.gameFocus.away || m.runOn),
       trash: (p) => toTrash(p),
       // 0.9.66: the new release of an update started once, for a few seconds, then closed. It fails only when it can't
@@ -304,7 +311,8 @@ module.exports = function recompsIpc(m) {
     await healGame(id);
     const R = recomps(), rec = R.record(id), e = R.byId(id);
     if (!rec) throw new Error('Install it first.');
-    if (!R.ready(id)) throw new Error(rec.game?.path ? `${e.name} isn’t set up yet. Press Set Up.` : `Pick your copy of ${e.recipe.game.title} first.`);
+    // 0.9.91: a port whose own window finishes the setup (r.setup) starts as soon as Cartridge's part is done
+    if (!R.ready(id) && !(e.recipe?.setup && R.baseReady(id))) throw new Error(rec.game?.path ? `${e.name} isn’t set up yet. Press Set Up.` : `Pick your copy of ${e.recipe.game.title} first.`);
     const st = rec.starts.find((x) => x.id === start) || rec.starts[0];
     // 0.9.88 (owner: Uncharted saw no controller): pads that Steam Input holds (a Steam Controller always, any pad on
     // the desktop) reach only games Steam started; a port Cartridge spawned itself got Steam's desktop mouse and
@@ -595,6 +603,7 @@ module.exports = function recompsIpc(m) {
     const R = recomps(), e = R.byId(id);
     if (e?.from !== 'verified') throw new Error('That isn’t a Cartridge Verified game.');
     let use = dir;
+    if (!use && e.recipe?.game?.kind === 'none') use = R.record(id)?.dir || ''; // 0.9.91: no game files to pick
     if (!use) {
       const copies = verifiedCopies(id).filter((c) => c.here);
       if (!copies.length) return { ok: false, noCopy: true, why: `${e.recipe.game.title} isn’t on this device yet. Download it from your library first.` };
