@@ -4710,6 +4710,7 @@ const handlers = {
     saveManifest();
     delete installedMap[romId];
     broadcast('installed-changed', { romId, path: null });
+    setTimeout(() => RIPC.healGames().catch(() => {}), 500); // 0.9.90: a port set up with this copy takes another one that's here
     try { if (steamMgr.onDeleted(romId)) broadcast('steam-auto', { romId, action: 'remove' }); } catch (e) { log('steam auto remove', e.message); }
     return true;
   },
@@ -5957,6 +5958,7 @@ const handlers = {
       computeInstalled();
       let steam = false; try { await steamMgr.refreshGame(romId, { force: true }); steam = true; } catch (e) { log('move: steam shortcut', e.message); }
       log('game moved', from, '->', to);
+      if (/^ps[45]/i.test(r.platform_slug || '')) setTimeout(() => RIPC.healGames().catch(() => {}), 500); // 0.9.90: a port set up with this copy follows it
       return { to, steam };
     }
   },

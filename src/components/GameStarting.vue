@@ -30,12 +30,15 @@ const art = computed(() => { const r = st.value.romId != null && romById(st.valu
 const secs = ref(0);
 const sub = computed(() => {
   if (st.value.state === 'closed') return 'It closed before it opened. If it happens again, Settings → Help and About → Report a Problem sends Cartridge’s log.';
+  // 0.9.90 (PC playtest: Bloodborne prepares for 35 s with nothing on screen, inFAMOUS for minutes after a new copy, and
+  // the owner closed a start that was working): a port says it's preparing and that it should be left to run
+  if (st.value.port && secs.value >= 45) return `Still preparing (${secs.value} s). After an update or a new copy of the game, a PC port can take several minutes before its window shows. Leave it running.`;
   if (secs.value >= 45) return `Still on its way (${secs.value} s). Big games can take a few minutes, longer the first time.`;
   if (st.value.state === 'opening') return 'It’s running. Its window shows in a moment.';
-  return st.value.port ? 'PC ports can take a minute to open, longer the first time.' : 'Getting it ready.';
+  return st.value.port ? 'PC ports prepare the game before their window shows, with nothing on screen for a minute or more. Leave it running.' : 'Getting it ready.';
 });
 const hide = () => { store.starting = null; };
-// how it ends: the game in front (Cartridge goes quiet), or as a last resort after five minutes. In Game Mode a port
+// how it ends: the game in front (Cartridge goes quiet), or as a last resort after five minutes (ten for a port). In Game Mode a port
 // Cartridge started quiets Cartridge the moment it starts (main.js child), before its window shows, so there it waits
 // for the port to end instead and stays under it
 const ownPort = computed(() => !!(st.value.port && store.info?.gamescope));
@@ -45,7 +48,7 @@ let layer;
 onMounted(() => {
   tick = setInterval(() => {
     secs.value = Math.round((Date.now() - (st.value.at || Date.now())) / 1000);
-    if (secs.value > 300 && st.value.state !== 'closed') hide();
+    if (secs.value > (st.value.port ? 600 : 300) && st.value.state !== 'closed') hide(); // a port's first start can pass 5 minutes
   }, 1000);
   const none = () => {};
   layer = pushLayer(document.querySelector('.gs-scrim'), { back: hide, accept: () => { if (st.value.state === 'closed') hide(); }, start: none, select: none, x: none, y: none, lb: none, rb: none, lt: none, rt: none, up: none, down: none, left: none, right: none });

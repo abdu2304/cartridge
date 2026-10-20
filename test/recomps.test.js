@@ -531,3 +531,22 @@ test('0.9.86: a port installed from a link stays listed when its project is list
   assert.deepStrictEqual(old.games, [{ title: 'Game', console: 'n64' }]);
   assert.ok(list.find((e) => e.id === 'game-verified'), 'and the listed one is there too');
 });
+
+// 0.9.90 (PC playtest: inFAMOUS "Missing: eboot.bin" after its game was downloaded again under a new folder name)
+test('copyGone: a verified port whose game copy moved or lost its files is set up again; never with the port unplugged', () => {
+  const h = fs.mkdtempSync(path.join(os.tmpdir(), 'cart-copy-'));
+  const game = path.join(h, 'roms/ps4/Game'), prog = path.join(h, 'recomp/ps4/Port/port');
+  fs.mkdirSync(game, { recursive: true }); fs.mkdirSync(path.dirname(prog), { recursive: true });
+  fs.writeFileSync(path.join(game, 'eboot.bin'), 'x'); fs.writeFileSync(prog, 'x');
+  const e = { from: 'verified', recipe: { game: { has: ['eboot.bin'] } } };
+  const rec = { program: prog, game: { path: game, source: game } };
+  assert.strictEqual(R.copyGone(e, rec), false, 'copy in place');
+  fs.rmSync(path.join(game, 'eboot.bin'));
+  assert.strictEqual(R.copyGone(e, rec), true, 'files gone');
+  fs.renameSync(game, game + ' 2');
+  assert.strictEqual(R.copyGone(e, rec), true, 'folder moved');
+  assert.strictEqual(R.copyGone(e, { ...rec, program: path.join(h, 'unplugged/port') }), false, 'port not here');
+  assert.strictEqual(R.copyGone({ from: 'link' }, rec), false, 'not a verified port');
+  const pkg = path.join(h, 'game.pkg'); fs.writeFileSync(pkg, 'x');
+  assert.strictEqual(R.copyGone(e, { program: prog, game: { path: pkg, source: pkg } }), false, 'a PKG file in place');
+});

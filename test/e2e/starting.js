@@ -20,7 +20,7 @@ const send = (app, ch, data) => app.evaluate(({ BrowserWindow }, [c, d]) => Brow
     await start({ romId: rom?.id ?? null, name: 'Uncharted', port: 'uncharted' });
     await wait(400);
     check('it shows with the name', await shown() && (await page.textContent('.gs-name')) === 'Uncharted');
-    check('it says a port can take a minute', /PC ports can take a minute/.test(await page.textContent('.gs-sub')));
+    check('it says a port prepares with nothing on screen', /PC ports prepare the game before their window shows/.test(await page.textContent('.gs-sub')));
     await page.screenshot({ path: '.ui-audit/starting.png' }).catch(() => {});
     await send(app, 'background', { away: true }); await wait(800);
     check('it goes when the game comes in front', !(await shown()));

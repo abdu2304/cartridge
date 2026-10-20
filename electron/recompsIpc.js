@@ -270,11 +270,8 @@ module.exports = function recompsIpc(m) {
     if (healing.has(id)) return healing.get(id);
     const job = (async () => {
       const R = recomps(), rec = R.record(id), e = R.byId(id);
-      // the port itself not here (its drive unplugged): nothing to set up
-      if (e?.from !== 'verified' || !rec?.game?.path || !rec.program || !fs.existsSync(rec.program)) return false;
+      if (!require('./recomps').copyGone(e, rec)) return false;
       const src = rec.game.source || rec.game.path;
-      const has = (d) => { try { return fs.statSync(d).isFile() || (e.recipe.game.has || []).slice(0, 1).every((f) => fs.existsSync(path.join(d, f))); } catch { return false; } };
-      if (fs.existsSync(src) && has(rec.game.path)) return false;
       for (const c of verifiedCopies(id).filter((x) => x.here && x.path)) {
         if (path.resolve(c.path) === path.resolve(src)) continue;
         try {

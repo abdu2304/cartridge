@@ -56,6 +56,17 @@ function indexOf(roms) {
   return ix;
 }
 // library games this recomp is for: same console family, same title
+// 0.9.90: a verified port's game copy that has gone (moved, downloaded again under a new folder name, deleted): its
+// source folder missing, or the folder in use (a view of links when an update is laid over) without the recipe's first
+// file. Never when the port itself isn't here (its drive unplugged): nothing could be set up then.
+function copyGone(e, rec) {
+  if (e?.from !== 'verified' || !rec?.game?.path || !rec.program || !fs.existsSync(rec.program)) return false;
+  const src = rec.game.source || rec.game.path;
+  if (!fs.existsSync(src)) return true;
+  try { if (fs.statSync(rec.game.path).isFile()) return false; } catch { return true; }
+  const first = (e.recipe?.game?.has || [])[0];
+  return !!first && !fs.existsSync(path.join(rec.game.path, first));
+}
 function matchRoms(entry, roms) {
   const ix = indexOf(roms || []), out = new Set();
   for (const g of entry.games || []) {
@@ -1280,4 +1291,4 @@ function createRecomps(ctx) {
   return { catalogue, byId, details, ready, watchSetup, launchArgs, restoreBackup, list, check, install, versions, useVersion, dropVersion, remove, setChannel, setGame, markDone, setAppid, addLink, refresh, ensureFolders, backups, backupSaves, checkSaves, record, saveDirs: (id) => { const e = byId(id); return e?.from === 'verified' ? verifiedSaves(e, installs[id]) : e?.saves?.length ? saveDirs(e, installs[id]) : (installs[id]?.syncSaves || []).filter(exists); }, saveChoices, setSyncSaves, pendingSetup, homeDir, reload, setVerifiedGame, configure, settings, setSettings, refreshRecipes };
 }
 
-module.exports = { ciBuildOf, checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, matchDumps, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
+module.exports = { ciBuildOf, checkDigest, guessSaves, fileArg, argString, setupTpl, companions, placePlan, savePaths, readmePicture, plainNotes, guessFromText, CONSOLES, SLUGS, consoleOfSlug, norm, titleKeys, matchRoms, matchDumps, copyGone, pickBuild, repoOf, projectUrl, releaseOf, expandPath, saveDirs, slugId, hashFile, checkGame, createRecomps };
