@@ -180,6 +180,9 @@ module.exports = function recompsIpc(m) {
   const libraryRoms = () => { const r = m.library?.roms || null; if (libRomsMemo.roms !== r) libRomsMemo = { roms: r, list: r ? Object.values(r).flat() : [] }; return libRomsMemo.list; };
   let recompRun = null;
   // a recomp's Steam shortcut: its program, its folder as Start In, its arguments; art from the game when it's in the library
+  // 0.9.90 (owner: show which ports have achievements): true when Cartridge reads the port's unlocks (a recipe's
+  // achievements, a link port whose format is known), false when it has none Cartridge can read
+  const achKnown = (e) => !!(e.recipe?.achievements || (e.achievements && typeof e.achievements === 'object'));
   // ---- Cartridge Verified (0.9.70)
   // your copies of a verified game: the library's matching games, on this device or not, with where they are
   // an installed port's Steam shortcut (its first start's for a port with several), or queued (game page More, 0.9.86)
@@ -289,6 +292,12 @@ module.exports = function recompsIpc(m) {
   async function healGames() {
     const R = recomps();
     for (const e of R.catalogue().entries) if (e.from === 'verified' && R.record(e.id)?.game?.path) await healGame(e.id).catch(() => {});
+    await portFilesFollow();
+  }
+  // 0.9.90: settings files a port rewrote (recomps.refreshPortFiles), after a game ends and at start-up
+  async function portFilesFollow() {
+    const R = recomps();
+    for (const e of R.catalogue().entries) if (e.from === 'verified' && R.record(e.id)) await R.refreshPortFiles(e.id).catch(() => {});
   }
   // a verified game started: its start script (one per game for Uncharted), the window stepping aside in Game Mode
   async function openVerified(id, start) {
@@ -360,7 +369,7 @@ module.exports = function recompsIpc(m) {
 
   const handlers = {
   // ---- recomps (0.9.65)
-  'recomps:list': () => { oneShortcutsSoon(); const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) steamOf(e); return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
+  'recomps:list': () => { oneShortcutsSoon(); const R = recomps(), l = R.list({ roms: libraryRoms() }); for (const e of l.entries) { steamOf(e); e.ach = achKnown(e); } return { ...l, folder: path.join(emulationFolders()[0] || path.join(os.homedir(), 'Emulation'), 'recomp'), running: recompRun?.id || null }; },
   // the recomps of one library game (game page More, 0.9.65)
   'recomps:forRom': ({ romId }) => { const rom = romIndexMain().get(Number(romId)); if (!rom) return []; return recomps().list({ roms: [rom] }).entries.filter((e) => e.roms.includes(rom.id)).map((e) => ({ id: e.id, name: e.name, installed: steamOf(e).installed, from: e.from, state: e.state || null })); },
   'recomps:check': ({ id, force }) => recomps().check(id, { force }),
@@ -606,5 +615,5 @@ module.exports = function recompsIpc(m) {
   'recomps:setSettings': async ({ id, changes }) => { const d = await recomps().setSettings(id, changes); log('verified settings', id, (changes || []).map((x) => `${x.id}=${x.value}`).join(' ')); return d; },
   'recomps:runner': () => { const r = require('./protonRunner').find({ roots: (() => { try { return m.steamMgr.steamRoots(); } catch { return []; } })() }); return r ? { kind: r.kind, name: r.name } : null; },
   };
-  return { handlers, recomps, ssUnits, recompTrophies, watchFromSteam, healGames };
+  return { handlers, recomps, ssUnits, recompTrophies, watchFromSteam, healGames, portFilesFollow };
 };

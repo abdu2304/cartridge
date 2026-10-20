@@ -588,5 +588,33 @@
   "output": true,
   "why": "runtime_services.c prints Runtime: trophy N unlocked; names come from your copy's trophy file when a shadPS4 trophy key is set up"
  },
- "rev": 3
+ "rev": 4,
+ "known": {
+  "app": [
+   "game_dir",
+   "check_updates",
+   "close_on_play",
+   "start",
+   "frame_rate",
+   "fullscreen",
+   "window_size",
+   "present_mode",
+   "show_fps",
+   "scaler",
+   "sharpening",
+   "anti_aliasing",
+   "aa_sharpness",
+   "frame_generation",
+   "frame_gen_multiplier",
+   "language",
+   "player_name",
+   "pad_invert_y",
+   "mouse_look",
+   "mouse_sensitivity",
+   "mouse_invert_y"
+  ],
+  "ini": [
+   "show_fps"
+  ]
+ }
 }

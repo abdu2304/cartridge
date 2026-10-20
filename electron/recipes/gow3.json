@@ -638,5 +638,39 @@
   "output": true,
   "why": "runtime_services.c prints Runtime: trophy N unlocked; names come from your copy's trophy file when a shadPS4 trophy key is set up"
  },
- "rev": 3
+ "rev": 4,
+ "known": {
+  "app": [
+   "game_dir",
+   "check_updates",
+   "close_on_play",
+   "hdr",
+   "background_warmup",
+   "parallel_warmup",
+   "language",
+   "glyph_style",
+   "partial_height_views",
+   "draw_pipe",
+   "readbacks",
+   "no_msaa",
+   "stream_memory",
+   "video_backend"
+  ],
+  "ini": [
+   "display_mode",
+   "vsync",
+   "show_fps",
+   "fps_limit",
+   "engine_fps",
+   "render_resolution",
+   "frames_queued",
+   "anisotropy",
+   "async_shaders",
+   "cheat_double_jumps",
+   "cheat_very_hard",
+   "vibration",
+   "stale_readback",
+   "deferred_readback"
+  ]
+ }
 }

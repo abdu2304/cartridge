@@ -399,3 +399,32 @@ test('Uncharted’s FPS counter goes to bbport.ini, where its game reads it (its
   const r = require('../electron/recipes/uncharted.json');
   assert.deepStrictEqual(r.settings.find((s) => s.id === 'show_fps').at, ['ini', 'show_fps']);
 });
+
+// 0.9.90 (owner: a port update that adds or removes settings is reflected in Cartridge's Game Settings)
+test('settingsNow: keys the port writes that the recipe lacks show under More; ones it stopped writing go', () => {
+  const r = { name: 'X', app: { game_dir: '{game}' }, known: { app: ['a', 'b', 'game_dir', 'nested', 'oldKey'], ini: ['cheat_c', 'loops'] }, settings: [
+    { id: 'a', tab: 'Display', label: 'A', type: 'bool', def: true, at: ['app', 'a'] },
+    { id: 'b', tab: 'Display', label: 'B', type: 'number', def: 1, at: ['app', 'b'] },
+    { id: 'c', tab: 'Game', label: 'C', type: 'bool', def: false, at: ['ini', 'cheat_c'] },
+  ] };
+  const build = { os: 'linux', program: 'p', files: { app: { path: '{dir}/s.json', format: 'json' }, ini: { path: '{dir}/g.ini', format: 'flat' } } };
+  const files = { '/i/s.json': JSON.stringify({ a: true, b: 2, game_dir: '/g', newMode: 'fast', nested: { x: 1 } }), '/i/g.ini': 'cheat_c=0\nloops=7\nnew_toggle=true\nfps_cap=120\nvolume=1\n' };
+  const rec = { dir: '/i', tag: 'v2', game: { path: '/g' } };
+  const read = (p) => files[p] ?? null;
+  const ids = (l) => l.map((s) => s.id);
+  let l = RC.settingsNow(r, build, rec, { read });
+  assert.deepStrictEqual(ids(l), ['a', 'b', 'c', 'x.app.newMode', 'x.ini.new_toggle', 'x.ini.fps_cap', 'x.ini.volume']); // loops was there when verified
+  assert.deepStrictEqual(RC.settingsNow({ ...r, known: undefined }, build, rec, { read }).filter((s) => s.found), [], 'a recipe without known shows no extras');
+  const extra = Object.fromEntries(l.filter((s) => s.found).map((s) => [s.id, s]));
+  assert.strictEqual(extra['x.app.newMode'].type, 'text'); assert.strictEqual(extra['x.app.newMode'].label, 'New mode');
+  assert.strictEqual(extra['x.ini.new_toggle'].type, 'bool'); assert.strictEqual(extra['x.ini.fps_cap'].type, 'number'); assert.strictEqual(extra['x.ini.volume'].type, 'number', '1 is a number, not on');
+  // written back by render with the rest
+  const out = RC.render(r, build, rec, RC.effective(r, build, { 'x.ini.new_toggle': false }, l), { read, sets: l });
+  assert.match(out.files.find((f) => f.path === '/i/g.ini').text, /new_toggle=false/);
+  // the port, updated, no longer writes b: hidden for that release only
+  l = RC.settingsNow(r, build, { ...rec, portKeys: { tag: 'v2', app: ['a', 'game_dir'], ini: ['cheat_c'] } }, { read });
+  assert.ok(!ids(l).includes('b') && ids(l).includes('a') && ids(l).includes('c'));
+  assert.ok(ids(RC.settingsNow(r, build, { ...rec, portKeys: { tag: 'v1', app: ['a'], ini: [] } }, { read })).includes('b'), 'another release: nothing hidden');
+  // a port that writes only what you changed (under half the recipe's keys) hides nothing
+  assert.ok(ids(RC.settingsNow(r, build, { ...rec, portKeys: { tag: 'v2', app: ['zzz'], ini: [] } }, { read })).includes('b'));
+});

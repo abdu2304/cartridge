@@ -55,6 +55,7 @@ function validate(r) {
     for (const f of a.files || []) if (!/^\{(dir|config|data|appdata)\}\//.test(f)) bad.push(`achievements file ${f}`);
     for (const t of a.list || []) if (!Array.isArray(t) || !Number.isInteger(t[0]) || !t[1] || !['P', 'G', 'S', 'B'].includes(t[3])) bad.push(`achievements list ${t?.[0]}`);
   }
+  if (r.known && !(['app', 'ini'].every((k) => r.known[k] == null || (Array.isArray(r.known[k]) && r.known[k].every((x) => typeof x === 'string'))))) bad.push('known');
   const ids = new Set();
   for (const s of r.settings || []) {
     if (!s.id || ids.has(s.id)) bad.push(`setting id ${s.id}`); ids.add(s.id);
@@ -112,15 +113,15 @@ const expand = (t, v) => String(t).replace(TPL, (_, k) => v[k] ?? '');
 
 // ---- values: yours where you changed one, else the port's own default; settings for another system are left out
 function settingsFor(r, build) { return (r.settings || []).filter((s) => !s.os || s.os === build?.os); }
-function effective(r, build, saved = {}) {
+function effective(r, build, saved = {}, sets = settingsFor(r, build)) {
   const out = {};
-  for (const s of settingsFor(r, build)) out[s.id] = saved[s.id] != null ? saved[s.id] : s.def;
+  for (const s of sets) out[s.id] = saved[s.id] != null ? saved[s.id] : s.def;
   return out;
 }
 // a value in the type the port's file holds: settings.json booleans and numbers as JSON, ini values as text
 // (booleans 1/0, as the launchers write them)
 function typed(s, v, where) {
-  if (s.type === 'bool') { const on = v === true || v === 'true' || v === '1' || v === 1; return where === 'app' ? on : on ? '1' : '0'; }
+  if (s.type === 'bool') { const on = v === true || v === 'true' || v === '1' || v === 1; return where === 'app' ? on : s.word ? String(on) : on ? '1' : '0'; } // word: an ini that writes true/false
   if (s.quote && where === 'ini') return `"${String(v ?? '').replace(/"/g, '')}"`; // P.T. writes its text values in quotes
   if (s.type === 'number') { const n = Number(v); if (!Number.isFinite(n)) return where === 'app' ? s.def : String(s.def); return where === 'app' && typeof s.def === 'number' ? n : String(v); }
   return v == null ? '' : String(v);
@@ -148,10 +149,9 @@ function check(s, v) {
 
 // ---- the files: the launcher's settings.json for each start (Uncharted: one per game) and the game's own ini.
 // read(path) gives a file's text or null; nothing here touches the disk.
-function render(r, build, rec, values, { read = () => null, home, env } = {}) {
+function render(r, build, rec, values, { read = () => null, home, env, sets = settingsFor(r, build) } = {}) {
   const F = require('./onlineFormats').FORMATS, v = varsFor(r, build, rec, { home, env });
   const files = [], starts = [];
-  const sets = settingsFor(r, build);
   const appAt = build.files?.app, iniAt = build.files?.ini;
   // the game's ini: only the keys of the settings shown, every other line kept
   if (iniAt) {
@@ -205,6 +205,69 @@ function readBack(r, build, rec, { read = () => null, home, env } = {}) {
   }
   return out;
 }
+
+// ---- 0.9.90 (owner: "if a game has an update and it removes settings or adds settings it should also be reflected in
+// cartridge change game settings"): what the port's own files hold. A key the port writes that the recipe doesn't
+// know (an update added a setting) shows in Game Settings under More, typed by its value; a recipe setting the port
+// no longer writes (an update took it away) is hidden. Only top-level JSON values and ini lines: nested objects,
+// lists and long or multi-line text are the port's business.
+function iniEntries(text, isFlat) {
+  const out = []; let sec = null;
+  for (const l of String(text || '').split(/\r?\n/)) {
+    const t = l.trim();
+    if (!t || /^[#;]/.test(t)) continue;
+    const m = /^\[(.+)\]$/.exec(t);
+    if (m) { sec = m[1]; continue; }
+    const i = t.indexOf('=');
+    if (i <= 0) continue;
+    const key = t.slice(0, i).trim(), value = t.slice(i + 1).trim().replace(/^"(.*)"$/, '$1');
+    out.push({ at: isFlat ? [key] : [sec || '', key], value });
+  }
+  return out;
+}
+function portKeys(r, build, rec, { read = () => null, home, env } = {}) {
+  const v = varsFor(r, build, rec, { home, env }), out = { app: null, ini: null };
+  if (build.files?.app) { try { const j = JSON.parse(read(expand(build.files.app.path, v)) || 'null'); if (j && typeof j === 'object' && !Array.isArray(j)) out.app = j; } catch {} }
+  if (build.files?.ini) { const t = read(expand(build.files.ini.path, v)); if (t != null) out.ini = iniEntries(t, build.files.ini.format === 'flat'); }
+  return out;
+}
+const iniKey = (at) => (Array.isArray(at) ? at : [at]).join('/');
+const words = (k) => { const w = String(k).replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_.-]+/g, ' ').trim().toLowerCase(); return w ? w[0].toUpperCase() + w.slice(1) : String(k); };
+// r.known: the keys the port's files already held when the recipe was written (left out on purpose: progress,
+// window state, what the recipe covers elsewhere). Only keys beyond those are new; a recipe without the list shows none.
+function discovered(r, build, files) {
+  if (!r.known) return [];
+  const sets = settingsFor(r, build), out = [], seen = new Set([...(r.known.app || []), ...(r.known.ini || []).map((k) => 'ini:' + k)]);
+  const knownApp = new Set([...sets.filter((s) => s.at[0] === 'app').map((s) => s.at[1]), ...Object.keys(r.app || {}), ...(r.play || []).flatMap((pl) => Object.keys(pl.app || {}))]);
+  const knownIni = new Set(sets.filter((s) => s.at[0] === 'ini').map((s) => iniKey(build.files?.ini?.format === 'flat' ? [].concat(s.at[1]).slice(-1) : s.at[1])));
+  const one = (id, at, value) => {
+    if (typeof value === 'boolean') return { id, at, type: 'bool', def: value };
+    if (typeof value === 'number' && Number.isFinite(value)) return { id, at, type: 'number', def: value, num: { min: -1e9, max: 1e9 } };
+    if (typeof value !== 'string' || value.length > 200 || /[\r\n]/.test(value)) return null;
+    if (at[0] === 'ini' && /^(true|false)$/i.test(value)) return { id, at, type: 'bool', def: /^true$/i.test(value), word: true };
+    if (/^-?\d+(\.\d+)?$/.test(value)) return { id, at, type: 'number', def: value, num: { min: -1e9, max: 1e9 } };
+    return { id, at, type: 'text', def: value };
+  };
+  for (const [k, x] of Object.entries(files.app || {})) if (!knownApp.has(k) && !seen.has(k)) { const s = one(`x.app.${k}`, ['app', k], x); if (s) out.push(s); }
+  const flatIni = build.files?.ini?.format === 'flat';
+  for (const e of files.ini || []) if ((flatIni || e.at[0]) && !knownIni.has(iniKey(e.at)) && !seen.has('ini:' + iniKey(e.at))) { const s = one(`x.ini.${iniKey(e.at)}`, ['ini', flatIni ? e.at[0] : e.at], e.value); if (s) out.push(s); }
+  return out.map((s) => ({ ...s, tab: 'More', label: words(s.at[0] === 'ini' ? [].concat(s.at[1]).slice(-1)[0] : s.at[1]), desc: 'From the port’s own settings file: a setting Cartridge’s recipe doesn’t name yet, shown as the port names it.', found: true }));
+}
+// the settings to show and write: the recipe's, less what the port no longer writes (rec.portKeys, recorded from a
+// file the port itself wrote for this release, and only when that file holds at least half of the recipe's keys, so a
+// port that writes only what you changed hides nothing), plus what the port's files hold that the recipe doesn't name
+function settingsNow(r, build, rec, { read = () => null, home, env } = {}) {
+  const sets = settingsFor(r, build), pk = rec?.portKeys;
+  let keep = sets;
+  if (pk && pk.tag === rec.tag) {
+    const has = (s) => (s.at[0] === 'app' ? (pk.app ? pk.app.includes(s.at[1]) : null) : pk.ini ? pk.ini.includes(iniKey(build.files?.ini?.format === 'flat' ? [].concat(s.at[1]).slice(-1) : s.at[1])) : null);
+    const judged = sets.filter((s) => has(s) !== null);
+    if (judged.length && judged.filter((s) => has(s)).length * 2 >= judged.length) keep = sets.filter((s) => has(s) !== false);
+  }
+  return [...keep, ...discovered(r, build, portKeys(r, build, rec, { read, home, env }))];
+}
+// the keys a port file holds, as rec.portKeys records them
+function keysOf(files) { return { app: files.app ? Object.keys(files.app) : null, ini: files.ini ? files.ini.map((e) => iniKey(e.at)) : null }; }
 
 // ---- the start script: Steam's shortcut and Cartridge's Play both run it, so a setting changed in Cartridge needs
 // nothing changed in Steam. Linux builds start directly; Windows builds through umu-launcher when it's installed,
@@ -339,4 +402,4 @@ function viewPlan(base, update, { list }) {
   return [...plan].map(([rel, from]) => ({ rel, from }));
 }
 
-module.exports = { findDir, achievementsOf, outputLog, SHIPPED, validate, load, chooseBuild, winPath, varsFor, expand, settingsFor, effective, typed, untyped, check, render, readBack, flat, script, prefixCommand, runCommand, checkGame, findUpdate, viewPlan, verCmp, prefixOf };
+module.exports = { iniEntries, portKeys, discovered, settingsNow, keysOf, findDir, achievementsOf, outputLog, SHIPPED, validate, load, chooseBuild, winPath, varsFor, expand, settingsFor, effective, typed, untyped, check, render, readBack, flat, script, prefixCommand, runCommand, checkGame, findUpdate, viewPlan, verCmp, prefixOf };

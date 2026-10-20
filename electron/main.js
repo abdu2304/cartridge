@@ -200,7 +200,7 @@ function childRun(p, what) {
   // 0.9.87: game-run as for a game started through Steam, so the page shows it starting and nav.js gameEnded() takes
   // the pad back when it ends (0.9.86 left that out, and the controller did nothing in Cartridge after a port)
   runOn = true; gameFocus.gameApp = null; gameFocus.endedAt = 0; log('game running', what); setAway('child', true); broadcast('game-run', { state: 'starting', port: what });
-  p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setAway('child', false); broadcast('game-run', { state: 'ended', port: what }); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
+  p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setTimeout(() => RIPC.portFilesFollow().catch(() => {}), 3000); setAway('child', false); broadcast('game-run', { state: 'ended', port: what }); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
 }
 // o.needles: what to look for instead of the game's own file (0.9.88: a PC port started through Steam, by its start script)
 function watchGameRun(romId, o = {}) {
@@ -237,7 +237,7 @@ function watchGameRun(romId, o = {}) {
     // while its game runs, so a freeze that takes everything down still leaves the last of it (emulator-runs/)
     if (vita && on && Date.now() - (copiedAt || 0) > 30000) { copiedAt = Date.now(); keepEmuLog('vita3k', require('./pkgInstall').vita3kLogFile(steamMgr.vita3kCommand?.()?.exe)); }
     if (!on && seen) {
-      clearInterval(runT); runOn = false; gameFocus.endedAt = Date.now(); log('game ended', romId); setAway('run', false);
+      clearInterval(runT); runOn = false; gameFocus.endedAt = Date.now(); log('game ended', romId); setAway('run', false); setTimeout(() => RIPC.portFilesFollow().catch(() => {}), 3000); // 0.9.90
       broadcast('game-run', { state: 'ended', romId });
       saveSyncAfter(romId); // Cartridge Save Sync (0.9.51)
       bringBack();

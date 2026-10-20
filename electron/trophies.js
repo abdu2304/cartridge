@@ -19,7 +19,7 @@ const SOURCES = {
   vita3k: { id: 'vita3k', name: 'Vita3K', platform: 'PlayStation Vita', short: 'Vita', slugs: ['psvita'], kind: 'trophy' },
   kytyps5: { id: 'kytyps5', name: 'KytyPS5', platform: 'PlayStation 5', short: 'PS5', slugs: ['ps5'], kind: 'trophy' },
   // 0.9.65: achievements recomps record themselves (recompAchievements.js), one game per installed recomp
-  recomp: { id: 'recomp', name: 'Recomps', platform: 'Recomps', short: 'Recomp', slugs: [], kind: 'gamerscore' },
+  recomp: { id: 'recomp', name: 'PC Ports', platform: 'PC Ports', short: 'PC Port', slugs: [], kind: 'gamerscore' }, // 0.9.90: named as everywhere else, never as its console
 };
 
 const HOME = os.homedir();
