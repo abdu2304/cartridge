@@ -31,13 +31,17 @@ const recipe = (id) => RC.load().find((r) => r.id === id);
 
 test('every shipped recipe passes its checks, and index.json holds exactly them', () => {
   const list = RC.load({ log: (...a) => assert.fail(a.join(' ')) });
-  assert.deepStrictEqual(list.map((r) => r.id).sort(), ['bloodborne', 'gow3', 'iss', 'pt', 'uncharted']);
+  // every file in the folder loads (one that fails validate() fails the log above); 0.9.91: no fixed list, ports are added often
+  const files = fs.readdirSync(RC.SHIPPED).filter((n) => n.endsWith('.json') && n !== 'index.json').map((n) => n.replace(/\.json$/, '')).sort();
+  assert.deepStrictEqual(list.map((r) => r.id).sort(), files);
+  assert.ok(files.length >= 5);
   for (const r of list) {
     assert.ok(r.verified?.on && r.verified?.release, `${r.id} says when it was checked`);
     for (const s of r.settings) {
       assert.ok(s.label && s.tab, `${r.id}.${s.id}`);
       if (s.at[0] === 'app') assert.ok(r.builds.some((b) => b.files?.app), `${r.id}.${s.id} has a settings.json to go in`);
       if (s.at[0] === 'ini') assert.ok(r.builds.some((b) => b.files?.ini), `${r.id}.${s.id} has an ini to go in`);
+      if (s.at[0] === 'list') assert.ok(r.builds.some((b) => b.files?.list), `${r.id}.${s.id} has a list file to go in`);
     }
   }
   const index = JSON.parse(fs.readFileSync(path.join(RC.SHIPPED, 'index.json'), 'utf8'));

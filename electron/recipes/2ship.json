@@ -1,0 +1,4505 @@
+{
+ "schema": 1,
+ "id": "2ship",
+ "name": "2 Ship 2 Harkinian",
+ "by": "The 2 Ship 2 Harkinian team (HarbourMasters), on the Majora’s Mask decompilation (zeldaret/mm)",
+ "repo": "github:2ship2harkinian/2ship2harkinian",
+ "licence": "CC0-1.0",
+ "about": "Majora’s Mask rebuilt from its decompiled code: widescreen, high frame rates, camera and time-saving enhancements, cheats and a randomizer. The first start builds mm.o2r from your own ROM and asks once to start the game; after that it starts straight in.",
+ "verified": {
+  "on": "2026-10-20",
+  "release": "5.0.1",
+  "played": false
+ },
+ "game": {
+  "console": "n64",
+  "title": "The Legend of Zelda: Majora’s Mask",
+  "also": [
+   "The Legend of Zelda: Majora's Mask"
+  ],
+  "kind": "file",
+  "ext": [
+   ".z64",
+   ".n64",
+   ".v64"
+  ],
+  "sha1": [
+   "d6133ace5afaa0882cf214cf88daba39e266c078",
+   "9743aa026e9269b339eb0e3044cd5830a440c1fd"
+  ],
+  "soft": true,
+  "why": "2 Ship 2 Harkinian is made for the US N64 1.0 ROM and the US GameCube one; it checks the ROM itself when it builds mm.o2r."
+ },
+ "builds": [
+  {
+   "os": "linux",
+   "asset": "^2Ship-[\\w-]+-Linux\\.zip$",
+   "program": "2ship.appimage",
+   "args": [],
+   "first": {
+    "unless": "{data}/2ship/mm.o2r",
+    "args": [
+     "{gamePosix}"
+    ]
+   },
+   "files": {
+    "app": {
+     "path": "{data}/2ship/2ship2harkinian.json",
+     "format": "json",
+     "nested": true,
+     "sparse": true
+    }
+   }
+  }
+ ],
+ "settings": [
+  {
+   "id": "gSettings_ControlNav",
+   "tab": "Settings",
+   "label": "Menu Controller Navigation",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "ControlNav"
+    ]
+   ],
+   "desc": "Allows controller navigation of the 2Ship menu (Settings, Enhancements,...) CAUTION: This will disable game inputs while the menu is visible.  D-pad to move between items, A to select, B to move up in scope.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gSettings_CursorVisibility",
+   "tab": "Settings",
+   "label": "Cursor Always Visible",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "CursorVisibility"
+    ]
+   ],
+   "desc": "Makes the cursor always visible, even in full screen.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gSettings_Menu_SidebarSearch",
+   "tab": "Settings",
+   "label": "Search In Sidebar",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "Menu",
+     "SidebarSearch"
+    ]
+   ],
+   "desc": "Displays the Search menu as a sidebar entry in Settings instead of in the header.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gSettings_Menu_SearchAutofocus",
+   "tab": "Settings",
+   "label": "Search Input Autofocus",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "Menu",
+     "SearchAutofocus"
+    ]
+   ],
+   "desc": "Search input box gets autofocus when visible. Does not affect using other widgets.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Mods_AlternateAssetsHotkey",
+   "tab": "Mods",
+   "label": "Alt Assets Tab hotkey",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Mods",
+     "AlternateAssetsHotkey"
+    ]
+   ],
+   "desc": "Allows pressing the Tab key to toggle alternate assets.",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gSettings_InternalResolution",
+   "tab": "Graphics",
+   "label": "Internal Resolution",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "InternalResolution"
+    ]
+   ],
+   "desc": "Multiplies your output resolution by the value inputted, as a more intensive but effective form of anti-aliasing.",
+   "type": "number",
+   "num": {
+    "min": 0.5,
+    "max": 2.0
+   },
+   "def": 1
+  },
+  {
+   "id": "gSettings_MSAAValue",
+   "tab": "Graphics",
+   "label": "Anti-aliasing (MSAA)",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "MSAAValue"
+    ]
+   ],
+   "desc": "Activates MSAA (multi-sample anti-aliasing) from 2x up to 8x, to smooth the edges of rendered geometry. Higher sample count will result in smoother edges on models, but may reduce performance.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 8
+   },
+   "def": 1
+  },
+  {
+   "id": "gInterpolationFPS",
+   "tab": "Graphics",
+   "label": "Current FPS",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gInterpolationFPS"
+    ]
+   ],
+   "desc": "Uses Matrix Interpolation to create extra frames, resulting in smoother graphics. This is purely visual and does not impact game logic, execution of glitches etc.  A higher target FPS than your monitor's refresh rate will waste resources, and might give a worse result.",
+   "type": "number",
+   "num": {
+    "min": 20,
+    "max": 360
+   },
+   "def": 20
+  },
+  {
+   "id": "gMatchRefreshRate",
+   "tab": "Graphics",
+   "label": "Match Refresh Rate",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gMatchRefreshRate"
+    ]
+   ],
+   "desc": "Matches interpolation value to the refresh rate of your display.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gSettings_VsyncEnabled",
+   "tab": "Graphics",
+   "label": "Enable Vsync",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "VsyncEnabled"
+    ]
+   ],
+   "desc": "Removes tearing, but clamps your max FPS to your displays refresh rate.",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gSettings_SdlWindowedFullscreen",
+   "tab": "Graphics",
+   "label": "Windowed Fullscreen",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "SdlWindowedFullscreen"
+    ]
+   ],
+   "desc": "Enables Windowed Fullscreen Mode.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gSettings_EnableMultiViewports",
+   "tab": "Graphics",
+   "label": "Allow multi-windows",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "EnableMultiViewports"
+    ]
+   ],
+   "desc": "Allows multiple windows to be opened at once. Requires a reload to take effect.",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gNotifications_Duration",
+   "tab": "Overlay",
+   "label": "Durationseconds",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gNotifications",
+     "Duration"
+    ]
+   ],
+   "desc": "How long notifications are displayed for.",
+   "type": "number",
+   "num": {
+    "min": 3.0,
+    "max": 30.0
+   },
+   "def": 10.0
+  },
+  {
+   "id": "gNotifications_Size",
+   "tab": "Overlay",
+   "label": "Size",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gNotifications",
+     "Size"
+    ]
+   ],
+   "desc": "How large notifications are.",
+   "type": "number",
+   "num": {
+    "min": 1.0,
+    "max": 5.0
+   },
+   "def": 1.8
+  },
+  {
+   "id": "gDisplayOverlay_Background",
+   "tab": "Overlay",
+   "label": "Hide Window Background",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gDisplayOverlay",
+     "Background"
+    ]
+   ],
+   "desc": "Hides the background of the Display Overlay window.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gDisplayOverlay_Scale",
+   "tab": "Overlay",
+   "label": "Scalex",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gDisplayOverlay",
+     "Scale"
+    ]
+   ],
+   "desc": "Adjust the Scale for the Display Overlay window.",
+   "type": "number",
+   "num": {
+    "min": 1.0,
+    "max": 5.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Camera_FixTargettingCameraSnap",
+   "tab": "Camera",
+   "label": "Fix Targeting Camera Snap",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FixTargettingCameraSnap"
+    ]
+   ],
+   "desc": "Fixes the camera snap that occurs when you are moving and press the targeting button.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_DisableFirstPersonAutoCenterView",
+   "tab": "Camera",
+   "label": "Disable Auto-Centering",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "DisableFirstPersonAutoCenterView"
+    ]
+   ],
+   "desc": "Disables the auto-centering of the camera in first person mode.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_InvertX",
+   "tab": "Camera",
+   "label": "Invert X Axis",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "InvertX"
+    ]
+   ],
+   "desc": "Inverts the X Axis of the Camera in First Person Mode.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_InvertY",
+   "tab": "Camera",
+   "label": "Invert Y Axis",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "InvertY"
+    ]
+   ],
+   "desc": "Inverts the Y Axis of the Camera in First Person Mode.",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_SensitivityX",
+   "tab": "Camera",
+   "label": "X Axis Sensitivity",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "SensitivityX"
+    ]
+   ],
+   "desc": "Adjusts the Sensitivity of the X Axis in First Person Mode.",
+   "type": "number",
+   "num": {
+    "min": 0.01,
+    "max": 2.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_SensitivityY",
+   "tab": "Camera",
+   "label": "Y Axis Sensitivity",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "SensitivityY"
+    ]
+   ],
+   "desc": "Adjusts the Sensitivity of the Y Axis in First Person Mode.",
+   "type": "number",
+   "num": {
+    "min": 0.01,
+    "max": 2.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_GyroEnabled",
+   "tab": "Camera",
+   "label": "Gyro Aiming",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "GyroEnabled"
+    ]
+   ],
+   "desc": "Enables Gyro Aiming in First Person Mode.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_GyroInvertX",
+   "tab": "Camera",
+   "label": "Invert Gyro X Axis",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "GyroInvertX"
+    ]
+   ],
+   "desc": "Inverts the X Axis of the Gyro in First Person Mode.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_GyroInvertY",
+   "tab": "Camera",
+   "label": "Invert Gyro Y Axis",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "GyroInvertY"
+    ]
+   ],
+   "desc": "Inverts the Y Axis of the Gyro in First Person Mode.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_GyroSensitivityX",
+   "tab": "Camera",
+   "label": "Gyro X Axis Sensitivity",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "GyroSensitivityX"
+    ]
+   ],
+   "desc": "Adjusts the Sensitivity of the X Axis of the Gyro in First Person Mode.",
+   "type": "number",
+   "num": {
+    "min": 0.01,
+    "max": 2.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_GyroSensitivityY",
+   "tab": "Camera",
+   "label": "Gyro Y Axis Sensitivity",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "GyroSensitivityY"
+    ]
+   ],
+   "desc": "Adjusts the Sensitivity of the Y Axis of the Gyro in First Person Mode.",
+   "type": "number",
+   "num": {
+    "min": 0.01,
+    "max": 2.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_RightStickEnabled",
+   "tab": "Camera",
+   "label": "Right Stick Aiming",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "RightStickEnabled"
+    ]
+   ],
+   "desc": "Enables Right Stick Aiming in First Person Mode.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_MoveInFirstPerson",
+   "tab": "Camera",
+   "label": "Move while aiming",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "MoveInFirstPerson"
+    ]
+   ],
+   "desc": "Allows movement with the left stick while in first person mode.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_RightStickInvertX",
+   "tab": "Camera",
+   "label": "Invert Right Stick X Axis",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "RightStickInvertX"
+    ]
+   ],
+   "desc": "Inverts the X Axis of the Right Stick in First Person Mode.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_RightStickInvertY",
+   "tab": "Camera",
+   "label": "Invert Right Stick Y Axis",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "RightStickInvertY"
+    ]
+   ],
+   "desc": "Inverts the Y Axis of the Right Stick in First Person Mode.",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_RightStickSensitivityX",
+   "tab": "Camera",
+   "label": "Right Stick X Axis Sensitivity",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "RightStickSensitivityX"
+    ]
+   ],
+   "desc": "Adjusts the Sensitivity of the X Axis of the Right Stick in First Person Mode.",
+   "type": "number",
+   "num": {
+    "min": 0.01,
+    "max": 2.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Camera_FirstPerson_RightStickSensitivityY",
+   "tab": "Camera",
+   "label": "Right Stick Y Axis Sensitivity",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FirstPerson",
+     "RightStickSensitivityY"
+    ]
+   ],
+   "desc": "Adjusts the Sensitivity of the Y Axis of the Right Stick in First Person Mode.",
+   "type": "number",
+   "num": {
+    "min": 0.01,
+    "max": 2.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Camera_FreeLook_Enable",
+   "tab": "Camera",
+   "label": "Free Look",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FreeLook",
+     "Enable"
+    ]
+   ],
+   "desc": "Enables free look camera control. Note: You must remap C buttons off of the right stick in the controller config menu, and map the camera stick to the right stick.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_FreeLook_MaxCameraDistance",
+   "tab": "Camera",
+   "label": "Camera Distance",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FreeLook",
+     "MaxCameraDistance"
+    ]
+   ],
+   "desc": "Maximum Camera Distance for Free Look.",
+   "type": "number",
+   "num": {
+    "min": 100,
+    "max": 900
+   },
+   "def": 185
+  },
+  {
+   "id": "gEnhancements_Camera_FreeLook_TransitionSpeed",
+   "tab": "Camera",
+   "label": "Camera Transition Speed",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FreeLook",
+     "TransitionSpeed"
+    ]
+   ],
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 900
+   },
+   "def": 25
+  },
+  {
+   "id": "gEnhancements_Camera_FreeLook_MaxPitch",
+   "tab": "Camera",
+   "label": "Max Camera Height Angle\\xC2\\xB0",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FreeLook",
+     "MaxPitch"
+    ]
+   ],
+   "desc": "Maximum Height of the Camera.",
+   "type": "number",
+   "num": {
+    "min": -89.0,
+    "max": 89.0
+   },
+   "def": 72.0
+  },
+  {
+   "id": "gEnhancements_Camera_FreeLook_MinPitch",
+   "tab": "Camera",
+   "label": "Min Camera Height Angle\\xC2\\xB0",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "FreeLook",
+     "MinPitch"
+    ]
+   ],
+   "desc": "Minimum Height of the Camera.",
+   "type": "number",
+   "num": {
+    "min": -89.0,
+    "max": 89.0
+   },
+   "def": -49.0
+  },
+  {
+   "id": "gEnhancements_Camera_DebugCam_Enable",
+   "tab": "Camera",
+   "label": "Debug Camera",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "DebugCam",
+     "Enable"
+    ]
+   ],
+   "desc": "Enables debug camera control.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_RightStick_InvertXAxis",
+   "tab": "Camera",
+   "label": "Invert Camera X Axis",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "RightStick",
+     "InvertXAxis"
+    ]
+   ],
+   "desc": "Inverts the Camera X Axis",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_RightStick_InvertYAxis",
+   "tab": "Camera",
+   "label": "Invert Camera Y Axis",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "RightStick",
+     "InvertYAxis"
+    ]
+   ],
+   "desc": "Inverts the Camera Y Axis",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gEnhancements_Camera_RightStick_CameraSensitivity_X",
+   "tab": "Camera",
+   "label": "Third-Person Camera\\nHorizontal Sensitivity",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "RightStick",
+     "CameraSensitivity",
+     "X"
+    ]
+   ],
+   "desc": "Adjust the Sensitivity of the x axis when in Third Person.",
+   "type": "number",
+   "num": {
+    "min": 0.01,
+    "max": 5.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Camera_RightStick_CameraSensitivity_Y",
+   "tab": "Camera",
+   "label": "Third-Person Camera\\nVertical Sensitivity",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "RightStick",
+     "CameraSensitivity",
+     "Y"
+    ]
+   ],
+   "desc": "Adjust the Sensitivity of the x axis when in Third Person.",
+   "type": "number",
+   "num": {
+    "min": 0.01,
+    "max": 5.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Camera_DebugCam_6DOF",
+   "tab": "Camera",
+   "label": "Enable Roll (6\\xC2\\xB0 of Freedom)",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "DebugCam",
+     "6DOF"
+    ]
+   ],
+   "desc": "This allows for all six degrees of movement with the camera, NOTE: Yaw will work differently in this system, instead rotating around the focal point, rather than a polar axis.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Camera_DebugCam_CameraSpeed",
+   "tab": "Camera",
+   "label": "Camera Speed",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Camera",
+     "DebugCam",
+     "CameraSpeed"
+    ]
+   ],
+   "desc": "Adjusts the speed of the Camera.",
+   "type": "number",
+   "num": {
+    "min": 0.1,
+    "max": 3.0
+   },
+   "def": 0.5
+  },
+  {
+   "id": "gCheats_InfiniteHealth",
+   "tab": "Cheats",
+   "label": "Infinite Health",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "InfiniteHealth"
+    ]
+   ],
+   "desc": "Always have full Hearts.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_InfiniteMagic",
+   "tab": "Cheats",
+   "label": "Infinite Magic",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "InfiniteMagic"
+    ]
+   ],
+   "desc": "Always have full Magic.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_InfiniteRupees",
+   "tab": "Cheats",
+   "label": "Infinite Rupees",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "InfiniteRupees"
+    ]
+   ],
+   "desc": "Always have a full Wallet.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_InfiniteConsumables",
+   "tab": "Cheats",
+   "label": "Infinite Consumables",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "InfiniteConsumables"
+    ]
+   ],
+   "desc": "Always have max Consumables, you must have collected the consumables first.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_InfiniteEponaCarrots",
+   "tab": "Cheats",
+   "label": "Infinite Epona Carrots",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "InfiniteEponaCarrots"
+    ]
+   ],
+   "desc": "Allows Epona to boost without consuming carrots.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_EasyFrameAdvance",
+   "tab": "Cheats",
+   "label": "Easy Frame Advance",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "EasyFrameAdvance"
+    ]
+   ],
+   "desc": "Continue holding START button when unpausing to only advance a single frame and then re-pause.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_LongerFlowerGlide",
+   "tab": "Cheats",
+   "label": "Longer Deku Flower Glide",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "LongerFlowerGlide"
+    ]
+   ],
+   "desc": "Allows Deku Link to glide longer, no longer dropping after a certain distance.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_NoClip",
+   "tab": "Cheats",
+   "label": "No Clip",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "NoClip"
+    ]
+   ],
+   "desc": "Allows Link to phase through collision.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_UnbreakableRazorSword",
+   "tab": "Cheats",
+   "label": "Unbreakable Razor Sword",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "UnbreakableRazorSword"
+    ]
+   ],
+   "desc": "Allows to Razor Sword to be used indefinitely without dulling its blade.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_UnrestrictedItems",
+   "tab": "Cheats",
+   "label": "Unrestricted Items",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "UnrestrictedItems"
+    ]
+   ],
+   "desc": "Allows all Forms to use all Items.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_HookshotAnywhere",
+   "tab": "Cheats",
+   "label": "Hookshot Anywhere",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "HookshotAnywhere"
+    ]
+   ],
+   "desc": "Allows most surfaces to be hookshot-able.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_MoonJumpOnL",
+   "tab": "Cheats",
+   "label": "Moon Jump on L",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "MoonJumpOnL"
+    ]
+   ],
+   "desc": "Holding L makes you float into the air.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_ElegyAnywhere",
+   "tab": "Cheats",
+   "label": "Elegy of Emptiness Anywhere",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "ElegyAnywhere"
+    ]
+   ],
+   "desc": "Allows Elegy of Emptiness outside of Ikana.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_ClimbAnywhere",
+   "tab": "Cheats",
+   "label": "Climb Anywhere",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "ClimbAnywhere"
+    ]
+   ],
+   "desc": "Allows climbing on most walls regardless of vines.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gCheats_SpeedModifier_Value",
+   "tab": "Cheats",
+   "label": "Multiplier",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gCheats",
+     "SpeedModifier",
+     "Value"
+    ]
+   ],
+   "type": "number",
+   "num": {
+    "min": 0.0,
+    "max": 6.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Player_FastFlowerLaunch",
+   "tab": "Player",
+   "label": "Fast Deku Flower Launch",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "FastFlowerLaunch"
+    ]
+   ],
+   "desc": "Speeds up the time it takes to be able to get maximum height fromlaunching out of a Deku Flower.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Player_InfiniteDekuHopping",
+   "tab": "Player",
+   "label": "Infinite Deku Hopping",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "InfiniteDekuHopping"
+    ]
+   ],
+   "desc": "Allows Deku Link to hop indefinitely in water without drowning. This also prevents the velocity loss while in the air.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Player_InstantPutaway",
+   "tab": "Player",
+   "label": "Instant Putaway",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "InstantPutaway"
+    ]
+   ],
+   "desc": "Allows Link to instantly puts away held item without waiting.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Player_UnsheatheWithoutSlashing",
+   "tab": "Player",
+   "label": "Unsheathe Sword Without Slashing",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "UnsheatheWithoutSlashing"
+    ]
+   ],
+   "desc": "Allows Link to unsheathe sword without slashing automatically.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Player_FierceDeityPutaway",
+   "tab": "Player",
+   "label": "Fierce Deity Putaway",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "FierceDeityPutaway"
+    ]
+   ],
+   "desc": "Allows Fierce Deity Link to put away his sword.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Player_ClimbSpeed",
+   "tab": "Player",
+   "label": "Climb speed",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "ClimbSpeed"
+    ]
+   ],
+   "desc": "Increases the speed at which Link climbs vines and ladders.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 5
+   },
+   "def": 1
+  },
+  {
+   "id": "gEnhancements_Player_FasterPushAndPull",
+   "tab": "Player",
+   "label": "Faster Push/Pull",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "FasterPushAndPull"
+    ]
+   ],
+   "desc": "Speeds up the time it takes to push/pull various objects.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Player_PreventDiveOverWater",
+   "tab": "Player",
+   "label": "Prevent Diving Over Water",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "PreventDiveOverWater"
+    ]
+   ],
+   "desc": "Prevents Link from automatically diving over bodies of water.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Player_UnderwaterOcarina",
+   "tab": "Player",
+   "label": "Underwater Ocarina",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "UnderwaterOcarina"
+    ]
+   ],
+   "desc": "Allows Zora to use the Ocarina of Time when grounded underwater.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Player_ManualJump",
+   "tab": "Player",
+   "label": "Manual Jump",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "ManualJump"
+    ]
+   ],
+   "desc": "Z + A to Jump and B while midair to Jump Attack.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Dpad_DpadEquips",
+   "tab": "Dpad",
+   "label": "Dpad Equips",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Dpad",
+     "DpadEquips"
+    ]
+   ],
+   "desc": "Allows you to equip items to your D-pad.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Equipment_ItemUnequip",
+   "tab": "Equipment",
+   "label": "Unequip Items",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Equipment",
+     "ItemUnequip"
+    ]
+   ],
+   "desc": "In the pause menu, press the same C-button or D-pad button an item is equipped to in order to unequip it.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Equipment_MagicArrowEquipSpeed",
+   "tab": "Equipment",
+   "label": "Fast Magic Arrow Equip Animation",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Equipment",
+     "MagicArrowEquipSpeed"
+    ]
+   ],
+   "desc": "Removes the animation for equipping Magic Arrows.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_PlayerActions_InstantRecall",
+   "tab": "Player Actions",
+   "label": "Instant Fin Boomerangs Recall",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "PlayerActions",
+     "InstantRecall"
+    ]
+   ],
+   "desc": "Pressing B will instantly recall the fin boomerang back to Zora Link after they are thrown.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Equipment_TwoHandedSwordSpinAttack",
+   "tab": "Equipment",
+   "label": "Two-Handed Sword Spin Attack",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Equipment",
+     "TwoHandedSwordSpinAttack"
+    ]
+   ],
+   "desc": "Enables magic spin attacks for the Fierce Deity Sword and Great Fairy's Sword.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Equipment_BetterPictoMessage",
+   "tab": "Equipment",
+   "label": "Better Picto Message",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Equipment",
+     "BetterPictoMessage"
+    ]
+   ],
+   "desc": "Inform the player what target if any is being captured in the pictograph.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Items_PictoBoxOnCUp",
+   "tab": "Items",
+   "label": "Picto Box on C-Up",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Items",
+     "PictoBoxOnCUp"
+    ]
+   ],
+   "desc": "Press C-Up to activate the Pictograph Box once acquired, without needing to equip it to a C-button.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_PlayerActions_ArrowCycle",
+   "tab": "Player Actions",
+   "label": "Arrow Type Cycling",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "PlayerActions",
+     "ArrowCycle"
+    ]
+   ],
+   "desc": "While aiming the bow, use R to cycle between Normal, Fire, Ice and Light arrows.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Equipment_InvertShieldY",
+   "tab": "Equipment",
+   "label": "Invert Shield Y Axis",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Equipment",
+     "InvertShieldY"
+    ]
+   ],
+   "desc": "Invert the Y axis while holding the shield so that it moves up with the left stick.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Equipment_GreatFairySwordBButton",
+   "tab": "Equipment",
+   "label": "Great Fairy Sword B-Button Attack",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Equipment",
+     "GreatFairySwordBButton"
+    ]
+   ],
+   "desc": "When the Great Fairy's Sword is held, pressing B attacks with it instead of drawing your equipped sword. The sword can still be put away with A as normal.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Player_InvertZoraSwimY",
+   "tab": "Player",
+   "label": "Invert Zora Swim Y Axis",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Player",
+     "InvertZoraSwimY"
+    ]
+   ],
+   "desc": "Invert the Y axis while swimming as Zora with the left stick.",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gModes_PlayAsKafei",
+   "tab": "Modes",
+   "label": "Play as Kafei",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gModes",
+     "PlayAsKafei"
+    ]
+   ],
+   "desc": "Requires scene reload to take effect.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gModes_HyruleWarriorsStyledLink",
+   "tab": "Modes",
+   "label": "Hyrule Warriors Styled Link",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gModes",
+     "HyruleWarriorsStyledLink"
+    ]
+   ],
+   "desc": "When acquired, places the Keaton and Fierce Deity masks on Link similarly to how he wears them in Hyrule Warriors.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gModes_TimeMovesWhenYouMove",
+   "tab": "Modes",
+   "label": "Time Moves when you Move",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gModes",
+     "TimeMovesWhenYouMove"
+    ]
+   ],
+   "desc": "Time only moves when Link is not standing still.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gModes_MirroredWorld_StoneTowerTempleFix",
+   "tab": "Modes",
+   "label": "Fix Inverted Stone Tower Temple",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gModes",
+     "MirroredWorld",
+     "StoneTowerTempleFix"
+    ]
+   ],
+   "desc": "Mirrors (or unmirrors) the inverted Stone Tower Temple to make its layout consistent.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Gameplay_ExtendedProjectileInteractionDistance",
+   "tab": "Gameplay",
+   "label": "Extended Projectile Interaction Distance",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Gameplay",
+     "ExtendedProjectileInteractionDistance"
+    ]
+   ],
+   "desc": "Allows projectiles and explosions to hit breakable objects at a distance matching your Increase Actor Draw Distance setting.  Does not affect pickup ranges, talk prompts, or physical body collision.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Shops_CuriosityShopRefills",
+   "tab": "Shops",
+   "label": "Curiosity Shop Refills",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Shops",
+     "CuriosityShopRefills"
+    ]
+   ],
+   "desc": "Adds refillable bottles to the Curiosity Shop after completing certain prerequisites: - Seahorse: After obtaining a Bottle, Zora Mask, Pictograph Box & (Rando Only) Swim Ability - Gold Dust: After obtaining the Gold Dust bottle - Chateau Romani: After obtaining Chateau Romani",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_A11y_NoScreenFlashForEnemyKill",
+   "tab": "Accessibility",
+   "label": "Disable Screen Flash for Enemy Kills",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "A11y",
+     "NoScreenFlashForEnemyKill"
+    ]
+   ],
+   "desc": "Disables the white screen flash on enemy kill.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_A11y_NoFinalDayQuakes",
+   "tab": "Accessibility",
+   "label": "Disable Final Day Quakes",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "A11y",
+     "NoFinalDayQuakes"
+    ]
+   ],
+   "desc": "Earthquakes will not occur on the final day.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_A11y_NoScreenDistortion",
+   "tab": "Accessibility",
+   "label": "Disable Screen Distortion",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "A11y",
+     "NoScreenDistortion"
+    ]
+   ],
+   "desc": "Disables the wobbling/warping of the screen while swimming underwater, and other various sources",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_BowReticle",
+   "tab": "Graphics",
+   "label": "Bow Reticle",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "BowReticle"
+    ]
+   ],
+   "desc": "Gives the bow a reticle when you draw an arrow.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Minigames_MarkShootingGalleryOctoroks",
+   "tab": "Minigames",
+   "label": "Mark Shooting Gallery Octoroks",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "MarkShootingGalleryOctoroks"
+    ]
+   ],
+   "desc": "Places markers on the Town Shooting Gallery Octoroks, indicating whether they should be hit.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Items_ExtraPowderKegs",
+   "tab": "Items",
+   "label": "Extra Powder Kegs",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Items",
+     "ExtraPowderKegs"
+    ]
+   ],
+   "desc": "Allows carrying up to 3 Powder Kegs at once instead of the vanilla limit of 1.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Equipment_BombArrows",
+   "tab": "Equipment",
+   "label": "Bomb Arrows",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Equipment",
+     "BombArrows"
+    ]
+   ],
+   "desc": "Allows equipping Bomb Arrows by equipping Bombs onto a bow button in the pause menu.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_PlayerActions_RemoteBombchu",
+   "tab": "Player Actions",
+   "label": "Remote Bombchu Control",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "PlayerActions",
+     "RemoteBombchu"
+    ]
+   ],
+   "desc": "Allows you to control the direction of the Bombchu while it is moving. Press B to detonate. Press A to stop controlling the Bombchu.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Equipment_ChuDrops",
+   "tab": "Equipment",
+   "label": "Bombchu Drops",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Equipment",
+     "ChuDrops"
+    ]
+   ],
+   "desc": "When a bomb drop is spawned, it has a 50% chance to be a Bombchu instead.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Items_RemoveExplosiveLimit",
+   "tab": "Items",
+   "label": "Remove Explosive Limit",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Items",
+     "RemoveExplosiveLimit"
+    ]
+   ],
+   "desc": "Removes the cap of 3 active explosives being deployed at once.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Saving_FileSlot3",
+   "tab": "Saving",
+   "label": "3rd Save File Slot",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Saving",
+     "FileSlot3"
+    ]
+   ],
+   "desc": "Adds a 3rd file slot that can be used for saves",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gEnhancements_Saving_NewFileSetup",
+   "tab": "Saving",
+   "label": "New File Setup Steps",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Saving",
+     "NewFileSetup"
+    ]
+   ],
+   "desc": "After picking an empty file, asks whether it should be a randomizer file and lets you apply one of your loaded presets before entering a name.",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gEnhancements_Saving_PersistentOwlSaves",
+   "tab": "Saving",
+   "label": "Persistent Owl Saves",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Saving",
+     "PersistentOwlSaves"
+    ]
+   ],
+   "desc": "Continuing a save will not remove the owl save. Playing Song of Time, allowing the moon to crash or finishing the game will remove the owl save and become the new last save.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Saving_PauseSave",
+   "tab": "Saving",
+   "label": "Pause Menu Save",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Saving",
+     "PauseSave"
+    ]
+   ],
+   "desc": "Re-introduce the pause menu save system. Pressing B in the pause menu will give you the option to create a persistent Owl Save from your current location.  When loading back into the game, you will be placed either at the entrance of the dungeon you saved in, or in South Clock Town, unless Remember Save Location is enabled.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Saving_RememberSaveLocation",
+   "tab": "Saving",
+   "label": "Remember Save Location",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Saving",
+     "RememberSaveLocation"
+    ]
+   ],
+   "desc": "When loading a save, places Link at the last entrance he went through.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Saving_Autosave",
+   "tab": "Saving",
+   "label": "Autosave",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Saving",
+     "Autosave"
+    ]
+   ],
+   "desc": "Automatically create a persistent Owl Save on the chosen interval.  When loading back into the game, you will be placed either at the entrance of the dungeon you saved in, or in South Clock Town, unless Remember Save Location is enabled.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Saving_AutosaveInterval",
+   "tab": "Saving",
+   "label": "Autosave Intervalminutes",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Saving",
+     "AutosaveInterval"
+    ]
+   ],
+   "desc": "Sets the interval between Autosaves.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 60
+   },
+   "def": 5
+  },
+  {
+   "id": "gEnhancements_Cycle_SaveOnMoonCrash",
+   "tab": "Cycle",
+   "label": "Save Game on Moon Crash",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "SaveOnMoonCrash"
+    ]
+   ],
+   "desc": "Moon Crashes will save game data similar to the Song of Time, instead of wiping owl save data. Automatically enabled in glitchless  rando seeds.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_DoNotResetBottleContent",
+   "tab": "Cycle",
+   "label": "Do not reset Bottle content",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "DoNotResetBottleContent"
+    ]
+   ],
+   "desc": "Playing the Song of Time will not reset the bottles' content.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_DoNotResetConsumables",
+   "tab": "Cycle",
+   "label": "Do not reset Consumables",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "DoNotResetConsumables"
+    ]
+   ],
+   "desc": "Playing the Song of Time will not reset the consumables.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_DoNotResetRazorSword",
+   "tab": "Cycle",
+   "label": "Do not reset Razor Sword",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "DoNotResetRazorSword"
+    ]
+   ],
+   "desc": "Playing the Song of Time will not reset the Sword back to Kokiri Sword.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_DoNotResetRupees",
+   "tab": "Cycle",
+   "label": "Do not reset Rupees",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "DoNotResetRupees"
+    ]
+   ],
+   "desc": "Playing the Song of Time will not reset the your rupees.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_DoNotResetTimeSpeed",
+   "tab": "Cycle",
+   "label": "Do not reset Time Speed",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "DoNotResetTimeSpeed"
+    ]
+   ],
+   "desc": "Playing the Song of Time will not reset the current time speed set by Inverted Song of Time.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_DoNotResetChateau",
+   "tab": "Cycle",
+   "label": "Do not reset Chateau status",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "DoNotResetChateau"
+    ]
+   ],
+   "desc": "Playing the Song of Time will not reset the infinite magic status granted by Chateau Romani.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_DoNotResetScarecrowSong",
+   "tab": "Cycle",
+   "label": "Do not reset Scarecrow's Song",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "DoNotResetScarecrowSong"
+    ]
+   ],
+   "desc": "Playing the Song of Time will not reset the Scarecrow's Song.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_KeepExpressMail",
+   "tab": "Cycle",
+   "label": "Keep Express Mail",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "KeepExpressMail"
+    ]
+   ],
+   "desc": "Allows the player to keep the Express Mail in their inventory after delivering it the first time, so that both deliveries can be done within one cycle.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_StopOceansideSpiderHouseSquatter",
+   "tab": "Cycle",
+   "label": "Stop Oceanside Spider House squatter",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "StopOceansideSpiderHouseSquatter"
+    ]
+   ],
+   "desc": "The Oceanside Spider House squatter will not move in until the player interacts with him. Forced on for randomizers.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_OceansideWalletAnyDay",
+   "tab": "Cycle",
+   "label": "Oceanside wallet any day",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "OceansideWalletAnyDay"
+    ]
+   ],
+   "desc": "Allows the wallet reward to be collected on any day.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cycle_TingleAlwaysInClockTown",
+   "tab": "Cycle",
+   "label": "Tingle Always in Clock Town",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cycle",
+     "TingleAlwaysInClockTown"
+    ]
+   ],
+   "desc": "Tingle will always appear in North Clock Town, not just during the day.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_24HoursClock",
+   "tab": "Graphics",
+   "label": "24 Hours Clock",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "24HoursClock"
+    ]
+   ],
+   "desc": "Changes from a 12 Hour to a 24 Hour Clock.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Mods_AlternateAssets",
+   "tab": "Mods",
+   "label": "Use Alternate Assets",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Mods",
+     "AlternateAssets"
+    ]
+   ],
+   "desc": "Toggle between standard assets and alternate assets. Usually mods will indicate if this setting has to be used or not.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Mods_DisableBombBillboarding",
+   "tab": "Mods",
+   "label": "Disable Bomb Billboarding",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Mods",
+     "DisableBombBillboarding"
+    ]
+   ],
+   "desc": "Disables bombs always rotating to face the camera. To be used in conjunction with mods that want to replace bombs with 3D objects.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Mods_DisableGrottoRotation",
+   "tab": "Mods",
+   "label": "Disable Grotto Fixed Rotation",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Mods",
+     "DisableGrottoRotation"
+    ]
+   ],
+   "desc": "Disables Grottos rotating with the Camera. To be used in conjuction with mods that want to replace grottos with 3D objects.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_MotionBlur_Interpolate",
+   "tab": "Graphics",
+   "label": "Interpolate",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "MotionBlur",
+     "Interpolate"
+    ]
+   ],
+   "desc": "Change motion blur capture to also happen on interpolated frames instead of only on game frames. This notably reduces the overall motion blur strength but smooths out the trails.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_MotionBlur_Strength",
+   "tab": "Graphics",
+   "label": "Strength",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "MotionBlur",
+     "Strength"
+    ]
+   ],
+   "desc": "Motion Blur strength.",
+   "type": "number",
+   "num": {
+    "min": 0,
+    "max": 255
+   },
+   "def": 180
+  },
+  {
+   "id": "gEnhancements_Graphics_3DItemDrops",
+   "tab": "Graphics",
+   "label": "3D Item Drops",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "3DItemDrops"
+    ]
+   ],
+   "desc": "Makes item drops 3D",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_AuthenticLogo",
+   "tab": "Graphics",
+   "label": "Authentic Logo",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "AuthenticLogo"
+    ]
+   ],
+   "desc": "Hide the game version and build details and display the authentic model and texture on the boot logo start screen.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_DisableBlackBars",
+   "tab": "Graphics",
+   "label": "Disable Black Bar Letterboxes",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "DisableBlackBars"
+    ]
+   ],
+   "desc": "Disables Black Bar Letterboxes during cutscenes and Z-targeting. Note: There may be minor visual glitches that were covered up by the black bars. Please disable this setting before reporting a bug.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_EnemyHealthBars",
+   "tab": "Graphics",
+   "label": "Enemy Health Bars",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "EnemyHealthBars"
+    ]
+   ],
+   "desc": "Renders a health bar for enemies and bosses when Z-targeted.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_FixSceneGeometrySeams",
+   "tab": "Graphics",
+   "label": "Fix Scene Geometry Seams",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "FixSceneGeometrySeams"
+    ]
+   ],
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_DisableSceneGeometryDistanceCheck",
+   "tab": "Graphics",
+   "label": "Disable Scene Geometry Distance Check",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "DisableSceneGeometryDistanceCheck"
+    ]
+   ],
+   "desc": "Disables the distance check for scene geometry, allowing it to be drawn no matter how far away it is from the player. This may have unintended side effects.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_ActorCullingAccountsForWidescreen",
+   "tab": "Graphics",
+   "label": "Widescreen Actor Culling",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "ActorCullingAccountsForWidescreen"
+    ]
+   ],
+   "desc": "Adjusts the culling planes to account for widescreen resolutions. This may have unintended side effects.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Graphics_IncreaseActorDrawDistance",
+   "tab": "Graphics",
+   "label": "Increase Actor Draw Distancex",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Graphics",
+     "IncreaseActorDrawDistance"
+    ]
+   ],
+   "desc": "Increase the range in which Actors are drawn. This may have unintended side effects.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 5
+   },
+   "def": 1
+  },
+  {
+   "id": "gSettings_LowResMode",
+   "tab": "Settings",
+   "label": "N64 Mode",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "LowResMode"
+    ]
+   ],
+   "desc": "Sets the aspect ratio to 4:3 and lowers resolution to 240p, the N64's native resolution.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Masks_EquipWhileSwimming",
+   "tab": "Masks",
+   "label": "Equippable While Swimming",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Masks",
+     "EquipWhileSwimming"
+    ]
+   ],
+   "desc": "Human Link can equip any non-transformation mask while swimming.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Masks_BlastMaskKeg",
+   "tab": "Masks",
+   "label": "Blast Mask has Powder Keg Force",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Masks",
+     "BlastMaskKeg"
+    ]
+   ],
+   "desc": "Blast Mask can also destroy objects only the Powder Keg can.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Masks_3DSMaskEquip",
+   "tab": "Masks",
+   "label": "3DS Style Mask Equipping",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Masks",
+     "3DSMaskEquip"
+    ]
+   ],
+   "desc": "Allows equipping masks while in other forms, returning you to human form with the mask immediately equipped, like in MM3D.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Masks_EasyMaskEquip",
+   "tab": "Masks",
+   "label": "Easy Mask Equip",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Masks",
+     "EasyMaskEquip"
+    ]
+   ],
+   "desc": "In the pause menu, press A on any owned mask to put it on or take it off without assigning it to a button. Mask-specific restrictions still apply.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Masks_FierceDeitysAnywhere",
+   "tab": "Masks",
+   "label": "Fierce Deity's Mask Anywhere",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Masks",
+     "FierceDeitysAnywhere"
+    ]
+   ],
+   "desc": "Allow using Fierce Deity's mask outside of boss rooms.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Masks_PersistentBunnyHood_Enabled",
+   "tab": "Masks",
+   "label": "Persistent Bunny Hood",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Masks",
+     "PersistentBunnyHood",
+     "Enabled"
+    ]
+   ],
+   "desc": "Permanently toggle a speed boost from the bunny hood by pressing 'A' on it in the mask menu.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Masks_BlastMaskCooldown",
+   "tab": "Masks",
+   "label": "Blast Mask Cooldown",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Masks",
+     "BlastMaskCooldown"
+    ]
+   ],
+   "desc": "Customize the Cooldown between Blast Mask usage. Default is 15.5 seconds.",
+   "type": "number",
+   "num": {
+    "min": 0.0,
+    "max": 15.5
+   },
+   "def": 15.5
+  },
+  {
+   "id": "gEnhancements_Masks_GoronRollingIgnoresMagic",
+   "tab": "Masks",
+   "label": "Goron Rolling Ignores Magic",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Masks",
+     "GoronRollingIgnoresMagic"
+    ]
+   ],
+   "desc": "Goron rolling will use spikes even when Link doesn't have magic, and doesn't consume any.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Masks_GoronRollingFastSpikes",
+   "tab": "Masks",
+   "label": "Goron Rolling Fast Spikes",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Masks",
+     "GoronRollingFastSpikes"
+    ]
+   ],
+   "desc": "Speeds up the wind-up towards spiky rolling to be near instant.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Masks_GoronRollingSpikesRequireShield",
+   "tab": "Masks",
+   "label": "Goron Rolling Spikes Require Shield Button Press",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Masks",
+     "GoronRollingSpikesRequireShield"
+    ]
+   ],
+   "desc": "Goron rolling will only use spikes if the Shield button is pressed, similar to Zora Link's swimming magic shield.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Songs_BetterSongOfDoubleTime",
+   "tab": "Songs",
+   "label": "Better Song of Double Time",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Songs",
+     "BetterSongOfDoubleTime"
+    ]
+   ],
+   "desc": "When playing the Song of Double Time, you can now choose the exact time you want to go to, similar to the 3DS version.  Holding Z allows decreasing the time adjustment factor, while holding R will increase the factor.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Songs_EnableSunsSong",
+   "tab": "Songs",
+   "label": "Enable Sun's Song",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Songs",
+     "EnableSunsSong"
+    ]
+   ],
+   "desc": "Enables the partially implemented Sun's Song. RIGHT-DOWN-UP-RIGHT-DOWN-UP to play it. This song will make time move very fast until either Link moves to a different scene, or when the time switches to a new time period.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Playback_DpadOcarina",
+   "tab": "Playback",
+   "label": "D-pad Ocarina",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Playback",
+     "DpadOcarina"
+    ]
+   ],
+   "desc": "Enables using the D-pad for Ocarina playback.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Playback_RightStickOcarina",
+   "tab": "Playback",
+   "label": "Right Stick Ocarina",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Playback",
+     "RightStickOcarina"
+    ]
+   ],
+   "desc": "Enables using the Right Stick for Ocarina playback.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Songs_SongItems",
+   "tab": "Songs",
+   "label": "Song Items",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Songs",
+     "SongItems"
+    ]
+   ],
+   "desc": "Equip songs to C/D-Pad buttons from the Quest Status page. Songs auto-play when used, skipping manual note input.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Songs_PauseOwlWarp",
+   "tab": "Songs",
+   "label": "Pause Owl Warp",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Songs",
+     "PauseOwlWarp"
+    ]
+   ],
+   "desc": "Allows warping to registered Owl Statues from the pause menu map screen. Requires that you can play Song of Soaring normally.  Accounts for Index-Warp being active, by presenting all valid warps for the registered map points. Great Bay Coast warp is always given for index 0 warp as a convenience.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Songs_BetterOwlWarpMenu",
+   "tab": "Songs",
+   "label": "Better Owl Warp Menu",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Songs",
+     "BetterOwlWarpMenu"
+    ]
+   ],
+   "desc": "Makes cursor movement conform more to Control Stick direction when choosing an Owl Statue to warp to.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Songs_ZoraEggCount",
+   "tab": "Songs",
+   "label": "Zora Eggs For Bossa Nova",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Songs",
+     "ZoraEggCount"
+    ]
+   ],
+   "desc": "The number of eggs required to unlock New Wave Bossa Nova.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 7
+   },
+   "def": 7
+  },
+  {
+   "id": "gEnhancements_Playback_NoDropOcarinaInput",
+   "tab": "Playback",
+   "label": "Prevent Dropped Ocarina Inputs",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Playback",
+     "NoDropOcarinaInput"
+    ]
+   ],
+   "desc": "Prevent dropping inputs when playing the Ocarina quickly.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Playback_SkipScarecrowSong",
+   "tab": "Playback",
+   "label": "Skip Scarecrow Song",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Playback",
+     "SkipScarecrowSong"
+    ]
+   ],
+   "desc": "Pierre appears when the Ocarina is pulled out.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Songs_FasterSongPlayback",
+   "tab": "Songs",
+   "label": "Faster Song Playback",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Songs",
+     "FasterSongPlayback"
+    ]
+   ],
+   "desc": "Speeds up the playback of songs.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Songs_SkipSoTCutscenes",
+   "tab": "Songs",
+   "label": "Skip Song of Time cutscenes",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Songs",
+     "SkipSoTCutscenes"
+    ]
+   ],
+   "desc": "Skips the cutscenes when playing any of the Song of Time songs.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Songs_SkipSoaringCutscene",
+   "tab": "Songs",
+   "label": "Skip Soaring cutscene",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Songs",
+     "SkipSoaringCutscene"
+    ]
+   ],
+   "desc": "Skips the cutscene when using the Song of Soaring to warp.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Items_ColorPictograph",
+   "tab": "Items",
+   "label": "Color Pictograph",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Items",
+     "ColorPictograph"
+    ]
+   ],
+   "desc": "Will take and display pictographs in color.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cutscenes_HideTitleCards",
+   "tab": "Cutscenes",
+   "label": "Hide Title Cards",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cutscenes",
+     "HideTitleCards"
+    ]
+   ],
+   "desc": "Hides Title Cards when entering areas.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cutscenes_SkipOnePointCutscenes",
+   "tab": "Cutscenes",
+   "label": "Skip One Point Cutscenes",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cutscenes",
+     "SkipOnePointCutscenes"
+    ]
+   ],
+   "desc": "Skips freezing Link to focus on various events like chest spawning, door unlocking, switch pressed, etc",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cutscenes_SkipEntranceCutscenes",
+   "tab": "Cutscenes",
+   "label": "Skip Entrance Cutscenes",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cutscenes",
+     "SkipEntranceCutscenes"
+    ]
+   ],
+   "desc": "Skip cutscenes that occur when first entering a new area.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cutscenes_SkipToFileSelect",
+   "tab": "Cutscenes",
+   "label": "Skip to File Select",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cutscenes",
+     "SkipToFileSelect"
+    ]
+   ],
+   "desc": "Skip the opening title sequence and go straight to the file select menu after boot.  Note: Takes priority over debug warp points with [Boot] enabled.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cutscenes_SkipIntroSequence",
+   "tab": "Cutscenes",
+   "label": "Skip Intro Sequence",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cutscenes",
+     "SkipIntroSequence"
+    ]
+   ],
+   "desc": "When starting a game you will be taken straight to South Clock Town as Deku Link.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cutscenes_SkipFirstCycle",
+   "tab": "Cutscenes",
+   "label": "Skip First Cycle",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cutscenes",
+     "SkipFirstCycle"
+    ]
+   ],
+   "desc": "When starting a game you will be taken straight to South Clock Town as Human Link with Deku Mask, Ocarina, Song of Time, and Song of Healing.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cutscenes_SkipStoryCutscenes",
+   "tab": "Cutscenes",
+   "label": "Skip Story Cutscenes",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cutscenes",
+     "SkipStoryCutscenes"
+    ]
+   ],
+   "desc": "This skips many of the cutscenes associated with the main story.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cutscenes_SkipMiscInteractions",
+   "tab": "Cutscenes",
+   "label": "Skip Misc Interactions",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cutscenes",
+     "SkipMiscInteractions"
+    ]
+   ],
+   "desc": "This skips many minor cutscenes and interactions.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cutscenes_SkipEnemyCutscenes",
+   "tab": "Cutscenes",
+   "label": "Skip Enemy Cutscenes",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cutscenes",
+     "SkipEnemyCutscenes"
+    ]
+   ],
+   "desc": "Skips cutscenes specific to enemies and boss battles.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Dialogue_FastBankSelection",
+   "tab": "Dialogue",
+   "label": "Fast Bank Selection",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Dialogue",
+     "FastBankSelection"
+    ]
+   ],
+   "desc": "Pressing the Z or R buttons while the Deposit/Withdrawal Rupees dialogue is open will set the Rupees to Links current Rupees or 0 respectively.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Dialogue_FastText",
+   "tab": "Dialogue",
+   "label": "Fast Text",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Dialogue",
+     "FastText"
+    ]
+   ],
+   "desc": "Speeds up text rendering, and enables holding of B progress to next message.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Dialogue_AutoBombersCode",
+   "tab": "Dialogue",
+   "label": "Auto Bombers' Code",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Dialogue",
+     "AutoBombersCode"
+    ]
+   ],
+   "desc": "Automatically fill in the Bombers' code once you've got the notebook.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Dialogue_SkipBottlePickupMessages",
+   "tab": "Dialogue",
+   "label": "Skip Bottle Pickup Messages",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Dialogue",
+     "SkipBottlePickupMessages"
+    ]
+   ],
+   "desc": "Skip pickup messages for bottle swipes.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Cutscenes_AutoAdvanceEndingText",
+   "tab": "Cutscenes",
+   "label": "Auto Advance Ending Text",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Cutscenes",
+     "AutoAdvanceEndingText"
+    ]
+   ],
+   "desc": "After completing the game, textboxes shown on the way to the credits advance on their own once they've been up long enough to read, so the ending plays out without controller input.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_SwampBoatSpeed",
+   "tab": "Timesavers",
+   "label": "Swamp Boat Timesaver",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "SwampBoatSpeed"
+    ]
+   ],
+   "desc": "Hold Z to speed up the boat ride in through the Swamp.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_GalleryTwofer",
+   "tab": "Timesavers",
+   "label": "Shooting Gallery Both Rewards",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "GalleryTwofer"
+    ]
+   ],
+   "desc": "When getting a perfect score at the Shooting Gallery, receive both rewards back to back instead of having to play twice.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_MarineLabHP",
+   "tab": "Timesavers",
+   "label": "Fast Marine Lab Fish",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "MarineLabHP"
+    ]
+   ],
+   "desc": "Only requires a single fish to be fed for the Piece of Heart to spawn. Requires a Scene Reload to take effect.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_DampeDiggingSkip",
+   "tab": "Timesavers",
+   "label": "Fast Dampe Flame Digging",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "DampeDiggingSkip"
+    ]
+   ],
+   "desc": "Only requires digging up one flame to spawn the big poe.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_AlwaysShowShrineFeathers",
+   "tab": "Timesavers",
+   "label": "Always Show Shrine of Truth Feathers",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "AlwaysShowShrineFeathers"
+    ]
+   ],
+   "desc": "Always reveals the feather-marked path to the Shrine of Truth.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_FastChests",
+   "tab": "Timesavers",
+   "label": "Fast Chests",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "FastChests"
+    ]
+   ],
+   "desc": "Uses the quick kick animation for all chests in vanilla gameplay.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_FasterSceneTransitions",
+   "tab": "Timesavers",
+   "label": "Faster Scene Transitions",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "FasterSceneTransitions"
+    ]
+   ],
+   "desc": "Fade in and out more quickly when moving between areas.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_PowderKegCertification",
+   "tab": "Timesavers",
+   "label": "Skip Powder Keg Certification",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "PowderKegCertification"
+    ]
+   ],
+   "desc": "Skips requiring to take the Powder Keg Test before being given the Certification.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_SkipBalladOfWindfish",
+   "tab": "Timesavers",
+   "label": "Skip Ballad of Windfish",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "SkipBalladOfWindfish"
+    ]
+   ],
+   "desc": "Play the complete Ballad after playing in one form if you have all three transformation masks.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_AutoBankDeposit",
+   "tab": "Timesavers",
+   "label": "Auto Bank Deposit",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "AutoBankDeposit"
+    ]
+   ],
+   "desc": "Automatically deposits excess Rupees into your bank account when your wallet is full. Deposits stop when the bank reaches maximum capacity. Bank rewards are granted automatically. Notifications display deposit amount and new balance.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_FasterRupeeAccumulator",
+   "tab": "Timesavers",
+   "label": "Faster Rupee Accumulator",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "FasterRupeeAccumulator"
+    ]
+   ],
+   "desc": "Causes your Wallet to fill and empty faster when you gain or lose money.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Timesavers_FasterBottles",
+   "tab": "Timesavers",
+   "label": "Faster Bottles",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Timesavers",
+     "FasterBottles"
+    ]
+   ],
+   "desc": "Speeds up animation when using a bottle item.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Fixes_ConsoleCrashes",
+   "tab": "Fixes",
+   "label": "Fix Console Crashes",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Fixes",
+     "ConsoleCrashes"
+    ]
+   ],
+   "desc": "Fixes crashes that would typically happen on Console. Disabling this option will simply soft reset 2Ship when encountering these crashes instead of actually crashing the program.  Includes the following: - HESS/Weirdshot crashes - Action Swap crash without arrow ammo - Owl Warp menu crash when moving the cursor with Index-Warp active - Remote Hookshot Hookslide crashes when over voids in Great Bay",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gFixes_FixButtonEnvColor",
+   "tab": "Mod Menu",
+   "label": "Fix Button Env Color",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gFixes",
+     "FixButtonEnvColor"
+    ]
+   ],
+   "desc": "Fixes a missing gDPSetEnvColor, which causes ammo counts and B button action labels to be the wrong color prior to obtaining magic or other conditions.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gFixes_FixCircleShadowStreaks",
+   "tab": "Mod Menu",
+   "label": "Fix Circle Shadow Streaks",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gFixes",
+     "FixCircleShadowStreaks"
+    ]
+   ],
+   "desc": "Fixes faint streaks on round actor shadows",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gFixes_FixEponaStealingSword",
+   "tab": "Mod Menu",
+   "label": "Fix Epona stealing Sword",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gFixes",
+     "FixEponaStealingSword"
+    ]
+   ],
+   "desc": "This fixes a bug where Epona can steal your sword when you mount her without a bow in your inventory.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Fixes_FierceDeityZTargetMovement",
+   "tab": "Fixes",
+   "label": "Fix Fierce Deity Z-Target movement",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Fixes",
+     "FierceDeityZTargetMovement"
+    ]
+   ],
+   "desc": "Fixes Fierce Deity movement being choppy when Z-targeting.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Fixes_ControlCharacters",
+   "tab": "Fixes",
+   "label": "Fix Text Control Characters",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Fixes",
+     "ControlCharacters"
+    ]
+   ],
+   "desc": "Fixes certain control characters not functioning properly depending on their position within the text.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gFixes_FixIkanaGreatFairyFountainColor",
+   "tab": "Mod Menu",
+   "label": "Fix Ikana Great Fairy Fountain Color",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gFixes",
+     "FixIkanaGreatFairyFountainColor"
+    ]
+   ],
+   "desc": "Fixes a bug that results in the Ikana Great Fairy fountain looking green instead of yellow, this was fixed in the EU version.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Fixes_FixTexturesOOB",
+   "tab": "Fixes",
+   "label": "Fix Texture overflow OOB",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Fixes",
+     "FixTexturesOOB"
+    ]
+   ],
+   "desc": "Fixes textures that normally overflow to be patched with the correct size or format.",
+   "type": "bool",
+   "int": true,
+   "def": true
+  },
+  {
+   "id": "gEnhancements_Fixes_CompletedHeartContainerAudio",
+   "tab": "Fixes",
+   "label": "Fix Completed Heart Container Audio",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Fixes",
+     "CompletedHeartContainerAudio"
+    ]
+   ],
+   "desc": "Fixes a bug that results in the wrong audio playing upon receiving a 4th piece of heart to fill a new heart container.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Fixes_DekuButlerFixShockLoopAnimation",
+   "tab": "Fixes",
+   "label": "Fix Deku Butler Shock Animation",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Fixes",
+     "DekuButlerFixShockLoopAnimation"
+    ]
+   ],
+   "desc": "Fixes a bug where the Deku Butler loops the incorrect animation in the cutscene that plays after freeing the Deku Princess.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Restorations_ConstantFlipsHops",
+   "tab": "Restorations",
+   "label": "Constant Distance Backflips and Sidehops",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Restorations",
+     "ConstantFlipsHops"
+    ]
+   ],
+   "desc": "Backflips and Sidehops travel a constant distance as they did in OoT.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Restorations_SideRoll",
+   "tab": "Restorations",
+   "label": "Side Rolls",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Restorations",
+     "SideRoll"
+    ]
+   ],
+   "desc": "Restores side rolling from OoT.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Restorations_OoTFasterSwim",
+   "tab": "Restorations",
+   "label": "Faster Swim",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Restorations",
+     "OoTFasterSwim"
+    ]
+   ],
+   "desc": "Restores the ability to swim faster by spamming the B button, as in OoT.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Restorations_TatlISG",
+   "tab": "Restorations",
+   "label": "Tatl ISG",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Restorations",
+     "TatlISG"
+    ]
+   ],
+   "desc": "Restores Navi ISG from OoT, but now with Tatl.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Restorations_WoodfallMountainAppearance",
+   "tab": "Restorations",
+   "label": "Woodfall Mountain Appearance",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Restorations",
+     "WoodfallMountainAppearance"
+    ]
+   ],
+   "desc": "Restores the appearance of Woodfall mountain to not look poisoned when viewed from Termina Field after clearing Woodfall Temple  Requires a scene reload to take effect.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Restorations_JPGrottos",
+   "tab": "Restorations",
+   "label": "JP Deku Palace Grottos",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Restorations",
+     "JPGrottos"
+    ]
+   ],
+   "desc": "Restores the Deku Palace Grottos to their original Japanese layout.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Restorations_DayTelopDuration",
+   "tab": "Restorations",
+   "label": "Day Transition Duration",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Restorations",
+     "DayTelopDuration"
+    ]
+   ],
+   "desc": "Restores the day transition title card duration, which was longer on original hardware due to disguising load times.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Restorations_BonkCollision",
+   "tab": "Restorations",
+   "label": "Bonk Collision",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Restorations",
+     "BonkCollision"
+    ]
+   ],
+   "desc": "Corrects rolls to allow bonking trees near the end of the roll, as in OoT.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Restorations_SoilPatch",
+   "tab": "Restorations",
+   "label": "Soil Patch Burrowed Bugs",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Restorations",
+     "SoilPatch"
+    ]
+   ],
+   "desc": "Removes the cutscene lock when bugs burrow into a Skulltula soil patch, allowing the player to re-bottle them, as in OoT.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gSettings_SimulatedInputLag",
+   "tab": "Settings",
+   "label": "Simulated Input Lag",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "SimulatedInputLag"
+    ]
+   ],
+   "desc": "Buffers your inputs to be executed a specified amount of frames later.",
+   "type": "number",
+   "num": {
+    "min": 0,
+    "max": 6
+   },
+   "def": 0
+  },
+  {
+   "id": "gEnhancements_Restorations_PauseBufferWindow",
+   "tab": "Restorations",
+   "label": "Pause Buffer Input Window",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Restorations",
+     "PauseBufferWindow"
+    ]
+   ],
+   "desc": "Amount of time in frames you have to buffer an input while unpausing the game. Original hardware is around 20.",
+   "type": "number",
+   "num": {
+    "min": 0,
+    "max": 40
+   },
+   "def": 0
+  },
+  {
+   "id": "gEnhancements_Minigames_BombersHideAndSeek",
+   "tab": "Minigames",
+   "label": "Bombers Hide-and-Seek Count",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "BombersHideAndSeek"
+    ]
+   ],
+   "desc": "Sets the number of Bomber Kids you have to find to complete the hide-and-seek game.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 5
+   },
+   "def": 5
+  },
+  {
+   "id": "gEnhancements_Minigames_SwordsmanSchoolScore",
+   "tab": "Minigames",
+   "label": "Swordsman School Winning Score",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "SwordsmanSchoolScore"
+    ]
+   ],
+   "desc": "Sets the score required to win the Swordsman School.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 30
+   },
+   "def": 30
+  },
+  {
+   "id": "gEnhancements_Minigames_HoneyAndDarlingDay1",
+   "tab": "Minigames",
+   "label": "Honey & Darling Day 1 (Bombchus)",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "HoneyAndDarlingDay1"
+    ]
+   ],
+   "desc": "Sets the score required to win the Honey & Darling minigame on Day 1.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 8
+   },
+   "def": 8
+  },
+  {
+   "id": "gEnhancements_Minigames_HoneyAndDarlingDay2",
+   "tab": "Minigames",
+   "label": "Honey & Darling Day 2 (Bombs)",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "HoneyAndDarlingDay2"
+    ]
+   ],
+   "desc": "Sets the score required to win the Honey & Darling minigame on Day 2.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 8
+   },
+   "def": 8
+  },
+  {
+   "id": "gEnhancements_Minigames_HoneyAndDarlingDay3",
+   "tab": "Minigames",
+   "label": "Honey & Darling Day 3 (Bow)",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "HoneyAndDarlingDay3"
+    ]
+   ],
+   "desc": "Sets the score required to win the Honey & Darling minigame on Day 3.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 16
+   },
+   "def": 16
+  },
+  {
+   "id": "gEnhancements_Minigames_TownArcheryScore",
+   "tab": "Minigames",
+   "label": "Town Archery Perfect Score",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "TownArcheryScore"
+    ]
+   ],
+   "desc": "Sets the score required to win the Town Archery minigame. Reaching this score will end the minigame.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 50
+   },
+   "def": 50
+  },
+  {
+   "id": "gEnhancements_Minigames_RandomizeShootingGalleryOctoroks",
+   "tab": "Minigames",
+   "label": "Randomize Shooting Gallery Octoroks",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "RandomizeShootingGalleryOctoroks"
+    ]
+   ],
+   "desc": "Randomizes the positions of Octoroks in the Town Shooting Gallery minigame each time they appear.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Minigames_SwampArcheryScore",
+   "tab": "Minigames",
+   "label": "Swamp Archery Perfect Score",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "SwampArcheryScore"
+    ]
+   ],
+   "desc": "Sets the score required to win the Swamp Archery minigame, if this is changed it also speeds up the final score counting.",
+   "type": "number",
+   "num": {
+    "min": 1000,
+    "max": 2180
+   },
+   "def": 2180
+  },
+  {
+   "id": "gEnhancements_Minigames_BoatArcheryScore",
+   "tab": "Minigames",
+   "label": "Swamp Boat Archery Target Score",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "BoatArcheryScore"
+    ]
+   ],
+   "desc": "Sets the initial target score of the Swamp Boat Archery minigame. The target score gets set the first time you play the minigame in each cycle.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 50
+   },
+   "def": 20
+  },
+  {
+   "id": "gEnhancements_Minigames_BoatArcheryHealth",
+   "tab": "Minigames",
+   "label": "Koume's Health",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "BoatArcheryHealth"
+    ]
+   ],
+   "desc": "Sets Koume's health in the Swamp Boat Archery minigame. If Koume is hit this many times, the minigame will end.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 30
+   },
+   "def": 10
+  },
+  {
+   "id": "gEnhancements_Minigames_BoatArcheryInvincible",
+   "tab": "Minigames",
+   "label": "Invincible",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "BoatArcheryInvincible"
+    ]
+   ],
+   "desc": "Koume's health does not decrease when hit.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Minigames_RomaniTargetPractice",
+   "tab": "Minigames",
+   "label": "Romani Target Practice Winning Score",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "RomaniTargetPractice"
+    ]
+   ],
+   "desc": "Sets the score required to win Romani's Target Practice.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 10
+   },
+   "def": 10
+  },
+  {
+   "id": "gEnhancements_Minigames_AlienSpeed",
+   "tab": "Minigames",
+   "label": "Alien Speedx",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "AlienSpeed"
+    ]
+   ],
+   "desc": "Changes the movement speed of the aliens during the Romani Ranch invasion.",
+   "type": "number",
+   "num": {
+    "min": 0.5,
+    "max": 5.0
+   },
+   "def": 1.0
+  },
+  {
+   "id": "gEnhancements_Minigames_SkipRanchInvasion",
+   "tab": "Minigames",
+   "label": "Skip Invasion",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "SkipRanchInvasion"
+    ]
+   ],
+   "desc": "Link automatically succeeds in defending Romani Ranch from the invasion. In order for this to happen, you must be present at the ranch between 2:30 and 5:15 AM. Automatically advances to 5:15 AM.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Minigames_CuccoShackCuccoCount",
+   "tab": "Minigames",
+   "label": "Cucco Shack Cucco Count",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "CuccoShackCuccoCount"
+    ]
+   ],
+   "desc": "Choose how many cuccos you need to raise to make Grog happy.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 10
+   },
+   "def": 10
+  },
+  {
+   "id": "gEnhancements_Minigames_SkipHorseRace",
+   "tab": "Minigames",
+   "label": "Skip Gorman Horse Race",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "SkipHorseRace"
+    ]
+   ],
+   "desc": "Instantly win the Gorman Horse Race",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Minigames_BeaverRaceRingsCollected",
+   "tab": "Minigames",
+   "label": "Beaver Race Rings Collected",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "BeaverRaceRingsCollected"
+    ]
+   ],
+   "desc": "Sets the number of rings required for both Beavers. If the slider is set to 20, the first Beaver will require 20 rings, and the second Beaver will require 25 rings, which are their vanilla values.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 20
+   },
+   "def": 20
+  },
+  {
+   "id": "gEnhancements_Minigames_SkipLittleBeaver",
+   "tab": "Minigames",
+   "label": "Skip Little Beaver Brother Races",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "SkipLittleBeaver"
+    ]
+   ],
+   "desc": "Only Race the Older Beaver.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_Minigames_FishermanJumpingGame_TargetScore",
+   "tab": "Minigames",
+   "label": "Fisherman's Jumping Game Target Score",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "FishermanJumpingGame",
+     "TargetScore"
+    ]
+   ],
+   "desc": "Sets the target score for the Fisherman's Jumping Game.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 40
+   },
+   "def": 20
+  },
+  {
+   "id": "gEnhancements_Minigames_FishermanJumpingGame_EarlyWin",
+   "tab": "Minigames",
+   "label": "Win Jumping Game Early",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "Minigames",
+     "FishermanJumpingGame",
+     "EarlyWin"
+    ]
+   ],
+   "desc": "Link wins the Fisherman's Jumping Game immediately upon reaching the target score.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_DifficultyOptions_HyperEnemies",
+   "tab": "Difficulty Options",
+   "label": "Hyper Enemies",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "DifficultyOptions",
+     "HyperEnemies"
+    ]
+   ],
+   "desc": "Double the rate at which enemies are updated, making them more difficult",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_DifficultyOptions_PermanentHeartLoss",
+   "tab": "Difficulty Options",
+   "label": "Permanent Heart Loss",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "DifficultyOptions",
+     "PermanentHeartLoss"
+    ]
+   ],
+   "desc": "When you lose 4 quarters of a heart you will permanently lose that heart container.  Disabling this after the fact will not restore any received heart containers.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_DifficultyOptions_DeleteFileOnDeath",
+   "tab": "Difficulty Options",
+   "label": "Delete File on Death",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "DifficultyOptions",
+     "DeleteFileOnDeath"
+    ]
+   ],
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_DifficultyOptions_JinxedTimer",
+   "tab": "Difficulty Options",
+   "label": "Jinxed Timerseconds",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "DifficultyOptions",
+     "JinxedTimer"
+    ]
+   ],
+   "desc": "Set the duration of the Jinxed effect. Setting it to 0 will prevent the effect entirely.",
+   "type": "number",
+   "num": {
+    "min": 0,
+    "max": 60
+   },
+   "def": 60
+  },
+  {
+   "id": "gEnhancements_DifficultyOptions_LowerBankRewardThresholds",
+   "tab": "Difficulty Options",
+   "label": "Lower Bank Reward Thresholds",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "DifficultyOptions",
+     "LowerBankRewardThresholds"
+    ]
+   ],
+   "desc": "Reduces the amount of rupees required to receive the rewards from the bank. From: 200 -> 1000 -> 5000 To:   100 ->  500 -> 1000",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_DifficultyOptions_DisableTakkuriSteal",
+   "tab": "Difficulty Options",
+   "label": "Disable Takkuri Steal",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "DifficultyOptions",
+     "DisableTakkuriSteal"
+    ]
+   ],
+   "desc": "Prevents the Takkuri from stealing key items like bottles and swords. It may still steal other items.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_DifficultyOptions_NoHeartDrops",
+   "tab": "Difficulty Options",
+   "label": "No Heart Drops",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "DifficultyOptions",
+     "NoHeartDrops"
+    ]
+   ],
+   "desc": "Prevents spawning of any hearts or fairies.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_DifficultyOptions_NoRandomDrops",
+   "tab": "Difficulty Options",
+   "label": "No Random Drops",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "DifficultyOptions",
+     "NoRandomDrops"
+    ]
+   ],
+   "desc": "Prevents spawning of any collectibles.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_DifficultyOptions_AlwaysFindRockSirloin",
+   "tab": "Difficulty Options",
+   "label": "Always Find Rock Sirloin",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "DifficultyOptions",
+     "AlwaysFindRockSirloin"
+    ]
+   ],
+   "desc": "Breaking any pot on the Goron Shrine's chandelier will reveal the Rock Sirloin.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gEnhancements_DifficultyOptions_FrogChoirCount",
+   "tab": "Difficulty Options",
+   "label": "Frog Choir Count",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gEnhancements",
+     "DifficultyOptions",
+     "FrogChoirCount"
+    ]
+   ],
+   "desc": "Choose how many frogs you need to save for the choir performance.",
+   "type": "number",
+   "num": {
+    "min": 1,
+    "max": 5
+   },
+   "def": 5
+  },
+  {
+   "id": "gSettings_Menu_Popout",
+   "tab": "Settings",
+   "label": "Popout Menu",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gSettings",
+     "Menu",
+     "Popout"
+    ]
+   ],
+   "desc": "Changes the menu display from overlay to windowed.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gDeveloperTools_DebugEnabled",
+   "tab": "Mod Menu",
+   "label": "Debug Mode",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gDeveloperTools",
+     "DebugEnabled"
+    ]
+   ],
+   "desc": "Enables Debug Mode, allowing the following:  - Open debug warp menu with L + R + Z - Enable debug no-clip mode with L + D-Right - Open built-in debug inventory editor when paused with L - Saves created will inherit inventory from \"Debug Save File Mode\"",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gDeveloperTools_BetterMapSelect_Enabled",
+   "tab": "Mod Menu",
+   "label": "Better Map Select",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gDeveloperTools",
+     "BetterMapSelect",
+     "Enabled"
+    ]
+   ],
+   "desc": "Overrides the original map select with a translated, more user-friendly version.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gDeveloperTools_PreventActorUpdate",
+   "tab": "Mod Menu",
+   "label": "Prevent Actor Update",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gDeveloperTools",
+     "PreventActorUpdate"
+    ]
+   ],
+   "desc": "Prevents Actors from updating.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gDeveloperTools_PreventActorDraw",
+   "tab": "Mod Menu",
+   "label": "Prevent Actor Draw",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gDeveloperTools",
+     "PreventActorDraw"
+    ]
+   ],
+   "desc": "Prevents Actors from drawing.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gDeveloperTools_PreventActorInit",
+   "tab": "Mod Menu",
+   "label": "Prevent Actor Init",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gDeveloperTools",
+     "PreventActorInit"
+    ]
+   ],
+   "desc": "Prevents Actors from initializing.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  },
+  {
+   "id": "gDeveloperTools_DisableObjectDependency",
+   "tab": "Mod Menu",
+   "label": "Disable Object Dependency",
+   "at": [
+    "app",
+    [
+     "CVars",
+     "gDeveloperTools",
+     "DisableObjectDependency"
+    ]
+   ],
+   "desc": "Disables dependencies when loading objects.",
+   "type": "bool",
+   "int": true,
+   "def": false
+  }
+ ],
+ "saves": [
+  "{data}/2ship/saves"
+ ],
+ "known": {
+  "app": [
+   "CVars.gSettings.Controllers.*",
+   "CVars.gSettings.AdvancedResolution.*",
+   "CVars.gOpenWindows.*",
+   "CVars.gRandoSettings.*",
+   "CVars.gRandoEnhancements.*",
+   "CVars.gTrackers.*",
+   "CVars.gDeveloperTools.*",
+   "CVars.gCosmetics.*",
+   "CVars.gAudioEditor.*",
+   "CVars.gGeneral.*",
+   "CVars.gRemote.*",
+   "CVars.gGameplayStats.*",
+   "CVars.gTimeDisplay.*",
+   "CVars.gSettings.Menu.*",
+   "Window.*",
+   "ConfigVersion",
+   "CVars.gSettings.ResetBtn"
+  ],
+  "ini": []
+ },
+ "rev": 1
+}

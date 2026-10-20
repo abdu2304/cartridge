@@ -118,7 +118,10 @@ const ok = (id, what, good, detail = '') => { report.push({ id, what, good: !!go
       } else ok(r.id, 'its installer is a Linux program', isElf(rec.installer));
       // the game: base version, or 1.00 with the update beside it when the recipe lays an update over
       const g = r.game, dir = path.join(games, r.id), v = g.version?.want || '01.00';
-      dump(dir, g.ids[0], g.version?.update ? '01.00' : v, g.has || []);
+      // 0.9.91: a ROM or disc image (a made-up file with the right ending: a recipe that checks SHA-1 strictly gets
+      // one from SHAPES), or nothing for a port that needs no game files
+      if (g.kind === 'file') { fs.mkdirSync(dir, { recursive: true }); fs.writeFileSync(path.join(dir, `${r.id}${g.ext[0]}`), 'game'); }
+      else if (g.kind !== 'none') dump(dir, g.ids[0], g.version?.update ? '01.00' : v, g.has || []);
       SHAPES[r.id]?.(dir);
       const cands = [];
       if (g.version?.update) { const u = path.join(games, r.id + '-update'); dump(u, g.ids[0], v, (g.has || []).filter((f) => !/sce_module/.test(f))); cands.push(u); }
@@ -136,7 +139,8 @@ const ok = (id, what, good, detail = '') => { report.push({ id, what, good: !!go
         const back = (await eng.settings(r.id)).items.find((i) => i.id === item.id);
         ok(r.id, 'a setting changed in Cartridge reads back', String(back.game) === String(value), `${item.id} = ${value}`);
       }
-      ok(r.id, 'shows as ready to play', eng.list().entries.find((e) => e.id === r.id)?.state === 'play');
+      // a port that finishes in its own setup window (r.setup) waits there, Cartridge's part done
+      ok(r.id, r.setup ? 'waits for its own setup window' : 'shows as ready to play', eng.list().entries.find((e) => e.id === r.id)?.state === (r.setup ? 'finish' : 'play'));
     } catch (e) { ok(r.id, 'set up', false, e.message.slice(0, 300)); }
   }
   const bad = report.filter((x) => !x.good);

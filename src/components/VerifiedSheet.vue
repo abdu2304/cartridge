@@ -96,6 +96,9 @@ const step = computed(() => {
     return { title: 'Your Copy', sub: `${x.wants.title} isn’t in your library. Pick its folder on this device.`, button: 'Pick a Folder', icon: 'mdiFolderOpenOutline' };
   }
   if (x.state === 'setup' && copyBad.value) return { title: 'That Copy Didn’t Work', sub: 'The port couldn’t use it (see below). Pick another copy, or try this one again.', button: 'Pick Another Copy', icon: 'mdiFolderOpenOutline', again: true };
+  // 0.9.91: the port sets the game up in its own window the first time (Unleashed's installer)
+  if (x.state === 'finish') return { title: 'Finish in Its Own Window', sub: `${x.finish?.say || 'The port sets the game up itself the first time.'}${x.finish?.copy ? ` Your copy: ${x.finish.copy}` : ''}`, button: 'Open It', icon: 'mdiOpenInNew' };
+  if (x.state === 'setup' && x.noGame) return { title: 'Set It Up', sub: 'It needs no game files of yours: its settings and start are written now.', button: 'Set Up', icon: 'mdiCogPlayOutline' };
   if (x.state === 'setup') return { title: 'Finish Setting Up', sub: 'Your copy is picked; its settings and start still need writing.', button: 'Set Up', icon: 'mdiCogPlayOutline' };
   return x.state === 'update' ? { title: 'An Update Is Out', sub: `${x.installed.tag} now, ${x.latest?.tag} out. Your saves are backed up first and this version is kept.` } : { title: 'Ready to Play', sub: `${x.installed.tag} · ${x.changed ? `${x.changed} of ${x.settingsCount} settings changed` : `${plural(x.settingsCount, 'setting')}, all at the port’s own`}` };
 });
@@ -116,7 +119,7 @@ let off = [], layer = null;
 onMounted(async () => {
   resolveOuter = store.modal?.resolve;
   layer = pushLayer(el.value, { back: () => closeModal(null), start: () => closeModal(null), lb: () => stepStart(-1), rb: () => stepStart(1), y: () => more(), select() {}, lt() {}, rt() {} });
-  off = [window.cart.on('bg-job', (j) => { if (['recomp:', 'recompprep:'].some((k) => j?.key === k + props.id) && j.state !== 'run') load(); }), window.cart.on('installed', () => load())];
+  off = [window.cart.on('bg-job', (j) => { if (['recomp:', 'recompprep:'].some((k) => j?.key === k + props.id) && j.state !== 'run') load(); }), window.cart.on('installed', () => load()), window.cart.on('game-run', (g) => { if (g?.state === 'ended') setTimeout(load, 1500); })];
   call('recomps:runner').then((r) => (runner.value = r)).catch(() => (runner.value = null));
   await load(); await nextTick(); if (el.value) focusFirst(el.value);
 });
@@ -129,6 +132,7 @@ async function main() {
   if (s === 'setup' && copyBad.value) return pickCopy();
   if (s === 'game' && !copyRom.value?.here && copyRom.value) { const rom = romById(copyRom.value.romId); if (rom) { waitCopy = true; await download(rom); reopen(); toast('Downloading your copy. It sets up when it’s here.', 'info', 3500, 'mdiDownload'); } return; }
   if (s === 'game' && !copyRom.value) return pickCopy();
+  if (s === 'finish') return play();
   return prepare();
 }
 async function install() {

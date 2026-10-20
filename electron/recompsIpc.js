@@ -304,7 +304,8 @@ module.exports = function recompsIpc(m) {
     await healGame(id);
     const R = recomps(), rec = R.record(id), e = R.byId(id);
     if (!rec) throw new Error('Install it first.');
-    if (!R.ready(id)) throw new Error(rec.game?.path ? `${e.name} isn’t set up yet. Press Set Up.` : `Pick your copy of ${e.recipe.game.title} first.`);
+    // 0.9.91: a port whose own window finishes the setup (r.setup) starts as soon as Cartridge's part is done
+    if (!R.ready(id) && !(e.recipe?.setup && R.baseReady(id))) throw new Error(rec.game?.path ? `${e.name} isn’t set up yet. Press Set Up.` : `Pick your copy of ${e.recipe.game.title} first.`);
     const st = rec.starts.find((x) => x.id === start) || rec.starts[0];
     // 0.9.88 (owner: Uncharted saw no controller): pads that Steam Input holds (a Steam Controller always, any pad on
     // the desktop) reach only games Steam started; a port Cartridge spawned itself got Steam's desktop mouse and
@@ -595,6 +596,7 @@ module.exports = function recompsIpc(m) {
     const R = recomps(), e = R.byId(id);
     if (e?.from !== 'verified') throw new Error('That isn’t a Cartridge Verified game.');
     let use = dir;
+    if (!use && e.recipe?.game?.kind === 'none') use = R.record(id)?.dir || ''; // 0.9.91: no game files to pick
     if (!use) {
       const copies = verifiedCopies(id).filter((c) => c.here);
       if (!copies.length) return { ok: false, noCopy: true, why: `${e.recipe.game.title} isn’t on this device yet. Download it from your library first.` };
