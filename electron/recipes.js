@@ -223,6 +223,8 @@ function render(r, build, rec, values, { read = () => null, home, env, sets = se
     const p = expand(iniAt.path, v);
     let text = read(p) || '';
     const fmt = iniAt.format === 'flat' ? flat : F.ini;
+    // 0.9.91: values written every time, as r.app is for JSON (DRIVECLUB's launcher.ini: update= and base=, your copy)
+    for (const [k, x] of Object.entries(r.ini || {})) text = fmt.set(text, k.split('/'), typeof x === 'string' ? expand(x, v) : String(x));
     for (const s of sets.filter((x) => x.at[0] === 'ini')) text = fmt.set(text, Array.isArray(s.at[1]) ? s.at[1] : [s.at[1]], typed(s, values[s.id], 'ini'));
     files.push({ path: p, text });
   }
@@ -326,7 +328,7 @@ function discovered(r, build, files) {
   const wild = [...seenSet].filter((k) => k.endsWith('.*')).map((k) => k.slice(0, -1));
   const seen = { has: (k) => seenSet.has(k) || wild.some((w) => k.startsWith(w) || ('ini:' + k).startsWith(w)) };
   const knownApp = new Set([...sets.filter((s) => s.at[0] === 'app').map((s) => keyName(s.at[1])), ...Object.keys(r.app || {}), ...(r.play || []).flatMap((pl) => Object.keys(pl.app || {}))]);
-  const knownIni = new Set(sets.filter((s) => s.at[0] === 'ini').map((s) => iniKey(build.files?.ini?.format === 'flat' ? [].concat(s.at[1]).slice(-1) : s.at[1])));
+  const knownIni = new Set([...Object.keys(r.ini || {}), ...sets.filter((s) => s.at[0] === 'ini').map((s) => iniKey(build.files?.ini?.format === 'flat' ? [].concat(s.at[1]).slice(-1) : s.at[1]))]);
   const one = (id, at, value) => {
     if (typeof value === 'boolean') return { id, at, type: 'bool', def: value };
     if (typeof value === 'number' && Number.isFinite(value)) return { id, at, type: 'number', def: value, num: { min: -1e9, max: 1e9 } };
