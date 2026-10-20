@@ -1,19 +1,18 @@
-## Cartridge 0.9.90 · Ports Start Again
+## Cartridge 0.9.91 · More Ports
 
 ### New
-- **A PC port's settings follow its updates.** When an update adds a setting to the port, Cartridge's Game Settings for it show it under More, named as the port names it; a setting the port no longer has is hidden. Cartridge also no longer puts an older settings file back over one the port changed itself.
-- **Which PC ports have achievements.** Get and Manage, the PC Ports page and the Achievements tab say which installed ports record achievements and which have none.
+- **Ten more Cartridge Verified PC ports.** Cartridge installs each one, takes your own copy from your library, writes the port's settings and starts it, as it does for Bloodborne:
+  - **Dusklight** (Twilight Princess, from your GameCube or Wii disc), with its achievements.
+  - **Ship of Harkinian** (Ocarina of Time) and **2 Ship 2 Harkinian** (Majora's Mask), from your N64 ROM. The first start builds the game's data from the ROM in a few seconds and asks once to start; after that it starts straight in.
+  - **Shadow of the Colossus** (PS4). Its sound needs two modules from your own console, which Cartridge finds in shadPS4's sys_modules.
+  - **DriveClub** (PS4 1.28), with its community patches, set in Cartridge.
+  - **Wind Waker HD Recomp** (Wii U, from a Cemu archive or a disc image). The first setup builds the game on your PC, which takes a few minutes.
+  - **JSRF Unleashed** (Jet Set Radio Future, Xbox). Cartridge unpacks your disc image itself, once.
+  - **Super Mario Strikers** (GameCube).
+  - **Unleashed Recompiled** (Sonic Unleashed, Xbox 360) and **SMS Launcher** (Super Mario Sunshine): their own window finishes the setup the first time, and Cartridge says what to do there. After that, Cartridge starts the game straight away.
+- **GameCube and Wii copies kept as RVZ.** For ports that read ISO only (Strikers, SMS Launcher), Cartridge converts your copy once with Dolphin's own tool when Dolphin is installed.
+- **Cloud saves for every PC port.** Saves already sync to RomM with the port's game; now port save folders are also shared through Syncthing, so a port whose game isn't in RomM keeps its saves in step too.
 
-### Changed
-- **The starting screen says when a PC port is preparing.** A port gets the game ready before its window shows: about 35 seconds for Bloodborne, several minutes after an update or a new copy of the game, with nothing on screen. The starting screen now says so and asks you to leave it running, and stays up to ten minutes for a port instead of five.
-
-### Fixed
-- **PC ports are PC Ports in Achievements.** A port's trophies showed as PlayStation 4 (its game's console); they show under PC Ports with the Steam mark, as ports do everywhere else.
-- **inFAMOUS Second Son starts again after its game is downloaded again.** A PC port remembered the folder of the game copy it was set up with. When that copy moved (downloaded again from RomM under a new folder name, a dump moved by hand, a drive renamed), the port opened and closed at once with "Missing: eboot.bin". Cartridge now notices a copy that's gone and sets the port up again with one that's here: before a start, at start-up and after a PS4 or PS5 download. This works from Steam too, because the Steam shortcut runs the start script Cartridge rewrites. Moving or deleting a game in Cartridge does the same for any port set up with it.
-- **No more recomp and bios folders beside your Emulation folder.** EmuDeck writes its paths as `"/run/media/you/Drive"/Emulation`, and Cartridge read only the quoted part. On an SD card or an external drive picked in EmuDeck, Cartridge then made recomp folders and a second copy of your BIOS files one folder too high. The path is now read as the shell reads it, and a folder only counts as an Emulation folder when it has `roms` in it. What was made in the wrong place is cleared up once: empty recomp console folders, and BIOS files byte for byte the same as the ones in your real bios folder. Nothing else is touched.
-- **Your system stays awake while games download, unpack or install, then sleeps as usual.** Cartridge already asked the desktop to stay awake during downloads, but Game Mode has no such service, so SteamOS could still go to sleep. Cartridge now also holds a system sleep lock (the one Steam's own sleep respects) while a game downloads or unpacks, and while an emulator, PC port or game update installs or a game moves. The lock goes as soon as the last one finishes, and it ends with Cartridge if it closes or crashes.
-- **Updating a PC port doesn't freeze Cartridge.** The new release was copied into place on the main thread; a few hundred MB onto an external drive held the window still for 14 seconds.
-- **A PC port's update no longer ends with "Close it first".** After an update Cartridge starts the new release once to check it runs. It moved on before that check had closed, so setting the port up afterwards found it still running and stopped.
-- **A port Steam starts isn't started twice.** Since 0.9.89 Cartridge starts a port itself when Steam hasn't after 25 seconds. It looked only once, at 25 seconds, so a port that Steam started and that closed quickly was started again. It now looks every 2 seconds.
-- **P.T.'s Save Sync takes only its saves.** Its recipe named the whole data folder (1.9 GB with the enhanced textures); it now names the two save files.
-- **The log no longer calls a night's sleep a stall.** A wake after sleep is logged as that, so real freezes stand out.
+### Not added
+- **Project Reignition**: its releases after 0.4.2 aren't on GitHub.
+- **Nebula** (Super Mario Galaxy): it installs through Proton, but the game needs a Windows file system feature Proton doesn't have.

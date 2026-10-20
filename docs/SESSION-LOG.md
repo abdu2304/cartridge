@@ -7,6 +7,15 @@ The branch for 0.9.3 work is `claude/relaxed-fermat-30pigp`. Pull it before star
 ---
 
 
+## 20 Oct 2026 · 0.9.91 · More Ports (third session on the owner's PC, continued)
+Owner: make twelve recomps Cartridge Verified for everyone; settings follow port updates; ports in Achievements; cloud saves for ports. Details: handover Part 38.
+- Ten Verified: Dusklight, Ship of Harkinian, 2 Ship 2 Harkinian, Shadow of the Colossus, DriveClub, Wind Waker HD, JSRF Unleashed, Strikers, Unleashed Recompiled, SMS Launcher. Six launched here with the owner's own copies.
+- Left out: Project Reignition (owner), Nebula (NTFS streams under Wine).
+- Port saves in Syncthing; RVZ converted with Dolphin for ISO-only ports; Xbox discs unpacked by Cartridge.
+- Next: the owner tries the new ports in Game Mode; Unleashed and SMS Launcher through their own setup windows.
+
+---
+
 ## 20 Oct 2026 · 0.9.90 · Ports Start Again (third session on the owner's PC)
 Owner: inFAMOUS and Bloodborne ports don't launch; recomp/ and bios/ made outside the Emulation folder; stay awake only while games download or install; go through the logs; fix for everyone. Details and evidence: handover Part 37.
 - inFAMOUS: its game copy had moved (downloaded again under a new folder name). Ports now re-find their copy. Played through Steam on the PC.
