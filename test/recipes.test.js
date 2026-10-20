@@ -176,7 +176,7 @@ test('the Proton runner: each Proton in the runtime it asks for, umu only with a
 test('Steam\'s own launch never reaches what Cartridge starts', () => {
   const CE = require('../electron/childEnv');
   const env = CE.clean({ STEAM_COMPAT_DATA_PATH: '/p' }, { HOME: '/h', LD_PRELOAD: 'x.so', APPIMAGE: '/a', SteamGameId: '1', STEAM_COMPAT_DATA_PATH: '/steam', STEAM_COMPAT_TOOL_PATHS: '/t', PRESSURE_VESSEL_RUNTIME: 'r', STEAM_RUNTIME_LIBRARY_PATH: 'l' });
-  assert.deepStrictEqual(env, { HOME: '/h', SteamGameId: '1', STEAM_COMPAT_DATA_PATH: '/p' });
+  assert.deepStrictEqual(env, { HOME: '/h', SteamGameId: '1', DISABLE_AUTO_UPDATES: '1', STEAM_COMPAT_DATA_PATH: '/p' });
   const sh = path.join(tmp(), 'u.sh');
   fs.writeFileSync(sh, `${CE.SHELL_UNSET}\nenv | grep -cE '^(STEAM_COMPAT_|PRESSURE_VESSEL_|STEAM_RUNTIME|LD_LIBRARY_PATH)' || true\necho "$SteamGameId"\n`);
   const out = require('child_process').execFileSync('/bin/sh', [sh], { env: { PATH: process.env.PATH, STEAM_COMPAT_APP_ID: '7', PRESSURE_VESSEL_X: '1', STEAM_RUNTIME: '1', LD_LIBRARY_PATH: '/l', SteamGameId: '9' } }).toString().trim().split('\n');
@@ -508,4 +508,10 @@ test('an Xbox disc image (XDVDFS) is listed and unpacked', async () => {
   assert.strictEqual(fs.readFileSync(path.join(dest, 'UDATA/save'), 'utf8'), 'mine', 'saves kept through unpacking again');
   fs.writeFileSync(iso, Buffer.alloc(S * 40));
   await assert.rejects(X.list(iso), /isn’t an Xbox disc image/);
+});
+
+test('programs Cartridge starts keep AppImage self-updaters quiet (Cartridge updates emulators itself)', () => {
+  const CE = require('../electron/childEnv');
+  assert.strictEqual(CE.clean({}, { PATH: '/bin' }).DISABLE_AUTO_UPDATES, '1');
+  assert.strictEqual(CE.clean({ DISABLE_AUTO_UPDATES: '0' }, {}).DISABLE_AUTO_UPDATES, '0', 'a caller can still ask for it');
 });

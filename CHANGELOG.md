@@ -18,6 +18,7 @@ Every Cartridge release, newest first. Each GitHub release only lists its own ch
 - **Cloud saves for every PC port.** Saves already sync to RomM with the port's game; now port save folders are also shared through Syncthing, so a port whose game isn't in RomM keeps its saves in step too.
 
 ### Fixed
+- **No "Allow Vita3K to check for updates?" question from Cartridge.** Vita3K's newest AppImage asks that from its second start on, and Cartridge's check that it starts made it ask out of nowhere. Programs Cartridge starts now have that question turned off (Cartridge updates your emulators itself).
 - **Beta and Nightly builds are made again.** The script that stamps their version was never added, so no nightly has been built since 17 October and the Beta and Nightly update channels had nothing new.
 
 ### Not added
