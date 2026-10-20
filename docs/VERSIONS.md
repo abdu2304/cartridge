@@ -702,3 +702,6 @@ layout and "do not change" list stay in `CLAUDE.md`.
 - openVerified through Steam: `scriptRuns` polled every 2 s for 25 s.
 - Stall watchdog: wall gap minus monotonic gap over 5 s logs `system woke after sleeping N min`.
 - Recipe pt: saves `PT_Save_Data0`, `PT_Save_Data1` (index.json rebuilt).
+- Achievements: store `consoleName`/`consoleSlug` give `src: 'recomp'` "PC Ports" and the `steam` slug; trophies SOURCES.recomp platform "PC Ports"; TrophyGame links a port to any library game. recompsIpc `achKnown` → `recomps:list` entries carry `ach`; shown in Recomps.vue (status pill), RecompsView.vue (card line) and AchAll.vue (`portsAch` note).
+- Port settings follow updates: recipes.js `portKeys`, `discovered` (only keys beyond a recipe's `known`; JSON booleans and true/false are toggles, the rest numbers or text), `settingsNow` (hides a recipe setting the port stopped writing for that release when its file holds at least half the recipe's keys), `keysOf`. recomps.js `refreshPortFiles` (rec.wrote hashes what Cartridge wrote; rec.portKeys) from recompsIpc `portFilesFollow` after a game ends and at start-up; configure renders with `settingsNow`. `known` recorded for the five recipes from real installs (revs bumped).
+
