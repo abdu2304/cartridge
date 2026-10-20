@@ -1231,9 +1231,17 @@ function createRecomps(ctx) {
       if (rec.preparedFrom !== rec.game.path || rec.preparedTag !== rec.tag || !exists(done)) {
         if (!ctx.runProgram) throw new Error(`${r.name} needs its own setup run, and Cartridge can’t run programs here.`);
         onProgress({ step: 'prepare', pct: null });
-        const [cmd, ...args] = build.prepare.cmd.map((a) => RC.expand(a, pv));
+        let [cmd, ...args] = build.prepare.cmd.map((a) => RC.expand(a, pv)), env;
+        // a Windows build's setup runs through Proton, in the port's prefix (made first: configure below is too late)
+        if (build.os === 'windows') {
+          if (!runner) throw new Error(`${r.name}’s setup is a Windows program, and there’s no Proton here to run it.`);
+          prefixFor(id, rec);
+          const pfx = RC.prefixOf(rec);
+          if (!exists(path.join(pfx, 'pfx', 'drive_c'))) { fs.mkdirSync(pfx, { recursive: true }); const c0 = RC.prefixCommand(runner, { prefix: pfx }); await ctx.runProgram(c0.cmd, c0.args, { env: c0.env, cwd: rec.dir, timeoutMs: 15 * 60e3 }); }
+          const c = RC.runCommand(runner, cmd, args, pfx); cmd = c.cmd; args = c.args; env = c.env;
+        }
         const t0 = Date.now();
-        await ctx.runProgram(cmd, args, { cwd: rec.dir, timeoutMs: 90 * 60e3, prepareDone: done }); // prepareDone: what the install test stands in for
+        await ctx.runProgram(cmd, args, { cwd: rec.dir, env, timeoutMs: 120 * 60e3, prepareDone: done }); // prepareDone: what the install test stands in for
         if (!exists(done)) throw new Error(`${r.name}’s own setup ran but didn’t finish (${path.basename(done)} wasn’t made). Its log is in ${rec.dir}.`);
         log('verified prepared', id, `${Math.round((Date.now() - t0) / 1000)} s`);
         rec.preparedFrom = rec.game.path; rec.preparedTag = rec.tag; saveInstalls();

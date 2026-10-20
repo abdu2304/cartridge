@@ -56,8 +56,9 @@ function validate(r) {
     if (!['linux', 'windows'].includes(b.os)) bad.push(`build os ${b.os}`);
     try { new RegExp(b.asset); } catch { bad.push(`build asset ${b.asset}`); }
     if (!b.program || /[/\\]\.\.|^\//.test(b.program)) bad.push(`build program ${b.program}`);
-    for (const [k, f] of Object.entries(b.files || {})) if (!['app', 'ini', 'list'].includes(k) || !(k === 'list' ? f.format === 'lines' : ['json', 'flat', 'ini'].includes(f.format)) || !/^\{(dir|home|config|data|appdata)\}\//.test(f.path || '')) bad.push(`build file ${k}`);
-    if (b.prepare && !(Array.isArray(b.prepare.cmd) && b.prepare.cmd.length && typeof b.prepare.done === 'string' && /^\{(dir|home|config|data|appdata)\}\//.test(b.prepare.done))) bad.push('build prepare');
+    for (const [k, f] of Object.entries(b.files || {})) if (!['app', 'ini', 'list'].includes(k) || !(k === 'list' ? f.format === 'lines' : ['json', 'flat', 'ini'].includes(f.format)) || !/^\{(dir|home|config|data|appdata|localappdata)\}\//.test(f.path || '')) bad.push(`build file ${k}`);
+    if (b.prepare && !(Array.isArray(b.prepare.cmd) && b.prepare.cmd.length && typeof b.prepare.done === 'string' && /^\{(dir|home|config|data|appdata|localappdata)\}\//.test(b.prepare.done))) bad.push('build prepare');
+    if (b.run && (/[/\\]\.\.|^\//.test(b.run) || typeof b.run !== 'string')) bad.push('build run');
     if (b.first && !(typeof b.first.unless === 'string' && /^\{(dir|home|config|data|appdata)\}\//.test(b.first.unless) && Array.isArray(b.first.args))) bad.push('build first');
   }
   if (r.achievements) {
@@ -113,6 +114,8 @@ function varsFor(r, build, rec, { home = os.homedir(), env = process.env, game }
     config: env.XDG_CONFIG_HOME || path.join(home, '.config'),
     data: env.XDG_DATA_HOME || path.join(home, '.local/share'),
     appdata: path.join(prefix, 'pfx/drive_c/users/steamuser/AppData/Roaming'),
+    localappdata: path.join(prefix, 'pfx/drive_c/users/steamuser/AppData/Local'), // 0.9.91: Nebula's %LOCALAPPDATA%
+    winDir: winPath(rec.dir), // the install folder as a Windows program sees it (an argument to a Windows setup)
     game: build?.os === 'windows' && g ? winPath(g) : g,
     gamePosix: g,
     // the folder the game is in (a ROM's folder), for ports that are pointed at a folder
@@ -379,7 +382,9 @@ function keysOf(files, build) { return { app: files.app ? appLeaves(files.app, b
 // beside the install. The launcher's settings.json for this start is copied into place first.
 const q = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 function script(r, build, rec, start, runner, vars, { env = {} } = {}) {
-  const program = rec.program || path.join(rec.dir, build.program); // as installed (a lone AppImage is renamed after the game)
+  // as installed (a lone AppImage is renamed after the game); build.run, the program a port's own setup made (Nebula's
+  // launcher, beside the setup program that was downloaded)
+  const program = build.run ? path.join(rec.dir, build.run) : rec.program || path.join(rec.dir, build.program);
   const args = (build.args || []).map((a) => expand(a, vars)).map(q).join(' ');
   const L = ['#!/bin/sh', `# Cartridge's start for ${start.name}. Its settings are changed in Cartridge, which writes this file again.`];
   if (start.copy) L.push(`mkdir -p ${q(path.dirname(start.copy.to))} && cp -f ${q(start.copy.from)} ${q(start.copy.to)}`);

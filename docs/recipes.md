@@ -22,6 +22,35 @@ Unverified: Cartridge installs it and keeps versions, the port sets itself up by
 Paths take `{dir}` (the install folder), `{game}`, `{home}`, `{config}`, `{data}`, `{appdata}` (the Proton prefix's
 AppData for Windows builds) and `{result}`.
 
+## More kinds of port (0.9.91)
+
+The first ports were all PS4 dump folders. Since 0.9.91 a recipe can also say:
+
+| Field | What it does | First used by |
+|---|---|---|
+| `game.kind: 'file'`, `ext`, `sha1`, `soft` | The game is one file (a ROM, a disc image) or a folder holding one, picked by ending; `sha1` lists the copies the project accepts (checked for files up to 128 MB; `soft` only notes a mismatch) | Ship of Harkinian, Dusklight |
+| `game.kind: 'none'` | No game files: Set Up writes the settings and start | (none yet) |
+| `game.alsoOn` | More consoles the game can come from (library matching) | Dusklight (GameCube and Wii) |
+| `game.unpack: 'xiso'`, `keep` | An Xbox disc image is unpacked once into `.cartridge/disc` with Cartridge's own reader (`electron/xiso.js`); an unpacked folder is used as it is; `keep` folders survive unpacking again | JSRF Unleashed (its saves are in UDATA) |
+| `builds[].first: { unless, args }` | Arguments for the first start only, until `unless` exists | Ship of Harkinian (the ROM, until oot.o2r is made) |
+| `builds[].prepare: { cmd, done }` | A step the port's own release runs with your copy during Set Up (through Proton for a Windows build); again when the copy or release changes or `done` is gone | Wind Waker HD (setup.py builds the game), Nebula |
+| `builds[].run` | The program to start when it isn't the one downloaded (a setup that installs the game's launcher) | Nebula |
+| `builds[].files.app.nested`, `sparse` | JSON settings inside objects (a key is a list of names); `sparse` writes only what you changed in Cartridge and takes it out when set back, so the port's defaults hold | Ship of Harkinian |
+| `builds[].files.ini.sparse` | The same for a flat ini | Wind Waker HD, Strikers |
+| `builds[].files.list` (`format: 'lines'`) | A file of lines, each one thing turned on: a toggle is its line, a choice is one of its options' lines | DriveClub's patches_enabled.txt |
+| `ini` | Values written into the ini every time, like `app` for JSON | DriveClub (`update=`, `base=`), Strikers (`data=`) |
+| settings `at: ['env', NAME]` | A setting the port reads from its environment: a toggle exports 1 when on | JSRF Unleashed's RECOMP_FULLSCREEN |
+| settings `int`, `word`, `quote` | A JSON toggle as 1/0 (libultraship CVars); an ini toggle as true/false (TOML); an ini text in quotes | Ship of Harkinian, Unleashed |
+| `look: [{ var, files, dirs }]` | Files of the player's own looked for where other programs keep them; the folder becomes `{var}` | Shadow of the Colossus (sound modules from shadPS4's sys_modules) |
+| `setup: { by: 'port', done, say }` | The port's own window finishes the setup the first time (Cartridge has done its part; the sheet says what to do); ready when any `done` file exists | Unleashed (its installer), SMS Launcher (its build) |
+| `achievements.format: 'keyed'` / `'hedge'` | A JSON `{ key: { unlocked } }` with names from `list`; Unleashed's ACH-DATA | Dusklight, Unleashed |
+| `achievements.files` with `*` | Every file the name matches | DriveClub (a log per start) |
+| `{gameDir}`, `{winDir}`, `{localappdata}` | The game's folder, the install folder as Windows sees it, %LOCALAPPDATA% in the prefix | Nebula |
+
+Ports in 0.9.91: Dusklight, Ship of Harkinian, 2 Ship 2 Harkinian, Shadow of the Colossus, DriveClub, Wind Waker HD,
+JSRF Unleashed, Super Mario Strikers, Unleashed Recompiled, SMS Launcher, Nebula. Project Reignition isn't one: its
+releases after 0.4.2 are on GameJolt, not GitHub.
+
 ## How a game starts
 
 Cartridge writes `.cartridge/play.sh` (or `play-<start>.sh`) in the install folder: it copies the staged settings to
