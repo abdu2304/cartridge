@@ -714,3 +714,4 @@ layout and "do not change" list stay in `CLAUDE.md`.
 - Save Sync for ports: main.js `syncRootsAll()` adds every installed port's save folders to Syncthing's folders (main device and joined devices); RomM sync already covered ports matched to a library game (and `savesync:match` for the rest).
 - tools/recipes/install-test.js: a made-up XISO for jsrf, Flatpak bundles named not installed, prepare stood in for, shell-script programs; test/recipes.test.js lists recipes from the folder.
 - Not Verified: Project Reignition (GameJolt), Nebula (NTFS streams under Wine; docs/recipes.md).
+- tools/release/prerelease.js (missing since 0.9.71's update channels; every nightly failed at Version and channel): `updateChannels.nextVersion`/`nameOf` stamp version, versionName and releaseName, publish releaseType prerelease, nightly notes from the commits since the last stable tag into release-notes-nightly.md.

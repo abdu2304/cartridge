@@ -13,6 +13,9 @@
 - **GameCube and Wii copies kept as RVZ.** For ports that read ISO only (Strikers, SMS Launcher), Cartridge converts your copy once with Dolphin's own tool when Dolphin is installed.
 - **Cloud saves for every PC port.** Saves already sync to RomM with the port's game; now port save folders are also shared through Syncthing, so a port whose game isn't in RomM keeps its saves in step too.
 
+### Fixed
+- **Beta and Nightly builds are made again.** The script that stamps their version was never added, so no nightly has been built since 17 October and the Beta and Nightly update channels had nothing new.
+
 ### Not added
 - **Project Reignition**: its releases after 0.4.2 aren't on GitHub.
 - **Nebula** (Super Mario Galaxy): it installs through Proton, but the game needs a Windows file system feature Proton doesn't have.
