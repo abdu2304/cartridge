@@ -1,0 +1,766 @@
+{
+ "schema": 1,
+ "id": "sms",
+ "name": "Super Mario Sunshine (SMS Launcher)",
+ "by": "chasem-dev and the Super Mario Sunshine decompilation",
+ "repo": "github:chasem-dev/sms-launcher",
+ "licence": "MIT",
+ "about": "Super Mario Sunshine built as a native PC game from its decompiled code, on your PC from your own disc: up to 120 FPS, widescreen and ultrawide, HD textures, language packs, free camera. The launcher’s own window does the first setup (it downloads its build tools and builds the game, which takes a while); after that Cartridge starts the game straight away.",
+ "verified": {
+  "on": "2026-10-20",
+  "release": "v0.1.63",
+  "played": false
+ },
+ "game": {
+  "console": "gamecube",
+  "title": "Super Mario Sunshine",
+  "ids": [
+   "GMSE01"
+  ],
+  "kind": "file",
+  "ext": [
+   ".iso",
+   ".gcm",
+   ".ciso"
+  ],
+  "why": "Your own North American Super Mario Sunshine disc (GMSE01, the first release) as an ISO, GCM or CISO; Dolphin converts an RVZ to ISO."
+ },
+ "builds": [
+  {
+   "os": "linux",
+   "asset": "^SMS-Launcher\\.AppImage$",
+   "program": "SuperMarioSunshine(SMSLauncher).AppImage",
+   "args": [
+    "--no-sandbox",
+    "--play"
+   ],
+   "files": {
+    "app": {
+     "path": "{config}/SMS Launcher/preferences.json",
+     "format": "json",
+     "nested": true
+    }
+   }
+  }
+ ],
+ "app": {
+  "rom": "{gamePosix}"
+ },
+ "setup": {
+  "by": "port",
+  "done": [
+   "{config}/SMS Launcher/sms-pc-port/build/linux-64/sms"
+  ],
+  "say": "SMS Launcher builds the game in its own window the first time, in three steps: Download setup files, then your disc (Cartridge has chosen your copy already), then the setup itself, which takes a while. When it says Play, it’s done."
+ },
+ "settings": [
+  {
+   "id": "frameRate",
+   "tab": "Display",
+   "label": "Frame rate",
+   "type": "choice",
+   "def": 60,
+   "at": [
+    "app",
+    [
+     "settings",
+     "frameRate"
+    ]
+   ],
+   "options": [
+    [
+     30,
+     "30 FPS"
+    ],
+    [
+     60,
+     "60 FPS"
+    ],
+    [
+     120,
+     "120 FPS"
+    ]
+   ]
+  },
+  {
+   "id": "resolution",
+   "tab": "Display",
+   "label": "Picture sharpness",
+   "type": "choice",
+   "def": 4,
+   "at": [
+    "app",
+    [
+     "settings",
+     "resolution"
+    ]
+   ],
+   "desc": "How many times the game’s own resolution it draws at.",
+   "options": [
+    [
+     1,
+     "1x"
+    ],
+    [
+     2,
+     "2x"
+    ],
+    [
+     3,
+     "3x"
+    ],
+    [
+     4,
+     "4x (sharpest)"
+    ]
+   ]
+  },
+  {
+   "id": "widescreen",
+   "tab": "Display",
+   "label": "Screen format",
+   "type": "choice",
+   "def": "16:9",
+   "at": [
+    "app",
+    [
+     "settings",
+     "widescreen"
+    ]
+   ],
+   "options": [
+    [
+     "off",
+     "4:3 (original)"
+    ],
+    [
+     "16:9",
+     "16:9"
+    ],
+    [
+     "16:10",
+     "16:10"
+    ],
+    [
+     "21:9",
+     "21:9"
+    ]
+   ]
+  },
+  {
+   "id": "hudEdges",
+   "tab": "Display",
+   "label": "HUD at the screen edges",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    [
+     "settings",
+     "hudEdges"
+    ]
+   ]
+  },
+  {
+   "id": "fullscreen",
+   "tab": "Display",
+   "label": "Fullscreen",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    [
+     "settings",
+     "fullscreen"
+    ]
+   ]
+  },
+  {
+   "id": "fullscreenMode",
+   "tab": "Display",
+   "label": "Fullscreen mode",
+   "type": "choice",
+   "def": "desktop",
+   "at": [
+    "app",
+    [
+     "settings",
+     "fullscreenMode"
+    ]
+   ],
+   "options": [
+    [
+     "desktop",
+     "Borderless"
+    ],
+    [
+     "exclusive",
+     "Exclusive"
+    ]
+   ]
+  },
+  {
+   "id": "vsync",
+   "tab": "Display",
+   "label": "VSync",
+   "type": "choice",
+   "def": "off",
+   "at": [
+    "app",
+    [
+     "settings",
+     "vsync"
+    ]
+   ],
+   "options": [
+    [
+     "off",
+     "Off"
+    ],
+    [
+     "on",
+     "On"
+    ],
+    [
+     "adaptive",
+     "Adaptive"
+    ]
+   ]
+  },
+  {
+   "id": "overlay",
+   "tab": "Display",
+   "label": "Frame-time overlay",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    [
+     "settings",
+     "overlay"
+    ]
+   ]
+  },
+  {
+   "id": "msaa",
+   "tab": "Picture",
+   "label": "Anti-aliasing (MSAA)",
+   "type": "choice",
+   "def": 0,
+   "at": [
+    "app",
+    [
+     "settings",
+     "msaa"
+    ]
+   ],
+   "options": [
+    [
+     0,
+     "Off"
+    ],
+    [
+     2,
+     "2x"
+    ],
+    [
+     4,
+     "4x"
+    ],
+    [
+     8,
+     "8x"
+    ]
+   ]
+  },
+  {
+   "id": "fxaa",
+   "tab": "Picture",
+   "label": "FXAA",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    [
+     "settings",
+     "fxaa"
+    ]
+   ]
+  },
+  {
+   "id": "anisotropic",
+   "tab": "Picture",
+   "label": "Texture filtering",
+   "type": "choice",
+   "def": 0,
+   "at": [
+    "app",
+    [
+     "settings",
+     "anisotropic"
+    ]
+   ],
+   "options": [
+    [
+     0,
+     "Off"
+    ],
+    [
+     2,
+     "2x"
+    ],
+    [
+     4,
+     "4x"
+    ],
+    [
+     8,
+     "8x"
+    ],
+    [
+     16,
+     "16x"
+    ]
+   ]
+  },
+  {
+   "id": "sharpen",
+   "tab": "Picture",
+   "label": "Sharpening",
+   "type": "number",
+   "def": 0,
+   "at": [
+    "app",
+    [
+     "settings",
+     "sharpen"
+    ]
+   ],
+   "num": {
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "brightness",
+   "tab": "Picture",
+   "label": "Brightness",
+   "type": "number",
+   "def": 100,
+   "at": [
+    "app",
+    [
+     "settings",
+     "brightness"
+    ]
+   ],
+   "num": {
+    "min": 50,
+    "max": 200,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "presentFilter",
+   "tab": "Picture",
+   "label": "Scaler",
+   "type": "choice",
+   "def": "bilinear",
+   "at": [
+    "app",
+    [
+     "settings",
+     "presentFilter"
+    ]
+   ],
+   "options": [
+    [
+     "bilinear",
+     "Bilinear"
+    ],
+    [
+     "sharp",
+     "Sharp"
+    ],
+    [
+     "nearest",
+     "Nearest"
+    ],
+    [
+     "fsr",
+     "AMD FSR 1"
+    ],
+    [
+     "nis",
+     "NVIDIA NIS"
+    ]
+   ]
+  },
+  {
+   "id": "fsrMode",
+   "tab": "Picture",
+   "label": "FSR quality",
+   "type": "choice",
+   "def": "quality",
+   "at": [
+    "app",
+    [
+     "settings",
+     "fsrMode"
+    ]
+   ],
+   "desc": "With FSR 1: how far below the screen size the game renders.",
+   "options": [
+    [
+     "native",
+     "Native"
+    ],
+    [
+     "quality",
+     "Quality"
+    ],
+    [
+     "balanced",
+     "Balanced"
+    ],
+    [
+     "performance",
+     "Performance"
+    ],
+    [
+     "ultraperformance",
+     "Ultra performance"
+    ]
+   ]
+  },
+  {
+   "id": "aspect",
+   "tab": "Picture",
+   "label": "Fit",
+   "type": "choice",
+   "def": "keep",
+   "at": [
+    "app",
+    [
+     "settings",
+     "aspect"
+    ]
+   ],
+   "options": [
+    [
+     "keep",
+     "Keep the shape"
+    ],
+    [
+     "stretch",
+     "Stretch"
+    ],
+    [
+     "integer",
+     "Whole multiples"
+    ]
+   ]
+  },
+  {
+   "id": "heatHaze",
+   "tab": "Picture",
+   "label": "Heat-wave shimmer",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    [
+     "settings",
+     "heatHaze"
+    ]
+   ]
+  },
+  {
+   "id": "textures",
+   "tab": "Picture",
+   "label": "HD textures",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    [
+     "settings",
+     "textures"
+    ]
+   ]
+  },
+  {
+   "id": "textureLoading",
+   "tab": "Picture",
+   "label": "When HD textures load",
+   "type": "choice",
+   "def": "stage",
+   "at": [
+    "app",
+    [
+     "settings",
+     "textureLoading"
+    ]
+   ],
+   "options": [
+    [
+     "stage",
+     "While each level loads"
+    ],
+    [
+     "all",
+     "All at the start (lots of video memory)"
+    ],
+    [
+     "play",
+     "Each when first drawn"
+    ]
+   ]
+  },
+  {
+   "id": "skipIntro",
+   "tab": "Game",
+   "label": "Skip the logos and opening movie",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    [
+     "settings",
+     "skipIntro"
+    ]
+   ]
+  },
+  {
+   "id": "skipMovies",
+   "tab": "Game",
+   "label": "Straight to the title screen",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    [
+     "settings",
+     "skipMovies"
+    ]
+   ]
+  },
+  {
+   "id": "language",
+   "tab": "Game",
+   "label": "Language",
+   "type": "choice",
+   "def": "en",
+   "at": [
+    "app",
+    [
+     "settings",
+     "language"
+    ]
+   ],
+   "options": [
+    [
+     "en",
+     "English (the disc’s own)"
+    ],
+    [
+     "fr",
+     "Français"
+    ],
+    [
+     "de",
+     "Deutsch"
+    ],
+    [
+     "es",
+     "Español"
+    ],
+    [
+     "it",
+     "Italiano"
+    ],
+    [
+     "pl",
+     "Polski (community)"
+    ]
+   ]
+  },
+  {
+   "id": "pauseTracker",
+   "tab": "Game",
+   "label": "Shine and blue coin tracker in the pause menu",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    [
+     "settings",
+     "pauseTracker"
+    ]
+   ]
+  },
+  {
+   "id": "volume",
+   "tab": "Audio",
+   "label": "Volume",
+   "type": "number",
+   "def": 100,
+   "at": [
+    "app",
+    [
+     "settings",
+     "volume"
+    ]
+   ],
+   "num": {
+    "min": 0,
+    "max": 100,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "invertCameraX",
+   "tab": "Controls",
+   "label": "Invert the camera left and right",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    [
+     "settings",
+     "invertCameraX"
+    ]
+   ]
+  },
+  {
+   "id": "invertCameraY",
+   "tab": "Controls",
+   "label": "Invert the camera up and down",
+   "type": "bool",
+   "def": true,
+   "at": [
+    "app",
+    [
+     "settings",
+     "invertCameraY"
+    ]
+   ]
+  },
+  {
+   "id": "freeCamera",
+   "tab": "Controls",
+   "label": "Free camera",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    [
+     "settings",
+     "freeCamera"
+    ]
+   ],
+   "desc": "The camera stays where it is put instead of swinging back behind Mario."
+  },
+  {
+   "id": "cstickAim",
+   "tab": "Controls",
+   "label": "C-stick aims in the close-up camera",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    [
+     "settings",
+     "cstickAim"
+    ]
+   ]
+  },
+  {
+   "id": "cameraSpeed",
+   "tab": "Controls",
+   "label": "Camera speed",
+   "type": "number",
+   "def": 100,
+   "at": [
+    "app",
+    [
+     "settings",
+     "cameraSpeed"
+    ]
+   ],
+   "num": {
+    "min": 10,
+    "max": 400,
+    "unit": "%"
+   }
+  },
+  {
+   "id": "mouseCamera",
+   "tab": "Controls",
+   "label": "Mouse camera",
+   "type": "bool",
+   "def": false,
+   "at": [
+    "app",
+    [
+     "settings",
+     "mouseCamera"
+    ]
+   ]
+  },
+  {
+   "id": "mouseSensitivity",
+   "tab": "Controls",
+   "label": "Mouse sensitivity",
+   "type": "number",
+   "def": 100,
+   "at": [
+    "app",
+    [
+     "settings",
+     "mouseSensitivity"
+    ]
+   ],
+   "num": {
+    "min": 5,
+    "max": 1000,
+    "unit": "%"
+   }
+  }
+ ],
+ "saves": [
+  "{config}/SMS Launcher/sms-pc-port/saves"
+ ],
+ "known": {
+  "app": [
+   "rom",
+   "repo",
+   "completedSetup",
+   "installRoot",
+   "saveDirectory",
+   "previousInstall.*",
+   "multiplayer.*",
+   "window*",
+   "source*",
+   "gameSource*",
+   "update*",
+   "last*",
+   "settings.arch",
+   "settings.renderer",
+   "settings.eclipse",
+   "settings.buttonPrompts",
+   "settings.promptPad",
+   "settings.hdr*",
+   "settings.display",
+   "settings.exclusiveResolution",
+   "settings.shaderWarmup",
+   "settings.marioLook*",
+   "settings.discordPresence",
+   "settings.autoUpdate",
+   "settings.cutscenes"
+  ],
+  "ini": []
+ },
+ "rev": 1
+}

@@ -1,0 +1,918 @@
+{
+ "schema": 1,
+ "id": "unleashed",
+ "name": "Unleashed Recompiled",
+ "by": "hedge-dev (Sajid, Skyth, Hyper, Darío and others)",
+ "repo": "github:hedge-dev/UnleashedRecomp",
+ "licence": "GPL-3.0",
+ "about": "The Xbox 360 Sonic Unleashed, statically recompiled for PC: high frame rates, ultrawide, higher resolutions, improved shadows and effects, achievements. Its own window installs the game the first time from your copy, its title update and any DLC.",
+ "verified": {
+  "on": "2026-10-20",
+  "release": "v1.0.3",
+  "played": false
+ },
+ "game": {
+  "console": "xbox360",
+  "title": "Sonic Unleashed",
+  "kind": "file",
+  "ext": [
+   ".iso",
+   ".xex",
+   ".zar"
+  ],
+  "why": "Your own Xbox 360 copy of Sonic Unleashed (a disc image or its extracted folder), and its title update."
+ },
+ "builds": [
+  {
+   "os": "linux",
+   "asset": "^UnleashedRecomp-Flatpak\\.zip$",
+   "program": "UnleashedRecomp",
+   "args": [
+    "run",
+    "io.github.hedge_dev.unleashedrecomp"
+   ],
+   "files": {
+    "ini": {
+     "path": "{home}/.config/UnleashedRecomp/config.toml",
+     "format": "ini"
+    }
+   }
+  },
+  {
+   "os": "windows",
+   "asset": "^UnleashedRecomp-Windows\\.zip$",
+   "program": "UnleashedRecomp.exe",
+   "args": [],
+   "files": {
+    "ini": {
+     "path": "{appdata}/UnleashedRecomp/config.toml",
+     "format": "ini"
+    }
+   }
+  }
+ ],
+ "setup": {
+  "by": "port",
+  "done": [
+   "{home}/.var/app/io.github.hedge_dev.unleashedrecomp/data/patched/default.xex",
+   "{dir}/patched/default.xex"
+  ],
+  "say": "Unleashed Recompiled installs the game in its own window the first time: choose Add Files or Add Folder for your copy, then add its title update and any DLC, and install. After that Cartridge starts it straight away."
+ },
+ "settings": [
+  {
+   "id": "language",
+   "tab": "Game",
+   "label": "Language",
+   "at": [
+    "ini",
+    [
+     "System",
+     "Language"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "English",
+     "English"
+    ],
+    [
+     "Japanese",
+     "Japanese"
+    ],
+    [
+     "German",
+     "German"
+    ],
+    [
+     "French",
+     "French"
+    ],
+    [
+     "Spanish",
+     "Spanish"
+    ],
+    [
+     "Italian",
+     "Italian"
+    ]
+   ],
+   "quote": true,
+   "def": "English"
+  },
+  {
+   "id": "voiceLanguage",
+   "tab": "Game",
+   "label": "Voice language",
+   "at": [
+    "ini",
+    [
+     "System",
+     "VoiceLanguage"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "English",
+     "English"
+    ],
+    [
+     "Japanese",
+     "Japanese"
+    ]
+   ],
+   "quote": true,
+   "def": "English"
+  },
+  {
+   "id": "subtitles",
+   "tab": "Game",
+   "label": "Subtitles",
+   "at": [
+    "ini",
+    [
+     "System",
+     "Subtitles"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": true
+  },
+  {
+   "id": "hints",
+   "tab": "Game",
+   "label": "Hints",
+   "at": [
+    "ini",
+    [
+     "System",
+     "Hints"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": true
+  },
+  {
+   "id": "controlTutorial",
+   "tab": "Game",
+   "label": "Control tutorial",
+   "at": [
+    "ini",
+    [
+     "System",
+     "ControlTutorial"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": true
+  },
+  {
+   "id": "achievementNotifications",
+   "tab": "Game",
+   "label": "Achievement notifications",
+   "at": [
+    "ini",
+    [
+     "System",
+     "AchievementNotifications"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": true
+  },
+  {
+   "id": "timeOfDayTransition",
+   "tab": "Game",
+   "label": "Time of day transition",
+   "at": [
+    "ini",
+    [
+     "System",
+     "TimeOfDayTransition"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Xbox",
+     "Xbox"
+    ],
+    [
+     "PlayStation",
+     "PlayStation"
+    ]
+   ],
+   "quote": true,
+   "def": "Xbox"
+  },
+  {
+   "id": "horizontalCamera",
+   "tab": "Controls",
+   "label": "Horizontal camera",
+   "at": [
+    "ini",
+    [
+     "Input",
+     "HorizontalCamera"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Normal",
+     "Normal"
+    ],
+    [
+     "Reverse",
+     "Reverse"
+    ]
+   ],
+   "quote": true,
+   "def": "Normal"
+  },
+  {
+   "id": "verticalCamera",
+   "tab": "Controls",
+   "label": "Vertical camera",
+   "at": [
+    "ini",
+    [
+     "Input",
+     "VerticalCamera"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Normal",
+     "Normal"
+    ],
+    [
+     "Reverse",
+     "Reverse"
+    ]
+   ],
+   "quote": true,
+   "def": "Normal"
+  },
+  {
+   "id": "vibration",
+   "tab": "Controls",
+   "label": "Vibration",
+   "at": [
+    "ini",
+    [
+     "Input",
+     "Vibration"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": true
+  },
+  {
+   "id": "allowBackgroundInput",
+   "tab": "Controls",
+   "label": "Allow background input",
+   "at": [
+    "ini",
+    [
+     "Input",
+     "AllowBackgroundInput"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": false
+  },
+  {
+   "id": "controllerIcons",
+   "tab": "Controls",
+   "label": "Controller icons",
+   "at": [
+    "ini",
+    [
+     "Input",
+     "ControllerIcons"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Auto",
+     "Auto"
+    ],
+    [
+     "Xbox",
+     "Xbox"
+    ],
+    [
+     "PlayStation",
+     "PlayStation"
+    ]
+   ],
+   "quote": true,
+   "def": "Auto"
+  },
+  {
+   "id": "masterVolume",
+   "tab": "Audio",
+   "label": "Master volume",
+   "at": [
+    "ini",
+    [
+     "Audio",
+     "MasterVolume"
+    ]
+   ],
+   "type": "number",
+   "num": {
+    "min": 0,
+    "max": 1
+   },
+   "def": 1.0
+  },
+  {
+   "id": "musicVolume",
+   "tab": "Audio",
+   "label": "Music volume",
+   "at": [
+    "ini",
+    [
+     "Audio",
+     "MusicVolume"
+    ]
+   ],
+   "type": "number",
+   "num": {
+    "min": 0,
+    "max": 1
+   },
+   "def": 1.0
+  },
+  {
+   "id": "effectsVolume",
+   "tab": "Audio",
+   "label": "Effects volume",
+   "at": [
+    "ini",
+    [
+     "Audio",
+     "EffectsVolume"
+    ]
+   ],
+   "type": "number",
+   "num": {
+    "min": 0,
+    "max": 1
+   },
+   "def": 1.0
+  },
+  {
+   "id": "channelConfiguration",
+   "tab": "Audio",
+   "label": "Channel configuration",
+   "at": [
+    "ini",
+    [
+     "Audio",
+     "ChannelConfiguration"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Stereo",
+     "Stereo"
+    ],
+    [
+     "Surround",
+     "Surround"
+    ]
+   ],
+   "quote": true,
+   "def": "Stereo"
+  },
+  {
+   "id": "musicAttenuation",
+   "tab": "Audio",
+   "label": "Music attenuation",
+   "at": [
+    "ini",
+    [
+     "Audio",
+     "MusicAttenuation"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": false
+  },
+  {
+   "id": "battleTheme",
+   "tab": "Audio",
+   "label": "Battle theme",
+   "at": [
+    "ini",
+    [
+     "Audio",
+     "BattleTheme"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": true
+  },
+  {
+   "id": "graphicsAPI",
+   "tab": "Video",
+   "label": "Graphics API",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "GraphicsAPI"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Auto",
+     "Auto"
+    ],
+    [
+     "D3D12",
+     "D3D12"
+    ],
+    [
+     "Vulkan",
+     "Vulkan"
+    ]
+   ],
+   "quote": true,
+   "def": "Auto"
+  },
+  {
+   "id": "aspectRatio",
+   "tab": "Video",
+   "label": "Aspect ratio",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "AspectRatio"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Auto",
+     "Auto"
+    ],
+    [
+     "16:9",
+     "16:9"
+    ],
+    [
+     "4:3",
+     "4:3"
+    ],
+    [
+     "Original 4:3",
+     "Original 4:3"
+    ]
+   ],
+   "quote": true,
+   "def": "Auto"
+  },
+  {
+   "id": "resolutionScale",
+   "tab": "Video",
+   "label": "Resolution scale",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "ResolutionScale"
+    ]
+   ],
+   "type": "number",
+   "num": {
+    "min": 0.25,
+    "max": 2
+   },
+   "def": 1.0
+  },
+  {
+   "id": "fullscreen",
+   "tab": "Video",
+   "label": "Fullscreen",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "Fullscreen"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": true
+  },
+  {
+   "id": "vSync",
+   "tab": "Video",
+   "label": "VSync",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "VSync"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": true
+  },
+  {
+   "id": "tripleBuffering",
+   "tab": "Video",
+   "label": "Triple buffering",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "TripleBuffering"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Auto",
+     "Auto"
+    ],
+    [
+     "On",
+     "On"
+    ],
+    [
+     "Off",
+     "Off"
+    ]
+   ],
+   "quote": true,
+   "def": "Auto"
+  },
+  {
+   "id": "fPS",
+   "tab": "Video",
+   "label": "Frame rate limit",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "FPS"
+    ]
+   ],
+   "type": "number",
+   "num": {
+    "min": 15,
+    "max": 240
+   },
+   "def": 60
+  },
+  {
+   "id": "showFPS",
+   "tab": "Video",
+   "label": "Show the FPS counter",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "ShowFPS"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": false
+  },
+  {
+   "id": "brightness",
+   "tab": "Video",
+   "label": "Brightness",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "Brightness"
+    ]
+   ],
+   "type": "number",
+   "num": {
+    "min": 0,
+    "max": 1
+   },
+   "def": 0.5
+  },
+  {
+   "id": "antiAliasing",
+   "tab": "Video",
+   "label": "Anti-aliasing",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "AntiAliasing"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "None",
+     "None"
+    ],
+    [
+     "2x MSAA",
+     "2x MSAA"
+    ],
+    [
+     "4x MSAA",
+     "4x MSAA"
+    ],
+    [
+     "8x MSAA",
+     "8x MSAA"
+    ]
+   ],
+   "quote": true,
+   "def": "4x MSAA"
+  },
+  {
+   "id": "transparencyAntiAliasing",
+   "tab": "Video",
+   "label": "Transparency anti-aliasing",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "TransparencyAntiAliasing"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": true
+  },
+  {
+   "id": "anisotropicFiltering",
+   "tab": "Video",
+   "label": "Anisotropic filtering",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "AnisotropicFiltering"
+    ]
+   ],
+   "type": "number",
+   "num": {
+    "min": 0,
+    "max": 16
+   },
+   "def": 16
+  },
+  {
+   "id": "shadowResolution",
+   "tab": "Video",
+   "label": "Shadow resolution",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "ShadowResolution"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Original",
+     "Original"
+    ],
+    [
+     "512",
+     "512"
+    ],
+    [
+     "1024",
+     "1024"
+    ],
+    [
+     "2048",
+     "2048"
+    ],
+    [
+     "4096",
+     "4096"
+    ],
+    [
+     "8192",
+     "8192"
+    ]
+   ],
+   "quote": true,
+   "def": "4096"
+  },
+  {
+   "id": "gITextureFiltering",
+   "tab": "Video",
+   "label": "GI texture filtering",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "GITextureFiltering"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Bilinear",
+     "Bilinear"
+    ],
+    [
+     "Bicubic",
+     "Bicubic"
+    ]
+   ],
+   "quote": true,
+   "def": "Bicubic"
+  },
+  {
+   "id": "depthOfFieldQuality",
+   "tab": "Video",
+   "label": "Depth of field quality",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "DepthOfFieldQuality"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Auto",
+     "Auto"
+    ],
+    [
+     "Low",
+     "Low"
+    ],
+    [
+     "Medium",
+     "Medium"
+    ],
+    [
+     "High",
+     "High"
+    ],
+    [
+     "Ultra",
+     "Ultra"
+    ]
+   ],
+   "quote": true,
+   "def": "Auto"
+  },
+  {
+   "id": "motionBlur",
+   "tab": "Video",
+   "label": "Motion blur",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "MotionBlur"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Off",
+     "Off"
+    ],
+    [
+     "Original",
+     "Original"
+    ],
+    [
+     "Enhanced",
+     "Enhanced"
+    ]
+   ],
+   "quote": true,
+   "def": "Original"
+  },
+  {
+   "id": "xboxColorCorrection",
+   "tab": "Video",
+   "label": "Xbox colour correction",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "XboxColorCorrection"
+    ]
+   ],
+   "type": "bool",
+   "word": true,
+   "def": false
+  },
+  {
+   "id": "cutsceneAspectRatio",
+   "tab": "Video",
+   "label": "Cutscene aspect ratio",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "CutsceneAspectRatio"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Original",
+     "Original"
+    ],
+    [
+     "Unlocked",
+     "Unlocked"
+    ]
+   ],
+   "quote": true,
+   "def": "Original"
+  },
+  {
+   "id": "uIAlignmentMode",
+   "tab": "Video",
+   "label": "HUD alignment",
+   "at": [
+    "ini",
+    [
+     "Video",
+     "UIAlignmentMode"
+    ]
+   ],
+   "type": "choice",
+   "options": [
+    [
+     "Edge",
+     "Edge"
+    ],
+    [
+     "Centre",
+     "Centre"
+    ]
+   ],
+   "quote": true,
+   "def": "Edge"
+  }
+ ],
+ "saves": {
+  "linux": [
+   "{home}/.config/UnleashedRecomp/save"
+  ],
+  "windows": [
+   "{appdata}/UnleashedRecomp/save"
+  ]
+ },
+ "achievements": {
+  "format": "hedge",
+  "user": "UnleashedRecomp",
+  "file": "ACH-DATA"
+ },
+ "known": {
+  "app": [],
+  "ini": [
+   "Bindings/*",
+   "Codes/*",
+   "Update/*",
+   "Video/WindowX",
+   "Video/WindowY",
+   "Video/WindowWidth",
+   "Video/WindowHeight",
+   "Video/WindowState",
+   "Video/WindowSize",
+   "Video/Monitor",
+   "Video/GraphicsDevice",
+   "Video/MaxFrameLatency",
+   "System/ShowConsole"
+  ]
+ },
+ "rev": 1
+}

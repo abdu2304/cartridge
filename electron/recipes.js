@@ -42,6 +42,8 @@ function validate(r) {
   if (!/^github:[\w.-]+\/[\w.-]+$/.test(r.repo || '')) bad.push('repo');
   if (!r.game?.console || !r.game?.title) bad.push('game');
   if (r.game?.kind && !['folder', 'folder-or-pkg', 'file', 'none'].includes(r.game.kind)) bad.push('game kind');
+  if (r.game?.unpack && r.game.unpack !== 'xiso') bad.push('game unpack');
+  if (r.game?.keep && !(Array.isArray(r.game.keep) && r.game.keep.every((k) => /^[\w.-]+$/.test(k) && !/^\.\.?$/.test(k)))) bad.push('game keep');
   if (r.game?.alsoOn && !(Array.isArray(r.game.alsoOn) && r.game.alsoOn.every((c) => /^[a-z0-9]+$/.test(c)))) bad.push('game alsoOn');
   if (r.game?.kind === 'file' && !(Array.isArray(r.game.ext) && r.game.ext.length && r.game.ext.every((e) => /^\.[\w.]+$/.test(e)))) bad.push('game ext');
   if (r.game?.sha1 && !(Array.isArray(r.game.sha1) && r.game.sha1.every((h) => /^[0-9a-f]{40}$/.test(h)))) bad.push('game sha1');
@@ -54,13 +56,15 @@ function validate(r) {
     if (!['linux', 'windows'].includes(b.os)) bad.push(`build os ${b.os}`);
     try { new RegExp(b.asset); } catch { bad.push(`build asset ${b.asset}`); }
     if (!b.program || /[/\\]\.\.|^\//.test(b.program)) bad.push(`build program ${b.program}`);
-    for (const [k, f] of Object.entries(b.files || {})) if (!['app', 'ini', 'list'].includes(k) || !(k === 'list' ? f.format === 'lines' : ['json', 'flat', 'ini'].includes(f.format)) || !/^\{(dir|config|data|appdata)\}\//.test(f.path || '')) bad.push(`build file ${k}`);
+    for (const [k, f] of Object.entries(b.files || {})) if (!['app', 'ini', 'list'].includes(k) || !(k === 'list' ? f.format === 'lines' : ['json', 'flat', 'ini'].includes(f.format)) || !/^\{(dir|home|config|data|appdata)\}\//.test(f.path || '')) bad.push(`build file ${k}`);
+    if (b.prepare && !(Array.isArray(b.prepare.cmd) && b.prepare.cmd.length && typeof b.prepare.done === 'string' && /^\{(dir|home|config|data|appdata)\}\//.test(b.prepare.done))) bad.push('build prepare');
     if (b.first && !(typeof b.first.unless === 'string' && /^\{(dir|home|config|data|appdata)\}\//.test(b.first.unless) && Array.isArray(b.first.args))) bad.push('build first');
   }
   if (r.achievements) {
     const a = r.achievements;
     for (const f of a.files || []) if (!/^\{(dir|config|data|appdata)\}\//.test(f)) bad.push(`achievements file ${f}`);
-    if (a.format && !['ps4', 'keyed'].includes(a.format)) bad.push('achievements format');
+    if (a.format && !['ps4', 'keyed', 'hedge'].includes(a.format)) bad.push('achievements format');
+    if (a.format === 'hedge' && !(/^[\w.-]+$/.test(a.user || '') && /^[\w.-]+$/.test(a.file || ''))) bad.push('achievements hedge');
     for (const t of a.list || []) if (!Array.isArray(t) || !(a.format === 'keyed' ? typeof t[0] === 'string' && t[0] : Number.isInteger(t[0])) || !t[1] || !(a.format === 'keyed' ? t[3] == null || ['P', 'G', 'S', 'B'].includes(t[3]) : ['P', 'G', 'S', 'B'].includes(t[3]))) bad.push(`achievements list ${t?.[0]}`);
   }
   if (r.known && !(['app', 'ini'].every((k) => r.known[k] == null || (Array.isArray(r.known[k]) && r.known[k].every((x) => typeof x === 'string'))))) bad.push('known');
@@ -69,7 +73,7 @@ function validate(r) {
     if (!s.id || ids.has(s.id)) bad.push(`setting id ${s.id}`); ids.add(s.id);
     if (!TYPES.has(s.type)) bad.push(`setting ${s.id} type`);
     if (s.type === 'choice' && !(s.options || []).some(([v]) => String(v) === String(s.def))) bad.push(`setting ${s.id} default not a choice`);
-    if (!Array.isArray(s.at) || !['app', 'ini', 'list'].includes(s.at[0])) bad.push(`setting ${s.id} at`);
+    if (!Array.isArray(s.at) || !['app', 'ini', 'list', 'env'].includes(s.at[0]) || (s.at[0] === 'env' && !/^[A-Z_][A-Z0-9_]*$/.test(s.at[1] || ''))) bad.push(`setting ${s.id} at`);
   }
   return bad;
 }
@@ -225,7 +229,12 @@ function render(r, build, rec, values, { read = () => null, home, env, sets = se
     const fmt = iniAt.format === 'flat' ? flat : F.ini;
     // 0.9.91: values written every time, as r.app is for JSON (DRIVECLUB's launcher.ini: update= and base=, your copy)
     for (const [k, x] of Object.entries(r.ini || {})) text = fmt.set(text, k.split('/'), typeof x === 'string' ? expand(x, v) : String(x));
-    for (const s of sets.filter((x) => x.at[0] === 'ini')) text = fmt.set(text, Array.isArray(s.at[1]) ? s.at[1] : [s.at[1]], typed(s, values[s.id], 'ini'));
+    // a sparse ini (Wind Waker HD's settings.ini: it reads only the keys it finds) gets only what you changed
+    for (const s of sets.filter((x) => x.at[0] === 'ini')) {
+      const at = Array.isArray(s.at[1]) ? s.at[1] : [s.at[1]];
+      if (iniAt.sparse && saved && iniAt.format === 'flat') text = saved[s.id] != null ? fmt.set(text, at, typed(s, saved[s.id], 'ini')) : flat.del(text, at);
+      else text = fmt.set(text, at, typed(s, values[s.id], 'ini'));
+    }
     files.push({ path: p, text });
   }
   const listAt = build.files?.list;
@@ -249,6 +258,7 @@ function render(r, build, rec, values, { read = () => null, home, env, sets = se
       files.push({ path: staged, text: JSON.stringify(json, null, 2) + '\n' });
       st.copy = { from: staged, to: target };
     }
+    st.envValues = Object.fromEntries(sets.filter((x) => x.at[0] === 'env').map((x) => [x.at[1], x.type === 'bool' ? (values[x.id] === true || values[x.id] === 'true' ? '1' : null) : values[x.id]]));
     st.script = path.join(rec.dir, '.cartridge', plays.length > 1 ? `play-${pl.id}.sh` : 'play.sh');
     starts.push(st);
   }
@@ -257,6 +267,11 @@ function render(r, build, rec, values, { read = () => null, home, env, sets = se
 // flat "key=value" files (bbport.ini, gow3.ini): a key rewritten in place, a missing one added at the end
 const flat = {
   get(text, [key]) { const m = new RegExp(`^\\s*${esc(key)}\\s*=(.*)$`, 'm').exec(String(text || '')); return m ? m[1].trim() : undefined; },
+  del(text, [key]) {
+    const nl = /\r\n/.test(text || '') ? '\r\n' : '\n', ls = String(text || '').split(/\r?\n/).filter((l) => /^\s*[#;]/.test(l) || !l.includes('=') || l.slice(0, l.indexOf('=')).trim() !== key);
+    if (ls.length && ls[ls.length - 1] === '') ls.pop();
+    return ls.length ? ls.join(nl) + nl : '';
+  },
   set(text, [key], value) {
     const nl = /\r\n/.test(text || '') ? '\r\n' : '\n', ls = String(text || '').split(/\r?\n/);
     if (ls.length && ls[ls.length - 1] === '') ls.pop();
@@ -324,8 +339,8 @@ function appLeaves(o, build) {
 function discovered(r, build, files) {
   if (!r.known) return [];
   const sets = settingsFor(r, build), out = [], seenSet = new Set([...(r.known.app || []), ...(r.known.ini || []).map((k) => 'ini:' + k)]);
-  // a known name ending in .* covers everything under it (Ship of Harkinian's controller mappings, window state)
-  const wild = [...seenSet].filter((k) => k.endsWith('.*')).map((k) => k.slice(0, -1));
+  // a known name ending in * covers every name it starts (Ship of Harkinian's controller mappings, window state)
+  const wild = [...seenSet].filter((k) => k.endsWith('*')).map((k) => k.slice(0, -1));
   const seen = { has: (k) => seenSet.has(k) || wild.some((w) => k.startsWith(w) || ('ini:' + k).startsWith(w)) };
   const knownApp = new Set([...sets.filter((s) => s.at[0] === 'app').map((s) => keyName(s.at[1])), ...Object.keys(r.app || {}), ...(r.play || []).flatMap((pl) => Object.keys(pl.app || {}))]);
   const knownIni = new Set([...Object.keys(r.ini || {}), ...sets.filter((s) => s.at[0] === 'ini').map((s) => iniKey(build.files?.ini?.format === 'flat' ? [].concat(s.at[1]).slice(-1) : s.at[1]))]);
@@ -369,6 +384,9 @@ function script(r, build, rec, start, runner, vars, { env = {} } = {}) {
   const L = ['#!/bin/sh', `# Cartridge's start for ${start.name}. Its settings are changed in Cartridge, which writes this file again.`];
   if (start.copy) L.push(`mkdir -p ${q(path.dirname(start.copy.to))} && cp -f ${q(start.copy.from)} ${q(start.copy.to)}`);
   for (const [k, x] of Object.entries({ ...(r.env || {}), ...env })) if (/^[A-Z_][A-Z0-9_]*$/.test(k)) L.push(`export ${k}=${q(expand(x, vars))}`);
+  // 0.9.91: settings the port reads from its environment (JSRF Unleashed's RECOMP_FULLSCREEN): a toggle is set to 1
+  // when on and left out when off; anything else is set to its value
+  for (const [k, x] of Object.entries(start.envValues || {})) if (/^[A-Z_][A-Z0-9_]*$/.test(k) && x != null && x !== '') L.push(`export ${k}=${q(String(x))}`);
   L.push(`cd ${q(path.dirname(program))}`);
   // 0.9.91: arguments for the first start only (Ship of Harkinian: the ROM, until it has made oot.o2r from it)
   if (build.first) L.push(`[ -e ${q(expand(build.first.unless, vars))} ] || set -- ${build.first.args.map((a) => q(expand(a, vars))).join(' ')} "$@"`);
@@ -398,6 +416,8 @@ const outputLog = (rec) => path.join(rec.dir, '.cartridge', 'output.log');
 function achievementsOf(r, build, rec, vars) {
   const a = r.achievements;
   if (!a || !rec?.dir) return null;
+  // 0.9.91: hedge (Unleashed Recompiled's save/ACH-DATA), found where the port keeps its user folder (recompAchievements.locate)
+  if (a.format === 'hedge') return { format: 'hedge', user: a.user, file: a.file };
   return { format: a.format === 'keyed' ? 'keyed' : 'ps4', files: [...(a.files || []).map((f) => expand(f, vars)), ...(a.output ? [outputLog(rec)] : [])], list: a.list || null, game: rec.game?.path || null };
 }
 // the Steam runtime a runner starts Proton in (0.9.86 'runtime'; 0.9.70 to 0.9.85 called it 'sniper')
@@ -453,6 +473,8 @@ function findDir(dir, find) {
 function pickGameFile(g, dir) {
   const ok = (n) => (g.ext || []).some((e) => n.toLowerCase().endsWith(e.toLowerCase()));
   let st; try { st = fs.statSync(dir); } catch { return { problems: ['That isn’t there any more.'] }; }
+  // a game that can also be its unpacked files (an extracted Xbox disc): a folder that holds them is used as it is
+  if (st.isDirectory() && g.unpack && g.has?.length && g.has.every((f) => fs.existsSync(path.join(dir, f)))) return { folder: dir };
   if (st.isFile()) return ok(dir) ? { file: dir } : { problems: [`It needs ${g.ext.join(', ')}; that’s a ${path.extname(dir) || 'file with no ending'}.`] };
   let names = []; try { names = fs.readdirSync(dir).filter((n) => ok(n) && fs.statSync(path.join(dir, n)).isFile()).sort(); } catch {}
   if (!names.length) return { problems: [`There’s no ${g.ext.join(', ')} in it.`] };
@@ -471,6 +493,7 @@ function checkGame(r, dir, { sfo } = {}) {
   if (g.kind === 'file') {
     const p = pickGameFile(g, dir);
     if (p.problems) return { ok: false, problems: p.problems, notes: [] };
+    if (p.folder) { out.folder = p.folder; return out; }
     out.file = p.file;
     const h = sha1Ok(g, p.file);
     if (h === false) { if (g.soft) out.notes.push(g.why || `It isn’t one of the copies ${r.name} was tested with.`); else return { ok: false, problems: [g.why || `It isn’t a copy ${r.name} accepts.`], notes: [] }; }

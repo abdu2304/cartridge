@@ -1099,7 +1099,22 @@ function createRecomps(ctx) {
     // 0.9.91: a port that needs no game files (a fan remake) is set up with nothing picked
     if (r.game?.kind === 'none') dir = rec?.dir || dir;
     const chk = RC.checkGame(r, dir, { sfo });
-    let use = chk.file || dir, update = null;
+    let use = chk.file || chk.folder || dir, update = null;
+    // 0.9.91: game.unpack 'xiso', a port that plays from the game's files (JSRF Unleashed): an Xbox disc image is
+    // unpacked once into the port's folder (Cartridge's own reader, electron/xiso.js), again only when the copy changes
+    if (chk.ok && chk.file && r.game.unpack === 'xiso') {
+      if (!rec) return { ok: true, check: chk, notInstalled: true };
+      const dest = path.join(rec.dir, '.cartridge', 'disc');
+      const has = (d) => (r.game.has || []).every((f) => exists(path.join(d, f)));
+      if (!(rec.game?.source === chk.file && has(dest))) {
+        onProgress({ step: 'unpack', pct: 0 });
+        let last = 0;
+        await require('./xiso').unpack(chk.file, dest, { keep: r.game.keep || [], onProgress: (got, want) => { if (got - last > 64e6 || got === want) { last = got; onProgress({ step: 'unpack', got, want, pct: want ? Math.floor((got / want) * 100) : null }); } } });
+        log('verified disc unpacked', id, chk.file);
+      }
+      if (!has(dest)) return { ok: false, why: `${r.name} needs ${(r.game.has || []).join(' and ')} from the disc, and the unpacked disc doesn’t have them. Is it the right game?` };
+      use = dest;
+    }
     if (!chk.ok && chk.needsUpdate) {
       const u = RC.findUpdate(r, dir, candidates, { sfo });
       if (!u || RC.verCmp(u.version, chk.needsUpdate) < 0) return { ok: false, problems: chk.problems, needsUpdate: chk.needsUpdate, why: `${r.name} needs update ${chk.needsUpdate}. ${u ? `The update on this device is ${u.version}.` : 'Pick the update’s folder (its dump, with sce_sys inside), or put it beside the game.'}` };
@@ -1112,7 +1127,7 @@ function createRecomps(ctx) {
       chk.notes.push(`Update ${u.version} is laid over it (links, nothing copied).`);
     } else if (!chk.ok) return { ok: false, problems: chk.problems, why: chk.problems.join(' ') };
     if (!rec) return { ok: true, check: chk, notInstalled: true };
-    rec.game = { path: use, source: dir, update: update?.dir || null, id: chk.id || null, version: update?.version || chk.version || null, notes: chk.notes, at: Date.now() };
+    rec.game = { path: use, source: chk.file || chk.folder || dir, update: update?.dir || null, id: chk.id || null, version: update?.version || chk.version || null, notes: chk.notes, at: Date.now() };
     saveInstalls();
     const done = await configure(id, { onProgress });
     return { ok: true, notes: chk.notes, ...done };
@@ -1207,6 +1222,22 @@ function createRecomps(ctx) {
       if (!/^PASS\b/.test(res)) throw new Error(`${r.name}’s installer didn’t finish: ${(res.split('\n').find((l) => l.trim()) || 'it gave no answer').slice(0, 200)}`);
       rec.installedTag = rec.tag; rec.installedFrom = rec.game.path; rec.installNotes = res.split('\n').filter((l) => /^note:/.test(l)).map((l) => l.slice(5).trim());
       saveInstalls();
+    }
+    // 0.9.91: build.prepare, a step the port's own release runs with your copy before it can start (Wind Waker HD's
+    // setup.py: extracts the game, translates its code to C and compiles it, a few minutes). Again when the copy
+    // changes or its done file has gone.
+    if (build.prepare) {
+      const pv = { ...vars, game: rec.game.path, gamePosix: rec.game.path }, done = RC.expand(build.prepare.done, pv);
+      if (rec.preparedFrom !== rec.game.path || rec.preparedTag !== rec.tag || !exists(done)) {
+        if (!ctx.runProgram) throw new Error(`${r.name} needs its own setup run, and Cartridge can’t run programs here.`);
+        onProgress({ step: 'prepare', pct: null });
+        const [cmd, ...args] = build.prepare.cmd.map((a) => RC.expand(a, pv));
+        const t0 = Date.now();
+        await ctx.runProgram(cmd, args, { cwd: rec.dir, timeoutMs: 90 * 60e3, prepareDone: done }); // prepareDone: what the install test stands in for
+        if (!exists(done)) throw new Error(`${r.name}’s own setup ran but didn’t finish (${path.basename(done)} wasn’t made). Its log is in ${rec.dir}.`);
+        log('verified prepared', id, `${Math.round((Date.now() - t0) / 1000)} s`);
+        rec.preparedFrom = rec.game.path; rec.preparedTag = rec.tag; saveInstalls();
+      }
     }
     // a Windows build: Cartridge's own Proton prefix, made by Proton itself before settings go into it
     if (build.os === 'windows' && !exists(path.join(vars.prefix, 'pfx', 'drive_c'))) {

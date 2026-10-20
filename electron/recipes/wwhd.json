@@ -1,0 +1,391 @@
+{
+ "schema": 1,
+ "id": "wwhd",
+ "name": "Wind Waker HD Recomp",
+ "by": "The ZeldaWWHDRecomp team",
+ "repo": "github:ZeldaWWHDRecomp/ZeldaWWHDRecomp",
+ "licence": "MPL-2.0",
+ "about": "The Wii U Wind Waker HD as a native program: its code translated to C and built on your PC from your own copy (the first setup takes a few minutes and downloads a compiler), then 60 to 240 FPS, up to 4K, widescreen and ultrawide, mods. Settings change in the game’s F1 menu too.",
+ "verified": {
+  "on": "2026-10-20",
+  "release": "v0.3.0",
+  "played": false
+ },
+ "game": {
+  "console": "wiiu",
+  "title": "The Legend of Zelda: The Wind Waker HD",
+  "also": [
+   "The Wind Waker HD",
+   "Zelda: The Wind Waker HD"
+  ],
+  "ids": [
+   "00050000-10143500",
+   "00050000-10143600"
+  ],
+  "kind": "file",
+  "ext": [
+   ".wua",
+   ".wux",
+   ".wud"
+  ],
+  "why": "Your own copy of the US or European game, version 0: a Cemu archive (.wua, no keys needed) or a disc image (.wux, .wud) with its .key file and common.key beside it."
+ },
+ "builds": [
+  {
+   "os": "linux",
+   "asset": "^WindWakerHD-v[\\d.]+-linux-x86_64\\.zip$",
+   "program": "wind-waker-hd",
+   "args": [],
+   "prepare": {
+    "cmd": [
+     "/bin/sh",
+     "{dir}/tools/setup-in-terminal.sh",
+     "--image",
+     "{gamePosix}",
+     "--yes",
+     "--no-launch",
+     "--no-shortcuts",
+     "--code-mods",
+     "0"
+    ],
+    "done": "{dir}/data/bin/wwhd"
+   },
+   "files": {
+    "ini": {
+     "path": "{dir}/data/user/settings.ini",
+     "format": "flat",
+     "sparse": true
+    }
+   }
+  }
+ ],
+ "settings": [
+  {
+   "id": "fps60",
+   "tab": "Graphics",
+   "label": "Frame rate",
+   "type": "choice",
+   "at": [
+    "ini",
+    "fps60"
+   ],
+   "options": [
+    [
+     "0",
+     "30 FPS (original)"
+    ],
+    [
+     "1",
+     "Interpolated (set below)"
+    ],
+    [
+     "2",
+     "True 60 (experimental)"
+    ]
+   ],
+   "desc": "Interpolated adds frames between the game’s own; True 60 runs the game logic at 60 steps a second.",
+   "def": "0"
+  },
+  {
+   "id": "interp_fps",
+   "tab": "Graphics",
+   "label": "Interpolated frame rate",
+   "type": "choice",
+   "at": [
+    "ini",
+    "interpFps"
+   ],
+   "options": [
+    [
+     "60",
+     "60 FPS"
+    ],
+    [
+     "120",
+     "120 FPS"
+    ],
+    [
+     "240",
+     "240 FPS"
+    ]
+   ],
+   "desc": "Needs a display that fast to show them all.",
+   "def": "60"
+  },
+  {
+   "id": "paced",
+   "tab": "Graphics",
+   "label": "Keep game speed at 60 FPS",
+   "type": "bool",
+   "at": [
+    "ini",
+    "fps60Paced"
+   ],
+   "desc": "When the computer can’t draw every frame, in-between frames are skipped instead of the whole game slowing down.",
+   "def": false
+  },
+  {
+   "id": "res",
+   "tab": "Graphics",
+   "label": "Internal resolution",
+   "type": "choice",
+   "at": [
+    "ini",
+    "resScale"
+   ],
+   "options": [
+    [
+     "1",
+     "1x (1280x720)"
+    ],
+    [
+     "1.5",
+     "1.5x (1920x1080)"
+    ],
+    [
+     "2",
+     "2x (2560x1440)"
+    ],
+    [
+     "3",
+     "3x (3840x2160)"
+    ]
+   ],
+   "def": "1"
+  },
+  {
+   "id": "aspect",
+   "tab": "Graphics",
+   "label": "Aspect ratio",
+   "type": "choice",
+   "at": [
+    "ini",
+    "aspectMode"
+   ],
+   "options": [
+    [
+     "0",
+     "16:9 (original)"
+    ],
+    [
+     "1",
+     "Match window"
+    ],
+    [
+     "2",
+     "16:10"
+    ],
+    [
+     "3",
+     "21:9"
+    ],
+    [
+     "4",
+     "32:9"
+    ]
+   ],
+   "def": "0"
+  },
+  {
+   "id": "present",
+   "tab": "Graphics",
+   "label": "Presentation",
+   "type": "choice",
+   "at": [
+    "ini",
+    "vkPresentMode"
+   ],
+   "options": [
+    [
+     "0",
+     "Vsync (smooth)"
+    ],
+    [
+     "1",
+     "Low latency"
+    ],
+    [
+     "2",
+     "Off (may tear)"
+    ]
+   ],
+   "def": "0"
+  },
+  {
+   "id": "full",
+   "tab": "Display",
+   "label": "Full screen",
+   "type": "bool",
+   "at": [
+    "ini",
+    "tvFullScreen"
+   ],
+   "def": false
+  },
+  {
+   "id": "perf",
+   "tab": "Display",
+   "label": "Performance overlay (FPS, frame time)",
+   "type": "bool",
+   "at": [
+    "ini",
+    "perfOverlay"
+   ],
+   "def": false
+  },
+  {
+   "id": "bloom",
+   "tab": "Effects",
+   "label": "Bloom strength",
+   "type": "number",
+   "at": [
+    "ini",
+    "bloomStrength"
+   ],
+   "num": {
+    "min": 0,
+    "max": 2,
+    "unit": "x"
+   },
+   "desc": "Glow around bright areas: 1 is the original game, 0 turns it off.",
+   "def": 1
+  },
+  {
+   "id": "ao",
+   "tab": "Effects",
+   "label": "Ambient occlusion",
+   "type": "choice",
+   "at": [
+    "ini",
+    "aoMode"
+   ],
+   "options": [
+    [
+     "0",
+     "Original"
+    ],
+    [
+     "1",
+     "Centre fix"
+    ],
+    [
+     "2",
+     "Centre and noise fix"
+    ]
+   ],
+   "def": "0"
+  },
+  {
+   "id": "ao_hires",
+   "tab": "Effects",
+   "label": "Full-size occlusion depth",
+   "type": "bool",
+   "at": [
+    "ini",
+    "aoHires"
+   ],
+   "def": false
+  },
+  {
+   "id": "aniso",
+   "tab": "Effects",
+   "label": "16x anisotropic filtering",
+   "type": "bool",
+   "at": [
+    "ini",
+    "aniso"
+   ],
+   "def": false
+  },
+  {
+   "id": "fxaa",
+   "tab": "Effects",
+   "label": "Edge smoothing (FXAA)",
+   "type": "bool",
+   "at": [
+    "ini",
+    "fxaa"
+   ],
+   "def": false
+  },
+  {
+   "id": "speakers",
+   "tab": "Audio",
+   "label": "Speakers",
+   "type": "choice",
+   "at": [
+    "ini",
+    "audioSpeakers"
+   ],
+   "options": [
+    [
+     "0",
+     "Stereo"
+    ],
+    [
+     "1",
+     "Surround 5.1"
+    ]
+   ],
+   "def": "0"
+  },
+  {
+   "id": "rumble",
+   "tab": "Controls",
+   "label": "Rumble",
+   "type": "bool",
+   "at": [
+    "ini",
+    "rumble"
+   ],
+   "def": true
+  },
+  {
+   "id": "pro",
+   "tab": "Controls",
+   "label": "Play with a Pro Controller (GamePad screen hidden)",
+   "type": "bool",
+   "at": [
+    "ini",
+    "proController"
+   ],
+   "def": false
+  }
+ ],
+ "saves": [
+  "{dir}/data/save"
+ ],
+ "known": {
+  "app": [],
+  "ini": [
+   "drcMode",
+   "pipCorner",
+   "pipSize",
+   "pipOpacity",
+   "vkDevice",
+   "logFile",
+   "language",
+   "language_region",
+   "uiSize",
+   "gameplayFovScale",
+   "fpsHighPaced",
+   "scaleFilter",
+   "audioVolume",
+   "hdrEnabled",
+   "hdrPaperWhite",
+   "hdrPeak",
+   "hdrExposure",
+   "hdrHighlights",
+   "hdrMenuWhite",
+   "stereoMode",
+   "stereoDepth",
+   "stereoConvergence",
+   "stereoSwap",
+   "screenshotGamePad",
+   "touchButtons",
+   "touchControls",
+   "mod.*"
+  ]
+ },
+ "rev": 1
+}
