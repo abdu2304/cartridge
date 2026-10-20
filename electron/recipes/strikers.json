@@ -28,9 +28,18 @@
    ".gcm",
    ".ciso",
    ".gcz",
-   ".nkit.iso"
+   ".nkit.iso",
+   ".rvz",
+   ".wia"
   ],
-  "why": "Your own Super Mario Strikers (or Mario Smash Football) disc image: US, European or Japanese."
+  "why": "Your own Super Mario Strikers (or Mario Smash Football) disc image: US, European or Japanese.",
+  "convert": {
+   "from": [
+    ".rvz",
+    ".wia"
+   ],
+   "reads": "ISO, GCM, CISO or GCZ"
+  }
  },
  "builds": [
   {

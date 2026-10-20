@@ -43,6 +43,7 @@ function validate(r) {
   if (!r.game?.console || !r.game?.title) bad.push('game');
   if (r.game?.kind && !['folder', 'folder-or-pkg', 'file', 'none'].includes(r.game.kind)) bad.push('game kind');
   if (r.game?.unpack && r.game.unpack !== 'xiso') bad.push('game unpack');
+  if (r.game?.convert && !(Array.isArray(r.game.convert.from) && r.game.convert.from.every((e) => /^\.[\w]+$/.test(e)) && r.game.convert.from.every((e) => (r.game.ext || []).includes(e)))) bad.push('game convert');
   if (r.game?.keep && !(Array.isArray(r.game.keep) && r.game.keep.every((k) => /^[\w.-]+$/.test(k) && !/^\.\.?$/.test(k)))) bad.push('game keep');
   if (r.game?.alsoOn && !(Array.isArray(r.game.alsoOn) && r.game.alsoOn.every((c) => /^[a-z0-9]+$/.test(c)))) bad.push('game alsoOn');
   if (r.game?.kind === 'file' && !(Array.isArray(r.game.ext) && r.game.ext.length && r.game.ext.every((e) => /^\.[\w.]+$/.test(e)))) bad.push('game ext');

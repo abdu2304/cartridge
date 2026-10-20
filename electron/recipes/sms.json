@@ -21,9 +21,18 @@
   "ext": [
    ".iso",
    ".gcm",
-   ".ciso"
+   ".ciso",
+   ".rvz",
+   ".wia"
   ],
-  "why": "Your own North American Super Mario Sunshine disc (GMSE01, the first release) as an ISO, GCM or CISO; Dolphin converts an RVZ to ISO."
+  "why": "Your own North American Super Mario Sunshine disc (GMSE01, the first release) as an ISO, GCM or CISO; Dolphin converts an RVZ to ISO.",
+  "convert": {
+   "from": [
+    ".rvz",
+    ".wia"
+   ],
+   "reads": "ISO, GCM or CISO"
+  }
  },
  "builds": [
   {

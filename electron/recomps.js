@@ -1100,6 +1100,25 @@ function createRecomps(ctx) {
     if (r.game?.kind === 'none') dir = rec?.dir || dir;
     const chk = RC.checkGame(r, dir, { sfo });
     let use = chk.file || chk.folder || dir, update = null;
+    // 0.9.91: game.convert, a port that reads ISO only (Strikers, SMS Launcher) and a copy kept as RVZ or WIA, Dolphin's
+    // own formats: made into an ISO once with Dolphin's dolphin-tool, in the port's folder, again only when the copy changes
+    if (chk.ok && chk.file && r.game.convert && r.game.convert.from.some((x) => chk.file.toLowerCase().endsWith(x))) {
+      if (!rec) return { ok: true, check: chk, notInstalled: true };
+      const dest = path.join(rec.dir, '.cartridge', 'disc.iso');
+      if (!(rec.game?.source === chk.file && exists(dest))) {
+        const tool = ctx.dolphinTool ? ctx.dolphinTool() : null;
+        if (!tool) return { ok: false, why: `${r.name} reads ${r.game.convert.reads || 'ISO'} files, and your copy is ${path.extname(chk.file).slice(1).toUpperCase()}. Install Dolphin (Get Emulators) and Cartridge converts it for you, or convert it in Dolphin: right-click the game, Convert File, ISO.` };
+        onProgress({ step: 'convert', pct: null });
+        const part = path.join(rec.dir, '.cartridge', 'disc.part.iso'); // dolphin-tool won't write a name not ending in .iso
+        fs.mkdirSync(path.dirname(part), { recursive: true }); fs.rmSync(part, { force: true });
+        const [cmd, ...pre] = tool;
+        await ctx.runProgram(cmd, [...pre, 'convert', '-i', chk.file, '-o', part, '-f', 'iso'], { cwd: rec.dir, timeoutMs: 60 * 60e3 });
+        if (!exists(part)) return { ok: false, why: `Dolphin couldn’t convert your copy of ${r.game.title} to an ISO.` };
+        fs.renameSync(part, dest);
+        log('verified disc converted', id, chk.file);
+      }
+      use = dest;
+    }
     // 0.9.91: game.unpack 'xiso', a port that plays from the game's files (JSRF Unleashed): an Xbox disc image is
     // unpacked once into the port's folder (Cartridge's own reader, electron/xiso.js), again only when the copy changes
     if (chk.ok && chk.file && r.game.unpack === 'xiso') {

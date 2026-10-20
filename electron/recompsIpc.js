@@ -49,6 +49,13 @@ module.exports = function recompsIpc(m) {
       unpackTo: (archive, dir) => unpackTo(archive, dir),
       appImageType: (f) => D.appImageType(f), isElf: (f) => D.isElf(f),
       isRunning: (f) => progRunning(f),
+      // 0.9.91: Dolphin's dolphin-tool, for a port that reads ISO only and a copy kept as RVZ: on PATH, else in Dolphin's Flatpak
+      dolphinTool: () => {
+        const cp = require('child_process');
+        for (const n of ['dolphin-tool', 'DolphinTool']) { const r = cp.spawnSync('sh', ['-c', `command -v ${n}`], { encoding: 'utf8' }); if (r.status === 0 && r.stdout.trim()) return [r.stdout.trim()]; }
+        for (const user of [true, false]) { const r = cp.spawnSync('flatpak', ['info', ...(user ? ['--user'] : ['--system']), 'org.DolphinEmu.dolphin-emu'], { encoding: 'utf8' }); if (r.status === 0) return ['flatpak', 'run', '--command=dolphin-tool', 'org.DolphinEmu.dolphin-emu']; }
+        return null;
+      },
       playing: () => !!(m.gameFocus.away || m.runOn),
       trash: (p) => toTrash(p),
       // 0.9.66: the new release of an update started once, for a few seconds, then closed. It fails only when it can't
