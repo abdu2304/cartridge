@@ -63,7 +63,7 @@
               <button v-if="pkgBusy" class="btn xl" data-focus data-autofocus @click="cancelPkg"><Icon name="mdiLoading" class="spin" :size="22" />{{ pkgProg?.opens ? `Close ${emuName} to finish` : `Installing in ${emuName}` }}{{ pkgPct != null ? ` · ${pkgPct}%` : '' }}{{ pkgProg?.of > 1 ? ` · ${pkgProg.step} of ${pkgProg.of}` : '' }}</button>
               <button v-else-if="needsInstall" class="btn primary xl" data-focus data-autofocus @click="installPkg"><Icon name="mdiPackageDown" :size="22" />Install in {{ emuName }}</button>
               <button v-else-if="pkg?.licenceMissing?.length" class="btn primary xl" data-focus data-autofocus @click="addLicence"><Icon name="mdiKeyOutline" :size="22" />Get licence (.rap)</button>
-              <button v-else class="btn primary ok xl" data-focus data-autofocus @click="playNow"><Icon name="mdiCheckCircle" />Ready to play</button>
+              <button v-else class="btn primary ok xl" data-focus data-autofocus @click="playNow()"><Icon name="mdiCheckCircle" />Ready to play</button>
               <!-- Re-download and Delete live in More → Options (owner, 0.9.16); the ring shows while deleting -->
               <button v-if="deleting != null" class="btn danger icon-btn" data-focus disabled><Ring :pct="deleting" :size="22" /><span>Deleting</span></button>
             </template>
@@ -653,6 +653,7 @@ async function more() {
     play.push({ label: 'Host This Game Online', sub: `Starts it in RetroArch for friends to join (port ${ra.port})`, value: 'rahost', icon: 'mdiAccountMultiplePlusOutline' });
     play.push({ label: 'Join a Friend’s Game', sub: 'Type their address and start it in RetroArch', value: 'rajoin', icon: 'mdiLanConnect' });
   }
+  if (installedPath.value) play.push({ label: 'Launch Check', sub: 'What could stop it starting, each with its fix', value: 'launchcheck', icon: 'mdiStethoscope' }); // 0.9.93
   if (installedPath.value && !marked.value) play.push({ label: 'Game settings', sub: `${pe || (/\bpsx\b/i.test(slugs) ? 'DuckStation' : 'The emulator')}’s settings for this game only`, value: 'gamesettings', icon: 'mdiTune' });
   // patches and cheats are in Game Add-ons (0.9.24, owner: no separate row for them here)
   // 0.9.28 (owner: PS4 patches had gone from here): PS3 and PS4 too; Game Add-ons shows only the tabs the console has
@@ -760,6 +761,7 @@ async function more() {
   if (v === 'trophies') { await linkTrophies(); return; }
   if (v === 'path') { toast(installedPath.value, 'info', 5000, 'mdiFolder'); return; }
   if (v === 'cloudsaves') return cloudSaves();
+  if (v === 'launchcheck') { const { launchGate } = await import('../launchFix.js'); if (await launchGate({ romId: Number(props.romId) }, { always: true })) playNow({ checked: true }); return; }
   if (v === 'saves') {
     // 0.9.92: read here (the menu's own list lived in the function that built the menu, so this threw and the row did nothing)
     const list = (await call('saves:forRom', { romId: Number(props.romId) }).catch(() => [])) || [];
@@ -907,8 +909,8 @@ async function playPort(x) {
   try { await openPort({ id: x.id, start, name: starts.find((s) => s.id === start)?.name || x.name, romId: props.romId }); } catch (e) { toast(e.message, 'error', 5000); }
 }
 // Ready to play (0.9.21, owner: it did nothing): starts the game's Steam shortcut; not in Steam yet: offers to add it
-async function playNow() {
-  try { await playGame(Number(props.romId)); }
+async function playNow(opts) {
+  try { await playGame(Number(props.romId), opts); }
   catch (e) {
     if (/Add it to Steam/.test(e.message) && (await confirm('Add to Steam to play?', 'Cartridge starts games through their Steam shortcut, so they launch with your emulator setup.', 'Add to Steam'))) return addGame({ ...base.value, id: Number(props.romId) });
     toast(e.message, 'error', 5000);

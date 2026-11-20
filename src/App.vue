@@ -91,6 +91,7 @@
     <AddonsSheet v-else-if="store.modal?.type === 'addons'" :key="'addons' + store.modal.props.romId" v-bind="store.modal.props" />
     <GameAddons v-else-if="store.modal?.type === 'gameaddons'" :key="'ga' + store.modal.props.romId" v-bind="store.modal.props" />
     <ShadVersions v-else-if="store.modal?.type === 'shadversions'" v-bind="store.modal.props" />
+    <LaunchCheck v-else-if="store.modal?.type === 'launchcheck'" :key="'lc' + JSON.stringify(store.modal.props.result)" v-bind="store.modal.props" />
     <WhatsNew v-else-if="store.modal?.type === 'whatsnew'" v-bind="store.modal.props" />
     <EmuPaths v-else-if="store.modal?.type === 'emupaths'" v-bind="store.modal.props" />
     <AddonDetail v-else-if="store.modal?.type === 'addondetail'" v-bind="store.modal.props" />
@@ -168,6 +169,7 @@ import Licenses from './components/Licenses.vue';
 import Installer from './components/Installer.vue';
 import ImageSearch from './components/ImageSearch.vue';
 import ShadVersions from './components/ShadVersions.vue';
+import LaunchCheck from './components/LaunchCheck.vue';
 import GameSettings from './components/GameSettings.vue';
 import IdleScreen from './components/IdleScreen.vue';
 import PerfOverlay from './components/PerfOverlay.vue';

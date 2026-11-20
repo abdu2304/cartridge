@@ -163,8 +163,10 @@ export const choose = (props) => openModal('menu', props);
 // the game's saves are checked against RomM and the newest is brought here before the emulator starts. A conflict
 // is never guessed: you pick which save to keep. RomM out of reach: the game starts with this device's save.
 export const saveSyncOn = () => store.config?.saveSync === 'cartridge' && !store.config?.syncthing?.role && !store.config?.localOnly;
-export async function playGame(romId) {
+export async function playGame(romId, { checked = false } = {}) {
   romId = Number(romId);
+  // Launch Check (0.9.93): anything that would stop it starting, with its fix, before the saves and the start
+  if (!checked && !(await (await import('./launchFix.js')).launchGate({ romId }))) return null;
   if (saveSyncOn()) {
     const game = romById(romId)?.name || '';
     const show = (o) => { store.cloudSync = { ...(store.cloudSync || {}), game, romId, ...o }; };
@@ -198,6 +200,7 @@ export function startingGame({ romId, name, port }) {
 }
 // a PC port started from Cartridge (game page, its sheets): with the starting screen, which leaves if it fails
 export async function openPort({ id, start, name, romId }) {
+  if (!(await (await import('./launchFix.js')).launchGate({ port: id, name }))) return null; // Launch Check (0.9.93)
   startingGame({ romId, name, port: id });
   try { return await call('recomps:open', { id, start }); } catch (e) { store.starting = null; throw e; }
 }

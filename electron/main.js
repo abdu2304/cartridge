@@ -6140,6 +6140,8 @@ const handlers = {
   'steam:forRom': ({ romId }) => steamMgr.forRom(Number(romId)),
   // the UI's own lines in the log (0.9.34: what the pad did after a game, for device reports)
   'app:log': ({ text }) => { log('[ui]', String(text || '').slice(0, 600)); return true; },
+  // Launch Check (0.9.93): what could stop this game starting, worst first, each with its fix (electron/launchCheck.js)
+  'launch:check': ({ romId }) => require('./launchCheck').game(steamMgr.launchFacts(Number(romId))),
   'steam:play': async ({ romId }) => { const r = await steamMgr.play(Number(romId)); watchGameRun(Number(romId)); return r; },
   'steam:addToCollections': ({ romId, names }) => steamMgr.addRomToCollections(Number(romId), names || []),
   // HowLongToBeat times when RomM has none: name plus release year, cached in hltb.json
