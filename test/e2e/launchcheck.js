@@ -67,8 +67,10 @@ const sum = (r) => r?.error ? 'ERROR ' + r.error : (r?.items || []).filter((x) =
         const { page } = t;
         await page.evaluate(() => window.__cartStore.closeModal(null)).catch(() => {});
         await page.evaluate((id) => window.__cartStore.go('game', { romId: id }), gc.id); await wait(1800);
-        await page.click('button.btn.primary.ok.xl').catch(() => {}); await wait(600);
-        const st = await page.evaluate(() => ({ lc: !!document.querySelector('.dialog.lc'), starting: !!window.__cartStore.starting || !!document.querySelector('.gs-scrim') }));
+        // the starting screen showing at all is the start (the fake home's Steam isn't running, so it can fail at once after)
+        await page.evaluate(() => { window.__gs = false; new MutationObserver(() => { if (document.querySelector('.gs-scrim')) window.__gs = true; }).observe(document.body, { childList: true, subtree: true }); });
+        await page.click('button.btn.primary.ok.xl').catch(() => {}); await wait(1500);
+        const st = await page.evaluate(() => ({ lc: !!document.querySelector('.dialog.lc'), starting: window.__gs, toast: [...document.querySelectorAll('.toast')].map((x) => x.innerText).join(' | ').slice(0, 120) }));
         check(`${name}: Play on ${gc.plat[1]} (nothing in the way) starts with no Launch Check`, !st.lc && st.starting, JSON.stringify(st));
         await page.keyboard.press('Escape'); await wait(500);
       }
