@@ -605,6 +605,15 @@ body.theme-light .top-search { color: rgba(28, 28, 30, 0.7); }
 body.theme-light .top-search:not(.open):not(:focus-within) { color: rgba(28, 28, 30, 0.6); }
 body.theme-light .top-search:not(.open):not(:focus-within):hover { color: #1c1c1e; background: rgba(0, 0, 0, 0.05); }
 body.theme-light :is(.ss-warn, .status.warn, .chip.none, .lf-wire.bad, .sv-badge.pre, .sp-e.skip) { color: #8a5a00; }
+/* 0.9.97 (design smoothing): the red and green pills kept the dark theme's pastel text on Light's pale pills (#ffa39c on pink,
+   hard to read: Launch Check's Add to Steam); a focused row's own pill rules are more specific and still win */
+body.theme-light .status.bad { color: #b3261e; }
+body.theme-light .status.ok { color: #1a7f37; }
+/* a dark highlight (Light's focus, no .focus-light): the focused row's pills in bright colours, the mixes above are made
+   for a white highlight and came out dim red, green and brown on it */
+body:not(.focus-light) :is(.lrow, .up-row, .menu-item, .prow, .ss-emu, .cc-row, .lf-card, .eg-emu):focus-visible .status.bad, body:not(.focus-light).pad-mode :is(.lrow, .up-row, .menu-item, .prow, .ss-emu, .cc-row, .lf-card, .eg-emu):focus .status.bad { color: #ff9d94; }
+body:not(.focus-light) :is(.lrow, .up-row, .menu-item, .prow, .ss-emu, .cc-row, .lf-card, .eg-emu):focus-visible .status.ok, body:not(.focus-light).pad-mode :is(.lrow, .up-row, .menu-item, .prow, .ss-emu, .cc-row, .lf-card, .eg-emu):focus .status.ok { color: #86e3a4; }
+body:not(.focus-light) :is(.lrow, .up-row, .menu-item, .prow, .ss-emu, .cc-row, .lf-card, .eg-emu):focus-visible .status.warn, body:not(.focus-light).pad-mode :is(.lrow, .up-row, .menu-item, .prow, .ss-emu, .cc-row, .lf-card, .eg-emu):focus .status.warn { color: #ffd57a; }
 body.theme-light .btn:not(.primary):not(:focus):not(:focus-visible) { box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06); }
 body.theme-light .scrim { background: rgba(227, 227, 233, 0.6); }
 body.theme-light .statusbar::before { background: linear-gradient(180deg, rgba(227, 227, 233, 0.9) 0%, rgba(227, 227, 233, 0.5) 62%, rgba(227, 227, 233, 0) 100%); }

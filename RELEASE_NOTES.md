@@ -1,4 +1,5 @@
-## Cartridge 0.9.96 · Best for This Device
+## Cartridge 0.9.97 · Smoother
 
-### New
-- **Best for This Device.** In a game's Game Settings, one press suggests the settings that suit your device: a Steam Deck (LCD or OLED), a ROG Ally, a Legion Go, or your PC going by its graphics card and processor. It also takes into account the screen it's showing on, so a desktop on a 4K TV gets 4K and a Deck docked to the same TV keeps the 720p it runs at full speed. It covers the renderer and resolution for PS3 (RPCS3), PS2 (PCSX2), PS1 (DuckStation), GameCube and Wii (Dolphin) and PSP (PPSSPP). You see each change and why before anything is saved, and "Back to the emulator's own" undoes it.
+### Fixed
+- **Status labels are easy to read in Light.** Red and green labels such as Add to Steam, Failed and Up to Date were pale pink and green on pale backgrounds. They're now a deeper red and green.
+- **Labels on a highlighted row read in every look.** On a dark highlight (Light's own, or a dark Highlights colour), a row's red, green and amber labels were dim. They're bright now.
