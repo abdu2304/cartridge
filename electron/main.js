@@ -3312,6 +3312,45 @@ async function freshCemuPacks(romId, force = false) {
 }
 // An emulator installed from a GitHub link, set up once its program is known (0.9.24, 0.9.32 for folders)
 let customPending = null, phoneLinkNow = null;
+// Phone Remote (0.9.94): what the phone's page asks for, answered from what Cartridge already has
+let remoteNow = null;
+const remoteState = () => ({ on: !!remoteNow, urls: remoteNow?.urls || [], phones: remoteNow?.phones() || 0 });
+async function remoteStart() {
+  if (remoteNow) return remoteState();
+  const keep = config.phoneRemote || {};
+  const norm = (x) => String(x || '').toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, ' ').trim();
+  const ctx = {
+    name: deviceName(),
+    games: ({ q, offset }) => {
+      const plats = new Map((library?.platforms || []).map((p) => [p.id, p.display_name || p.name || '']));
+      const want = norm(q).split(' ').filter(Boolean);
+      const all = [...romIndexMain().values()].filter((r) => !want.length || want.every((w) => norm(r.name).includes(w))).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      return { total: all.length, list: all.slice(offset, offset + 40).map((r) => ({ id: r.id, name: r.name || r.fs_name, platform: plats.get(r.platform_id) || r.platform_display_name || '', size: r.fs_size_bytes || 0, installed: !!installedMap[r.id] })) };
+    },
+    downloads: () => queue.slice(-30).reverse().map((it) => ({ romId: it.romId, name: it.name, status: it.status, received: it.received || 0, total: it.total || 0, speed: it.speed || 0, error: it.error || null })),
+    download: (romId) => {
+      const r = romIndexMain().get(romId);
+      if (!r) throw new Error('That game isn’t in your library.');
+      if (installedMap[romId]) throw new Error('It’s already on this device.');
+      return handlers['dl:add']({ romId, name: r.name, platformSlug: r.platform_slug, platformName: r.platform_display_name, size: r.fs_size_bytes, cover: r.path_cover_small || r.url_cover });
+    },
+    show: (romId) => broadcast('remote-show', { romId }),
+    pad: (a) => broadcast('remote-pad', { a }),
+    cover: async (romId) => {
+      const r = romIndexMain().get(romId), p = r && (r.path_cover_small || r.path_cover_large || r.url_cover);
+      if (!p) return null;
+      const res = await handleImage(new Request('romimg://img/?u=' + encodeURIComponent(p) + '&w=240'));
+      return res.ok ? { type: res.headers.get('content-type') || 'image/jpeg', body: Buffer.from(await res.arrayBuffer()) } : null;
+    },
+    seen: () => { const n = remoteNow?.phones() || 0; if (n !== remoteSeen) { remoteSeen = n; broadcast('remote-changed', remoteState()); } },
+    closed: () => { if (remoteNow) { remoteNow = null; config.phoneRemote = { ...(config.phoneRemote || {}), on: false }; saveConfig(); log('phone remote off after 3 h with no phone'); broadcast('remote-changed', remoteState()); } }, // only the idle close gets here with remoteNow set
+  };
+  remoteNow = await require('./phoneRemote').open(ctx, { secret: keep.secret || undefined, port: keep.port || 0 });
+  config.phoneRemote = { secret: remoteNow.secret, port: remoteNow.port, on: true }; saveConfig();
+  log('phone remote on', remoteNow.urls.length, 'address(es), port', remoteNow.port);
+  return remoteState();
+}
+let remoteSeen = 0;
 // is this program running (its path in a process's command line)? Before files under it move (0.9.64)
 function progRunning(file) {
   const real = (() => { try { return fs.realpathSync(file); } catch { return file; } })();
@@ -5351,6 +5390,11 @@ const handlers = {
     return { urls: s.urls };
   },
   'phone:close': () => { phoneLinkNow?.close(); phoneLinkNow = null; return true; },
+  // Phone Remote (0.9.94, electron/phoneRemote.js): the phone as a remote, on the home network only
+  'remote:status': () => remoteState(),
+  'remote:start': () => remoteStart(),
+  'remote:stop': () => { const r = remoteNow; remoteNow = null; r?.close(); config.phoneRemote = { ...(config.phoneRemote || {}), on: false }; saveConfig(); return remoteState(); },
+  'remote:newAddress': async () => { const r = remoteNow; remoteNow = null; r?.close(); config.phoneRemote = { on: false }; saveConfig(); return remoteStart(); }, // the old address stops working
   // what a link would install, before anything downloads (0.9.64: you see the project, its release and the file first)
   'emuget:preview': async ({ link }) => {
     const C = require('./customEmu'), repo = C.repoOf(link);
@@ -6453,6 +6497,7 @@ app.whenReady().then(() => {
   win.webContents.once('did-finish-load', () => {
     if (config.configured && (config.sync.onLaunch || !library)) syncLibrary().catch(() => {});
     setTimeout(() => trophySvc.start().catch((e) => log('trophies failed', e.message)), 1500);
+    if (config.phoneRemote?.on) setTimeout(() => remoteStart().catch((e) => log('phone remote failed', e.message)), 4000); // left on: back on, same address
   });
   // image pipeline (0.9.48): the picture cache stays under 1.5 GB; the oldest pictures go first and come back from RomM
   // or SteamGridDB if they're shown again. Looked at once a day, never during a game
@@ -6494,6 +6539,7 @@ let quitting = false;
 app.on('before-quit', () => {
   if (quitting) return;
   quitting = true;
+  try { const r = remoteNow; remoteNow = null; r?.close(); } catch {} // Phone Remote closes with Cartridge (and comes back on next start)
   log('quit');
   recovery.ok(); // a normal quit is never a crash
   setTimeout(() => app.exit(0), 3000).unref?.();
