@@ -39,6 +39,8 @@ jobs:
         run: xvfb-run -a node test/e2e/starting.js
       - name: How long each page's data takes
         run: xvfb-run -a node test/e2e/timings.js
+      - name: Best for This Device in Game Settings
+        run: xvfb-run -a node test/e2e/bestsettings.js
       - name: Captures from Steam and emulator folders
         run: xvfb-run -a node test/e2e/captures.js
       - name: Phone Remote, opened as a phone opens it
