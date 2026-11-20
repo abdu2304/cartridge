@@ -91,6 +91,7 @@
     <AddonsSheet v-else-if="store.modal?.type === 'addons'" :key="'addons' + store.modal.props.romId" v-bind="store.modal.props" />
     <GameAddons v-else-if="store.modal?.type === 'gameaddons'" :key="'ga' + store.modal.props.romId" v-bind="store.modal.props" />
     <ShadVersions v-else-if="store.modal?.type === 'shadversions'" v-bind="store.modal.props" />
+    <PhoneRemote v-else-if="store.modal?.type === 'phoneremote'" key="phoneremote" />
     <LaunchCheck v-else-if="store.modal?.type === 'launchcheck'" :key="'lc' + JSON.stringify(store.modal.props.result)" v-bind="store.modal.props" />
     <WhatsNew v-else-if="store.modal?.type === 'whatsnew'" v-bind="store.modal.props" />
     <EmuPaths v-else-if="store.modal?.type === 'emupaths'" v-bind="store.modal.props" />
@@ -126,7 +127,7 @@
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref, watch, nextTick, defineAsyncComponent } from 'vue';
 import { store, loadConfig, loadLibrary, loadArt, back, tab, go, call, toast, choose, saveConfig, builtinKb, askText, GRADE, activeTabs, TAB_DEFS, romById, isFavourite, download, playGame, plural } from './store.js';
-import { pushLayer, focusFirst, input, gameEnded } from './nav.js';
+import { pushLayer, focusFirst, input, gameEnded, dispatch } from './nav.js';
 import { governorAway } from './motion.js';
 import { setSoundEnabled, setSoundStyle, sfx } from './sfx.js';
 import { applyTheme, CARD_SIZES, dockOf } from './themes.js';
@@ -170,6 +171,7 @@ import Installer from './components/Installer.vue';
 import ImageSearch from './components/ImageSearch.vue';
 import ShadVersions from './components/ShadVersions.vue';
 import LaunchCheck from './components/LaunchCheck.vue';
+import PhoneRemote from './components/PhoneRemote.vue';
 import GameSettings from './components/GameSettings.vue';
 import IdleScreen from './components/IdleScreen.vue';
 import PerfOverlay from './components/PerfOverlay.vue';
@@ -378,6 +380,10 @@ onMounted(async () => {
   const openGame = (id) => { if (id && store.lib) { store.quickMenu = false; go('game', { romId: Number(id) }); } };
   call('app:startGame').then(openGame).catch(() => {});
   window.cart.on('open-game', openGame);
+  // Phone Remote (0.9.94): the phone's buttons are a controller; Show on TV opens the game's page. Only while
+  // Cartridge is in front: a press never reaches Cartridge under a game
+  window.cart.on('remote-pad', (m) => { if (!store.away && m?.a) dispatch(m.a); });
+  window.cart.on('remote-show', (m) => { if (!store.away && m?.romId != null) { if (store.modal) { const r = store.modal.resolve; store.modal = null; try { r?.(null); } catch {} } openGame(m.romId); } });
   // another app in front in Game Mode (0.9.21, owner: still laggy in the background): gamescope never
   // hides or blurs the window, so stop the pad, the animated background and every CSS animation here
   window.cart.on('game-run', (g) => {

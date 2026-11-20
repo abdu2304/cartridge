@@ -563,6 +563,10 @@
             <div class="row"><span class="lbl">On-screen keyboard</span><div class="seg"><button v-for="k in keyboards" :key="k.v" data-focus :class="{ on: (ui.keyboard || 'auto') === k.v }" @click="saveConfig({ ui: { keyboard: k.v } })">{{ k.l }}</button></div></div>
             <p class="muted small" style="margin-top: -6px">Auto uses the built-in keyboard in Game Mode and your real keyboard on the desktop. Steam leaves typing to the Steam keyboard (Steam + X).</p>
 
+            <!-- 0.9.94: Phone Remote (components/PhoneRemote.vue) -->
+            <div class="subh"><Icon name="mdiCellphoneLink" :size="20" />Phone Remote</div>
+            <button class="lrow" data-focus @click="openModal('phoneremote', {})"><Icon name="mdiCellphoneLink" :size="22" /><span class="l-mid"><b>Phone Remote</b><span class="l-sub">Browse, download and steer Cartridge from your phone</span></span><span class="l-end"><span class="status" :class="remoteOn ? 'ok' : 'none'">{{ remoteOn ? 'On' : 'Off' }}</span></span></button>
+
             <div class="subh"><Icon name="mdiDockTop" :size="20" />Top Bar</div>
             <div class="row"><span class="lbl">Open on</span><div class="seg"><button v-for="t in tabsOn.filter((n) => n !== 'settings')" :key="t" data-focus :class="{ on: (ui.openOn || 'start') === t }" @click="saveConfig({ ui: { openOn: t } })">{{ TAB_DEFS[t].label }}</button></div></div>
             <p class="muted small" style="margin-top: -6px">The menu Cartridge shows when it starts.</p>
@@ -1420,6 +1424,11 @@ async function applyArt() {
 async function clearCache() { await call('app:clearCache'); toast('Image cache cleared', 'ok', 2000); }
 
 onMounted(async () => { space.value = await call('fs:space', store.config.romsRoot); });
+// Phone Remote (0.9.94): On or Off on its row, read again when its pop-up closes
+const remoteOn = ref(false);
+const readRemote = () => call('remote:status').then((r) => { remoteOn.value = !!r?.on; }).catch(() => {});
+onMounted(readRemote);
+watch(() => store.modal?.type, (t, was) => { if (was === 'phoneremote' && t !== 'phoneremote') readRemote(); });
 // Back from a screen opened here (Emulator setup, Shortcut health...) lands on the row you opened it
 // from (store.go remembers it), not the section in the left list (0.9.3 L). The row is found again by
 // its text, as lists above it (Issues) load later and move it.

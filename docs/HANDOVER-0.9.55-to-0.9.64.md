@@ -295,6 +295,9 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 
 ## Part 9. Open items, unverified work and what to ask the owner
 
+**From 0.9.94 (Phone Remote, Part 41):**
+- Not tried with a real phone. Bazzite's firewalld default zone should allow its high port (Part 41); if the phone can't open the page, offer a firewalld rule from the pop-up.
+
 **From 0.9.93 (Launch Check, Part 40):**
 - Launch Check's fixes have only run against fake homes. Ask the owner to try Allow Access (Flatpak), Add to Steam and Get It from RomM from the pop-up on the device, and whether any game that starts fine is wrongly stopped by it.
 
@@ -955,4 +958,9 @@ Batch 2 of the owner's "make it OP" list. Before Play, Cartridge checks what wou
 - Checked: `npm test` 437, `vite build`, `test/e2e/launchcheck.js` in all four setups (real downloads, Steam Apply, the real Play button, B), audit:ui (0 cut texts, nothing low-contrast in the pop-up), real-app screenshots in Plain, Glass and Light.
 - Not checked on a device: all of it. Ask the owner: press Play on a game not in Steam, and on a Flatpak emulator's game, on the handheld and the TV; do the fixes do what they say?
 - Next batches: Phone Remote, Captures Gallery, Best Settings for This Device, design smoothing (note: `.status.bad` pills are pale in Light everywhere).
+
+## Part 41. 0.9.94 · Phone Remote (20 Nov 2026)
+Batch 3 of the "make it OP" list. Settings → Controls → Phone Remote: a QR code opens a page on the phone with the library (search, covers, Download, Show on TV), downloads with progress, and a remote with a D-pad and buttons that steer Cartridge. Home network only, a secret address kept until New Address, off after 3 hours with no phone. Code and reasons: docs/VERSIONS.md 0.9.94.
+- Checked: `npm test`, `vite build`, `test/e2e/phoneremote.js` (19 checks in the real app), audit:ui with the pop-up on, screenshots of the pop-up in Plain, Glass and Light and of the phone page at 390x844 (no sideways scroll).
+- Not checked on a device: a real phone on a real home network, Show on TV and the remote in Game Mode, and the firewall: SteamOS has none by default; Bazzite and other Fedora-based systems run firewalld, whose default FedoraWorkstation zone allows ports 1025 to 65535, and Phone Remote always listens on a high port, so it should get through. Unconfirmed: if the phone can't open the page on a device, a firewalld rule offered from the pop-up is the fix (not built).
 
