@@ -53,7 +53,10 @@ module.exports = function recompsIpc(m) {
       dolphinTool: () => {
         const cp = require('child_process');
         for (const n of ['dolphin-tool', 'DolphinTool']) { const r = cp.spawnSync('sh', ['-c', `command -v ${n}`], { encoding: 'utf8' }); if (r.status === 0 && r.stdout.trim()) return [r.stdout.trim()]; }
-        for (const user of [true, false]) { const r = cp.spawnSync('flatpak', ['info', ...(user ? ['--user'] : ['--system']), 'org.DolphinEmu.dolphin-emu'], { encoding: 'utf8' }); if (r.status === 0) return ['flatpak', 'run', '--command=dolphin-tool', 'org.DolphinEmu.dolphin-emu']; }
+        // 0.9.92: read from the Flatpak installations' folders (detect.flatpakApps), not `flatpak info`, which held the
+        // main thread for as long as flatpak took to answer
+        const apps = D.flatpakApps();
+        if (apps ? apps.has?.('org.DolphinEmu.dolphin-emu') || apps.includes?.('org.DolphinEmu.dolphin-emu') : cp.spawnSync('flatpak', ['info', 'org.DolphinEmu.dolphin-emu'], { encoding: 'utf8', timeout: 5000 }).status === 0) return ['flatpak', 'run', '--command=dolphin-tool', 'org.DolphinEmu.dolphin-emu'];
         return null;
       },
       playing: () => !!(m.gameFocus.away || m.runOn),

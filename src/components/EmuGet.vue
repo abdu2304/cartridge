@@ -437,7 +437,7 @@ async function getAll() {
 let ghCalling = false;
 watch(() => bgJob('emu:'), (j) => { if (j) { upRun.value = j.key.slice(4); upPct.value = j.pct ?? null; } else if (upRun.value) { upRun.value = ''; loadUps(true); } }, { immediate: true });
 watch(() => bgJob('custom:'), (j) => { if (j) { gh.value.open = true; gh.value.busy = true; gh.value.pct = j.pct ?? null; } else if (gh.value.busy && !ghCalling) { gh.value.busy = false; load(); loadUps(true); } }, { immediate: true });
-let off = null, offP = null, offU = null, offA = null, lastDone = 0;
+let off = null, offP = null, offU = null, offA = null, offG = null, lastDone = 0;
 const told = new Set();
 // masonry (0.9.47, owner: a console with one emulator shouldn't take a row as tall as one with three): same
 // column widths, each card as tall as what's in it, the next card moves up under it. Order stays left to right
@@ -470,12 +470,14 @@ onMounted(async () => {
   // Update All in the background (0.9.58): which one is updating, also after coming back to this page
   const follow = (m) => { if (!m || m.ended) { if (allRun.value) { allRun.value = null; upRun.value = ''; loadUps(true); } return; } allRun.value = { done: m.done, of: m.of }; if (m.path) { upRun.value = m.path; upPct.value = null; } };
   offA = window.cart.on('emu-all', follow);
+  // 0.9.92: the list is answered without waiting for GitHub; when a release check changes what's offered, it's read again
+  offG = window.cart.on('emu-get-changed', () => { call('emuget:list').then((l) => { if (Array.isArray(l)) list.value = l; }).catch(() => {}); });
   call('emuup:allState').then((m) => m && follow(m)).catch(() => {});
   q.value = (await call('emuget:state').catch(() => null)) || q.value; // installs queued earlier carry on
   loadUps(); // at the same time as the list (0.9.37)
   if (phase.value === 'where') await loadDrives(); else { fresh.value = await call('emuget:fresh').catch(() => ({ fresh: false })); await load(); }
 });
-onBeforeUnmount(() => { off?.(); offP?.(); offU?.(); offA?.(); });
+onBeforeUnmount(() => { off?.(); offP?.(); offU?.(); offA?.(); offG?.(); });
 defineExpose({ load });
 </script>
 

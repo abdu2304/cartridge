@@ -84,6 +84,10 @@ module.exports = {
   'sfam': ['sfc', 'snes'],
   'supervision': ['supervision'],
   'switch': ['switch'],
+  // Switch 2 (0.9.92): RomM/IGDB call it switch-2; its own folder, as ES-DE names it, so its games never mix with Switch's
+  'switch-2': ['switch2'],
+  'switch2': ['switch2'],
+  'switch_2': ['switch2'],
   'tic-80': ['tic80'],
   'turbografx16--1': ['pcengine', 'tg16'],
   'tg16': ['pcengine', 'tg16'],

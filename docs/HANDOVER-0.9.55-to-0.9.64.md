@@ -298,7 +298,7 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 **From the second PC session (0.9.88, Part 35):**
 - Cartridge's own controller on the desktop with a Steam Controller: Steam made no virtual pad for it (started from Steam or not, Wayland or X11). Ask the owner whether a button press makes it appear; if not, Steam's per-game controller setting for Cartridge's shortcut is the next thing to look at.
 - Buttons pressed in a port started through Steam (detected, not pressed), and Cartridge's pad after such a port, desktop and Game Mode.
-- `checkFile` hashes big downloads on the main thread in 1 MB steps: hash in `dlWorker` while writing instead.
+- ~~`checkFile` hashes big downloads on the main thread~~ (done in 0.9.92: `hashWorker.js`). Was: hash in `dlWorker` while writing instead.
 - Uncharted offers FSR 4.1.1 on GPUs that can't run it (the game falls back to FSR 3.1 by itself): a note per GPU would need the port's own capability check (`bb-gpu-capabilities.exe`).
 
 **From the PC playtest (0.9.86, Part 33):**
@@ -935,3 +935,12 @@ Owner: twelve links to make Cartridge Verified ("remember the rule set ... adapt
 - Nebula: the unattended setup ran through Proton (about 30 min) and installed; the game stops 2 s in, its NAND root needs NTFS alternate data streams. Not Verified; docs/recipes.md says what to look for.
 - What went wrong and how it was caught: my /tmp (RAM) filled with project sources and hung crawl for three hours; a 1.7 GB extraction for WWHD ran out of room there (tests moved to the external drive, deleted after); dolphin-tool refused an output name not ending in .iso; I removed two unused Flatpak runtimes that weren't the test's (told the owner).
 - Checked: see the PR. Not checked on a device: Game Mode with the controller for any new port; Unleashed's and SMS Launcher's own setup windows through to Play.
+
+## Part 39. 0.9.92 · Quick on Its Feet (14 Nov 2026)
+Owner: a day of a stronger model with a full allowance; "not just bug hunt I want this to be OP": Launch Check, Phone Remote, Captures Gallery, Best Settings for This Device, a bug audit, design smoothing "and more". Worked in batches, each released when built and tested. This is batch 1 (audit and speed); see docs/VERSIONS.md 0.9.92 for the code.
+- Found by tools, not by reading: the `sv` ReferenceError (ESLint no-undef on Vue script), `emuget:list` at 1 s a call (the new `test/e2e/timings.js`). The slow Emulators page the owner reported after 0.9.86 was most likely this: the list awaited GitHub for KytyPS5's gate on every open until one answer came.
+- Owner, mid-batch: "add switch 2 support for folder creation". Switch 2 gets its own `switch2` folder (ES-DE's name) in the Emulation folder and for RomM's `switch-2` games; no emulator is offered, with the reason written in CEE.
+- Checked: `npm test` 435, `vite build`, e2e run (28), setups (21), starting (8), steam (15), online (40), saves (13), game settings (99), add-ons (61), links (23), timings (all handlers under 1.5 s, all but one under 100 ms), crawl (all four setups; no script errors; the only messages are no-internet ones and the rows that open a system file dialog or file manager, which the crawl can't see. Once, in the "none" setup, the window closed late in the run; a second full run of that setup didn't repeat it. Watch for it).
+- Not checked on a device: all of it. Ask the owner whether Settings → Emulators now opens at once on the PC and the handheld.
+- Next batches: Launch Check (`electron/launchCheck.js` and its test are written, not wired), Phone Remote, Captures Gallery, Best Settings, design smoothing.
+

@@ -45,7 +45,7 @@ const CATALOG = [
 ];
 let appsDir = null; // set from config: <drive>/Emulation/emulators when the user picked a drive (0.9.17)
 // ES-DE's console folder names, for the Emulation folder Cartridge makes on the drive the user picks
-const ESDE = ['3do', 'arcade', 'atari2600', 'dreamcast', 'gamecube', 'gb', 'gba', 'gbc', 'genesis', 'mastersystem', 'megacd', 'n3ds', 'n64', 'nds', 'neogeo', 'nes', 'pcengine', 'ps2', 'ps3', 'ps4', 'psp', 'psvita', 'psx', 'saturn', 'segacd', 'snes', 'switch', 'wii', 'wiiu', 'xbox', 'xbox360'];
+const ESDE = ['3do', 'arcade', 'atari2600', 'dreamcast', 'gamecube', 'gb', 'gba', 'gbc', 'genesis', 'mastersystem', 'megacd', 'n3ds', 'n64', 'nds', 'neogeo', 'nes', 'pcengine', 'ps2', 'ps3', 'ps4', 'psp', 'psvita', 'psx', 'saturn', 'segacd', 'snes', 'switch', 'switch2', 'wii', 'wiiu', 'xbox', 'xbox360'];
 const APPS = () => appsDir || path.join(os.homedir(), 'Applications');
 const setAppsDir = (d) => { appsDir = d || null; };
 function plainEnv() { const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k]; return env; }

@@ -9,7 +9,7 @@ const PLATFORM_MAP = require('./platformMap');
 
 const NAMES = {
   psx: 'PlayStation', ps2: 'PlayStation 2', ps3: 'PlayStation 3', ps4: 'PlayStation 4', psp: 'PlayStation Portable', psvita: 'PlayStation Vita',
-  ngc: 'GameCube', wii: 'Wii', wiiu: 'Wii U', switch: 'Nintendo Switch', '3ds': 'Nintendo 3DS', n3ds: 'Nintendo 3DS', nds: 'Nintendo DS', gba: 'Game Boy Advance',
+  ngc: 'GameCube', wii: 'Wii', wiiu: 'Wii U', switch: 'Nintendo Switch', switch2: 'Nintendo Switch 2', 'switch-2': 'Nintendo Switch 2', '3ds': 'Nintendo 3DS', n3ds: 'Nintendo 3DS', nds: 'Nintendo DS', gba: 'Game Boy Advance',
   gbc: 'Game Boy Color', gb: 'Game Boy', snes: 'Super Nintendo', nes: 'NES', n64: 'Nintendo 64', genesis: 'Mega Drive', 'genesis-slash-megadrive': 'Mega Drive',
   sms: 'Master System', gamegear: 'Game Gear', segacd: 'Sega CD', saturn: 'Saturn', dc: 'Dreamcast', xbox: 'Xbox', xbox360: 'Xbox 360', arcade: 'Arcade',
   'turbografx16--1': 'PC Engine', neogeoaes: 'Neo Geo', atari2600: 'Atari 2600', '3do': '3DO',

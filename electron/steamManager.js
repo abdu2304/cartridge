@@ -69,17 +69,31 @@ function environment() {
   if (!accounts.length) return { installed: true, reason: 'noaccount', roots };
   accounts.sort((a, b) => (b.mostRecent - a.mostRecent) || (b.ts - a.ts));
   FLATPAK_STEAM = !!accounts[0].flatpak;
-  return { installed: true, accounts, account: accounts[0], running: steamRunning() };
+  // 0.9.92: asked for only by what reads it, and remembered for a second: every environment() scanned all of /proc
+  // for Steam (two file reads a process when Steam isn't open), and one PC Ports list calls it dozens of times
+  return { installed: true, accounts, account: accounts[0], get running() { return runningNow(); } };
 }
+let runMemo = { t: 0, v: false };
+function runningNow() { if (Date.now() - runMemo.t > 1000) runMemo = { t: Date.now(), v: steamRunning() }; return runMemo.v; }
 const files = (acc) => ({
   shortcuts: path.join(acc.root, 'userdata', acc.id, 'config', 'shortcuts.vdf'),
   grid: path.join(acc.root, 'userdata', acc.id, 'config', 'grid'),
   cloud: path.join(acc.root, 'userdata', acc.id, 'config', 'cloudstorage', 'cloud-storage-namespace-1.json'),
   config: path.join(acc.root, 'config', 'config.vdf'),
 });
+// 0.9.92: parsed once per version of the file (its size and time), each caller getting its own copies: a list of
+// ports or games asked for it once per entry (a few ms each with a few hundred shortcuts, on the main thread)
+const scMemo = new Map(); // file -> { key, list }
 function readShortcuts(acc) {
   const f = files(acc).shortcuts;
-  if (!exists(f)) return [];
+  let st; try { st = fs.statSync(f); } catch { scMemo.delete(f); return []; }
+  const key = `${st.size}:${st.mtimeMs}:${st.ino}`, hit = scMemo.get(f);
+  if (hit && hit.key === key) return hit.list.map((x) => ({ ...x }));
+  const list = parseShortcuts(f);
+  scMemo.set(f, { key, list });
+  return list.map((x) => ({ ...x }));
+}
+function parseShortcuts(f) {
   const data = parseVdf(fs.readFileSync(f));
   return Object.values(data.shortcuts || data.Shortcuts || {}).map((e) => {
     const exeRaw = e.Exe || e.exe || '';
