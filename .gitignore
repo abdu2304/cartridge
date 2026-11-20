@@ -1,8 +1,9 @@
 node_modules/
 dist/
-release/
+/release/
 *.AppImage
 .DS_Store
 .ui-audit/
 tools/brand/out/
+release-notes-nightly.md
 release-notes-nightly.md
