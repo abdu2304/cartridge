@@ -295,6 +295,9 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 
 ## Part 9. Open items, unverified work and what to ask the owner
 
+**From 0.9.98 (Switch 2, Part 45):**
+- Ask the owner to install Lichii from Get Emulators and start a Switch 2 game, and to set up Triforce with their Ocarina of Time copy (it reports its own build progress; the Set Up sheet waits up to two hours).
+
 **From 0.9.96 (Best for This Device, Part 43):**
 - Ask the owner whether the suggested settings run well on the Deck and the PC, and whether the device name shown is right.
 
@@ -991,4 +994,10 @@ Batch 6, the last of the "make it OP" list. Kept to fixes: status pills in Light
 
 ### The whole "make it OP" run (0.9.92 to 0.9.97, 20 Nov 2026)
 0.9.92 Quick on Its Feet (audit and speed, Switch 2 folder), 0.9.93 Launch Check, 0.9.94 Phone Remote, 0.9.95 Captures, 0.9.96 Best for This Device, 0.9.97 Smoother. Also: the Nightly and Beta builds, broken since 0.9.71, work again (prerelease.js). Every batch: unit tests, a real-app e2e added to e2e.yml, audit:ui in all six looks, screenshots looked at. None of it has been tried on the owner's devices yet; Part 9 lists what to ask.
+
+## Part 45. 0.9.98 · Switch 2 (20 Nov 2026)
+Owner: "Lichii will be the main emulator for Nintendo Switch 2 on Cartridge ... prepare Cartridge for Nintendo Switch 2", "the Emulation folder Cartridge will make will be called ns2", "or to play the decompiled version use triforceproject.com, give users the choice". Code and reasons: docs/VERSIONS.md 0.9.98.
+- Lichii is in Get Emulators (Switch 2), found where it's installed, started fullscreen with the game, in Steam, with keys, firmware, mods, saves and Save Sync like Eden. Triforce is a Cartridge Verified PC port for the Switch 2 Ocarina of Time: the game's page offers it beside playing it in Lichii.
+- "Bake it in": Lichii isn't bundled inside Cartridge's AppImage (160 MB, its own updates, and Cartridge's rule that it never ships emulators); it's one press in Get Emulators, from Lichii's own releases. Ask the owner if they meant bundling.
+- Not checked on a device: Lichii running a game, and Triforce's build (it needs the owner's copy, about 60 GB and 10 to 45 minutes, and Vulkan 1.3 with mesh shaders). triforceproject.com itself couldn't be read from the container (network policy); a "cartridge" environment allowing it was created for later sessions.
 

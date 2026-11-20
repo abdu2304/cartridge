@@ -22,6 +22,7 @@ const LINKS = {
   dolphin: { site: 'https://dolphin-emu.org', downloads: 'https://dolphin-emu.org/download/' },
   primehack: { site: GH('shiiion/dolphin'), downloads: FH('io.github.shiiion.primehack') },
   cemu: { site: 'https://cemu.info', downloads: GH('cemu-project/Cemu/releases') },
+  lichii: { site: 'https://github.com/zortos293/Lichii', downloads: 'https://github.com/zortos293/Lichii/releases' },
   eden: { site: 'https://eden-emu.dev', downloads: 'https://git.eden-emu.dev/eden-emu/eden/releases' },
   citron: { site: 'https://citron-emu.org', downloads: 'https://git.citron-emu.org/Citron/Emulator/releases' },
   yuzu: { site: 'https://yuzu-mirror.github.io', downloads: FH('org.yuzu_emu.yuzu') },
@@ -64,7 +65,6 @@ const LINKS = {
 const UNSUPPORTED = {
   android: 'Android apps aren’t emulated by Cartridge (Waydroid runs them as apps)',
   windows: 'PC games run through Steam and Proton, not an emulator',
-  switch2: 'No Switch 2 emulator plays games yet; Cartridge keeps its games in their own folder until one does',
   ngage: 'EKA2L1 needs each game installed into it first; Cartridge can’t start N-Gage games by file yet',
 };
 

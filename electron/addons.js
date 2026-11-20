@@ -62,7 +62,7 @@ function emulators(home = os.homedir(), env = process.env) {
   }
   // Switch (0.9.16): yuzu and its forks load mods from load/<TITLE ID> ([Data%20Storage] load_directory
   // in qt-config.ini, default "load" in the data folder); Ryujinx from mods/contents/<title id>
-  for (const [id, name, dirName, fp] of [['eden', 'Eden', 'eden', 'dev.eden_emu.eden'], ['citron', 'Citron', 'citron', 'org.citron_emu.citron'], ['yuzu', 'Yuzu', 'yuzu', 'org.yuzu_emu.yuzu'], ['yuzu', 'Sudachi', 'sudachi', 'org.sudachi_emu.sudachi'], ['yuzu', 'suyu', 'suyu', null]]) {
+  for (const [id, name, dirName, fp] of [['eden', 'Eden', 'eden', 'dev.eden_emu.eden'], ['lichii', 'Lichii', 'lichii', null], ['citron', 'Citron', 'citron', 'org.citron_emu.citron'], ['yuzu', 'Yuzu', 'yuzu', 'org.yuzu_emu.yuzu'], ['yuzu', 'Sudachi', 'sudachi', 'org.sudachi_emu.sudachi'], ['yuzu', 'suyu', 'suyu', null]]) {
     for (const [c, d] of [[path.join(cfg, dirName), path.join(data, dirName)], ...(fp ? [[v(fp, 'config', dirName), v(fp, 'data', dirName)]] : [])]) {
       const ini = path.join(c, 'qt-config.ini'); if (!exists(ini)) continue;
       add({ id, name, for: ['switch'], root: d, settings: ini, textures: under(d, iniGet(read(ini), 'Data%20Storage', 'load_directory'), 'load'), per: '{switchId}', on: true, mods: true, how: `${name} loads every mod in the game's folder; turn single ones off in its game properties (Add-Ons).` });
@@ -146,7 +146,7 @@ function keyDirs(home = os.homedir(), env = process.env) {
   const cfg = env.XDG_CONFIG_HOME || path.join(home, '.config'), data = env.XDG_DATA_HOME || path.join(home, '.local/share');
   const v = (id, ...p) => path.join(home, '.var/app', id, ...p);
   const out = [];
-  for (const n of ['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu']) out.push(path.join(data, n, 'keys'), path.join(cfg, n, 'keys'));
+  for (const n of ['eden', 'lichii', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu']) out.push(path.join(data, n, 'keys'), path.join(cfg, n, 'keys'));
   for (const [id, n] of [['dev.eden_emu.eden', 'eden'], ['org.citron_emu.citron', 'citron'], ['org.yuzu_emu.yuzu', 'yuzu'], ['org.sudachi_emu.sudachi', 'sudachi']]) out.push(v(id, 'data', n, 'keys'));
   out.push(path.join(cfg, 'Ryujinx/system'), v('io.github.ryubing.Ryujinx', 'config/Ryujinx/system'), v('org.ryujinx.Ryujinx', 'config/Ryujinx/system'), path.join(home, '.switch'));
   // 0.9.29 (owner: "Eden finds the IDs of any format"): every place a keys file lives, as Eden's path_util.cpp

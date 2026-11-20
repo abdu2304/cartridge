@@ -22,9 +22,9 @@ const path = require('path');
 const os = require('os');
 
 // console folder keys (ES-DE names, as roms/) and the names shown for them
-const CONSOLES = { arcade: 'Arcade', nes: 'NES', snes: 'SNES', n64: 'Nintendo 64', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', gamecube: 'GameCube', nds: 'Nintendo DS', wii: 'Wii', wiiu: 'Wii U', genesis: 'Genesis', psx: 'PlayStation', ps2: 'PlayStation 2', ps4: 'PlayStation 4', xbox: 'Xbox', xbox360: 'Xbox 360' };
+const CONSOLES = { arcade: 'Arcade', nes: 'NES', snes: 'SNES', n64: 'Nintendo 64', gb: 'Game Boy', gbc: 'Game Boy Color', gba: 'Game Boy Advance', gamecube: 'GameCube', nds: 'Nintendo DS', wii: 'Wii', wiiu: 'Wii U', ns2: 'Nintendo Switch 2', genesis: 'Genesis', psx: 'PlayStation', ps2: 'PlayStation 2', ps4: 'PlayStation 4', xbox: 'Xbox', xbox360: 'Xbox 360' };
 // RomM platform slugs of each, for finding the player's copy in their library
-const SLUGS = { arcade: /^(arcade|mame|model3|naomi|cps\d?|neogeo)$/, nes: /^(nes|famicom|fds)$/, snes: /^(snes|sfam)$/, n64: /^n64$/, gb: /^gb$/, gbc: /^gbc?$/, gba: /^gba$/, gamecube: /^(ngc|gc|gamecube)$/, nds: /^nds$/, wii: /^wii$/, genesis: /^(genesis.*|megadrive|md)$/, psx: /^(psx|ps1|ps|playstation)$/, ps2: /^ps2$/, ps4: /^ps4.*$/, xbox360: /^(xbox360|x360)$/, wiiu: /^(wiiu|wii-u)$/, xbox: /^(xbox|xbox-?og)$/ };
+const SLUGS = { arcade: /^(arcade|mame|model3|naomi|cps\d?|neogeo)$/, nes: /^(nes|famicom|fds)$/, snes: /^(snes|sfam)$/, n64: /^n64$/, gb: /^gb$/, gbc: /^gbc?$/, gba: /^gba$/, gamecube: /^(ngc|gc|gamecube)$/, nds: /^nds$/, wii: /^wii$/, genesis: /^(genesis.*|megadrive|md)$/, psx: /^(psx|ps1|ps|playstation)$/, ps2: /^ps2$/, ps4: /^ps4.*$/, xbox360: /^(xbox360|x360)$/, wiiu: /^(wiiu|wii-u)$/, ns2: /^(switch-?2|switch_2|nintendo-switch-2|ns2)$/, xbox: /^(xbox|xbox-?og)$/ };
 const consoleOfSlug = (slug) => Object.keys(SLUGS).find((k) => SLUGS[k].test(String(slug || '').toLowerCase())) || null;
 
 // ---------------------------------------------------------------- names
@@ -382,7 +382,7 @@ function plainNotes(md) {
 const CON_WORDS = [
   ['n64', /\b(n64|nintendo 64|ultra ?64)\b/i], ['snes', /\b(snes|super nintendo|super famicom|sfc)\b/i], ['nes', /\b(nes|famicom)\b/i],
   ['gb', /\bgame ?boy(?! (color|colour|advance))\b|\bgb\b/i], ['gbc', /\b(gbc|game ?boy colou?r)\b/i], ['gba', /\b(gba|game ?boy advance)\b/i],
-  ['nds', /\b(nds|nintendo ds)\b/i], ['3ds', /\b3ds\b/i], ['gamecube', /\b(gamecube|gcn|ngc)\b/i], ['wii', /\bwii(?! ?u)\b/i], ['wiiu', /\bwii ?u\b/i], ['switch', /\b(nintendo switch|switch)\b/i],
+  ['nds', /\b(nds|nintendo ds)\b/i], ['3ds', /\b3ds\b/i], ['gamecube', /\b(gamecube|gcn|ngc)\b/i], ['wii', /\bwii(?! ?u)\b/i], ['wiiu', /\bwii ?u\b/i], ['ns2', /\b(nintendo switch 2|switch 2|nx2|ns2)\b/i], ['switch', /\b(nintendo switch|switch)\b(?! ?2)/i],
   ['psx', /\b(ps1|psx|playstation 1|playstation one)\b/i], ['ps2', /\b(ps2|playstation 2)\b/i], ['ps3', /\b(ps3|playstation 3)\b/i], ['ps4', /\b(ps4|playstation 4)\b/i], ['psp', /\bpsp\b/i], ['psvita', /\b(vita|psvita)\b/i],
   ['xbox', /\bxbox(?! ?360| one| series)\b/i], ['xbox360', /\b(xbox ?360|x360)\b/i], ['genesis', /\b(genesis|mega ?drive)\b/i], ['dc', /\bdreamcast\b/i], ['saturn', /\bsaturn\b/i], ['arcade', /\barcade\b/i],
 ];

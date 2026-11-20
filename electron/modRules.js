@@ -32,7 +32,7 @@ const RULES = {
   shadps4: { emu: 'shadps4', what: 'Game mod', where: '<game folder>-mods/ beside the game (the game is never touched)', needs: 'folders named like the game\'s own (dvdroot_ps4, Image0...)', id: '', on: 'loaded by themselves' },
 };
 // emulator id -> rule (the Switch family shares one)
-const SWITCH = /^(eden|citron|yuzu|sudachi|suyu|torzu|ryujinx)$/;
+const SWITCH = /^(eden|lichii|citron|yuzu|sudachi|suyu|torzu|ryujinx)$/;
 function kindOf(emuId, source) {
   if (source === 'ps2') return 'ps2';
   if (SWITCH.test(emuId)) return 'switch';

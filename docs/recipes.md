@@ -42,6 +42,7 @@ The first ports were all PS4 dump folders. Since 0.9.91 a recipe can also say:
 | settings `at: ['env', NAME]` | A setting the port reads from its environment: a toggle exports 1 when on | JSRF Unleashed's RECOMP_FULLSCREEN |
 | settings `int`, `word`, `quote` | A JSON toggle as 1/0 (libultraship CVars); an ini toggle as true/false (TOML); an ini text in quotes | Ship of Harkinian, Unleashed |
 | `look: [{ var, files, dirs }]` | Files of the player's own looked for where other programs keep them; the folder becomes `{var}` | Shadow of the Colossus (sound modules from shadPS4's sys_modules) |
+| `game.asFolder` | A file port that also takes an unpacked folder: a folder holding every `has` entry is handed over as it is | Triforce (a .nup, or romfs and exefs) |
 | `setup: { by: 'port', done, say }` | The port's own window finishes the setup the first time (Cartridge has done its part; the sheet says what to do); ready when any `done` file exists | Unleashed (its installer), SMS Launcher (its build) |
 | `achievements.format: 'keyed'` / `'hedge'` | A JSON `{ key: { unlocked } }` with names from `list`; Unleashed's ACH-DATA | Dusklight, Unleashed |
 | `achievements.files` with `*` | Every file the name matches | DriveClub (a log per start) |

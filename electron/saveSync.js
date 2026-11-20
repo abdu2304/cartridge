@@ -32,15 +32,15 @@ const exists = (p) => { try { fs.accessSync(p); return true; } catch { return fa
 // ---------------------------------------------------------------- 1. units
 // where the console's games live in RomM terms, for the carrier of a whole card
 // 0.9.58: the Eden/yuzu family keep Switch saves the same way (nand/user/save/<user>/<title ID>), so all of them sync
-const SWITCH_FAMILY = ['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu'];
-const CONSOLE = { eden: 'switch', citron: 'switch', yuzu: 'switch', sudachi: 'switch', suyu: 'switch', torzu: 'switch', rpcs3: 'ps3', ppsspp: 'psp', vita3k: 'psvita', shadps4: 'ps4', pcsx2: 'ps2', duckstation: 'psx', dolphin: 'ngc', cemu: 'wiiu', azahar: '3ds', xenia: 'xbox360', retroarch: null };
+const SWITCH_FAMILY = ['eden', 'lichii', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu'];
+const CONSOLE = { eden: 'switch', lichii: 'ns2', citron: 'switch', yuzu: 'switch', sudachi: 'switch', suyu: 'switch', torzu: 'switch', rpcs3: 'ps3', ppsspp: 'psp', vita3k: 'psvita', shadps4: 'ps4', pcsx2: 'ps2', duckstation: 'psx', dolphin: 'ngc', cemu: 'wiiu', azahar: '3ds', xenia: 'xbox360', retroarch: null };
 const SUPPORTED = Object.keys(CONSOLE);
-const LABEL = { eden: 'Eden', citron: 'Citron', yuzu: 'yuzu', sudachi: 'Sudachi', suyu: 'suyu', torzu: 'torzu', rpcs3: 'RPCS3', ppsspp: 'PPSSPP', vita3k: 'Vita3K', shadps4: 'shadPS4', pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', cemu: 'Cemu', azahar: 'Azahar', xenia: 'Xenia', retroarch: 'RetroArch' };
+const LABEL = { eden: 'Eden', lichii: 'Lichii', citron: 'Citron', yuzu: 'yuzu', sudachi: 'Sudachi', suyu: 'suyu', torzu: 'torzu', rpcs3: 'RPCS3', ppsspp: 'PPSSPP', vita3k: 'Vita3K', shadps4: 'shadPS4', pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', cemu: 'Cemu', azahar: 'Azahar', xenia: 'Xenia', retroarch: 'RetroArch' };
 // One slot per game per console (0.9.58, owner: "fix this as a top priority, I don't want mistakes"): a save's slot in
 // RomM was named after the emulator ("cartridge:eden:…"), so Eden on one device and Citron (or any renamed build) on
 // another never met. The slot now names the console family; slots written the old way are still read (FAMILY maps
 // both an emulator and a family to the family), so nothing already in RomM is lost.
-const FAMILY = { eden: 'switch', citron: 'switch', yuzu: 'switch', sudachi: 'switch', suyu: 'switch', torzu: 'switch', switch: 'switch', rpcs3: 'ps3', ps3: 'ps3', ppsspp: 'psp', psp: 'psp', vita3k: 'vita', vita: 'vita', shadps4: 'ps4', ps4: 'ps4', pcsx2: 'ps2', ps2: 'ps2', duckstation: 'ps1', ps1: 'ps1', dolphin: 'gc', gc: 'gc', cemu: 'wiiu', wiiu: 'wiiu', azahar: '3ds', '3ds': '3ds', xenia: 'x360', x360: 'x360', retroarch: 'retroarch' };
+const FAMILY = { eden: 'switch', lichii: 'switch', citron: 'switch', yuzu: 'switch', sudachi: 'switch', suyu: 'switch', torzu: 'switch', switch: 'switch', rpcs3: 'ps3', ps3: 'ps3', ppsspp: 'psp', psp: 'psp', vita3k: 'vita', vita: 'vita', shadps4: 'ps4', ps4: 'ps4', pcsx2: 'ps2', ps2: 'ps2', duckstation: 'ps1', ps1: 'ps1', dolphin: 'gc', gc: 'gc', cemu: 'wiiu', wiiu: 'wiiu', azahar: '3ds', '3ds': '3ds', xenia: 'x360', x360: 'x360', retroarch: 'retroarch' };
 const familyOf = (x) => FAMILY[x] || x;
 const MEMBERS = (fam) => SUPPORTED.filter((e) => familyOf(e) === fam);
 const FAMILY_LABEL = { recomp: 'Recomp', switch: 'Switch', ps3: 'RPCS3', psp: 'PPSSPP', vita: 'Vita3K', ps4: 'shadPS4', ps2: 'PCSX2', ps1: 'DuckStation', gc: 'Dolphin', wiiu: 'Cemu', '3ds': 'Azahar', x360: 'Xenia', retroarch: 'RetroArch' };
@@ -49,7 +49,7 @@ const labelOf = (x) => LABEL[x] || FAMILY_LABEL[x] || x;
 // platforms"). A game can be in the library on several consoles under one name (Ratchet & Clank: Size Matters on PSP
 // and PS2); a save is only ever filed under, matched to or shown for a game of its own console. RetroArch plays many
 // consoles: any game fits.
-const FAMILY_SLUGS = { switch: /^switch$/, ps3: /^ps3$/, psp: /^psp$/, vita: /^(psvita|vita)$/, ps4: /^ps4$/, ps2: /^ps2$/, ps1: /^(psx|ps1|ps)$/, gc: /^(ngc|gc|gamecube|wii)$/, wiiu: /^wiiu$/, '3ds': /^(3ds|n3ds|new-nintendo-3ds)$/, x360: /^xbox-?360$/ };
+const FAMILY_SLUGS = { switch: /^(switch|switch-?2|switch_2|nintendo-switch-2|ns2)$/, ps3: /^ps3$/, psp: /^psp$/, vita: /^(psvita|vita)$/, ps4: /^ps4$/, ps2: /^ps2$/, ps1: /^(psx|ps1|ps)$/, gc: /^(ngc|gc|gamecube|wii)$/, wiiu: /^wiiu$/, '3ds': /^(3ds|n3ds|new-nintendo-3ds)$/, x360: /^xbox-?360$/ };
 // does a game with these RomM slugs fit a save of this emulator or family? unknown slugs fit (nothing to go on)
 function fitsConsole(emuOrFamily, slugs) {
   const re = FAMILY_SLUGS[familyOf(emuOrFamily)]; if (!re) return true;
@@ -67,7 +67,7 @@ const remotesFor = (all, u) => (all || []).filter((r) => { const p = parseSlot(r
 function shape(s) {
   const p = s.path, b = path.basename(p);
   switch (s.emu) {
-    case 'eden': case 'citron': case 'yuzu': case 'sudachi': case 'suyu': case 'torzu': { const m = /nand\/user\/save\/(0000000000000000\/[^/]+|account\/[^/]+)\/([0-9A-Fa-f]{16})$/.exec(p); return m ? { key: 'switch:' + m[2].toUpperCase(), kind: 'dir' } : null; }
+    case 'eden': case 'lichii': case 'citron': case 'yuzu': case 'sudachi': case 'suyu': case 'torzu': { const m = /nand\/user\/save\/(0000000000000000\/[^/]+|account\/[^/]+)\/([0-9A-Fa-f]{16})$/.exec(p); return m ? { key: 'switch:' + m[2].toUpperCase(), kind: 'dir' } : null; }
     case 'rpcs3': return { key: 'ps3:' + b, kind: 'dir' };
     case 'ppsspp': return { key: 'psp:' + b, kind: 'dir' };
     case 'vita3k': return { key: 'vita:' + b, kind: 'dir' };
@@ -349,8 +349,8 @@ function writeUnit(u, files, target, backupsRoot) {
 }
 
 // is the emulator running? (never write its saves under it). procs: lines of /proc/*/cmdline
-const SW_RUN = /\b(eden|citron|yuzu|sudachi|suyu|torzu)\b/i; // any of the family: Linked Folders can give them one save folder
-const RUN_MARK = { eden: SW_RUN, citron: SW_RUN, yuzu: SW_RUN, sudachi: SW_RUN, suyu: SW_RUN, torzu: SW_RUN, rpcs3: /rpcs3/i, ppsspp: /ppsspp/i, vita3k: /vita3k/i, shadps4: /shadps4/i, pcsx2: /pcsx2/i, duckstation: /duckstation/i, dolphin: /dolphin-emu|DolphinEmu/i, cemu: /\bcemu\b/i, azahar: /azahar|citra/i, xenia: /xenia/i, retroarch: /retroarch/i };
+const SW_RUN = /\b(eden|lichii|citron|yuzu|sudachi|suyu|torzu)\b/i; // any of the family: Linked Folders can give them one save folder
+const RUN_MARK = { eden: SW_RUN, lichii: SW_RUN, citron: SW_RUN, yuzu: SW_RUN, sudachi: SW_RUN, suyu: SW_RUN, torzu: SW_RUN, rpcs3: /rpcs3/i, ppsspp: /ppsspp/i, vita3k: /vita3k/i, shadps4: /shadps4/i, pcsx2: /pcsx2/i, duckstation: /duckstation/i, dolphin: /dolphin-emu|DolphinEmu/i, cemu: /\bcemu\b/i, azahar: /azahar|citra/i, xenia: /xenia/i, retroarch: /retroarch/i };
 // 0.9.58: judged by the program actually running, never by text anywhere in a command line. Matching "eden" anywhere
 // counted a file manager, an editor, a shell or a script naming a path with "eden" in it as Eden being open, and that
 // save was skipped as "busy" every time. A process counts when its program (argv[0]) is the emulator (an AppImage, its

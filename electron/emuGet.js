@@ -29,6 +29,7 @@ const CATALOG = [
   { key: 'psvita', name: 'PS Vita', emus: [GH('vita3k', 'Vita3K.AppImage')] },
   { key: 'gc', name: 'GameCube and Wii', emus: [FP('dolphin', 'org.DolphinEmu.dolphin-emu'), FP('primehack', 'io.github.shiiion.primehack')] },
   { key: 'wiiu', name: 'Wii U', emus: [GH('cemu', 'Cemu.AppImage', { fp: 'info.cemu.Cemu' })] },
+  { key: 'ns2', name: 'Switch 2', emus: [GH('lichii', 'Lichii.AppImage')] }, // 0.9.98 (owner): Lichii, the Switch 2 emulator
   { key: 'switch', name: 'Switch', emus: [GH('eden', 'Eden.AppImage', { fp: 'dev.eden_emu.eden' }), GH('ryujinx', 'Ryujinx.AppImage', { fp: 'io.github.ryubing.Ryujinx' })] },
   { key: 'n3ds', name: 'Nintendo 3DS', emus: [GH('azahar', 'azahar.AppImage', { fp: 'org.azahar_emu.Azahar' })] },
   { key: 'nds', name: 'Nintendo DS', emus: [FP('melonds', 'net.kuribo64.melonDS')] },
@@ -45,7 +46,7 @@ const CATALOG = [
 ];
 let appsDir = null; // set from config: <drive>/Emulation/emulators when the user picked a drive (0.9.17)
 // ES-DE's console folder names, for the Emulation folder Cartridge makes on the drive the user picks
-const ESDE = ['3do', 'arcade', 'atari2600', 'dreamcast', 'gamecube', 'gb', 'gba', 'gbc', 'genesis', 'mastersystem', 'megacd', 'n3ds', 'n64', 'nds', 'neogeo', 'nes', 'pcengine', 'ps2', 'ps3', 'ps4', 'psp', 'psvita', 'psx', 'saturn', 'segacd', 'snes', 'switch', 'switch2', 'wii', 'wiiu', 'xbox', 'xbox360'];
+const ESDE = ['3do', 'arcade', 'atari2600', 'dreamcast', 'gamecube', 'gb', 'gba', 'gbc', 'genesis', 'mastersystem', 'megacd', 'n3ds', 'n64', 'nds', 'neogeo', 'nes', 'pcengine', 'ps2', 'ps3', 'ps4', 'psp', 'psvita', 'psx', 'saturn', 'segacd', 'snes', 'switch', 'ns2', 'wii', 'wiiu', 'xbox', 'xbox360'];
 const APPS = () => appsDir || path.join(os.homedir(), 'Applications');
 const setAppsDir = (d) => { appsDir = d || null; };
 function plainEnv() { const env = { ...process.env }; for (const k of ['LD_PRELOAD', 'LD_LIBRARY_PATH', 'APPDIR', 'APPIMAGE', 'ARGV0', 'OWD']) delete env[k]; return env; }

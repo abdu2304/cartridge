@@ -329,7 +329,7 @@ async function installLink() {
   ghCalling = false;
   off?.();
 }
-const SLUG = { psx: 'psx', ps2: 'ps2', ps3: 'ps3', ps4: 'ps4', ps5: 'ps5', psp: 'psp', psvita: 'psvita', gc: 'ngc', wiiu: 'wiiu', switch: 'switch', n3ds: '3ds', nds: 'nds', gba: 'gba', n64: 'n64', xbox: 'xbox', dreamcast: 'dc', xbox360: 'xbox360', saturn: 'saturn', arcade: 'arcade' };
+const SLUG = { psx: 'psx', ps2: 'ps2', ps3: 'ps3', ps4: 'ps4', ps5: 'ps5', psp: 'psp', psvita: 'psvita', gc: 'ngc', wiiu: 'wiiu', switch: 'switch', ns2: 'switch', n3ds: '3ds', nds: 'nds', gba: 'gba', n64: 'n64', xbox: 'xbox', dreamcast: 'dc', xbox360: 'xbox360', saturn: 'saturn', arcade: 'arcade' };
 const phase = ref(props.flow ? (store.config.emuDir ? 'pick' : 'where') : 'list');
 // 0.9.37 (owner: after Location it skipped to the welcome's next step): the welcome shows its own Continue only
 // once installing has started, and focus stays in here while a step loads

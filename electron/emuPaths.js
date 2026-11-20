@@ -97,14 +97,14 @@ const ROWS = {
   // PPSSPP looks. Nothing is deleted.
   ppsspp: [['PSP', 'Memory Stick (PSP)', 'Saves, save states, textures and cheats']],
 };
-const NAMES = { pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', yuzu: 'Yuzu', eden: 'Eden', citron: 'Citron', azahar: 'Azahar', citra: 'Citra', ryujinx: 'Ryujinx', cemu: 'Cemu', rpcs3: 'RPCS3', shadps4: 'shadPS4', vita3k: 'Vita3K', ppsspp: 'PPSSPP' };
+const NAMES = { pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', yuzu: 'Yuzu', eden: 'Eden', lichii: 'Lichii', citron: 'Citron', azahar: 'Azahar', citra: 'Citra', ryujinx: 'Ryujinx', cemu: 'Cemu', rpcs3: 'RPCS3', shadps4: 'shadPS4', vita3k: 'Vita3K', ppsspp: 'PPSSPP' };
 
 // where each one's settings file is, from what's on this device (the same places add-ons look)
 function locate(id, home = os.homedir()) {
   const env = process.env, cfg = env.XDG_CONFIG_HOME || path.join(home, '.config'), data = env.XDG_DATA_HOME || path.join(home, '.local/share');
-  const kind = /^(eden|citron|yuzu)$/.test(id) ? 'yuzu' : id === 'citra' ? 'azahar' : id;
+  const kind = /^(eden|lichii|citron|yuzu)$/.test(id) ? 'yuzu' : id === 'citra' ? 'azahar' : id;
   if (['pcsx2', 'duckstation', 'dolphin', 'yuzu', 'azahar', 'ryujinx', 'cemu'].includes(kind)) {
-    const e = require('./addons').emulators(home).find((x) => x.id === id || (kind === 'yuzu' && /^(eden|citron|yuzu)$/.test(x.id) && x.id === id) || (kind === 'azahar' && /^(azahar|citra)$/.test(x.id) && x.id === id));
+    const e = require('./addons').emulators(home).find((x) => x.id === id || (kind === 'yuzu' && /^(eden|lichii|citron|yuzu)$/.test(x.id) && x.id === id) || (kind === 'azahar' && /^(azahar|citra)$/.test(x.id) && x.id === id));
     if (!e) return null;
     return { id, kind, file: e.settings, root: e.root, cfgDir: path.dirname(e.settings) };
   }

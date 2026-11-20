@@ -2230,7 +2230,7 @@ async function downloadBios(platformId, slug) {
   // 0.9.17: copied into each emulator set up here that reads it from its own folder (never over a file)
   const key = { dc: 'dreamcast', 'sega-cd': 'segacd', megacd: 'segacd', 'pc-engine-cd': 'pcenginecd', 'turbografx-cd': 'pcenginecd', vita: 'psvita' }[slug] || slug;
   const placed = require('./bios').place(key, dir, { roots: emuRootsAll(), steamRoots: steamMgr.steamRoots?.() || [] });
-  if (key === 'switch') placed.push(...(await switchFirmware(list.filter((f) => /\.zip$/i.test(f.file_name)).map((f) => path.join(dir, f.file_name)))));
+  if (key === 'switch' || key === 'ns2') placed.push(...(await switchFirmware(list.filter((f) => /\.zip$/i.test(f.file_name)).map((f) => path.join(dir, f.file_name)))));
   if (placed.length) log('bios placed', key, placed.length);
   return { count: list.length, files: done, dir, installed, emu, placed: placed.length };
 }
@@ -2283,7 +2283,7 @@ async function biosSetup({ install = true } = {}) {
         } else if (!before.ok) why = 'Not in your BIOS folder: get it from RomM';
       } else {
         for (const d of dirs) copied += B.place(key, d, { roots, steamRoots }).length;
-        if (key === 'switch') copied += (await switchFirmware(filesIn(/\.zip$/i).filter((f) => !/^(neogeo|pgm|naomi|awbios|hod2bios|skns|stvbios|cpzn\d|taitofx1|coh\d+)\.zip$/i.test(path.basename(f))))).length; // a zip with .nca files in it
+        if (key === 'switch' || key === 'ns2') copied += (await switchFirmware(filesIn(/\.zip$/i).filter((f) => !/^(neogeo|pgm|naomi|awbios|hod2bios|skns|stvbios|cpzn\d|taitofx1|coh\d+)\.zip$/i.test(path.basename(f))))).length; // a zip with .nca files in it
       }
       const after = B.status(key, opts);
       out.push({ key, label: after.label, ok: after.ok, optional: after.optional, where: after.where, look: after.look, names: after.names || [], hint: after.hint, copied, installed, why: after.ok ? '' : why || (after.optional ? '' : 'Not found in your BIOS folder') });
