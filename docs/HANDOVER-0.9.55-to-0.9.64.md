@@ -982,3 +982,13 @@ Batch 5 of the "make it OP" list. A game's Game Settings → Best for This Devic
 - Not checked on a device: the DMI names (Valve's Jupiter and Galileo are well known; the others are from vendor model numbers), and whether the suggestions feel right in play. Ask the owner on the Deck and the PC.
 - Next: suggestions for the emulators whose settings come from their own source lists (Eden, Azahar, Cemu, Vita3K, Xenia, shadPS4) once their resolution keys are pinned per version.
 
+## Part 44. 0.9.97 · Smoother (20 Nov 2026)
+Batch 6, the last of the "make it OP" list. Kept to fixes: status pills in Light (red and green were pale pastel on pale pills) and the pills on a focused row when the highlight is dark. Bigger design ideas need the owner's say, so they were offered instead of built:
+- A cover for clips in Captures (a frame from the clip instead of the dark tile).
+- Matching Dolphin and PPSSPP screenshots named by disc ID to their games (through the IDs Cartridge already reads).
+- Best for This Device for Eden, Azahar, Cemu, Vita3K, Xenia and shadPS4.
+- A firewalld rule offered from Phone Remote if a Bazzite owner's phone can't reach it.
+
+### The whole "make it OP" run (0.9.92 to 0.9.97, 20 Nov 2026)
+0.9.92 Quick on Its Feet (audit and speed, Switch 2 folder), 0.9.93 Launch Check, 0.9.94 Phone Remote, 0.9.95 Captures, 0.9.96 Best for This Device, 0.9.97 Smoother. Also: the Nightly and Beta builds, broken since 0.9.71, work again (prerelease.js). Every batch: unit tests, a real-app e2e added to e2e.yml, audit:ui in all six looks, screenshots looked at. None of it has been tried on the owner's devices yet; Part 9 lists what to ask.
+
