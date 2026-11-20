@@ -49,6 +49,29 @@ const sum = (r) => r?.error ? 'ERROR ' + r.error : (r?.items || []).filter((x) =
       });
       check(`${name}: after Apply, games with an emulator are in Steam; without one they say what to do`, !wrong.length, GAMES.map((g) => `${g.plat[1]}=${sum(after[g.id])}`).join(' '));
       if (name === 'none') check('none: no emulator anywhere is said for every game', GAMES.every((g) => after[g.id]?.items?.some((x) => x.id === 'emu' && x.level === 'bad' && x.fix?.id === 'emu-page')));
+      // the real Play button: something in the way opens Launch Check instead of starting; B leaves without starting
+      const gp = GAMES.find((g) => after[g.id] && !after[g.id].clear) || null;
+      if (gp) {
+        const { page } = t;
+        await page.evaluate((id) => window.__cartStore.go('game', { romId: id }), gp.id); await wait(1800);
+        await page.click('button.btn.primary.ok.xl').catch(() => {}); await wait(1500);
+        const shown = await page.evaluate(() => ({ lc: !!document.querySelector('.dialog.lc'), rows: document.querySelectorAll('.dialog.lc .lc-row').length, focus: document.activeElement?.classList.contains('lc-row') || document.activeElement?.classList.contains('btn'), starting: !!window.__cartStore.starting }));
+        check(`${name}: Play on ${gp.plat[1]} opens Launch Check, focused, and doesn't start the game`, shown.lc && shown.rows > 0 && shown.focus && !shown.starting, JSON.stringify(shown));
+        await page.keyboard.press('Escape'); await wait(700);
+        const gone = await page.evaluate(() => ({ lc: !!document.querySelector('.dialog.lc'), starting: !!window.__cartStore.starting }));
+        check(`${name}: B closes it and nothing starts`, !gone.lc && !gone.starting, JSON.stringify(gone));
+      }
+      // nothing in the way (warnings only): Play goes straight on, with no Launch Check in between
+      const gc = GAMES.find((g) => after[g.id]?.clear) || null;
+      if (gc) {
+        const { page } = t;
+        await page.evaluate(() => window.__cartStore.closeModal(null)).catch(() => {});
+        await page.evaluate((id) => window.__cartStore.go('game', { romId: id }), gc.id); await wait(1800);
+        await page.click('button.btn.primary.ok.xl').catch(() => {}); await wait(600);
+        const st = await page.evaluate(() => ({ lc: !!document.querySelector('.dialog.lc'), starting: !!window.__cartStore.starting || !!document.querySelector('.gs-scrim') }));
+        check(`${name}: Play on ${gc.plat[1]} (nothing in the way) starts with no Launch Check`, !st.lc && st.starting, JSON.stringify(st));
+        await page.keyboard.press('Escape'); await wait(500);
+      }
       // a game whose file went missing
       const g0 = GAMES[0], file = (await call('dl:list')).find((d) => d.romId === g0.id)?.path;
       const inst = await call('installed:get').catch(() => null);

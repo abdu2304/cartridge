@@ -69,10 +69,11 @@ onBeforeUnmount(() => layer?.pop());
 .lc-row.bad .lc-ic { color: #ffa39c; }
 .lc-row.warn .lc-ic { color: #ffd978; }
 .lc-row.ok .lc-ic { color: var(--green-l); }
-.lc-row:focus-visible .lc-ic, :global(.pad-mode .lc-row:focus .lc-ic) { color: var(--on-focus); }
+.lc-row:focus-visible .lc-ic { color: var(--on-focus); }
+:global(.pad-mode .lc-row:focus .lc-ic) { color: var(--on-focus); } /* its own rule: beside a scoped selector it compiled to a bare .pad-mode (designRules test) */
 .lc-foot { justify-content: flex-end; gap: var(--s-2); flex-wrap: wrap; }
 /* Light: the softer pill colours read on a bright panel */
-:global(body.theme-light .lc-mark.bad), :global(body.theme-light .lc-row.bad .lc-ic) { color: #c4302b; }
-:global(body.theme-light .lc-mark.ok), :global(body.theme-light .lc-row.ok .lc-ic) { color: #1f7a33; }
-:global(body.theme-light .lc-row.warn .lc-ic) { color: #a8750a; }
+:global(body.theme-light .lc-mark.bad), :global(body.theme-light .lc-row.bad:not(:focus) .lc-ic) { color: #c4302b; }
+:global(body.theme-light .lc-mark.ok), :global(body.theme-light .lc-row.ok:not(:focus) .lc-ic) { color: #1f7a33; }
+:global(body.theme-light .lc-row.warn:not(:focus) .lc-ic) { color: #a8750a; }
 </style>
