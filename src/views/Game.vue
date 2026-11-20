@@ -653,6 +653,9 @@ async function more() {
     play.push({ label: 'Host This Game Online', sub: `Starts it in RetroArch for friends to join (port ${ra.port})`, value: 'rahost', icon: 'mdiAccountMultiplePlusOutline' });
     play.push({ label: 'Join a Friend’s Game', sub: 'Type their address and start it in RetroArch', value: 'rajoin', icon: 'mdiLanConnect' });
   }
+  // Captures (0.9.95): this game's screenshots and clips, when it has any (the scan is kept a minute)
+  const capN = await Promise.race([call('captures:count', { romId: Number(props.romId) }).catch(() => 0), new Promise((r) => setTimeout(() => r(0), 1200))]);
+  if (capN) play.push({ label: 'Captures', sub: `${capN} ${capN === 1 ? 'screenshot or clip' : 'screenshots and clips'}`, value: 'captures', icon: 'mdiImageMultipleOutline' });
   if (installedPath.value) play.push({ label: 'Launch Check', sub: 'What could stop it starting, each with its fix', value: 'launchcheck', icon: 'mdiStethoscope' }); // 0.9.93
   if (installedPath.value && !marked.value) play.push({ label: 'Game settings', sub: `${pe || (/\bpsx\b/i.test(slugs) ? 'DuckStation' : 'The emulator')}’s settings for this game only`, value: 'gamesettings', icon: 'mdiTune' });
   // patches and cheats are in Game Add-ons (0.9.24, owner: no separate row for them here)
@@ -761,6 +764,7 @@ async function more() {
   if (v === 'trophies') { await linkTrophies(); return; }
   if (v === 'path') { toast(installedPath.value, 'info', 5000, 'mdiFolder'); return; }
   if (v === 'cloudsaves') return cloudSaves();
+  if (v === 'captures') { openModal('captures', { romId: Number(props.romId), name: base.value?.name || '' }); return; }
   if (v === 'launchcheck') { const { launchGate } = await import('../launchFix.js'); if (await launchGate({ romId: Number(props.romId) }, { always: true })) playNow({ checked: true }); return; }
   if (v === 'saves') {
     // 0.9.92: read here (the menu's own list lived in the function that built the menu, so this threw and the row did nothing)
