@@ -1135,6 +1135,20 @@ function screenWidth() {
 }
 async function handleImage(request) {
   const u = new URL(request.url);
+  // Captures (0.9.95): a screenshot or clip by its token only (never a path from the page); pictures sized like covers,
+  // clips streamed by Chromium's own file fetch so they can seek
+  const capId = u.searchParams.get('cap');
+  if (capId) {
+    const c = capCache.byId.get(capId);
+    if (!c) return new Response('nf', { status: 404 });
+    if (c.kind === 'video') return require('electron').net.fetch(require('url').pathToFileURL(c.path).toString(), { headers: request.headers });
+    try {
+      const buf = await fsp.readFile(c.path), type = /\.png$/i.test(c.path) ? 'image/png' : /\.webp$/i.test(c.path) ? 'image/webp' : /\.bmp$/i.test(c.path) ? 'image/bmp' : 'image/jpeg';
+      const want = Math.min(2000, Number(u.searchParams.get('w')) || 0);
+      const sz = want ? await sizedImage(buf, type, want, path.join(IMG_CACHE, 'cap-' + capId + '-' + Math.round(c.at)), true) : null;
+      return new Response(sz ? sz.buf : buf, { headers: { 'Content-Type': sz ? sz.type : type, 'Cache-Control': 'max-age=86400' } });
+    } catch { return new Response('nf', { status: 404 }); }
+  }
   const sl = u.searchParams.get('sys');
   if (sl && u.searchParams.get('png')) {
     try { return new Response(await fsp.readFile(path.join(__dirname, '../build/syslogos', path.basename(sl) + '.png')), { headers: { 'Content-Type': 'image/png' } }); } catch { return new Response('nf', { status: 404 }); }
@@ -3311,6 +3325,20 @@ async function freshCemuPacks(romId, force = false) {
   } catch (e) { log('cemu graphic packs download failed:', e.message); if (force) throw new Error('Cemu\'s graphic packs couldn\'t be downloaded: ' + e.message); return fs.existsSync(path.join(st.dir.root, 'graphicPacks')) ? '' : 'Cemu\'s graphic packs couldn\'t be downloaded: ' + e.message; }
 }
 // An emulator installed from a GitHub link, set up once its program is known (0.9.24, 0.9.32 for folders)
+// Captures (0.9.95, electron/captures.js): scanned when asked for, kept a minute; the page gets tokens, not paths
+let capCache = { at: 0, items: [], byId: new Map(), running: null };
+function capturesScan(force) {
+  if (!force && Date.now() - capCache.at < 60e3) return Promise.resolve(capCache.items);
+  if (capCache.running) return capCache.running;
+  capCache.running = (async () => {
+    let steam = { dirs: [], apps: {} }; try { steam = steamMgr.captureSteam(); } catch {}
+    const roms = [...romIndexMain().values()].map((r) => ({ id: r.id, name: r.name || r.fs_name_no_ext || '' }));
+    const items = await require('./captures').scan({ home: os.homedir(), emulationRoots: emuRootsAll(), steam, roms }).catch((e) => { log('captures scan failed', e.message); return []; });
+    capCache = { at: Date.now(), items, byId: new Map(items.map((i) => [i.id, i])), running: null };
+    return items;
+  })();
+  return capCache.running;
+}
 let customPending = null, phoneLinkNow = null;
 // Phone Remote (0.9.94): what the phone's page asks for, answered from what Cartridge already has
 let remoteNow = null;
@@ -6242,6 +6270,14 @@ const handlers = {
   'app:info': () => ({ version: versionName(), number: app.getVersion(), gamescope: isGamescope(), userData: USER_DATA, gpu: useGpu, home: os.homedir(), hostname: os.hostname() }),
   'app:scale': () => { const [w, h] = win.getContentSize(); return { auto: autoZoom(), current: currentZoom(), w, h, display }; },
   'app:quit': () => app.quit(),
+  // Captures (0.9.95): every capture (or one game's), newest first, with the game's name; Show in Folder by token
+  'captures:list': async ({ romId, fresh } = {}) => {
+    const items = await capturesScan(!!fresh), idx = romIndexMain(), home = os.homedir();
+    const want = romId != null ? Number(romId) : null;
+    return items.filter((i) => want == null || i.romId === want).map((i) => ({ id: i.id, kind: i.kind, at: i.at, size: i.size, source: i.source, romId: i.romId, game: (i.romId != null && idx.get(i.romId)?.name) || i.title || '', file: path.basename(i.path), where: path.dirname(i.path).replace(home, '~') }));
+  },
+  'captures:count': async ({ romId }) => (await capturesScan(false)).filter((i) => i.romId === Number(romId)).length,
+  'captures:show': ({ id }) => { const c = capCache.byId.get(String(id)); if (!c) throw new Error('That capture isn’t there any more.'); shell.showItemInFolder(c.path); return true; },
   'app:screenshot': async () => {
     const dir = path.join(app.getPath('pictures'), 'Cartridge');
     await fsp.mkdir(dir, { recursive: true });

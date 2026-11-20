@@ -295,6 +295,9 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 
 ## Part 9. Open items, unverified work and what to ask the owner
 
+**From 0.9.95 (Captures, Part 42):**
+- Ask the owner whether their Deck screenshots of Cartridge's games show under the right game, and which emulators' captures are missing or unmatched.
+
 **From 0.9.94 (Phone Remote, Part 41):**
 - Not tried with a real phone. Bazzite's firewalld default zone should allow its high port (Part 41); if the phone can't open the page, offer a firewalld rule from the pop-up.
 
@@ -963,4 +966,10 @@ Batch 2 of the owner's "make it OP" list. Before Play, Cartridge checks what wou
 Batch 3 of the "make it OP" list. Settings → Controls → Phone Remote: a QR code opens a page on the phone with the library (search, covers, Download, Show on TV), downloads with progress, and a remote with a D-pad and buttons that steer Cartridge. Home network only, a secret address kept until New Address, off after 3 hours with no phone. Code and reasons: docs/VERSIONS.md 0.9.94.
 - Checked: `npm test`, `vite build`, `test/e2e/phoneremote.js` (19 checks in the real app), audit:ui with the pop-up on, screenshots of the pop-up in Plain, Glass and Light and of the phone page at 390x844 (no sideways scroll).
 - Not checked on a device: a real phone on a real home network, Show on TV and the remote in Game Mode, and the firewall: SteamOS has none by default; Bazzite and other Fedora-based systems run firewalld, whose default FedoraWorkstation zone allows ports 1025 to 65535, and Phone Remote always listens on a high port, so it should get through. Unconfirmed: if the phone can't open the page on a device, a firewalld rule offered from the pop-up is the fix (not built).
+
+## Part 42. 0.9.95 · Captures (20 Nov 2026)
+Batch 4 of the "make it OP" list. Start → Quick Menu → Captures, and a game's More → Captures: every screenshot and clip from Steam (Cartridge's own shortcuts) and the emulators' own folders (native, Flatpak, EmuDeck), matched to the game by name, in a gallery with a big view. Read only. Code and reasons: docs/VERSIONS.md 0.9.95.
+- Checked: `npm test`, `vite build`, `test/e2e/captures.js` (13 checks in the real app), audit:ui with the gallery open, screenshots of the grid and the big view.
+- Not checked on a device: real Steam screenshots from the Deck's button (folder per shortcut appid is Steam's documented layout, but the owner's own should be looked at), real emulator file names beyond RetroArch, PCSX2, Dolphin, PPSSPP; clips from Steam Game Recording are not included (Steam keeps them as stream fragments, not files a player opens).
+- Next: match disc-ID names (Dolphin, PPSSPP) through the IDs Cartridge already reads (CIDE).
 

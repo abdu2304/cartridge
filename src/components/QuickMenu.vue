@@ -36,6 +36,7 @@
       </div>
 
       <div class="qm-list">
+        <button class="qm-item" data-focus @click="openCaptures"><Icon name="mdiImageMultipleOutline" :size="22" /><div><b>Captures</b><small>Screenshots and clips from your games</small></div></button>
         <button class="qm-item" data-focus @click="rescan"><Icon name="mdiHarddisk" :size="22" /><div><b>Rescan This Device</b><small>Refresh which games are installed</small></div></button>
         <button class="qm-item" data-focus @click="checkUpdate"><Icon name="mdiCloudDownloadOutline" :size="22" /><div><b>Check for Updates</b><small>{{ updLabel }}</small></div></button>
         <button class="qm-item" data-focus @click="nav('settings')"><Icon name="mdiCog" :size="22" /><div><b>Settings</b><small>Library, emulators, Steam, look</small></div></button>
@@ -47,7 +48,7 @@
 </template>
 <script setup>
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
-import { store, call, refreshLibrary, tab, ago, saveConfig, toast } from '../store.js';
+import { store, call, refreshLibrary, tab, ago, saveConfig, toast, openModal } from '../store.js';
 import { pushLayer, focusFirst } from '../nav.js';
 import { setSoundEnabled } from '../sfx.js';
 import Icon from './Icon.vue';
@@ -82,6 +83,7 @@ async function shot() {
   await new Promise((r) => setTimeout(r, 450));
   try { const f = await call('app:screenshot'); toast(`Screenshot saved: ${f.split('/').pop()}`, 'ok', 3000, 'mdiCamera'); } catch (e) { toast(e.message, 'error'); }
 }
+function openCaptures() { close(); openModal('captures', {}); } // 0.9.95
 async function rescan() { await call('installed:rescan'); toast('Device rescanned', 'ok', 2000, 'mdiHarddisk'); }
 async function toggleSounds() { const v = !store.config.ui.sounds; await saveConfig({ ui: { sounds: v } }); setSoundEnabled(v); }
 const togglePerf = () => saveConfig({ ui: { perfOverlay: !store.config.ui.perfOverlay } });

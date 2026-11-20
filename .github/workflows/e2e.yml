@@ -39,6 +39,8 @@ jobs:
         run: xvfb-run -a node test/e2e/starting.js
       - name: How long each page's data takes
         run: xvfb-run -a node test/e2e/timings.js
+      - name: Captures from Steam and emulator folders
+        run: xvfb-run -a node test/e2e/captures.js
       - name: Phone Remote, opened as a phone opens it
         run: xvfb-run -a node test/e2e/phoneremote.js
       - name: Launch Check before Play, in each setup
