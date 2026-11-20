@@ -5719,6 +5719,24 @@ const handlers = {
     return true;
   },
   'gamesettings:get': ({ romId }) => { const c = gameSettingsCtx(Number(romId)); if (c.why) return { why: c.why, emu: c.emu }; c.emuVersion = emuVersionFor(c.emu, Number(romId)); const d = require('./gameSettings').describe(c); if (d && c.fork) { d.parentName = d.name; d.name = forkTitle(d.name, c.fork); d.fork = c.fork; } return d; }, // 0.9.64: a fork's own settings say so
+  // Best for This Device (0.9.96, electron/bestSettings.js): what this device is, and the changes that suit it for this
+  // game's emulator; only settings its Game Settings shows, not locked, and not already set that way
+  'gamesettings:best': ({ romId }) => {
+    const B = require('./bestSettings');
+    const d = handlers['gamesettings:get']({ romId });
+    if (!d || d.why || !d.items?.length) return { device: null, changes: [] };
+    let screenH = 1080;
+    try { const disp = win ? screen.getDisplayMatching(win.getBounds()) : screen.getPrimaryDisplay(); screenH = Math.round(disp.size.height * (disp.scaleFactor || 1)); } catch {}
+    const dev = B.detect({ cpus: os.cpus().length, memGB: os.totalmem() / 2 ** 30, screenH });
+    const c = gameSettingsCtx(Number(romId));
+    const items = new Map(d.items.map((x) => [x.id, x]));
+    const changes = B.recommend(c.emu, dev).filter((r) => items.has(r.id) && !items.get(r.id).locked && String(items.get(r.id).game ?? '') !== String(r.value)).map((r) => {
+      const it = items.get(r.id), o = (it.options || []).find((x) => String(x.value) === String(r.value));
+      return { id: r.id, value: r.value, label: it.label, valueLabel: o?.label || String(r.value), why: r.why };
+    });
+    log('best settings', c.emu, dev.name, dev.tier, screenH, changes.map((x) => x.id + '=' + x.value).join(' '));
+    return { device: { name: dev.name, kind: B.TIER[dev.tier] || '', screenH }, changes, emu: d.name };
+  },
   'gamesettings:set': ({ romId, changes }) => {
     const c = gameSettingsCtx(Number(romId));
     if (c.why) throw new Error(c.why);

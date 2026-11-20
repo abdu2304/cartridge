@@ -53,7 +53,9 @@ const another = (it) => {
 };
 const walk = (d) => { const out = []; const go = (x) => { let e; try { e = fs.readdirSync(x, { withFileTypes: true }); } catch { return; } for (const k of e) { const p = path.join(x, k.name); if (k.isDirectory()) go(p); else out.push(p); } }; go(d); return out; };
 
-(async () => {
+// 0.9.96: test/e2e/bestsettings.js uses the same games and settings files
+module.exports = { CASES, GAMES, readable };
+if (require.main === module) (async () => {
   const srv = await mock.start({ games: 0, extra: { games: GAMES } });
   const t = await launch('flatpaks', srv);
   const { errors, home, roms } = t;

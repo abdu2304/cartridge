@@ -295,6 +295,9 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 
 ## Part 9. Open items, unverified work and what to ask the owner
 
+**From 0.9.96 (Best for This Device, Part 43):**
+- Ask the owner whether the suggested settings run well on the Deck and the PC, and whether the device name shown is right.
+
 **From 0.9.95 (Captures, Part 42):**
 - Ask the owner whether their Deck screenshots of Cartridge's games show under the right game, and which emulators' captures are missing or unmatched.
 
@@ -972,4 +975,10 @@ Batch 4 of the "make it OP" list. Start → Quick Menu → Captures, and a game'
 - Checked: `npm test`, `vite build`, `test/e2e/captures.js` (13 checks in the real app), audit:ui with the gallery open, screenshots of the grid and the big view.
 - Not checked on a device: real Steam screenshots from the Deck's button (folder per shortcut appid is Steam's documented layout, but the owner's own should be looked at), real emulator file names beyond RetroArch, PCSX2, Dolphin, PPSSPP; clips from Steam Game Recording are not included (Steam keeps them as stream fragments, not files a player opens).
 - Next: match disc-ID names (Dolphin, PPSSPP) through the IDs Cartridge already reads (CIDE).
+
+## Part 43. 0.9.96 · Best for This Device (20 Nov 2026)
+Batch 5 of the "make it OP" list. A game's Game Settings → Best for This Device: Cartridge names the device (Steam Deck LCD or OLED, ROG Ally, Legion Go, or a PC by its parts), and suggests the renderer and resolution that suit it and the screen it shows on, for RPCS3, PCSX2, DuckStation, Dolphin and PPSSPP. You see each change and why first; Back to the emulator's own undoes it. Code and reasons: docs/VERSIONS.md 0.9.96.
+- Checked: `npm test`, `vite build`, `test/e2e/bestsettings.js` (28 checks in the real app), the Game Settings e2e still passing with its cases exported, audit:ui.
+- Not checked on a device: the DMI names (Valve's Jupiter and Galileo are well known; the others are from vendor model numbers), and whether the suggestions feel right in play. Ask the owner on the Deck and the PC.
+- Next: suggestions for the emulators whose settings come from their own source lists (Eden, Azahar, Cemu, Vita3K, Xenia, shadPS4) once their resolution keys are pinned per version.
 

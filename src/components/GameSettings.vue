@@ -35,6 +35,7 @@
         </template>
       </div>
       <div class="row" style="justify-content: flex-end">
+        <button v-if="!recomp && d?.items?.length" class="btn" data-focus data-key="best" :disabled="busy" @click="best"><Icon name="mdiAutoFix" />Best for This Device</button>
         <button v-if="d?.items?.some((x) => x.game != null)" class="btn" data-focus :disabled="busy" @click="resetAll"><Icon name="mdiRestore" />Back to {{ own }}’s Own</button>
         <button class="btn" data-focus @click="closeModal(null)">Done</button>
       </div>
@@ -117,6 +118,19 @@ async function save(changes) {
   try { d.value = props.recomp ? await call('recomps:setSettings', { id: props.recomp, changes }) : await call('gamesettings:set', { romId: props.romId, changes }); toast('Saved. It applies the next time the game starts.', 'ok', 2500, 'mdiTune'); }
   catch (e) { toast(e.message, 'error', 6000); }
   busy.value = false;
+}
+// Best for This Device (0.9.96, electron/bestSettings.js): what suits this device, shown first, saved like any pick
+async function best() {
+  busy.value = true;
+  const b = await call('gamesettings:best', { romId: props.romId }).catch((e) => ({ error: e.message }));
+  busy.value = false;
+  if (b?.error) return toast(b.error, 'error', 5000);
+  if (!b?.device) return toast('Cartridge has no suggestions for this emulator yet.', 'info', 3500, 'mdiAutoFix');
+  if (!b.changes.length) return toast(`Already set up well for ${b.device.name}.`, 'ok', 3500, 'mdiCheck');
+  const lines = b.changes.map((c) => `· ${c.label}: ${c.valueLabel}, ${c.why}`).join('\n');
+  const v = await choose({ title: `Best for ${b.device.name}`, message: `${b.device.kind ? `Cartridge sees ${b.device.kind}. ` : ''}For this game in ${b.emu}:\n${lines}\n\n“Back to ${own.value}’s Own” undoes it.`, options: [{ label: 'Use These', value: 'use', icon: 'mdiCheck' }, { label: 'Cancel', value: false, icon: 'mdiClose' }] });
+  reopen('best');
+  if (v === 'use') await save(b.changes.map((c) => ({ id: c.id, value: c.value })));
 }
 async function resetAll() { await save((d.value.items || []).filter((x) => x.game != null).map((x) => ({ id: x.id, value: null }))); }
 onMounted(async () => {
