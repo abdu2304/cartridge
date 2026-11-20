@@ -761,7 +761,8 @@ async function more() {
   if (v === 'path') { toast(installedPath.value, 'info', 5000, 'mdiFolder'); return; }
   if (v === 'cloudsaves') return cloudSaves();
   if (v === 'saves') {
-    const list = sv || [];
+    // 0.9.92: read here (the menu's own list lived in the function that built the menu, so this threw and the row did nothing)
+    const list = (await call('saves:forRom', { romId: Number(props.romId) }).catch(() => [])) || [];
     const p = await choose({ title: 'Saves on This Device', message: saveSyncOn() ? 'Cartridge Save Sync keeps these in step with RomM. A to copy where one is.' : 'Read only: Cartridge never changes a save. A to copy where it is.', options: list.map((x) => ({ label: x.emuName + (x.shared ? ' · Memory Card' : ''), sub: `${bytes(x.size || 0)} · changed ${ago(x.at)} · ${x.synced ? 'synced in ' + x.synced.label : 'not synced'}${x.conflicts ? ` · ${x.conflicts} conflict ${x.conflicts === 1 ? 'copy' : 'copies'} from two devices` : ''}`, value: x.path, icon: x.synced ? 'mdiSync' : 'mdiContentSaveOutline', raw: true })) });
     const x = list.find((y) => y.path === p);
     if (!x) return;

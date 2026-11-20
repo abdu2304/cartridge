@@ -196,15 +196,24 @@ const scheduler = require('./scheduler').createScheduler({ playing: () => !!(gam
 // a game Cartridge started as its own process (a PC port, 0.9.86, PC playtest: Bloodborne ran with Cartridge drawing
 // at about 95% of a core behind it): counted as our game running, so quiet mode and the scheduler's pause apply on
 // the desktop too, and Cartridge comes back when it ends, as for a game started through Steam
+let children = 0; // ports Cartridge started that are still open (0.9.92: one closing no longer ends "running" for another)
 function childRun(p, what) {
   // 0.9.87: game-run as for a game started through Steam, so the page shows it starting and nav.js gameEnded() takes
   // the pad back when it ends (0.9.86 left that out, and the controller did nothing in Cartridge after a port)
-  runOn = true; gameFocus.gameApp = null; gameFocus.endedAt = 0; log('game running', what); setAway('child', true); broadcast('game-run', { state: 'starting', port: what });
-  p.once('exit', () => { runOn = false; gameFocus.endedAt = Date.now(); log('game ended', what); setTimeout(() => RIPC.portFilesFollow().catch(() => {}), 3000); setAway('child', false); broadcast('game-run', { state: 'ended', port: what }); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500); });
+  children++; runOn = true; gameFocus.gameApp = null; gameFocus.endedAt = 0; log('game running', what); setAway('child', true); broadcast('game-run', { state: 'starting', port: what });
+  p.once('exit', () => {
+    children = Math.max(0, children - 1); log('game ended', what); setTimeout(() => RIPC.portFilesFollow().catch(() => {}), 3000);
+    if (children) return; // another port is still open
+    runOn = awayBy.run; gameFocus.endedAt = Date.now(); setAway('child', false); broadcast('game-run', { state: 'ended', port: what }); bringBack(); if (isGamescope()) setTimeout(steamFront, 1500);
+  });
 }
 // o.needles: what to look for instead of the game's own file (0.9.88: a PC port started through Steam, by its start script)
 function watchGameRun(romId, o = {}) {
   clearInterval(runT);
+  // 0.9.92: a watch replaced while its game was counted as running (another game started before the last one was
+  // seen to end) left "a game is running" set for good when the new one never showed: background jobs (library sync,
+  // Save Sync) then waited forever and Cartridge stayed quiet. The new watch starts from nothing running.
+  if (awayBy.run) { runOn = children > 0; setAway('run', false); }
   gameFocus.gameApp = null; gameFocus.endedAt = 0;
   const where = installedMap[romId];
   if (!o.needles && (!where || where === MARKED)) return;
@@ -237,7 +246,7 @@ function watchGameRun(romId, o = {}) {
     // while its game runs, so a freeze that takes everything down still leaves the last of it (emulator-runs/)
     if (vita && on && Date.now() - (copiedAt || 0) > 30000) { copiedAt = Date.now(); keepEmuLog('vita3k', require('./pkgInstall').vita3kLogFile(steamMgr.vita3kCommand?.()?.exe)); }
     if (!on && seen) {
-      clearInterval(runT); runOn = false; gameFocus.endedAt = Date.now(); log('game ended', romId); setAway('run', false); setTimeout(() => RIPC.portFilesFollow().catch(() => {}), 3000); // 0.9.90
+      clearInterval(runT); runOn = children > 0; gameFocus.endedAt = Date.now(); log('game ended', romId); setAway('run', false); setTimeout(() => RIPC.portFilesFollow().catch(() => {}), 3000); // 0.9.90
       broadcast('game-run', { state: 'ended', romId });
       saveSyncAfter(romId); // Cartridge Save Sync (0.9.51)
       bringBack();
@@ -1720,7 +1729,15 @@ function restorePending() {
   let list = []; try { list = JSON.parse(fs.readFileSync(PENDING_FILE, 'utf8')); } catch { return; }
   if (!Array.isArray(list) || !list.length) return;
   log('downloads: picking up', list.length, 'not finished last time');
-  for (const job of list) if (job?.romId != null) enqueue({ ...job, resumed: true });
+  for (const job of list) {
+    if (job?.romId == null) continue;
+    const { held, ...rest } = job;
+    if (!held) { enqueue({ ...rest, resumed: true }); continue; }
+    // paused or failed last time (0.9.92): back in the list as it was, waiting for Resume or Retry
+    if (queue.some((q) => q.romId === job.romId)) continue;
+    queue.push({ id: nextId++, speed: 0, total: rest.size || 0, addedAt: Date.now(), received: 0, error: null, ...rest, status: held === 'error' ? 'error' : 'cancelled', resumed: true });
+  }
+  emitQueue();
 }
 let emitTimer = null;
 function emitQueueThrottled() {
@@ -1892,12 +1909,16 @@ async function checkFile(file, f, it) {
   if (!want || HASH_BY_CONTENTS.has(path.extname(file).slice(1).toLowerCase())) return null;
   it.currentFile = 'Checking ' + path.basename(file);
   emitQueueThrottled();
-  const h = crypto.createHash(want[0]);
-  for await (const chunk of fs.createReadStream(file, { highWaterMark: 1 << 20 })) {
-    if (it.abort.signal.aborted) throw new Error('aborted');
-    h.update(chunk);
+  // 0.9.92: in a worker thread (hashWorker.js); read here it kept the main process busy for a big game's whole check
+  let got;
+  try { got = await require('./hashWorker').hashFile(file, want[0], { signal: it.abort.signal }); }
+  catch (e) {
+    if (e.message === 'aborted') throw e;
+    log('checksum worker failed, reading here', e.message);
+    const h = crypto.createHash(want[0]);
+    for await (const chunk of fs.createReadStream(file, { highWaterMark: 1 << 20 })) { if (it.abort.signal.aborted) throw new Error('aborted'); h.update(chunk); }
+    got = h.digest('hex');
   }
-  const got = h.digest('hex');
   return got === String(want[1]).toLowerCase() ? null : { why: 'hash', got };
 }
 // Damaged files are deleted, so Retry downloads them again instead of skipping them as complete.
@@ -5153,7 +5174,7 @@ const handlers = {
     // 0.9.65 (owner: KytyPS5's newest builds have no Linux file): an emulator marked gate is offered only while its
     // newest release carries a Linux build; it comes back by itself when one does. Copies already here stay listed.
     const G = require('./emuGet'), gated = new Set(), rows = emugetRows();
-    for (const c of G.CATALOG) for (const e of c.emus) if (e.gate && !rows.find((r) => r.key === c.key)?.emus.find((x) => x.id === e.id)?.installed && !(await linuxNow(e))) gated.add(e.id);
+    for (const c of G.CATALOG) for (const e of c.emus) if (e.gate && !rows.find((r) => r.key === c.key)?.emus.find((x) => x.id === e.id)?.installed && !linuxNow(e)) gated.add(e.id);
     return rows.map((c) => ({ ...c, emus: c.emus.filter((e) => !gated.has(e.id)) }));
   },
   // where emulators live (0.9.17): this device and every mounted drive, with free space
@@ -6243,6 +6264,7 @@ function online() {
     dataDir: USER_DATA, log,
     installed: () => { try { return steamMgr.installedEmulators().map((x) => x.id.split('@')[0]); } catch { return []; } },
     running: (emu) => require('./raLogin').running().has(emu),
+    runningAll: () => require('./raLogin').running(),
     // a portable copy keeps its settings beside the program (portable/, user/)
     portable: (emu) => { try { return steamMgr.installedEmulators().filter((x) => x.id.split('@')[0] === emu && x.path).flatMap((x) => { const d = path.dirname(x.path); return [path.join(d, 'portable'), path.join(d, 'user'), path.join(d, 'user', 'config')]; }).filter((d) => isDir(d)); } catch { return []; } },
     versionOf: (emu) => { try { return steamMgr.installedEmulators().find((x) => x.id.split('@')[0] === emu)?.version || null; } catch { return null; } },
@@ -6485,18 +6507,32 @@ for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) process.on(sig, () => { if (i
 // does an emulator's newest release carry a Linux build (0.9.65, KytyPS5)? Its newest release only, never an older
 // one: a Linux build from three days ago isn't what its project ships now. Remembered 6 hours; an unanswered check
 // keeps the last answer (shown when never known).
-const linuxSeen = {};
-async function linuxNow(e) {
+// 0.9.92 (owner: Settings → Emulators took very long to open): the list waited for GitHub every time it was asked for
+// until one answer came (a second when GitHub refuses at once, far longer on a slow or rate-limited connection), and
+// a failed ask was never remembered. Now the list is answered at once from what was last known (kept in
+// linux-builds.json across starts; never asked = offered), and GitHub is asked in the background, at most every
+// 6 hours, a failed ask not again for 10 minutes. emu-get-changed tells an open page when an answer changed it.
+const LINUX_FILE = path.join(USER_DATA, 'linux-builds.json');
+const linuxSeen = loadJson(LINUX_FILE, {});
+const linuxAsking = new Set();
+function linuxNow(e) {
   const k = linuxSeen[e.id];
-  if (k && Date.now() - k.at < 6 * 3600e3) return k.ok;
-  try {
-    const U = require('./emuUpdates');
-    const rel = await require('./github').release(e.repo, { pre: e.pre });
-    const ok = !!U.pickAsset(rel?.assets, e.asset);
-    linuxSeen[e.id] = { ok, at: Date.now() };
-    if (!ok) log(`${e.id}: its newest release (${rel?.tag || 'none'}) has no Linux build, so it isn't offered`);
-    return ok;
-  } catch { return k ? k.ok : true; }
+  if ((!k || Date.now() - k.at > 6 * 3600e3) && !(k?.failedAt && Date.now() - k.failedAt < 10 * 60e3) && !linuxAsking.has(e.id)) {
+    linuxAsking.add(e.id);
+    (async () => {
+      try {
+        const U = require('./emuUpdates');
+        const rel = await require('./github').release(e.repo, { pre: e.pre });
+        const ok = !!U.pickAsset(rel?.assets, e.asset), was = linuxSeen[e.id]?.ok;
+        linuxSeen[e.id] = { ok, at: Date.now() };
+        if (!ok) log(`${e.id}: its newest release (${rel?.tag || 'none'}) has no Linux build, so it isn't offered`);
+        if (was !== ok && !(was === undefined && ok)) broadcast('emu-get-changed', { id: e.id });
+      } catch { linuxSeen[e.id] = { ...(linuxSeen[e.id] || { ok: true, at: 0 }), failedAt: Date.now() }; }
+      linuxAsking.delete(e.id);
+      saveJson(LINUX_FILE, linuxSeen);
+    })();
+  }
+  return k ? k.ok : true;
 }
 
 

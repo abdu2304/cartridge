@@ -64,6 +64,7 @@ const LINKS = {
 const UNSUPPORTED = {
   android: 'Android apps aren’t emulated by Cartridge (Waydroid runs them as apps)',
   windows: 'PC games run through Steam and Proton, not an emulator',
+  switch2: 'No Switch 2 emulator plays games yet; Cartridge keeps its games in their own folder until one does',
   ngage: 'EKA2L1 needs each game installed into it first; Cartridge can’t start N-Gage games by file yet',
 };
 

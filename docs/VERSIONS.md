@@ -716,3 +716,15 @@ layout and "do not change" list stay in `CLAUDE.md`.
 - Not Verified: Project Reignition (GameJolt), Nebula (NTFS streams under Wine; docs/recipes.md).
 - tools/release/prerelease.js (missing since 0.9.71's update channels; every nightly failed at Version and channel): `updateChannels.nextVersion`/`nameOf` stamp version, versionName and releaseName, publish releaseType prerelease, nightly notes from the commits since the last stable tag into release-notes-nightly.md.
 - emuStart `plainEnv` and childEnv `clean` set DISABLE_AUTO_UPDATES=1: pkgforge AppImages (Vita3K's newest) carry bin/10-self-updater.hook, silent on the first start, then a kdialog "Allow … to check for updates?" in the background from the second; the hook's own switch. Found when crawl's fake homes left two Vita3K AppImages waiting on that dialog, which then made game settings' Vita3K test see Vita3K as running.
+
+## 0.9.92 · Quick on Its Feet (14 Nov 2026; handover Part 39)
+- Audit by tools (ESLint no-undef and friends over electron/, src/ incl. Vue templates, test/, tools/; every `call()` channel, event, modal type and `go()` target cross-checked) plus `test/e2e/timings.js` (in e2e.yml): the handlers pages call when they open, timed in the real app in every setup with 300 Steam shortcuts and 2,000 games; a warm call over 1.5 s fails.
+- `emuget:list` never waits for GitHub: `linuxNow(e)` answers from `linux-builds.json` (never asked = offered) and asks in the background (6 h, a failed ask not again for 10 min), `emu-get-changed` re-reads an open EmuGet. It was 1 s per call in the container and unbounded on a slow or rate-limited connection (the owner's slow Settings → Emulators).
+- Game.vue `saves` action read `sv`, a variable of the function that builds the menu: ReferenceError, the row did nothing.
+- Downloads: `dlPending.pick` keeps paused (`cancelled`) and failed items as `held` (with `error`, `received`); `restorePending` puts them back in that state without starting them.
+- `watchGameRun`: a watch replaced while `awayBy.run` was set resets it (`runOn = children > 0`); `childRun` counts open ports (`children`), so one closing doesn't end "running" for another.
+- `electron/hashWorker.js` (`hashFile(file, algo, { signal })`, worker thread, 4 MB reads): `checkFile` uses it, reading in place only if the worker can't start. Tested in `test/hashWorker.test.js`.
+- steamManager: `environment().running` is a getter (`runningNow`, 1 s memo), `readShortcuts` is cached per file by size, mtime and inode (`scMemo`, callers get copies). onlinePlay `list()` reads running processes once (`ctx.runningAll`). recompsIpc `dolphinTool` reads `detect.flatpakApps()` instead of `flatpak info`.
+- The tracked `node_modules` symlink (from a WIP commit) is out of the repository.
+- Switch 2 (owner): `platformMap` sends `switch-2`, `switch2`, `switch_2` to the folder `switch2` (ES-DE's name), `emuGet.ESDE` makes it with the other console folders, `localLibrary` names it, `cee.UNSUPPORTED.switch2` says why nothing plays it and `cide.BY_NAME` lists it. Tested in `test/switch2.test.js`.
+

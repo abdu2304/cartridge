@@ -66,12 +66,13 @@ function createOnline(ctx) {
   function list() {
     const have = new Set(ctx.installed?.() || []);
     const emus = [], issues = [];
+    const runSet = ctx.runningAll?.() || null; // 0.9.92: every process read once for the list, not once per emulator
     for (const a of ADAPTERS) {
       const dir = dirOf(a);
       // installed: found by Cartridge's scan, or its settings file is here (a distro package, a copy elsewhere)
       if (!have.has(a.emu) && !(dir && exists(path.join(dir, a.files.main[0])))) continue;
       const t = dir ? texts(a, dir) : {};
-      const running = !!ctx.running?.(a.emu);
+      const running = runSet ? runSet.has(a.emu) : !!ctx.running?.(a.emu);
       // a settings file the emulator itself can't read (RPCS3's EmuDeck leftover): Repair is offered before anything is written
       let damaged = null; if (dir && t.main != null) try { damaged = a.precheck?.({ dir, ctx }) || null; } catch {}
       // a kind with `status` reports what it can't change (Pretendo's console files): { ready, note }
