@@ -242,7 +242,7 @@ const RA = { label: 'RetroArch', fp: ['org.libretro.RetroArch'], bin: ['retroarc
 const KNOWN = () => ({ ...EMU, retroarch: RA });
 const lc = (s) => String(s || '').toLowerCase();
 // Emulators that take the same arguments: a close guess inside a family still launches
-const FAMILY = { eden: 'yuzu', citron: 'yuzu', yuzu: 'yuzu' };
+const FAMILY = { eden: 'yuzu', lichii: 'yuzu', citron: 'yuzu', yuzu: 'yuzu' };
 // conf: 3 certain (its own id or program name inside it), 2 high, 1 a guess to confirm, 0 unknown
 function identify({ desktop, desktopFile, appstream, upd, fileName, exec } = {}) {
   const scores = [];

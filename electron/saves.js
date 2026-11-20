@@ -90,6 +90,7 @@ function ryujinxIndex(file) {
 // where each emulator keeps its data, relative to home, per install kind (EmuDeck installs use the same)
 const DATA = {
   eden: ['.local/share/eden', '.var/app/dev.eden_emu.eden/data/eden'],
+  lichii: ['.local/share/lichii'], // 0.9.98
   citron: ['.local/share/citron', '.var/app/org.citron_emu.citron/data/citron'],
   yuzu: ['.local/share/yuzu', '.var/app/org.yuzu_emu.yuzu/data/yuzu'],
   sudachi: ['.local/share/sudachi', '.var/app/org.sudachi_emu.sudachi/data/sudachi'],
@@ -108,8 +109,8 @@ const DATA = {
   xenia: ['.local/share/Xenia', 'Documents/Xenia'],
   retroarch: ['.config/retroarch', '.var/app/org.libretro.RetroArch/config/retroarch'],
 };
-const NAMES = { eden: 'Eden', citron: 'Citron', yuzu: 'yuzu', sudachi: 'Sudachi', suyu: 'suyu', torzu: 'torzu', ryujinx: 'Ryujinx', rpcs3: 'RPCS3', ppsspp: 'PPSSPP', vita3k: 'Vita3K', shadps4: 'shadPS4', pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', cemu: 'Cemu', azahar: 'Azahar', xenia: 'Xenia', retroarch: 'RetroArch' };
-const SWITCH = ['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu'];
+const NAMES = { eden: 'Eden', lichii: 'Lichii', citron: 'Citron', yuzu: 'yuzu', sudachi: 'Sudachi', suyu: 'suyu', torzu: 'torzu', ryujinx: 'Ryujinx', rpcs3: 'RPCS3', ppsspp: 'PPSSPP', vita3k: 'Vita3K', shadps4: 'shadPS4', pcsx2: 'PCSX2', duckstation: 'DuckStation', dolphin: 'Dolphin', cemu: 'Cemu', azahar: 'Azahar', xenia: 'Xenia', retroarch: 'RetroArch' };
+const SWITCH = ['eden', 'lichii', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu'];
 const hex = (n, w) => /^[0-9A-F]+$/i.test(n) && n.length === w;
 
 // one emulator data folder -> its saves: { emu, kind, path, label, keys: { switch, serial, title, gc, n3ds, wiiu, x360, name }, shared, serials }
@@ -456,7 +457,7 @@ const idNorm = (s) => String(s || '').toUpperCase().replace(/[-_.\s]/g, '');
 // 0.9.59 (owner: PS4 saves not matched): when nothing else matched, a title that is the start of exactly one game's
 // title on the save's own console ("Bloodborne" and "Bloodborne: The Old Hunters Edition", or the other way round),
 // at least 6 letters; two or more games that fit match none (no guessing). The save is marked loose.
-const EMU_CONSOLE = { shadps4: /^ps4$/, rpcs3: /^ps3$/, ppsspp: /^psp$/, vita3k: /^(psvita|vita)$/, pcsx2: /^ps2$/, duckstation: /^(psx|ps1|ps)$/, dolphin: /^(ngc|gc|gamecube|wii)$/, cemu: /^wiiu$/, azahar: /^(3ds|n3ds|new-nintendo-3ds)$/, xenia: /^xbox-?360$/, ...Object.fromEntries(['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu', 'ryujinx'].map((e) => [e, /^switch$/])) };
+const EMU_CONSOLE = { shadps4: /^ps4$/, rpcs3: /^ps3$/, ppsspp: /^psp$/, vita3k: /^(psvita|vita)$/, pcsx2: /^ps2$/, duckstation: /^(psx|ps1|ps)$/, dolphin: /^(ngc|gc|gamecube|wii)$/, cemu: /^wiiu$/, azahar: /^(3ds|n3ds|new-nintendo-3ds)$/, xenia: /^xbox-?360$/, ...Object.fromEntries(['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu', 'ryujinx'].map((e) => [e, /^switch$/])), lichii: /^(switch|switch-?2|switch_2|nintendo-switch-2|ns2)$/ };
 function looseMatch(title, emu, games) {
   const re = EMU_CONSOLE[emu], t = norm(title);
   if (!re || t.length < 6) return null;

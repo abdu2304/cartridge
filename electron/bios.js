@@ -39,7 +39,8 @@ function table(roots, steamRoots, extra = []) {
     ps2: { label: 'PS2 BIOS', any: (f, n) => /\.(bin|rom0)$/i.test(n) && size(f) >= 4 * 1024 * 1024 - 1 && size(f) <= 4 * 1024 * 1024 + 1024 * 1024, where: [path.join(HOME, '.config/PCSX2/bios'), var_('net.pcsx2.PCSX2', 'config/PCSX2/bios'), ...eb, ...sub(ra, 'pcsx2/bios')] },
     ps3: { label: 'PS3 firmware', test: () => [path.join(HOME, '.config/rpcs3/dev_flash/vsh/module/vsh.self'), var_('net.rpcs3.RPCS3', 'config/rpcs3/dev_flash/vsh/module/vsh.self'), ...roots.map((r) => path.join(r, 'storage/rpcs3/dev_flash/vsh/module/vsh.self'))].find((f) => size(f) > 0), hint: 'Install it in RPCS3: File → Install Firmware.' },
     psvita: { label: 'Vita firmware', test: () => [path.join(HOME, '.local/share/Vita3K/Vita3K/vs0/vsh'), path.join(HOME, '.local/share/Vita3K/vs0/vsh'), ...roots.map((r) => path.join(r, 'storage/Vita3K/vs0/vsh'))].find(isDir), hint: 'Install it in Vita3K: File → Install Firmware.' },
-    switch: { label: 'Switch keys (prod.keys)', files: ['prod.keys'], where: [...keysIn(['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu']), path.join(HOME, '.config/Ryujinx/system'), var_('io.github.ryubing.Ryujinx', 'config/Ryujinx/system'), var_('org.ryujinx.Ryujinx', 'config/Ryujinx/system'), ...eb] },
+    ns2: { label: 'Switch 2 keys (prod.keys)', files: ['prod.keys'], where: [...keysIn(['lichii']), ...eb] }, // 0.9.98: Lichii, an Eden fork: keys in its data folder's keys/
+    switch: { label: 'Switch keys (prod.keys)', files: ['prod.keys'], where: [...keysIn(['eden', 'lichii', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu']), path.join(HOME, '.config/Ryujinx/system'), var_('io.github.ryubing.Ryujinx', 'config/Ryujinx/system'), var_('org.ryujinx.Ryujinx', 'config/Ryujinx/system'), ...eb] },
     segacd: { label: 'Sega CD BIOS', files: ['bios_CD_U.bin', 'bios_CD_E.bin', 'bios_CD_J.bin'], where: [...ra, ...eb] },
     saturn: { label: 'Saturn BIOS', files: ['sega_101.bin', 'mpr-17933.bin', 'saturn_bios.bin'], where: [...ra, ...sub(ra, 'kronos'), ...eb], optional: true },
     dreamcast: { label: 'Dreamcast BIOS', files: ['dc_boot.bin'], where: [path.join(HOME, '.local/share/flycast/data'), var_('org.flycast.Flycast', 'data/flycast/data'), ...sub(ra, 'dc'), ...eb], optional: true },
@@ -74,7 +75,7 @@ function status(key, { roots = [], steamRoots = [], extra = [] } = {}) {
 function place(key, src, { roots = [], steamRoots = [] } = {}) {
   const t = table(roots, steamRoots, [])[key === 'megacd' ? 'segacd' : key];
   if (!t || t.test || !isDir(src)) return [];
-  const names = new Set([...(t.files || []), ...(key === 'switch' ? ['title.keys'] : []), ...(key === 'nds' ? ['bios9.bin', 'firmware.bin'] : [])].map((f) => f.toLowerCase()));
+  const names = new Set([...(t.files || []), ...(key === 'switch' || key === 'ns2' ? ['title.keys'] : []), ...(key === 'nds' ? ['bios9.bin', 'firmware.bin'] : [])].map((f) => f.toLowerCase()));
   const files = ls(src).filter((n) => names.has(n.toLowerCase()) || (t.any && t.any(path.join(src, n), n)));
   const out = [];
   for (const d of [...new Set(t.where)]) {
@@ -91,7 +92,7 @@ function place(key, src, { roots = [], steamRoots = [] } = {}) {
 // nand/system/Contents/registered, as their Install Firmware puts it)
 function switchNandDirs() {
   const out = [];
-  for (const n of ['eden', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu']) {
+  for (const n of ['eden', 'lichii', 'citron', 'yuzu', 'sudachi', 'suyu', 'torzu']) {
     for (const d of [path.join(process.env.XDG_DATA_HOME || path.join(HOME, '.local/share'), n), var_(`org.${n}_emu.${n}`, 'data', n), var_(`dev.${n}_emu.${n}`, 'data', n)]) if (isDir(d)) out.push(path.join(d, 'nand/system/Contents/registered'));
   }
   return [...new Set(out)];

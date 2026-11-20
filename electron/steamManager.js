@@ -860,7 +860,7 @@ module.exports = function createSteamManager(ctx) {
   }
 
   // ---------------------------------------------------------------- library view
-  const SHORT = { ps2: 'PS2', ps3: 'PS3', ps4: 'PS4', psx: 'PS1', psp: 'PSP', psvita: 'Vita', gc: 'GameCube', wii: 'Wii', wiiu: 'Wii U', switch: 'Switch', n3ds: '3DS', nds: 'DS', n64: 'N64', snes: 'SNES', nes: 'NES', gba: 'GBA', gb: 'Game Boy', gbc: 'GBC', xbox: 'Xbox', xbox360: 'Xbox 360', dreamcast: 'Dreamcast', genesis: 'Genesis', megadrive: 'Mega Drive', saturn: 'Saturn' };
+  const SHORT = { ps2: 'PS2', ps3: 'PS3', ps4: 'PS4', psx: 'PS1', psp: 'PSP', psvita: 'Vita', gc: 'GameCube', wii: 'Wii', wiiu: 'Wii U', switch: 'Switch', ns2: 'Switch 2', n3ds: '3DS', nds: 'DS', n64: 'N64', snes: 'SNES', nes: 'NES', gba: 'GBA', gb: 'Game Boy', gbc: 'GBC', xbox: 'Xbox', xbox360: 'Xbox 360', dreamcast: 'Dreamcast', genesis: 'Genesis', megadrive: 'Mega Drive', saturn: 'Saturn' };
   // 0.9.68 (owner: the app dims, then no controller): every installed game's real path was asked of the disk on each
   // Steam match (play time, last played, collections), thousands of lstat calls on the main thread; asked once per 5 min
   let realMemo = new Map(), realAt = Date.now();

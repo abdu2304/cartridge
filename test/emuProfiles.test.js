@@ -18,6 +18,7 @@ const EXPECT = {
   "dolphin": 'y own own own own own dolphin own - y',
   "duckstation": 'y own own own own own duckstation - own y',
   "eden": 'y own own yuzu own - switch - own y',
+  "lichii": 'y own yuzu yuzu - - switch - own y', // 0.9.98: Switch 2 (an Eden fork)
   "flycast": 'y - - - own - - - own y',
   "kronos": 'y - - - - - - - - -',
   "kytyps5": 'y - - - - - - - own y',

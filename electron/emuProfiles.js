@@ -12,8 +12,8 @@
 const E = require('./emulators');
 
 // forks and builds that use another emulator's folders and formats
-const FAMILY = { eden: 'yuzu', citron: 'yuzu', sudachi: 'yuzu', suyu: 'yuzu', torzu: 'yuzu', primehack: 'dolphin', xeniaedge: 'xenia', 'xenia-win': 'xenia', citra: 'azahar' };
-const SWITCH = /^(eden|citron|yuzu|ryujinx)$/;
+const FAMILY = { eden: 'yuzu', lichii: 'yuzu', citron: 'yuzu', sudachi: 'yuzu', suyu: 'yuzu', torzu: 'yuzu', primehack: 'dolphin', xeniaedge: 'xenia', 'xenia-win': 'xenia', citra: 'azahar' };
+const SWITCH = /^(eden|lichii|citron|yuzu|ryujinx)$/;
 // how an add-on for this emulator is laid out (addonInstall.plan's kinds): the rule book in modRules.js (0.9.52);
 // 'plain' = no rule, and Cartridge then installs nothing
 function modKind(id, source) { return require('./modRules').kindOf(id, source) || 'plain'; }

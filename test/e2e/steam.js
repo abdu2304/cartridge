@@ -15,7 +15,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const G = (id, slug, disp, file, size = 4000) => ({ id, plat: [100 + id - 600, slug, disp], name: `${disp} Test`, files: [[file.replace('%', `${disp} Test`), Buffer.alloc(size, id & 255)]] });
 const GAMES = [G(600, 'snes', 'SNES', '%.sfc'), G(601, 'n64', 'N64', '%.z64'), G(602, 'gba', 'GBA', '%.gba'), G(603, 'psx', 'PS1', '%.chd'), G(604, 'ps2', 'PS2', '%.iso'), G(605, 'psp', 'PSP', '%.iso'),
   G(606, 'ps3', 'PS3', '%.iso'), G(607, 'ngc', 'GameCube', '%.iso'), G(608, 'wii', 'Wii', '%.iso'), G(609, 'wiiu', 'Wii U', '%.wua'), G(610, 'switch', 'Switch', '%.nsp'), G(611, '3ds', '3DS', '%.3ds'),
-  G(612, 'nds', 'DS', '%.nds'), G(613, 'dc', 'Dreamcast', '%.chd'), G(614, 'xbox', 'Xbox', '%.iso'), G(615, 'xbox360', 'Xbox 360', '%.iso')];
+  G(612, 'nds', 'DS', '%.nds'), G(613, 'dc', 'Dreamcast', '%.chd'), G(614, 'xbox', 'Xbox', '%.iso'), G(615, 'xbox360', 'Xbox 360', '%.iso'), G(616, 'switch-2', 'Switch 2', '%.nsp')]; // 0.9.98: Switch 2 into ns2, started by Lichii
 
 (async () => {
   const srv = await mock.start({ games: 10, extra: { games: GAMES } });
@@ -52,6 +52,11 @@ const GAMES = [G(600, 'snes', 'SNES', '%.sfc'), G(601, 'n64', 'N64', '%.z64'), G
       }
       check(`${name}: every planned game in Steam starts its emulator with its own file`, !bad.length, `${planned.size} in Steam${bad.length ? ' · ' + bad.join(' | ') : ''}`);
       // a console left out must say why (no emulator), never a shortcut that can't start
+      // 0.9.98: where Lichii is installed (the AppImage setup), the Switch 2 game starts in it, fullscreen, with its own file
+      if (name === 'appimages') {
+        const e = sc.find((x) => (x.AppName || x.appname) === 'Switch 2 Test'), line = e ? String(e.Exe || e.exe) + ' ' + String(e.LaunchOptions || e.launchoptions) : '';
+        check('appimages: the Switch 2 game starts in Lichii with -f -g and its file', /Lichii\.AppImage/.test(line) && /-f -g "[^"]*Switch 2 Test\.nsp"/.test(line) && /\/ns2\//.test(line), line.replace(new RegExp(home, 'g'), '~').slice(0, 200));
+      }
       check(`${name}: games left out say why`, missing.every((m) => !/no reason/.test(m)), missing.join(' | ') || 'none left out');
       check(`${name}: no script errors`, !errors.length, errors.slice(0, 3).join(' | '));
     } catch (e) { check(`${name}: run finished`, false, e.message); }

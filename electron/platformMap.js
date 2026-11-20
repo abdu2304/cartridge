@@ -84,10 +84,13 @@ module.exports = {
   'sfam': ['sfc', 'snes'],
   'supervision': ['supervision'],
   'switch': ['switch'],
-  // Switch 2 (0.9.92): RomM/IGDB call it switch-2; its own folder, as ES-DE names it, so its games never mix with Switch's
-  'switch-2': ['switch2'],
-  'switch2': ['switch2'],
-  'switch_2': ['switch2'],
+  // Switch 2 (0.9.92; owner, 0.9.98: the folder is "ns2"): RomM/IGDB call it switch-2; its own folder, so its games never
+  // mix with Switch's. Lichii plays it. 0.9.92's "switch2" is left out on purpose: an empty one made then would win
+  'switch-2': ['ns2'],
+  'switch2': ['ns2'],
+  'switch_2': ['ns2'],
+  'nintendo-switch-2': ['ns2'],
+  'ns2': ['ns2'],
   'tic-80': ['tic80'],
   'turbografx16--1': ['pcengine', 'tg16'],
   'tg16': ['pcengine', 'tg16'],

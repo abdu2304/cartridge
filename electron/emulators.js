@@ -18,6 +18,10 @@ const EMU = {
   eden: { label: 'Eden', scripts: ['eden.sh'], app: /eden/i, fp: ['dev.eden_emu.eden'], bin: ['eden'], pre: ['vblank_mode=0'], args: '-f -g "{ROM}"', for: ['switch'] },
   citron: { label: 'Citron', scripts: ['citron.sh'], app: /citron/i, fp: ['org.citron_emu.citron'], bin: ['citron'], pre: ['vblank_mode=0'], args: '-f -g "{ROM}"', for: ['switch'] },
   yuzu: { label: 'Yuzu', scripts: ['yuzu.sh', 'suyu.sh'], app: /(yuzu|sudachi|suyu)/i, fp: ['org.yuzu_emu.yuzu', 'org.sudachi_emu.sudachi'], bin: ['yuzu', 'sudachi', 'suyu'], pre: ['vblank_mode=0'], args: '-f -g "{ROM}"', for: ['switch'] },
+  // 0.9.98 (owner: "the main emulator for Nintendo Switch 2"): Lichii, an Eden fork (zortos293/Lichii); Eden's command
+  // line, its own folders (~/.config/lichii, ~/.local/share/lichii). Its release builds also run Switch games: offered
+  // for Switch after Eden and the rest. The tar.gz build is a lichii/lichii folder
+  lichii: { label: 'Lichii', app: /lichii/i, dir: ['lichii', 'Lichii'], bin: ['lichii'], pre: ['vblank_mode=0'], args: '-f -g "{ROM}"', for: ['ns2', 'switch'] },
   ryujinx: { label: 'Ryujinx', scripts: ['ryujinx.sh'], app: /ryujinx/i, fp: ['io.github.ryubing.Ryujinx', 'org.ryujinx.Ryujinx'], bin: ['Ryujinx', 'ryujinx'], args: '--fullscreen "{ROM}"', for: ['switch'] },
   rpcs3: { label: 'RPCS3', scripts: ['rpcs3.sh'], app: /rpcs3/i, fp: ['net.rpcs3.RPCS3'], bin: ['rpcs3'], args: '--no-gui "{ROM}"', for: ['ps3'] },
   shadps4: { label: 'shadPS4', scripts: ['shadps4.sh'], app: /shadps4/i, fp: ['net.shadps4.shadPS4'], bin: ['shadps4'], args: '-g "{ROM}"', qtArgs: '-d -g "{ROM}"', for: ['ps4'] },
@@ -155,7 +159,7 @@ const DISC_FIRST = ['m3u', 'cue', 'gdi', 'cdi', 'ccd', 'mds', 'chd'];
 const GAME_EXT = {
   psx: ['pbp', 'iso', 'img', 'ecm', 'bin'], ps2: ['iso', 'cso', 'zso', 'bin', 'gz'], psp: ['iso', 'cso', 'pbp', 'elf'],
   xbox: ['iso', 'xiso'], xbox360: ['iso', 'xex', 'zar'], gc: ['rvz', 'iso', 'gcm', 'gcz', 'ciso', 'wbfs'], wii: ['rvz', 'wbfs', 'iso', 'wia', 'gcz'],
-  switch: ['xci', 'nsp', 'nsz', 'xcz'], n3ds: ['3ds', 'cci', 'cia', 'cxi', 'app', 'zcci'], nds: ['nds', 'dsi', 'zip', '7z'],
+  switch: ['xci', 'nsp', 'nsz', 'xcz'], ns2: ['xci', 'nsp', 'nsz', 'xcz'], n3ds: ['3ds', 'cci', 'cia', 'cxi', 'app', 'zcci'], nds: ['nds', 'dsi', 'zip', '7z'],
   nes: ['nes', 'fds', 'unf', 'unif', 'zip', '7z'], fds: ['fds', 'zip'], famicom: ['nes', 'fds', 'zip'], snes: ['sfc', 'smc', 'fig', 'swc', 'bs', 'zip', '7z'], sfc: ['sfc', 'smc', 'zip'],
   gb: ['gb', 'zip', '7z'], gbc: ['gbc', 'gb', 'zip', '7z'], gba: ['gba', 'zip', '7z'], n64: ['z64', 'n64', 'v64', 'ndd', 'zip', '7z'], virtualboy: ['vb', 'zip'],
   genesis: ['md', 'gen', 'smd', 'bin', 'zip', '7z'], megadrive: ['md', 'gen', 'smd', 'bin', 'zip', '7z'], mastersystem: ['sms', 'zip'], gamegear: ['gg', 'zip'], sega32x: ['32x', 'zip'], 'sg-1000': ['sg', 'zip'],

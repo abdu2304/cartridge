@@ -39,6 +39,7 @@ const REPOS = {
   // as a pre-release (its build.yml), so GitHub's "latest" skipped them all and found an old release without Linux
   shadps4: { repo: 'shadps4-emu/shadps4-qtlauncher', asset: /linux-qt.*\.zip$|qt.?launcher.*\.AppImage$/i, zipped: /\.AppImage$/i, pre: true, preOnly: true },
   // 0.9.21 (owner: "couldn't check"): Eden's server is git.eden-emu.dev; .org kept as the older name
+  lichii: { repo: 'zortos293/Lichii', asset: /lichii-linux-x86_64-pgo\.AppImage$/i }, // 0.9.98: the PGO build, the one its releases recommend
   eden: { repo: 'eden-emulator/Releases', asset: /(amd64|x86_64|x64|steamdeck|rog).*\.AppImage$|linux.*\.AppImage$/i, forge: [['https://git.eden-emu.dev', 'eden-emu/eden'], ['https://git.eden-emu.org', 'eden-emu/eden']], first: 'forge' },
   // 0.9.49 (owner: "Citron has no update source? look for it"): Citron publishes on its own Forgejo (git.citron-emu.org,
   // Citron/Emulator; the old lower-case path kept), and its Linux AppImages are rebuilt on GitHub by pkgforge-dev,
@@ -100,7 +101,9 @@ const run = (cmd, args, timeout = 60000) => new Promise((resolve, reject) => exe
 // version text from a tag or file name: v2.3.120 -> 2.3.120
 // 0.9.37: a build number after the version counts (RPCS3's 0.0.38-18166 is newer than 0.0.38-18101: every
 // RPCS3 build shares 0.0.38, so updates were never seen); it becomes the last part, 0.0.38.18166
-const verOf = (s) => { const m = String(s || '').match(/(\d+(?:\.\d+){1,3})(?:-(\d{4,})(?!\d|-\d{2}-))?/); return m ? m[1] + (m[2] ? '.' + m[2] : '') : ''; };
+const verOf = (s) => { const b = /^build[- ]?(\d+)$/i.exec(String(s || '').trim()); if (b) return b[1] + '.0'; const m = String(s || '').match(/(\d+(?:\.\d+){1,3})(?:-(\d{4,})(?!\d|-\d{2}-))?/); return m ? m[1] + (m[2] ? '.' + m[2] : '') : ''; };
+// a release tagged only by its build number (0.9.98, Lichii's build-341): shown as "build 341", compared as 341
+const buildOf = (t) => { const m = /^build[- ]?(\d+)$/i.exec(String(t || '').trim()); return m ? 'build ' + m[1] : ''; };
 // 0.9.63 (owner's log: DuckStation "-> latest"): a rolling release with no number anywhere is named by its build date
 const dated = (d) => (d && !isNaN(Date.parse(d)) ? 'build ' + new Date(d).toISOString().slice(0, 10) : '');
 const cmpVer = (a, b) => { const x = verOf(a).split('.').map(Number), y = verOf(b).split('.').map(Number); for (let i = 0; i < Math.max(x.length, y.length); i++) { const d = (x[i] || 0) - (y[i] || 0); if (d) return d; } return 0; };
@@ -177,7 +180,7 @@ async function latestRelease(id, { fetchImpl, spec, file, channel } = {}) {
   for (const t of tries) {
     let rel = null; try { rel = await t(); } catch (e) { lastErr = e; continue; }
     const asset = pickAsset(rel?.assets, r.asset, file);
-    if (asset) return { id, fallback: r.fallback || null, version: verOf(rel.tag) || verOf(asset.name) || dated(asset.date || rel.date), tag: rel.tag, name: asset.name, url: asset.url, size: asset.size, date: asset.date || rel.date, folder: !!r.wholeFolder, dirBuild: r.dirBuild || null, zipped: r.wholeFolder || r.dirBuild ? null : /\.(zip|tar\.gz|tgz)$/i.test(asset.name) ? r.zipped || /\.AppImage$/i : null };
+    if (asset) return { id, fallback: r.fallback || null, version: buildOf(rel.tag) || verOf(rel.tag) || verOf(asset.name) || dated(asset.date || rel.date), tag: rel.tag, name: asset.name, url: asset.url, size: asset.size, date: asset.date || rel.date, folder: !!r.wholeFolder, dirBuild: r.dirBuild || null, zipped: r.wholeFolder || r.dirBuild ? null : /\.(zip|tar\.gz|tgz)$/i.test(asset.name) ? r.zipped || /\.AppImage$/i : null };
   }
   if (lastErr) throw lastErr; // every source refused: say why
   return null;

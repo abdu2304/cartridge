@@ -480,7 +480,8 @@ function pickGameFile(g, dir) {
   const ok = (n) => (g.ext || []).some((e) => n.toLowerCase().endsWith(e.toLowerCase()));
   let st; try { st = fs.statSync(dir); } catch { return { problems: ['That isn’t there any more.'] }; }
   // a game that can also be its unpacked files (an extracted Xbox disc): a folder that holds them is used as it is
-  if (st.isDirectory() && g.unpack && g.has?.length && g.has.every((f) => fs.existsSync(path.join(dir, f)))) return { folder: dir };
+  // 0.9.98 asFolder: a port that takes either one file or an unpacked folder (Triforce: a .nup, or romfs and exefs)
+  if (st.isDirectory() && (g.unpack || g.asFolder) && g.has?.length && g.has.every((f) => fs.existsSync(path.join(dir, f)))) return { folder: dir };
   if (st.isFile()) return ok(dir) ? { file: dir } : { problems: [`It needs ${g.ext.join(', ')}; that’s a ${path.extname(dir) || 'file with no ending'}.`] };
   let names = []; try { names = fs.readdirSync(dir).filter((n) => ok(n) && fs.statSync(path.join(dir, n)).isFile()).sort(); } catch {}
   if (!names.length) return { problems: [`There’s no ${g.ext.join(', ')} in it.`] };
