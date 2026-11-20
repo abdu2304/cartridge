@@ -1442,7 +1442,8 @@ onUpdated(() => { const st = flipState; flipState = null; if (st) Flip.from(st, 
    focus zoom's transform alone. It runs with light effects too (one layer, nothing redrawn); Reduce Motion, arranging
    and Cartridge being away (body.away) stop it. */
 .st-art.st-pan { inset: -4%; will-change: translate, scale; } /* moved by v-ambient: 2.5% 1% to -2.5% -1% and scale 1 to 1.05 */
-:global(body.motion-reduce .st-art.st-pan), .st-board.editing .st-art.st-pan { animation: none; translate: none; scale: none; will-change: auto; }
+:global(body.motion-reduce .st-art.st-pan) { animation: none; translate: none; scale: none; will-change: auto; }
+.st-board.editing .st-art.st-pan { animation: none; translate: none; scale: none; will-change: auto; }
 @media (prefers-reduced-motion: reduce) { .st-art.st-pan { animation: none; } }
 /* 0.9.52: a soft band at the top too, so the tile's label reads on a bright cover */
 .st-scrim { position: absolute; inset: 0; z-index: -1; background: linear-gradient(to bottom, rgba(8, 9, 12, 0.6) 0%, rgba(8, 9, 12, 0.25) 16%, transparent 32%), linear-gradient(to top, rgba(8, 9, 12, 0.92) 0%, rgba(8, 9, 12, 0.55) 38%, rgba(8, 9, 12, 0.08) 72%), linear-gradient(to right, rgba(8, 9, 12, 0.5), transparent 60%); }

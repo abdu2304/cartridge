@@ -9,12 +9,12 @@ const ids = (r, level) => r.items.filter((x) => x.level === level).map((x) => x.
 
 test('a game with nothing wrong passes, every check listed as fine', () => {
   const r = L.game(fine);
-  assert.deepStrictEqual([r.ok, r.bad, r.warn], [true, 0, 0]);
+  assert.deepStrictEqual([r.clear, r.bad, r.warn], [true, 0, 0]);
   assert.deepStrictEqual(ids(r, 'ok'), ['files', 'bios', 'emu', 'steam']);
 });
 test('files gone, no emulator, not in Steam: each a problem with its own fix, worst first', () => {
   const r = L.game({ ...fine, fileThere: false, emu: null, pre: [], steam: { there: true, inSteam: false } });
-  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.clear, false);
   assert.deepStrictEqual(r.items.map((x) => [x.id, x.level, x.fix?.id]), [['files', 'bad', 'redownload'], ['emu', 'bad', 'emu-page'], ['steam', 'bad', 'steam-add']]);
   assert.match(r.items[0].text, /~\/Emulation\/roms\/ps2\/Okami\.chd/); // the home folder is never spelled out
 });
@@ -32,7 +32,7 @@ test('a PS3 package not installed yet, a shortcut waiting, an outdated one, one 
   assert.deepStrictEqual(L.game({ ...fine, missing: 'Install it in RPCS3 first.', pkg: 'RPCS3' }).items[0], { id: 'install', level: 'bad', text: 'Install it in RPCS3 first.', fix: { id: 'pkg-install', label: 'Install It in RPCS3' } });
   assert.strictEqual(L.game({ ...fine, steam: { there: true, inSteam: false, queued: 'add' } }).items[0].fix.id, 'steam-apply');
   const old = L.game({ ...fine, steam: { there: true, inSteam: true, ours: true, outdated: true } });
-  assert.deepStrictEqual([old.ok, old.warn, old.items[0].fix.id], [true, 1, 'steam-refresh']);
+  assert.deepStrictEqual([old.clear, old.warn, old.items[0].fix.id], [true, 1, 'steam-refresh']);
   assert.strictEqual(L.game({ ...fine, steam: { there: true, inSteam: true, ours: true, exeGone: true } }).items[0].fix.id, 'steam-refresh');
   assert.strictEqual(L.game({ ...fine, steam: { there: true, inSteam: true, ours: false, exeGone: true } }).items[0].fix.id, 'emu-page'); // your own shortcut is never rewritten
   assert.strictEqual(L.game({ ...fine, steam: { there: false } }).items[0].fix, undefined);
@@ -40,9 +40,9 @@ test('a PS3 package not installed yet, a shortcut waiting, an outdated one, one 
 
 const port = { name: 'Bloodborne', game: 'Bloodborne', home: '/home/p', installed: true, verified: true, programThere: true, copy: '/home/p/Emulation/roms/ps4/CUSA00900', copyThere: true, ready: true, windows: true, runner: 'Proton 11.0', prefixThere: true, scriptsThere: true, steam: { inSteam: true } };
 test('a port that is ready passes; out of Steam is a note, not a stop', () => {
-  assert.deepStrictEqual([L.port(port).ok, L.port(port).warn], [true, 0]);
+  assert.deepStrictEqual([L.port(port).clear, L.port(port).warn], [true, 0]);
   const r = L.port({ ...port, steam: { inSteam: false } });
-  assert.deepStrictEqual([r.ok, r.warn, r.items[0].fix.id], [true, 1, 'port-steam']);
+  assert.deepStrictEqual([r.clear, r.warn, r.items[0].fix.id], [true, 1, 'port-steam']);
   assert.strictEqual(L.port({ ...port, steam: { inSteam: false, queued: true } }).items[0].fix, undefined);
 });
 test('a port: not installed, no copy, copy on an unplugged drive, no Proton, no prefix, not set up', () => {
@@ -50,10 +50,15 @@ test('a port: not installed, no copy, copy on an unplugged drive, no Proton, no 
   assert.strictEqual(L.port({ ...port, copy: null }).items[0].id, 'copy');
   assert.match(L.port({ ...port, copyThere: false }).items[0].text, /~\/Emulation\/roms\/ps4\/CUSA00900/);
   const noProton = L.port({ ...port, runner: null });
-  assert.deepStrictEqual([noProton.ok, noProton.items[0].id, noProton.items[0].fix], [false, 'proton', undefined]);
+  assert.deepStrictEqual([noProton.clear, noProton.items[0].id, noProton.items[0].fix], [false, 'proton', undefined]);
   assert.deepStrictEqual(L.port({ ...port, prefixThere: false }).items.filter((x) => x.level === 'bad').map((x) => [x.id, x.fix.id]), [['prefix', 'port-setup']]); // one line, not "prefix" and "not set up"
   assert.deepStrictEqual(L.port({ ...port, ready: false }).items.filter((x) => x.level === 'bad').map((x) => x.id), ['setup']);
-  assert.strictEqual(L.port({ ...port, windows: false, runner: null }).ok, true); // a Linux build needs no Proton
+  assert.strictEqual(L.port({ ...port, windows: false, runner: null }).clear, true); // a Linux build needs no Proton
   const link = L.port({ name: 'Zelda 64', installed: true, verified: false, programThere: true, ready: false, steam: { inSteam: true } });
-  assert.deepStrictEqual([link.ok, link.warn], [true, 1]); // a link port sets itself up on its first start
+  assert.deepStrictEqual([link.clear, link.warn], [true, 1]); // a link port sets itself up on its first start
+});
+
+test('a game not downloaded yet says only that, with Download It', () => {
+  const r = L.game({ ...fine, installed: false });
+  assert.deepStrictEqual([r.clear, r.items.length, r.items[0].id, r.items[0].fix.id], [false, 1, 'files', 'download']);
 });

@@ -33,6 +33,25 @@ test('no selector continues after :global(...) in a .vue file', () => {
   assert.deepStrictEqual(bad, []);
 });
 
+// The same trap the other way (0.9.93, caught before release): `.a .b, :global(.c .d)` in one rule compiled to
+// `.a .b, .c` and turned the whole app's text dark in pad mode. A :global() selector goes in a rule of its own.
+test('no rule in a .vue file mixes :global(...) and scoped selectors', () => {
+  const bad = [];
+  for (const f of SRC.filter((x) => x.endsWith('.vue'))) {
+    const t = fs.readFileSync(f, 'utf8');
+    const css = t.slice(t.indexOf('<style')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/<\/?style[^>]*>/g, '');
+    for (const m of css.matchAll(/([^{}]+)\{/g)) {
+      const parts = []; let depth = 0, cur = '';
+      for (const ch of m[1]) { if (ch === '(') depth++; if (ch === ')') depth--; if (ch === ',' && !depth) { parts.push(cur.trim()); cur = ''; } else cur += ch; }
+      parts.push(cur.trim());
+      const sel = parts.filter((p) => p && !p.startsWith('@') && !/^(from|to|\d+%)$/.test(p));
+      const g = sel.filter((p) => p.startsWith(':global(')).length;
+      if (g && g < sel.length) bad.push(`${rel(f)}: ${m[1].trim().replace(/\s+/g, ' ').slice(0, 140)}`);
+    }
+  }
+  assert.deepStrictEqual(bad, []);
+});
+
 // Nothing moves the whole screen on its own (0.9.49: a slow whole-screen zoom made people feel sick): the drift of the
 // page art and the header picture may pan a little, never change scale.
 test('background and header drift never zoom', () => {

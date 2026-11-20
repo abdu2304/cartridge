@@ -1048,6 +1048,32 @@ module.exports = function createSteamManager(ctx) {
     out.lastCollections = (cfg().lastCollections || {})[out.console] || null;
     return out;
   }
+  // Launch Check (0.9.93): the facts launchCheck.game turns into what could stop this game starting. Read only, one game,
+  // one shortcuts read (cached); never throws (a fact it can't read is left out rather than guessed)
+  function launchFacts(romId) {
+    const env = environment(), rom = ctx.romById(romId);
+    const g = installedGames().find((x) => x.rom.id === romId);
+    const key = g?.key || consoleOfRom(romId);
+    let t = null; try { t = key ? templateForGame(romId, key) : null; } catch {}
+    const file = g?.file || null, fileThere = !!(file && exists(file));
+    let missing = null; try { if (t && fileThere) missing = buildLaunch(g.rom, file, t).missing || null; } catch {}
+    const steam = { there: !!env.account, inSteam: false, ours: false, queued: null, outdated: false, exeGone: false };
+    if (env.account && g) {
+      const sc = inSteamIndex(shortcutsOf(env.account))(g) || liveHit(g);
+      steam.inSteam = !!sc; steam.ours = !!(sc && reg[sc.appid]);
+      steam.queued = queue.add.some((a) => a.romId === romId) ? 'add' : null;
+      if (sc?.exe) {
+        const fpId = /(^|\/)flatpak$/.test(sc.exe) ? (String(sc.lo || '').match(/run\s+(?:--\S+\s+)*(\S+)/) || [])[1] : null;
+        steam.exeGone = fpId ? !flatpakApps().includes(fpId) : (!exists(String(sc.exe).replace(/^"|"$/g, '')) || isTempMount(sc.exe));
+      }
+      if (steam.ours && t) steam.outdated = reg[sc.appid]?.sig !== sigOf(t, (cfg().modes || {})[key]);
+    }
+    return {
+      name: rom?.name || g?.rom?.name || 'This game', console: SHORT[key] || g?.platform?.display_name || key || '', home: HOME, installed: !!g, file, fileThere,
+      emu: t ? { label: t.how === 'yours' ? 'Your emulator' : t.emu ? labelOf(t.emu) : path.basename(String(t.exe || '')) || 'Its emulator' } : null,
+      pre: t ? preflight(key, t) : [], start: null, missing, pkg: missing ? (key === 'ps3' ? 'RPCS3' : key === 'psvita' ? 'Vita3K' : null) : null, steam,
+    };
+  }
   // ---------------------------------------------------------------- queue
   // Ready to play (0.9.21, owner: start the Steam shortcut Cartridge made, straight from Cartridge):
   // Steam's own way when its live connection is on, else steam://rungameid (a shortcut's 64-bit game id)
@@ -2057,7 +2083,7 @@ module.exports = function createSteamManager(ctx) {
     liveInfo: async () => { const env = environment(); if (!env.account) return { on: false, flag: false }; return { on: await live.available(env.account.root), flag: live.flagOn(env.account.root) }; },
     liveEnable: () => { const env = environment(); if (!env.account) throw new Error('Steam was not found.'); fs.writeFileSync(path.join(env.account.root, live.FLAG), ''); return true; },
     installedEmulators, addRomToCollections, onDownloaded, onDeleted, lastStatus, writeScript, startupReport, forRom, fixCollections, played, playtime, warmSerials, steamRoots, refreshArt,
-    play, scanEmulators, rpcs3Command, vita3kCommand, setupOverview, confirm, markFork, useFile, health, healthFix, movedEmulators, setupReport, syncConsoleCollections, fillCollections, consoleCollection, collectionsReview, collectionsApply, forksAll, frontRunning, preflight: (key) => preflight(key, templateFor(key)),
+    play, launchFacts, scanEmulators, rpcs3Command, vita3kCommand, setupOverview, confirm, markFork, useFile, health, healthFix, movedEmulators, setupReport, syncConsoleCollections, fillCollections, consoleCollection, collectionsReview, collectionsApply, forksAll, frontRunning, preflight: (key) => preflight(key, templateFor(key)),
     candidatesFor: (key) => az(candidates(key).map((c) => ({ id: c.id, label: c.label, sub: shortPath(c.t.how === 'flatpak' ? c.t.from : c.t.exe), fork: !!c.fork }))),
     // one game's own Target, Start in and Launch options (console page, 0.9.15); null goes back
     setGameTemplate: (romId, t) => { const c = cfg(); c.gameTemplates ||= {}; if (t) c.gameTemplates[romId] = parseTemplate(t); else delete c.gameTemplates[romId]; ctx.saveConfig(); return true; },

@@ -7,7 +7,7 @@
 //
 // item: { id, level: 'bad' | 'warn' | 'ok', text, fix?: { id, label, ...what the fix needs } }
 //   bad  = it won't start (Play asks first); warn = it starts, something may be off; ok = checked and fine
-// fix ids (run by src/launchFix.js): steam-add, steam-apply, steam-refresh, flatpak-allow, bios, pkg-install,
+// fix ids (run by src/launchFix.js): download, steam-add, steam-apply, steam-refresh, flatpak-allow, bios, pkg-install,
 //   emu-page, copy, port-sheet, port-setup, redownload
 
 const short = (p, home) => (home && p ? String(p).replace(home, '~') : String(p || ''));
@@ -15,14 +15,15 @@ const ORDER = { bad: 0, warn: 1, ok: 2 };
 function finish(items) {
   const list = items.filter(Boolean).sort((a, b) => ORDER[a.level] - ORDER[b.level]);
   const n = (l) => list.filter((x) => x.level === l).length;
-  return { ok: !n('bad'), bad: n('bad'), warn: n('warn'), items: list };
+  return { clear: !n('bad'), bad: n('bad'), warn: n('warn'), items: list };
 }
 
-// f: { name, console, home, file, fileThere, emu: { label } | null, pre: preflight items, start: { ok, reason } | null,
+// f: { name, console, home, installed, file, fileThere, emu: { label } | null, pre: preflight items, start: { ok, reason } | null,
 //      missing, pkg, steam: { there, inSteam, ours, queued, outdated, exeGone } }
 function game(f) {
   const items = [], con = f.console || 'this console';
-  // its files
+  // its files (a game not downloaded yet: only that, the rest follows once it's here)
+  if (f.installed === false) return finish([{ id: 'files', level: 'bad', text: 'It isn’t on this device yet.', fix: { id: 'download', label: 'Download It' } }]);
   if (!f.file) items.push({ id: 'folder', level: 'bad', text: 'Cartridge doesn’t know where this game’s folder is.', fix: { id: 'steam-add', label: 'Pick Its Folder' } });
   else if (!f.fileThere) items.push({ id: 'files', level: 'bad', text: `Its files aren’t at ${short(f.file, f.home)} any more. If they’re on another drive, plug it in.`, fix: { id: 'redownload', label: 'Download It Again' } });
   else items.push({ id: 'files', level: 'ok', text: 'Its files are on this device.' });

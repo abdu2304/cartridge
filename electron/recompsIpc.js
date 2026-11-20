@@ -625,6 +625,23 @@ module.exports = function recompsIpc(m) {
   },
   'recomps:settings': ({ id }) => recomps().settings(id),
   'recomps:setSettings': async ({ id, changes }) => { const d = await recomps().setSettings(id, changes); log('verified settings', id, (changes || []).map((x) => `${x.id}=${x.value}`).join(' ')); return d; },
+  // Launch Check (0.9.93): what could stop a port starting, as launchCheck.port reads it. Read only.
+  'recomps:launchCheck': ({ id }) => {
+    const R = recomps(), e = R.byId(id), rec = R.record(id), there = (p) => !!(p && fs.existsSync(p));
+    if (!e) throw new Error('That port isn’t in the list any more.');
+    const verified = e.from === 'verified', windows = rec?.kind === 'windows';
+    let runner = null;
+    if (windows) try { const r = require('./protonRunner').find({ roots: (() => { try { return m.steamMgr.steamRoots(); } catch { return []; } })() }); runner = r ? r.name || r.kind : null; } catch {}
+    let sc = null; try { sc = rec ? portShortcut(id, e.starts) : null; } catch {}
+    return { verified, ...require('./launchCheck').port({
+      name: e.name, game: e.recipe?.game?.title || e.game || '', home: os.homedir(), installed: !!rec, verified,
+      programThere: !!rec && there(rec.program), copy: rec?.game?.path || null, copyThere: there(rec?.game?.path),
+      ready: !!rec && (R.ready(id) || !!(e.recipe?.setup && R.baseReady(id))), windows, runner,
+      prefixThere: !!rec && there(path.join(rec.prefix || path.join(rec.dir, '.cartridge', 'proton'), 'pfx', 'drive_c')),
+      scriptsThere: !verified || !rec || (rec.starts || []).every((s) => !s.script || there(s.script)),
+      steam: { inSteam: !!sc, queued: !sc && !!m.steamMgr.recompQueued?.(id) },
+    }) };
+  },
   'recomps:runner': () => { const r = require('./protonRunner').find({ roots: (() => { try { return m.steamMgr.steamRoots(); } catch { return []; } })() }); return r ? { kind: r.kind, name: r.name } : null; },
   };
   return { handlers, recomps, ssUnits, recompTrophies, watchFromSteam, healGames, portFilesFollow };

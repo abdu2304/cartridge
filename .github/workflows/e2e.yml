@@ -39,6 +39,8 @@ jobs:
         run: xvfb-run -a node test/e2e/starting.js
       - name: How long each page's data takes
         run: xvfb-run -a node test/e2e/timings.js
+      - name: Launch Check before Play, in each setup
+        run: xvfb-run -a node test/e2e/launchcheck.js
       - name: Every console's games into Steam, in each setup
         run: xvfb-run -a node test/e2e/steam.js
       - name: Online Play on and off for ten emulators

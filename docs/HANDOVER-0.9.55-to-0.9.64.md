@@ -295,6 +295,9 @@ What a recomp is here: a native PC port of a console game (static recompilation 
 
 ## Part 9. Open items, unverified work and what to ask the owner
 
+**From 0.9.93 (Launch Check, Part 40):**
+- Launch Check's fixes have only run against fake homes. Ask the owner to try Allow Access (Flatpak), Add to Steam and Get It from RomM from the pop-up on the device, and whether any game that starts fine is wrongly stopped by it.
+
 **From the second PC session (0.9.88, Part 35):**
 - Cartridge's own controller on the desktop with a Steam Controller: Steam made no virtual pad for it (started from Steam or not, Wayland or X11). Ask the owner whether a button press makes it appear; if not, Steam's per-game controller setting for Cartridge's shortcut is the next thing to look at.
 - Buttons pressed in a port started through Steam (detected, not pressed), and Cartridge's pad after such a port, desktop and Game Mode.
@@ -943,4 +946,13 @@ Owner: a day of a stronger model with a full allowance; "not just bug hunt I wan
 - Checked: `npm test` 435, `vite build`, e2e run (28), setups (21), starting (8), steam (15), online (40), saves (13), game settings (99), add-ons (61), links (23), timings (all handlers under 1.5 s, all but one under 100 ms), crawl (all four setups; no script errors; the only messages are no-internet ones and the rows that open a system file dialog or file manager, which the crawl can't see. Once, in the "none" setup, the window closed late in the run; a second full run of that setup didn't repeat it. Watch for it).
 - Not checked on a device: all of it. Ask the owner whether Settings → Emulators now opens at once on the PC and the handheld.
 - Next batches: Launch Check (`electron/launchCheck.js` and its test are written, not wired), Phone Remote, Captures Gallery, Best Settings, design smoothing.
+- Released 20 Nov 2026 (the session ran on past the 14th). The nightly had failed every night since 0.9.71: `tools/release/prerelease.js` was never committed (`.gitignore` `release/` hid `tools/release/`); committed separately right after.
+
+## Part 40. 0.9.93 · Launch Check (20 Nov 2026)
+Batch 2 of the owner's "make it OP" list. Before Play, Cartridge checks what would stop the game or port starting and offers the fix for each, instead of a black screen or an emulator error after the fact. Code and reasons: docs/VERSIONS.md 0.9.93.
+- Owner-visible: Play with something in the way opens a Launch Check pop-up (worst first, a fix on each line, Play Anyway, Cancel). Nothing in the way: Play is exactly as before. A game's More → Launch Check shows it any time. Ports are checked too (copy, Proton, prefix, setup, Steam).
+- Caught before release by looking at real-app screenshots, not by the audits: a CSS rule in the new pop-up darkened the whole app's text with a controller (a `:global()` beside a scoped selector). Fixed, and a designRules test now refuses that pattern. Lesson: screenshot new pop-ups in the real app (homes.js) in Plain, Glass and Light, not only the audit harness.
+- Checked: `npm test` 437, `vite build`, `test/e2e/launchcheck.js` in all four setups (real downloads, Steam Apply, the real Play button, B), audit:ui (0 cut texts, nothing low-contrast in the pop-up), real-app screenshots in Plain, Glass and Light.
+- Not checked on a device: all of it. Ask the owner: press Play on a game not in Steam, and on a Flatpak emulator's game, on the handheld and the TV; do the fixes do what they say?
+- Next batches: Phone Remote, Captures Gallery, Best Settings for This Device, design smoothing (note: `.status.bad` pills are pale in Light everywhere).
 
