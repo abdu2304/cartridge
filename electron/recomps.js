@@ -102,14 +102,17 @@ function pickBuild(assets, e = {}) {
   const w = (wr && list.find((x) => wr.test(x.name))) || C.pickWindows(list);
   return w ? { asset: w, kind: 'windows' } : null;
 }
-// "github:owner/name" | "gitlab:owner/name" -> { host, repo }
+// "github:owner/name" | "gitlab:owner/name" | "forgejo:<server>/owner/name" -> { host, repo, server? }
+// (0.9.99: Forgejo and Gitea servers a project runs itself, Triforce's git.triforceproject.com)
 function repoOf(s) {
+  const f = /^forgejo:([a-z0-9.-]+\.[a-z]{2,})\/([\w.-]+\/[\w.-]+)$/i.exec(String(s || ''));
+  if (f) return { host: 'forgejo', server: f[1].toLowerCase(), repo: f[2] };
   const m = /^(github|gitlab):([\w.-]+\/[\w.-]+)$/.exec(String(s || ''));
   return m ? { host: m[1], repo: m[2] } : null;
 }
 function projectUrl(e) {
   const r = repoOf(e?.repo);
-  return r ? `https://${r.host}.com/${r.repo}` : e?.site || null;
+  return r ? (r.server ? `https://${r.server}/${r.repo}` : `https://${r.host}.com/${r.repo}`) : e?.site || null;
 }
 // a project's releases: GitHub (github.js, its API else its pages) or GitLab's API. want(assets) picks the newest
 // release that has a build this device can use (a project whose newest build failed for Linux still gives its last)
@@ -119,6 +122,13 @@ async function releaseOf(e, { pre = false, fetchImpl } = {}) {
   const want = (assets) => !!pickBuild(assets, e);
   if (r.host === 'github') return require('./github').release(r.repo, { pre, want, ...(fetchImpl ? { fetchImpl } : {}) });
   const f = fetchImpl || require('./webFetch');
+  // a project that only ever publishes pre-releases (Triforce): its newest, rather than nothing on the stable channel
+  const choose = (all) => { const ok = all.filter((x) => pre || !x.pre), use = ok.length ? ok : all; return use.find((x) => want(x.assets)) || use[0] || null; };
+  if (r.host === 'forgejo') {
+    const res = await f(`https://${r.server}/api/v1/repos/${r.repo}/releases?limit=10`, { headers: { 'User-Agent': 'Cartridge', Accept: 'application/json' }, signal: AbortSignal.timeout(20000) });
+    if (!res.ok) throw new Error(`${r.server} answered ${res.status}.`);
+    return choose((await res.json()).filter((x) => !x.draft).map((x) => ({ tag: x.tag_name, date: x.published_at || x.created_at || '', pre: !!x.prerelease, assets: (x.assets || []).map((a) => ({ name: a.name, url: a.browser_download_url, size: a.size || 0 })) })));
+  }
   const res = await f(`https://gitlab.com/api/v4/projects/${encodeURIComponent(r.repo)}/releases?per_page=10`, { headers: { 'User-Agent': 'Cartridge' }, signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`GitLab answered ${res.status}.`);
   const all = (await res.json()).filter((x) => !x.upcoming_release).map((x) => ({ tag: x.tag_name, date: x.released_at || x.created_at || '', pre: /(pre|beta|alpha|rc|nightly)/i.test(x.tag_name), assets: (x.assets?.links || []).map((l) => ({ name: l.name || l.url.split('/').pop(), url: l.direct_asset_url || l.url, size: 0 })) }));

@@ -1001,3 +1001,8 @@ Owner: "Lichii will be the main emulator for Nintendo Switch 2 on Cartridge ... 
 - "Bake it in": Lichii isn't bundled inside Cartridge's AppImage (160 MB, its own updates, and Cartridge's rule that it never ships emulators); it's one press in Get Emulators, from Lichii's own releases. Ask the owner if they meant bundling.
 - Not checked on a device: Lichii running a game, and Triforce's build (it needs the owner's copy, about 60 GB and 10 to 45 minutes, and Vulkan 1.3 with mesh shaders). triforceproject.com itself couldn't be read from the container (network policy); a "cartridge" environment allowing it was created for later sessions.
 
+## Part 46. 0.9.99 · Triforce from its own server (22 Nov 2026)
+Owner sent the Triforce site ("the most recent is the website") and asked to allow it: git.triforceproject.com, triforceproject.com and dl.triforceproject.com were added to the owner's Default cloud environment. Triforce now installs from the official releases (v0.6.0, its Linux AppImage), not loteran's older fork. Code and reasons: docs/VERSIONS.md 0.9.99.
+- For e2e in the container: a fake home needs `/root/.pki` copied in to trust the proxy, and downloads still can't run there (Node fetch in the download worker ignores the proxy). Real devices are unaffected.
+- Not checked on a device: the build and Play (needs the owner's copy, about 60 GB, 10 to 45 minutes).
+
