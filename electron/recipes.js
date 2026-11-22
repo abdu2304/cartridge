@@ -39,7 +39,7 @@ function validate(r) {
   for (const at of todo) bad.push(`${at} is TODO`);
   if (!/^[a-z0-9][a-z0-9-]{1,40}$/.test(r.id || '')) bad.push('id');
   if (!r.name) bad.push('name');
-  if (!/^github:[\w.-]+\/[\w.-]+$/.test(r.repo || '')) bad.push('repo');
+  if (!/^github:[\w.-]+\/[\w.-]+$/.test(r.repo || '') && !/^forgejo:[a-z0-9.-]+\.[a-z]{2,}\/[\w.-]+\/[\w.-]+$/i.test(r.repo || '')) bad.push('repo'); // 0.9.99: or a project's own Forgejo
   if (!r.game?.console || !r.game?.title) bad.push('game');
   if (r.game?.kind && !['folder', 'folder-or-pkg', 'file', 'none'].includes(r.game.kind)) bad.push('game kind');
   if (r.game?.unpack && r.game.unpack !== 'xiso') bad.push('game unpack');

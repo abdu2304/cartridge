@@ -33,7 +33,9 @@ test('Triforce takes a .nup or its romfs and exefs folder, builds into its own f
   assert.deepStrictEqual(R.validate(r), []);
   assert.strictEqual(r.game.console, 'ns2');
   const b = r.builds[0];
-  assert.ok(new RegExp(b.asset).test('Triforce-v0.3.7-linux.1-x86_64.AppImage'));
+  for (const n of ['Triforce-v0.6.0-x86_64.AppImage', 'Triforce-v0.5.2-linux-test-x86_64.AppImage']) assert.ok(new RegExp(b.asset).test(n), n);
+  assert.ok(!new RegExp(b.asset).test('TriforceSetup.exe') && !new RegExp(b.asset).test('Triforce-Tools.zip'));
+  assert.strictEqual(r.repo, 'forgejo:git.triforceproject.com/triforce/downloads');
   assert.deepStrictEqual(b.args, ['--play', '{dir}/game']);
   assert.ok(b.prepare.cmd.includes('--cli') && b.prepare.cmd.includes('{gamePosix}') && b.prepare.done === '{dir}/game/image.bin');
   const fs = require('fs'), os = require('os'), path = require('path');
@@ -47,4 +49,20 @@ test('Triforce takes a .nup or its romfs and exefs folder, builds into its own f
     assert.strictEqual(R.checkGame(r, e).ok, false); // neither: says what it needs
     fs.rmSync(e, { recursive: true });
   } finally { fs.rmSync(d, { recursive: true, force: true }); }
+});
+
+test('a project’s own Forgejo: its releases read, and only pre-releases still give the newest (Triforce)', async () => {
+  const RC = require('../electron/recomps');
+  assert.deepStrictEqual(RC.repoOf('forgejo:git.triforceproject.com/triforce/downloads'), { host: 'forgejo', server: 'git.triforceproject.com', repo: 'triforce/downloads' });
+  assert.strictEqual(RC.repoOf('forgejo:not a server/x/y'), null);
+  const r = require('../electron/recipes/triforce.json');
+  let asked = '';
+  const fetchImpl = async (u) => { asked = u; return { ok: true, json: async () => [
+    { tag_name: 'v0.6.0', prerelease: true, published_at: '2026-11-20T10:00:00Z', assets: [{ name: 'TriforceSetup.exe', browser_download_url: 'https://x/TriforceSetup.exe' }, { name: 'Triforce-v0.6.0-x86_64.AppImage', browser_download_url: 'https://git.triforceproject.com/triforce/downloads/releases/download/v0.6.0/Triforce-v0.6.0-x86_64.AppImage', size: 280e6 }] },
+    { tag_name: 'v0.5.2', prerelease: true, published_at: '2026-11-19T10:00:00Z', assets: [] },
+  ] }; };
+  const rel = await RC.releaseOf(r, { pre: false, fetchImpl });
+  assert.strictEqual(asked, 'https://git.triforceproject.com/api/v1/repos/triforce/downloads/releases?limit=10');
+  assert.strictEqual(rel.tag, 'v0.6.0');
+  assert.strictEqual(RC.pickBuild(rel.assets, r).asset.name, 'Triforce-v0.6.0-x86_64.AppImage');
 });
