@@ -1,8 +1,5 @@
-## Cartridge 0.9.99 · Triforce from Its Own Server
-
-### Changed
-- **Triforce comes from the Triforce project itself.** Cartridge now downloads Triforce from its official releases (v0.6.0 today), with its own Linux build, instead of an older unofficial copy on GitHub. Updates follow the official releases.
-- **Triforce's saves are found where newer versions keep them.** Backups and Save Sync look in its new save folder, and in the old one for games built with an earlier version.
+## Cartridge 0.9.100 · Longshot
 
 ### New
-- **PC ports from a project's own server.** Cartridge can now install and update ports from Forgejo servers that projects run themselves, not only GitHub and GitLab, including projects that only publish pre-releases.
+- **Longshot, a second way to play Ocarina of Time natively.** Longshot is another native PC version of the Switch 2 edition of The Legend of Zelda: Ocarina of Time, recompiled from your own copy. Every change it takes in is played on real hardware first, and it keeps a few differences of its own, such as nights as dark blue as on the Switch 2. It's a Cartridge Verified port in PC Ports, from Longshot's own releases. It takes the same copy as Triforce (your .nup, or your romfs and exefs folder), and Cartridge builds it the first time, then starts it straight away.
+- **Three ways to play one game.** The Switch 2 Ocarina of Time's page now offers Lichii, Triforce and Longshot. Each port keeps its own build and its own saves, so you can try both.
