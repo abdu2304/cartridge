@@ -66,3 +66,15 @@ test('a project’s own Forgejo: its releases read, and only pre-releases still 
   assert.strictEqual(rel.tag, 'v0.6.0');
   assert.strictEqual(RC.pickBuild(rel.assets, r).asset.name, 'Triforce-v0.6.0-x86_64.AppImage');
 });
+
+test('Longshot: the second Ocarina of Time port, from its own Forgejo, the same copy, its own folder and saves', () => {
+  const r = require('../electron/recipes/longshot.json'), t = require('../electron/recipes/triforce.json');
+  assert.deepStrictEqual(R.validate(r), []);
+  assert.strictEqual(r.repo, 'forgejo:git.magicbean.dev/MagicBeanDev/Longshot');
+  assert.deepStrictEqual([r.game.console, r.game.ids, r.game.ext, r.game.has], [t.game.console, t.game.ids, t.game.ext, t.game.has]); // the same game, either port
+  const b = r.builds[0], re = new RegExp(b.asset);
+  assert.ok(re.test('Longshot-nightly-763-0e32bc10-x86_64.AppImage') && re.test('Longshot-v1.0.0-x86_64.AppImage'));
+  assert.ok(!re.test('LongshotBuilder-nightly-763-0e32bc10-windows-x64.zip') && !re.test('SHA256SUMS'));
+  assert.deepStrictEqual([b.args, b.prepare.done, r.saves], [['--play', '{dir}/game'], '{dir}/game/image.bin', ['{data}/longshot']]);
+  assert.ok(b.prepare.cmd.join(' ').startsWith('{dir}/Longshot.AppImage --cli --prepare --game {gamePosix} --out {dir}/game'));
+});

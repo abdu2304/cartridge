@@ -1006,3 +1006,7 @@ Owner sent the Triforce site ("the most recent is the website") and asked to all
 - For e2e in the container: a fake home needs `/root/.pki` copied in to trust the proxy, and downloads still can't run there (Node fetch in the download worker ignores the proxy). Real devices are unaffected.
 - Not checked on a device: the build and Play (needs the owner's copy, about 60 GB, 10 to 45 minutes).
 
+## Part 47. 0.9.100 · Longshot (23 Nov 2026)
+Owner: "add support for a second type of recomp, Longshot, for Ocarina of Time". Longshot is a Hookshot fork where every change is played before it's merged; it now lives on git.magicbean.dev (git.magicbean.dev and git-cdn.magicbean.dev added to the owner's Default environment). A Cartridge Verified port beside Triforce: a Switch 2 Ocarina of Time's page offers both, and Lichii. Code and reasons: docs/VERSIONS.md 0.9.100.
+- Not checked on a device: its build and Play (the owner's copy; its first build also downloads its tools).
+
